@@ -17,22 +17,22 @@ services:
 
   facilitator:
     build:
-      context: ./apps/facilitator
+      context: ./facilitator
       dockerfile: Dockerfile
     ports:
       - "8787:8787"
-    env_file: ./apps/facilitator/.env
+    env_file: ./facilitator/.env
     depends_on:
       postgres:
         condition: service_healthy
 
   resource-server:
     build:
-      context: ./apps/resource-server
+      context: ./resource-server
       dockerfile: Dockerfile
     ports:
       - "3200:3200"
-    env_file: ./apps/resource-server/.env
+    env_file: ./resource-server/.env
     depends_on:
       facilitator:
         condition: service_started

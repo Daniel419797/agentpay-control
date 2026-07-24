@@ -36,8 +36,6 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
-    "apps/facilitator",
-    "apps/resource-server"
+    "node_modules"
   ]
 }

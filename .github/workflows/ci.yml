@@ -12,18 +12,25 @@ env:
 jobs:
   lint-typecheck:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
+          cache-dependency-path: dashboard/package-lock.json
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
 
   test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
     services:
       postgres:
         image: postgres:17-alpine
@@ -44,6 +51,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
+          cache-dependency-path: dashboard/package-lock.json
       - run: npm ci
       - run: npx prisma generate
         env:
@@ -63,12 +71,16 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
+          cache-dependency-path: dashboard/package-lock.json
       - run: npm ci
       - run: npm run build
         env:

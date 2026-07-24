@@ -10,3 +10,11 @@ prisma/dev.db
 playwright-report/
 test-results/
 tmp/
+dashboard/.next/
+dashboard/coverage/
+dashboard/playwright-report/
+dashboard/test-results/
+dashboard/.vercel/
+facilitator/node_modules/
+resource-server/node_modules/
+*.tsbuildinfo
