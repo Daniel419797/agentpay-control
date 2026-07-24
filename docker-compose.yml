@@ -15,5 +15,27 @@ services:
     volumes:
       - agentpay-postgres:/var/lib/postgresql/data
 
+  facilitator:
+    build:
+      context: ./apps/facilitator
+      dockerfile: Dockerfile
+    ports:
+      - "8787:8787"
+    env_file: ./apps/facilitator/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  resource-server:
+    build:
+      context: ./apps/resource-server
+      dockerfile: Dockerfile
+    ports:
+      - "3200:3200"
+    env_file: ./apps/resource-server/.env
+    depends_on:
+      facilitator:
+        condition: service_started
+
 volumes:
   agentpay-postgres:
