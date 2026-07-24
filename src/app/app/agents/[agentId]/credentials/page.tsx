@@ -1,0 +1,2 @@
+import { FormPage } from "@/components/workspace-page";
+export default function CredentialsPage() { return <FormPage title="Agent credentials" description="Issue scoped, secret-once API credentials."><div className="empty-state"><strong>No exposed secrets</strong><p>Credential values are displayed once and only hashes are stored.</p><button className="primary-button">Create credential</button></div></FormPage>; }

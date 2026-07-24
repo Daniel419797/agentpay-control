@@ -1,0 +1,1 @@
+{"name":"@agentpay/mcp","version":"0.1.0","type":"module","bin":{"agentpay-mcp":"src/server.mjs"}}

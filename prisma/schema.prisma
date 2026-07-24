@@ -1,0 +1,532 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum Role {
+  OWNER
+  OPERATOR
+  APPROVER
+  VIEWER
+  PROVIDER_ADMIN
+}
+
+enum AgentStatus {
+  PROVISIONING
+  ACTIVE
+  PAUSED
+  ERROR
+  ARCHIVED
+}
+
+enum CustodyType {
+  PLATFORM_MANAGED_TESTNET
+  KMS
+  SELF_CUSTODY
+  EXTERNAL_DELEGATED
+}
+
+enum SigningMode {
+  AUTONOMOUS_MANAGED
+  WALLET_CONFIRMATION
+  BOUNDED_DELEGATION
+}
+
+enum AccountStatus {
+  PROVISIONING
+  ACTIVE
+  LOCKED
+  ERROR
+}
+
+enum CredentialStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum PolicyStatus {
+  DRAFT
+  PUBLISHED
+  SUPERSEDED
+}
+
+enum OverLimitAction {
+  DENY
+  REQUIRE_APPROVAL
+}
+
+enum MerchantMode {
+  ANY
+  ALLOWLIST_ONLY
+}
+
+enum PaymentStatus {
+  CREATED
+  QUOTED
+  DENIED
+  APPROVAL_PENDING
+  REJECTED
+  EXPIRED
+  AUTHORIZED
+  SIGNING
+  SUBMITTED
+  SUBMISSION_UNKNOWN
+  SETTLED
+  SETTLEMENT_FAILED
+  FAILED_BEFORE_SUBMISSION
+  CANCELED
+}
+
+enum PolicyOutcome {
+  ALLOW
+  DENY
+  REQUIRE_APPROVAL
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  CANCELED
+  CONSUMED
+}
+
+enum ReservationStatus {
+  ACTIVE
+  CONSUMED
+  SETTLED
+  RELEASED
+  EXPIRED
+}
+
+enum AttemptStatus {
+  STARTED
+  SIGNED
+  SUBMITTED
+  CONFIRMED
+  FAILED
+  UNKNOWN
+}
+
+enum SettlementStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  UNKNOWN
+}
+
+enum AssetType {
+  NATIVE
+  TOKEN
+}
+
+enum ResourceCategory {
+  MARKET_DATA
+  FILE
+  AI_INFERENCE
+  WEB_RESEARCH
+}
+
+enum ResourceStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  UNAVAILABLE
+}
+
+enum ProviderStatus {
+  ACTIVE
+  PAUSED
+  UNAVAILABLE
+}
+
+enum AuditResult {
+  SUCCESS
+  FAILURE
+  DENIED
+}
+
+model User {
+  id          String       @id @default(uuid()) @db.Uuid
+  email       String?      @unique
+  displayName String
+  createdAt   DateTime     @default(now()) @db.Timestamptz
+  memberships Membership[]
+  identities  WalletIdentity[]
+}
+
+model Organization {
+  id                String             @id @default(uuid()) @db.Uuid
+  name              String
+  slug              String             @unique
+  status            OrganizationStatus @default(ACTIVE)
+  environmentMode   String             @default("TESTNET_ONLY")
+  killSwitchEnabled Boolean            @default(false)
+  timezone          String             @default("UTC")
+  createdAt         DateTime           @default(now()) @db.Timestamptz
+  updatedAt         DateTime           @updatedAt @db.Timestamptz
+  memberships       Membership[]
+  agents            Agent[]
+  policies          Policy[]
+  paymentIntents    PaymentIntent[]
+  providers         ResourceProvider[]
+  auditEvents       AuditEvent[]
+  outboxEvents      OutboxEvent[]
+}
+
+model Membership {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  userId         String       @db.Uuid
+  roles          Role[]
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+model WalletIdentity {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @db.Uuid
+  network        String
+  accountId      String
+  walletProvider String
+  verifiedAt     DateTime @default(now()) @db.Timestamptz
+  user           User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  @@unique([network, accountId])
+}
+
+model Agent {
+  id                    String              @id @default(uuid()) @db.Uuid
+  organizationId        String              @db.Uuid
+  name                  String
+  description           String?
+  status                AgentStatus         @default(PROVISIONING)
+  network               String              @default("hedera:testnet")
+  defaultAssetId        String?             @db.Uuid
+  effectivePolicyId     String?             @db.Uuid
+  createdAt             DateTime            @default(now()) @db.Timestamptz
+  updatedAt             DateTime            @updatedAt @db.Timestamptz
+  organization          Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  defaultAsset          Asset?              @relation(fields: [defaultAssetId], references: [id], onDelete: Restrict)
+  effectivePolicy       PolicyVersion?      @relation("EffectivePolicy", fields: [effectivePolicyId], references: [id], onDelete: SetNull)
+  accounts              PaymentAccount[]
+  credentials           AgentCredential[]
+  policies              Policy[]
+  paymentIntents        PaymentIntent[]
+  reservations          SpendReservation[]
+  @@index([organizationId, status])
+}
+
+model PaymentAccount {
+  id                  String        @id @default(uuid()) @db.Uuid
+  agentId             String        @db.Uuid
+  network             String
+  accountId           String
+  evmAddress          String?
+  publicKey           String?
+  encryptedKeyBundle String?
+  custodyType         CustodyType
+  signingMode         SigningMode
+  status              AccountStatus @default(PROVISIONING)
+  delegationExpiresAt DateTime?      @db.Timestamptz
+  syncedAt            DateTime?      @db.Timestamptz
+  createdAt           DateTime       @default(now()) @db.Timestamptz
+  updatedAt           DateTime       @updatedAt @db.Timestamptz
+  agent               Agent          @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  balances            BalanceSnapshot[]
+  @@unique([network, accountId])
+  @@index([agentId, status])
+}
+
+model Asset {
+  id            String       @id @default(uuid()) @db.Uuid
+  network       String
+  type          AssetType
+  hederaTokenId String?
+  symbol        String
+  name          String
+  decimals      Int
+  verified      Boolean      @default(false)
+  agents        Agent[]
+  balances      BalanceSnapshot[]
+  policies      PolicyVersion[]
+  quotes        PaymentQuote[]
+  reservations  SpendReservation[]
+  prices        ResourcePrice[]
+  settlements   Settlement[]
+  @@unique([network, symbol])
+  @@unique([network, hederaTokenId])
+}
+
+model BalanceSnapshot {
+  id               String         @id @default(uuid()) @db.Uuid
+  paymentAccountId String         @db.Uuid
+  assetId          String         @db.Uuid
+  atomicAmount     Decimal        @db.Decimal(78, 0)
+  spendableAtomic  Decimal        @db.Decimal(78, 0)
+  source           String
+  asOf             DateTime       @db.Timestamptz
+  paymentAccount   PaymentAccount @relation(fields: [paymentAccountId], references: [id], onDelete: Restrict)
+  asset            Asset          @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  @@index([paymentAccountId, assetId, asOf(sort: Desc)])
+}
+
+model AgentCredential {
+  id         String           @id @default(uuid()) @db.Uuid
+  agentId    String           @db.Uuid
+  label      String
+  prefix     String           @unique
+  secretHash String           @unique
+  scopes     String[]
+  status     CredentialStatus @default(ACTIVE)
+  expiresAt  DateTime?        @db.Timestamptz
+  lastUsedAt DateTime?        @db.Timestamptz
+  revokedAt  DateTime?        @db.Timestamptz
+  createdAt  DateTime         @default(now()) @db.Timestamptz
+  agent      Agent            @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  @@index([agentId, status])
+}
+
+model Policy {
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String          @db.Uuid
+  agentId        String          @db.Uuid
+  createdAt      DateTime        @default(now()) @db.Timestamptz
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent          Agent           @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  versions       PolicyVersion[]
+  @@index([organizationId, agentId])
+}
+
+model PolicyVersion {
+  id                        String          @id @default(uuid()) @db.Uuid
+  policyId                  String          @db.Uuid
+  version                   Int
+  status                    PolicyStatus
+  assetId                   String          @db.Uuid
+  perTransactionLimitAtomic Decimal         @db.Decimal(78, 0)
+  dailyLimitAtomic          Decimal         @db.Decimal(78, 0)
+  overLimitAction           OverLimitAction
+  merchantMode              MerchantMode    @default(ANY)
+  allowedHosts              String[]
+  deniedHosts               String[]
+  createdBy                 String          @db.Uuid
+  createdAt                 DateTime        @default(now()) @db.Timestamptz
+  publishedAt               DateTime?       @db.Timestamptz
+  policy                    Policy          @relation(fields: [policyId], references: [id], onDelete: Restrict)
+  asset                     Asset           @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  activeForAgents           Agent[]         @relation("EffectivePolicy")
+  decisions                 PolicyDecision[]
+  @@unique([policyId, version])
+  @@index([policyId, status])
+}
+
+model PaymentIntent {
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @db.Uuid
+  agentId        String         @db.Uuid
+  idempotencyKey String
+  requestHash    String
+  resourceUrl    String
+  merchantHost   String
+  purpose        String?
+  status         PaymentStatus  @default(CREATED)
+  createdAt      DateTime       @default(now()) @db.Timestamptz
+  updatedAt      DateTime       @updatedAt @db.Timestamptz
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent          Agent          @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  quote          PaymentQuote?
+  decisions      PolicyDecision[]
+  reservation    SpendReservation?
+  approval       ApprovalRequest?
+  attempts       PaymentAttempt[]
+  @@unique([organizationId, agentId, idempotencyKey])
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([agentId, createdAt(sort: Desc)])
+}
+
+model PaymentQuote {
+  id                  String        @id @default(uuid()) @db.Uuid
+  paymentIntentId     String        @unique @db.Uuid
+  x402Version         Int
+  scheme              String
+  network             String
+  resourceDescription String?
+  payToAccountId      String
+  assetId             String        @db.Uuid
+  amountAtomic        Decimal       @db.Decimal(78, 0)
+  validUntil          DateTime      @db.Timestamptz
+  fingerprint         String        @unique
+  rawChallenge        Json?
+  paymentIntent       PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+  asset               Asset         @relation(fields: [assetId], references: [id], onDelete: Restrict)
+}
+
+model PolicyDecision {
+  id                  String         @id @default(uuid()) @db.Uuid
+  paymentIntentId     String         @db.Uuid
+  policyVersionId     String         @db.Uuid
+  outcome             PolicyOutcome
+  reasonCodes         String[]
+  factsHash           String
+  spendBeforeAtomic   Decimal        @db.Decimal(78, 0)
+  reservedBeforeAtomic Decimal       @db.Decimal(78, 0)
+  projectedAtomic     Decimal        @db.Decimal(78, 0)
+  evaluatedAt         DateTime       @default(now()) @db.Timestamptz
+  paymentIntent       PaymentIntent  @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+  policyVersion       PolicyVersion  @relation(fields: [policyVersionId], references: [id], onDelete: Restrict)
+  @@index([paymentIntentId, evaluatedAt(sort: Desc)])
+}
+
+model SpendReservation {
+  id              String            @id @default(uuid()) @db.Uuid
+  paymentIntentId String            @unique @db.Uuid
+  agentId         String            @db.Uuid
+  assetId         String            @db.Uuid
+  amountAtomic    Decimal           @db.Decimal(78, 0)
+  windowStart     DateTime          @db.Timestamptz
+  windowEnd       DateTime          @db.Timestamptz
+  status          ReservationStatus @default(ACTIVE)
+  expiresAt       DateTime          @db.Timestamptz
+  createdAt       DateTime          @default(now()) @db.Timestamptz
+  updatedAt       DateTime          @updatedAt @db.Timestamptz
+  paymentIntent   PaymentIntent     @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+  agent           Agent             @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  asset           Asset             @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  @@index([agentId, assetId, windowStart, status])
+}
+
+model ApprovalRequest {
+  id              String          @id @default(uuid()) @db.Uuid
+  paymentIntentId String          @unique @db.Uuid
+  status          ApprovalStatus  @default(PENDING)
+  requestPurpose  String?
+  requestedAt     DateTime        @default(now()) @db.Timestamptz
+  expiresAt       DateTime        @db.Timestamptz
+  decidedAt       DateTime?       @db.Timestamptz
+  decidedBy       String?         @db.Uuid
+  decisionNote    String?
+  paymentIntent   PaymentIntent   @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+  @@index([status, expiresAt])
+}
+
+model PaymentAttempt {
+  id                   String        @id @default(uuid()) @db.Uuid
+  paymentIntentId      String        @db.Uuid
+  attemptNumber        Int
+  status               AttemptStatus
+  facilitatorRequestId String?
+  signatureFingerprint String?
+  errorCode            String?
+  createdAt            DateTime      @default(now()) @db.Timestamptz
+  updatedAt            DateTime      @updatedAt @db.Timestamptz
+  paymentIntent        PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+  settlement           Settlement?
+  @@unique([paymentIntentId, attemptNumber])
+}
+
+model Settlement {
+  id                 String           @id @default(uuid()) @db.Uuid
+  paymentAttemptId   String           @unique @db.Uuid
+  assetId            String           @db.Uuid
+  status             SettlementStatus
+  network            String
+  transactionId      String?
+  consensusTimestamp String?
+  payerAccountId     String
+  payeeAccountId     String
+  amountAtomic       Decimal          @db.Decimal(78, 0)
+  resultCode         String?
+  submittedAt        DateTime?        @db.Timestamptz
+  confirmedAt        DateTime?        @db.Timestamptz
+  paymentAttempt     PaymentAttempt   @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict)
+  asset              Asset            @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  @@unique([network, transactionId])
+  @@index([status, submittedAt])
+}
+
+model ResourceProvider {
+  id                        String         @id @default(uuid()) @db.Uuid
+  organizationId            String?        @db.Uuid
+  name                      String
+  status                    ProviderStatus @default(ACTIVE)
+  settlementAccountId       String
+  settlementAccountVerified Boolean        @default(false)
+  createdAt                 DateTime       @default(now()) @db.Timestamptz
+  organization              Organization?  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  resources                 ResourceListing[]
+}
+
+model ResourceListing {
+  id                 String           @id @default(uuid()) @db.Uuid
+  providerId         String           @db.Uuid
+  category           ResourceCategory
+  name               String
+  slug               String           @unique
+  description        String
+  endpoint            String
+  status              ResourceStatus  @default(DRAFT)
+  inputSchema         Json
+  outputContentTypes  String[]
+  version             Int              @default(1)
+  createdAt           DateTime         @default(now()) @db.Timestamptz
+  updatedAt           DateTime         @updatedAt @db.Timestamptz
+  provider            ResourceProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  prices              ResourcePrice[]
+  @@index([category, status])
+}
+
+model ResourcePrice {
+  id                String          @id @default(uuid()) @db.Uuid
+  resourceListingId String          @db.Uuid
+  assetId           String          @db.Uuid
+  atomicAmount      Decimal         @db.Decimal(78, 0)
+  scheme            String          @default("exact")
+  resourceListing   ResourceListing @relation(fields: [resourceListingId], references: [id], onDelete: Restrict)
+  asset             Asset           @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  @@unique([resourceListingId, assetId])
+}
+
+model AuditEvent {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  actorType      String
+  actorId        String?
+  action         String
+  targetType     String
+  targetId       String?
+  result         AuditResult
+  requestId      String?
+  metadata       Json
+  occurredAt     DateTime     @default(now()) @db.Timestamptz
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId, occurredAt(sort: Desc)])
+  @@index([organizationId, action])
+}
+
+model OutboxEvent {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  eventType      String
+  aggregateType  String
+  aggregateId    String
+  payload        Json
+  attempts       Int          @default(0)
+  availableAt    DateTime     @default(now()) @db.Timestamptz
+  processedAt    DateTime?    @db.Timestamptz
+  createdAt      DateTime     @default(now()) @db.Timestamptz
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([processedAt, availableAt])
+}

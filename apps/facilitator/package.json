@@ -1,0 +1,28 @@
+{
+  "name": "@agentpay/hedera-facilitator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "node --env-file=.env --import tsx --watch src/index.ts",
+    "start": "node --env-file=.env --import tsx src/index.ts",
+    "verify:live": "node --env-file=.env --import tsx scripts/live-x402.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hiero-ledger/sdk": "2.85.0",
+    "@hono/node-server": "1.19.11",
+    "@x402/core": "2.19.0",
+    "@x402/hedera": "2.19.0",
+    "hono": "4.12.8",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "25.0.10",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "vitest": "4.0.18"
+  }
+}

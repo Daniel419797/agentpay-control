@@ -1,0 +1,2 @@
+import { db } from "@/lib/db"; import { handleApiError, ok, problem } from "@/lib/api";
+export async function GET(_:Request,{params}:{params:Promise<{resourceId:string}>}){try{const {resourceId}=await params;const r=await db.resourceListing.findFirst({where:{OR:[{id:resourceId},{slug:resourceId}]},include:{provider:true,prices:{include:{asset:true}}}});if(!r)return problem(404,"RESOURCE_NOT_FOUND","Resource not found.");return ok({...r,prices:r.prices.map(p=>({...p,atomicAmount:p.atomicAmount.toString()}))});}catch(e){return handleApiError(e)}}

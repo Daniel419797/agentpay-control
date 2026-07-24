@@ -1,0 +1,1 @@
+{"name":"@agentpay/langchain","version":"0.1.0","type":"module","peerDependencies":{"@agentpay/sdk":"*"},"exports":"./src/index.ts"}

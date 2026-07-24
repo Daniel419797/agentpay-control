@@ -1,0 +1,2 @@
+import type { AgentPayClient, PaidRequest } from "../../sdk/src/index";
+export function createAgentPayTool(client:AgentPayClient,agentId:string){return {name:"agentpay_purchase_resource",description:"Purchase an x402-protected resource within the agent's published Hedera spending policy.",schema:{type:"object",properties:{resourceUrl:{type:"string"},purpose:{type:"string"},maxAmountAtomic:{type:"string"}},required:["resourceUrl"]},invoke:(input:PaidRequest)=>client.createPaidRequest(agentId,input)};}

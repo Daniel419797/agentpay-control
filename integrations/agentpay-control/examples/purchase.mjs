@@ -1,0 +1,2 @@
+const response=await fetch(`${process.env.AGENTPAY_BASE_URL}/api/v1/agents/${process.env.AGENTPAY_AGENT_ID}/paid-requests`,{method:"POST",headers:{authorization:`Bearer ${process.env.AGENTPAY_API_KEY}`,"content-type":"application/json","idempotency-key":crypto.randomUUID()},body:JSON.stringify({resourceUrl:"https://api.example.test/market",purpose:"Fetch the current HBAR market snapshot",maxAmountAtomic:"5000000"})});
+console.log(await response.json());
