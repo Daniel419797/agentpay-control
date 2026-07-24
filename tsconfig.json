@@ -37,6 +37,7 @@
   ],
   "exclude": [
     "node_modules",
-    "apps/facilitator"
+    "apps/facilitator",
+    "apps/resource-server"
   ]
 }

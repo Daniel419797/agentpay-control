@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { serve } from "@hono/node-server";
+import type { Context } from "hono";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -11,9 +12,11 @@ const env = z.object({
   USDC_TOKEN_ID: z.string().optional(),
 }).parse(process.env);
 
-const prices = {
+type AssetPrice = { type: string; amount: string; hederaTokenId?: string };
+
+const prices: Record<string, AssetPrice> = {
   hbar: { type: "NATIVE", amount: "5000000" },
-  usdc: { type: "TOKEN", hederaTokenId: env.USDC_TOKEN_ID, amount: "1000000" },
+  usdc: { type: "TOKEN", amount: "1000000", hederaTokenId: env.USDC_TOKEN_ID },
 };
 
 function paymentRequirements(asset: "hbar" | "usdc", resourceUrl: string) {
@@ -103,11 +106,11 @@ function generateResourceId(): string {
 
 const app = new Hono();
 
-app.get("/health", (c) => c.json({ status: "ok", network: env.NETWORK, provider: env.PROVIDER_ACCOUNT_ID }));
+app.get("/health", (c: Context) => c.json({ status: "ok", network: env.NETWORK, provider: env.PROVIDER_ACCOUNT_ID }));
 
-app.get("/catalog", (c) => c.json(catalog));
+app.get("/catalog", (c: Context) => c.json(catalog));
 
-async function handlePaidRequest(c: any, category: string, resourceId: string, data: unknown) {
+async function handlePaidRequest(c: Context, category: string, resourceId: string, data: unknown) {
   const paymentSignature = c.req.header("PAYMENT-SIGNATURE");
   const paymentRequirementsHeader = c.req.header("PAYMENT-REQUIREMENTS");
 
@@ -170,7 +173,7 @@ async function handlePaidRequest(c: any, category: string, resourceId: string, d
   }
 }
 
-app.get("/v1/market-data/:symbol", async (c) => {
+app.get("/v1/market-data/:symbol", async (c: Context) => {
   const symbol = c.req.param("symbol").toUpperCase();
   const data = marketData[symbol];
   if (!data) return c.json({ code: "NOT_FOUND", message: `Unknown symbol: ${symbol}` }, 404);
@@ -181,7 +184,7 @@ app.get("/v1/market-data/:symbol", async (c) => {
   });
 });
 
-app.get("/v1/files/:fileId", async (c) => {
+app.get("/v1/files/:fileId", async (c: Context) => {
   const fileId = c.req.param("fileId");
   const files: Record<string, { name: string; content: string }> = {
     "report-q2": { name: "Q2-2026-Market-Report.pdf", content: "Executive Summary: Q2 2026 saw continued growth in decentralized finance...\n\nKey findings:\n- Total value locked increased 34% YoY\n- Institutional adoption reached 22% of surveyed funds\n- Regulatory clarity improved in 3 major jurisdictions" },
@@ -192,10 +195,10 @@ app.get("/v1/files/:fileId", async (c) => {
   return handlePaidRequest(c, "FILE", `file-${fileId}`, file);
 });
 
-app.post("/v1/inference/:model", async (c) => {
+app.post("/v1/inference/:model", async (c: Context) => {
   const model = c.req.param("model");
-  const body = await c.req.json().catch(() => ({}));
-  const prompt = body.prompt || "Explain the benefits of Hedera hashgraph for microtransactions.";
+  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  const prompt = String(body.prompt || "Explain the benefits of Hedera hashgraph for microtransactions.");
   return handlePaidRequest(c, "AI_INFERENCE", `inference-${model}`, {
     model,
     prompt,
@@ -205,9 +208,9 @@ app.post("/v1/inference/:model", async (c) => {
   });
 });
 
-app.post("/v1/research", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  const query = body.query || "latest developments in decentralized AI";
+app.post("/v1/research", async (c: Context) => {
+  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  const query = String(body.query || "latest developments in decentralized AI");
   return handlePaidRequest(c, "WEB_RESEARCH", "research-default", {
     query,
     results: [

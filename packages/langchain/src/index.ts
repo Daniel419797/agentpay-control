@@ -1,4 +1,4 @@
-import type { AgentPayClient, PaidRequest, PaymentIntent } from "@agentpay/sdk";
+import type { AgentPayClient, PaidRequest, PaymentIntent } from "../../sdk/src/index";
 
 type ToolResult = { content: string; intent?: PaymentIntent };
 

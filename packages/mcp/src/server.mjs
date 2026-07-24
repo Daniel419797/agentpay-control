@@ -58,7 +58,7 @@ async function request(path: string, init?: RequestInit) {
   return response.json();
 }
 
-async function handle(message: any) {
+async function handle(message) {
   if (message.method === "initialize") {
     return {
       protocolVersion: "2025-06-18",
