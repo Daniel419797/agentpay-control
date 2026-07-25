@@ -24,7 +24,11 @@ export async function POST(request: Request) {
         gotrue_meta_security: {}
       })
     });
-    if (!response.ok) return problem(502, "EMAIL_AUTH_FAILED", "Supabase could not send the sign-in email.");
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      if (response.status === 429) return problem(429, "EMAIL_RATE_LIMITED", "Supabase email rate limit exceeded. Try again later or increase the limit in the Supabase dashboard.");
+      return problem(502, "EMAIL_AUTH_FAILED", `Supabase responded with ${response.status}: ${errorBody?.msg ?? "Unknown error"}`);
+    }
     return ok({ sent: true, email: input.email, mode: input.mode });
   } catch (error) { return handleApiError(error); }
 }
