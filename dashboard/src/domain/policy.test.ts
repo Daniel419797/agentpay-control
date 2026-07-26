@@ -10,12 +10,16 @@ const base: PolicyInput = {
   merchantMode: "ANY",
   allowedHosts: [],
   deniedHosts: [],
+  merchantCategory: "MARKET_DATA",
+  allowedMerchantCategories: [],
   amountAtomic: "5000000",
   balanceAtomic: "100000000",
   settledTodayAtomic: "10000000",
   reservedTodayAtomic: "0",
   perTransactionLimitAtomic: "25000000",
   dailyLimitAtomic: "50000000",
+  hourlySpendAtomic: "0",
+  monthlySpendAtomic: "0",
   overLimitAction: "REQUIRE_APPROVAL"
 };
 
@@ -47,5 +51,15 @@ describe("evaluatePolicy", () => {
       deniedHosts: [base.merchantHost]
     });
     expect(result.reasonCodes).toEqual(["MERCHANT_DENIED"]);
+  });
+
+  it("denies requests outside an overnight schedule", () => {
+    const result = evaluatePolicy({ ...base, evaluatedAt: new Date("2026-07-26T12:00:00Z"), allowedStartMinute: 22 * 60, allowedEndMinute: 6 * 60 });
+    expect(result.reasonCodes).toEqual(["OUTSIDE_POLICY_SCHEDULE"]);
+  });
+
+  it("enforces category and velocity controls", () => {
+    expect(evaluatePolicy({ ...base, allowedMerchantCategories: ["FILE"] }).reasonCodes).toEqual(["MERCHANT_CATEGORY_NOT_ALLOWED"]);
+    expect(evaluatePolicy({ ...base, maxTransactionsPerHour: 3, transactionsLastHour: 3 }).reasonCodes).toContain("HOURLY_VELOCITY_EXCEEDED");
   });
 });

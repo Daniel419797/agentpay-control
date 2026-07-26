@@ -24,4 +24,9 @@ describe("Google OAuth start", () => {
     expect(cookie).toContain("HttpOnly");
     expect(cookie).toContain("SameSite=Lax");
   });
+
+  it("marks the verifier cookie Secure on HTTPS", async () => {
+    const response = await GET(new Request("https://agentpay.example/api/v1/auth/oauth/google"));
+    expect(response.headers.get("set-cookie")).toContain("Secure");
+  });
 });

@@ -1,54 +1,215 @@
 import { createHash, randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import { getConfig } from "@/lib/config";
-import { evaluatePolicy } from "@/domain/policy";
+import { evaluatePolicy, policyScheduleViolation } from "@/domain/policy";
 import { paymentFingerprint } from "@/domain/fingerprint";
+import { createManagedPaymentPayload, discoverX402, fulfillX402Resource, parsePaymentRequired, selectRequirement, X402SubmissionUnknownError } from "@/domain/x402-client";
+import { assertSafeResourceUrl } from "@/lib/safe-url";
+import { retrySerializable } from "@/lib/retry";
+import { assertPlanLimit } from "@/domain/entitlement-service";
 
 export type PaidRequestInput = { resourceUrl: string; purpose?: string; maxAmountAtomic?: string };
 
 function hash(value: unknown) { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
 
+async function failBeforeSigning(intentId: string, organizationId: string, code: string) {
+  const status = ["PAYMENT_QUOTE_EXPIRED", "POLICY_EXPIRED", "SPEND_RESERVATION_INVALID"].includes(code) ? "EXPIRED" : "FAILED_BEFORE_SUBMISSION";
+  await db.$transaction(async (tx) => {
+    const changed = await tx.paymentIntent.updateMany({ where: { id: intentId, status: "AUTHORIZED" }, data: { status } });
+    if (changed.count !== 1) return;
+    await tx.spendReservation.updateMany({ where: { paymentIntentId: intentId, status: "ACTIVE" }, data: { status: status === "EXPIRED" ? "EXPIRED" : "RELEASED" } });
+    await tx.outboxEvent.create({ data: { organizationId, eventType: "PAYMENT_PRE_SIGN_REJECTED", aggregateType: "PAYMENT_INTENT", aggregateId: intentId, payload: { code } } });
+  });
+}
+
 export async function executeAuthorizedIntent(intentId: string) {
-  const intent = await db.paymentIntent.findUniqueOrThrow({ where: { id: intentId }, include: { quote: { include: { asset: true } }, agent: { include: { accounts: true } } } });
-  if (!intent.quote) throw new Error("PAYMENT_QUOTE_MISSING");
+  const intent = await db.paymentIntent.findUniqueOrThrow({
+    where: { id: intentId },
+    include: {
+      quote: { include: { asset: true } },
+      approval: true,
+      reservation: true,
+      decisions: { orderBy: { evaluatedAt: "desc" }, take: 1 },
+      organization: true,
+      agent: { include: { accounts: true, effectivePolicy: true } },
+    },
+  });
+  if (intent.status !== "AUTHORIZED") throw new Error("PAYMENT_NOT_AUTHORIZED");
+  let preSignError: string | undefined;
+  if (!intent.quote) preSignError = "PAYMENT_QUOTE_MISSING";
+  else if (intent.organization.killSwitchEnabled) preSignError = "ORGANIZATION_KILL_SWITCH_ENABLED";
+  else if (intent.agent.status !== "ACTIVE") preSignError = "AGENT_NOT_ACTIVE";
+  else if (intent.quote.validUntil <= new Date()) preSignError = "PAYMENT_QUOTE_EXPIRED";
+  else if (!intent.reservation || intent.reservation.status !== "ACTIVE" || intent.reservation.expiresAt <= new Date()) preSignError = "SPEND_RESERVATION_INVALID";
+  else if (intent.approval && intent.approval.status !== "CONSUMED") preSignError = "APPROVAL_NOT_CONSUMED";
+  else if (!intent.decisions[0] || intent.decisions[0].outcome === "DENY") preSignError = "POLICY_AUTHORIZATION_MISSING";
+  else if (intent.agent.effectivePolicyId !== intent.decisions[0].policyVersionId) preSignError = "POLICY_CHANGED";
+  else if (!intent.agent.effectivePolicy) preSignError = "POLICY_NOT_PUBLISHED";
+  if (preSignError) {
+    await failBeforeSigning(intent.id, intent.organizationId, preSignError);
+    throw new Error(preSignError);
+  }
+  const effectivePolicy = intent.agent.effectivePolicy!;
+  const scheduleViolation = policyScheduleViolation({
+    evaluatedAt: new Date(),
+    activeFrom: effectivePolicy.activeFrom,
+    activeUntil: effectivePolicy.activeUntil,
+    allowedWeekdays: effectivePolicy.allowedWeekdays,
+    allowedStartMinute: effectivePolicy.allowedStartMinute,
+    allowedEndMinute: effectivePolicy.allowedEndMinute,
+  });
+  if (scheduleViolation) {
+    await failBeforeSigning(intent.id, intent.organizationId, scheduleViolation);
+    throw new Error(scheduleViolation);
+  }
   const account = intent.agent.accounts.find((candidate) => candidate.status === "ACTIVE");
   if (!account) throw new Error("PAYMENT_ACCOUNT_UNAVAILABLE");
+  if (account.custodyType !== "PLATFORM_MANAGED_TESTNET" || account.signingMode !== "AUTONOMOUS_MANAGED") throw new Error("MANAGED_SIGNER_REQUIRED");
   const config = getConfig();
   if (!config.FACILITATOR_URL) throw new Error("LIVE_FACILITATOR_REQUIRED");
+  if (config.HEDERA_PAYER_ACCOUNT_ID && config.HEDERA_PAYER_ACCOUNT_ID !== account.accountId) throw new Error("MANAGED_PAYER_MISMATCH");
+  const required = parsePaymentRequired(intent.quote!.rawChallenge);
+  const requirement = selectRequirement(required, {
+    network: intent.quote!.network,
+    asset: intent.quote!.asset.type === "NATIVE" ? "0.0.0" : intent.quote!.asset.hederaTokenId ?? "",
+    amount: intent.quote!.amountAtomic.toString(),
+    payTo: intent.quote!.payToAccountId,
+    resourceUrl: intent.resourceUrl,
+  });
+  const claimed = await db.paymentIntent.updateMany({ where: { id: intent.id, status: "AUTHORIZED" }, data: { status: "SIGNING" } });
+  if (claimed.count !== 1) throw new Error("PAYMENT_ALREADY_CLAIMED");
   const attemptNumber = (await db.paymentAttempt.count({ where: { paymentIntentId: intent.id } })) + 1;
-  await db.paymentIntent.update({ where: { id: intent.id }, data: { status: "SIGNING" } });
-  const attempt = await db.paymentAttempt.create({ data: { paymentIntentId: intent.id, attemptNumber, status: "SIGNED", facilitatorRequestId: randomUUID(), signatureFingerprint: hash({ intentId, attemptNumber }) } });
-
-  const response = await fetch(`${config.FACILITATOR_URL}/managed-settle`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ intentId, fingerprint: intent.quote.fingerprint, payerAccountId: account.accountId, payeeAccountId: intent.quote.payToAccountId, amountAtomic: intent.quote.amountAtomic.toString(), asset: { type: intent.quote.asset.type, hederaTokenId: intent.quote.asset.hederaTokenId } }) });
-  if (!response.ok) { await db.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "FAILED", errorCode: `FACILITATOR_${response.status}` } }); await db.paymentIntent.update({ where: { id: intent.id }, data: { status: "FAILED_BEFORE_SUBMISSION" } }); throw new Error("FACILITATOR_REJECTED"); }
-  const settlement = await response.json() as { transactionId: string; consensusTimestamp?: string; resultCode: string };
-  await db.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "CONFIRMED" } });
-  await db.settlement.create({ data: { paymentAttemptId: attempt.id, assetId: intent.quote.assetId, status: "CONFIRMED", network: intent.quote.network, transactionId: settlement.transactionId, consensusTimestamp: settlement.consensusTimestamp, payerAccountId: account.accountId, payeeAccountId: intent.quote.payToAccountId, amountAtomic: intent.quote.amountAtomic, resultCode: settlement.resultCode, submittedAt: new Date(), confirmedAt: new Date() } });
-  await db.spendReservation.updateMany({ where: { paymentIntentId: intent.id }, data: { status: "SETTLED" } });
-  return db.paymentIntent.update({ where: { id: intent.id }, data: { status: "SETTLED" }, include: { quote: { include: { asset: true } }, attempts: { include: { settlement: true } } } });
+  const attempt = await db.paymentAttempt.create({ data: { paymentIntentId: intent.id, attemptNumber, status: "STARTED", facilitatorRequestId: randomUUID() } });
+  try {
+    const signed = await createManagedPaymentPayload(config.FACILITATOR_URL, requirement, config.FACILITATOR_API_KEY);
+    await db.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "SIGNED", signatureFingerprint: hash(signed.paymentPayload), candidateTransactionId: signed.transactionId } });
+    const fulfillment = await fulfillX402Resource(intent.resourceUrl, requirement, signed.paymentPayload);
+    return db.$transaction(async (tx) => {
+      await tx.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "CONFIRMED" } });
+      await tx.settlement.create({ data: { paymentAttemptId: attempt.id, assetId: intent.quote!.assetId, status: "CONFIRMED", network: fulfillment.network, transactionId: fulfillment.transactionId, payerAccountId: account.accountId, payeeAccountId: intent.quote!.payToAccountId, amountAtomic: intent.quote!.amountAtomic, resultCode: "SUCCESS", submittedAt: new Date(), confirmedAt: new Date() } });
+      const responseBody = JSON.parse(JSON.stringify(fulfillment.body));
+      await tx.resourceFulfillment.upsert({ where: { paymentIntentId: intent.id }, create: { paymentIntentId: intent.id, status: "FULFILLED", contentType: fulfillment.contentType, contentHash: fulfillment.contentHash, contentBytes: fulfillment.contentBytes, responseBody, fulfilledAt: new Date() }, update: { status: "FULFILLED", contentType: fulfillment.contentType, contentHash: fulfillment.contentHash, contentBytes: fulfillment.contentBytes, responseBody, errorCode: null, fulfilledAt: new Date() } });
+      await tx.spendReservation.updateMany({ where: { paymentIntentId: intent.id }, data: { status: "SETTLED" } });
+      await tx.outboxEvent.create({ data: { organizationId: intent.organizationId, eventType: "PAYMENT_SETTLED", aggregateType: "PAYMENT_INTENT", aggregateId: intent.id, payload: { transactionId: fulfillment.transactionId, resourceUrl: intent.resourceUrl } } });
+      return tx.paymentIntent.update({ where: { id: intent.id }, data: { status: "SETTLED" }, include: { quote: { include: { asset: true } }, fulfillment: true, attempts: { include: { settlement: true } } } });
+    });
+  } catch (error) {
+    if (error instanceof X402SubmissionUnknownError) {
+      await db.$transaction([
+        db.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "UNKNOWN", errorCode: error.message } }),
+        db.paymentIntent.update({ where: { id: intent.id }, data: { status: "SUBMISSION_UNKNOWN" } }),
+        db.resourceFulfillment.upsert({ where: { paymentIntentId: intent.id }, create: { paymentIntentId: intent.id, status: "PENDING", errorCode: error.message }, update: { status: "PENDING", errorCode: error.message } }),
+        db.outboxEvent.create({ data: { organizationId: intent.organizationId, eventType: "PAYMENT_RECONCILIATION_REQUIRED", aggregateType: "PAYMENT_INTENT", aggregateId: intent.id, payload: { attemptId: attempt.id } } }),
+      ]);
+      return db.paymentIntent.findUniqueOrThrow({ where: { id: intent.id }, include: { quote: { include: { asset: true } }, fulfillment: true, attempts: { include: { settlement: true } } } });
+    }
+    await db.$transaction([
+      db.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "FAILED", errorCode: error instanceof Error ? error.message.slice(0, 120) : "PAYMENT_FAILED" } }),
+      db.paymentIntent.update({ where: { id: intent.id }, data: { status: "FAILED_BEFORE_SUBMISSION" } }),
+      db.spendReservation.updateMany({ where: { paymentIntentId: intent.id, status: "ACTIVE" }, data: { status: "RELEASED" } }),
+    ]);
+    throw error;
+  }
 }
 
 export async function createPaidRequest(agentId: string, idempotencyKey: string, input: PaidRequestInput) {
-  const canonical = { agentId, resourceUrl: new URL(input.resourceUrl).toString(), purpose: input.purpose ?? null, maxAmountAtomic: input.maxAmountAtomic ?? null };
+  const config = getConfig();
+  const resourceUrl = await assertSafeResourceUrl(input.resourceUrl, config.APP_ENV === "production");
+  const canonical = { agentId, resourceUrl: resourceUrl.toString(), purpose: input.purpose ?? null, maxAmountAtomic: input.maxAmountAtomic ?? null };
   const requestHash = hash(canonical);
-  const agent = await db.agent.findUniqueOrThrow({ where: { id: agentId }, include: { organization: true, effectivePolicy: true, accounts: { where: { status: "ACTIVE" }, include: { balances: { orderBy: { asOf: "desc" }, take: 1 } } } } });
-  const existing = await db.paymentIntent.findUnique({ where: { organizationId_agentId_idempotencyKey: { organizationId: agent.organizationId, agentId, idempotencyKey } }, include: { quote: { include: { asset: true } }, approval: true, attempts: { include: { settlement: true } } } });
-  if (existing) { if (existing.requestHash !== requestHash) throw new Error("IDEMPOTENCY_CONFLICT"); return existing; }
-  const policy = agent.effectivePolicy;
-  if (!policy) throw new Error("POLICY_NOT_PUBLISHED");
-  const listing = await db.resourceListing.findFirst({ where: { OR: [{ endpoint: canonical.resourceUrl }, { slug: new URL(canonical.resourceUrl).pathname.split("/").filter(Boolean).at(-1) }], status: "ACTIVE" }, include: { provider: true, prices: { where: { assetId: policy.assetId }, take: 1 } } });
-  if (!listing?.prices[0]) throw new Error("RESOURCE_PRICE_NOT_FOUND");
-  const amountAtomic = listing.prices[0].atomicAmount.toString();
-  if (input.maxAmountAtomic && BigInt(amountAtomic) > BigInt(input.maxAmountAtomic)) throw new Error("MAX_AMOUNT_EXCEEDED");
-  const account = agent.accounts[0];
-  const balanceAtomic = account?.balances[0]?.spendableAtomic.toString() ?? "0";
-  const dayStart = new Date(); dayStart.setUTCHours(0, 0, 0, 0);
-  const reservations = await db.spendReservation.aggregate({ where: { agentId, assetId: policy.assetId, windowStart: { gte: dayStart }, status: { in: ["ACTIVE", "CONSUMED", "SETTLED"] } }, _sum: { amountAtomic: true } });
-  const decision = evaluatePolicy({ agentStatus: agent.status, organizationKillSwitch: agent.organization.killSwitchEnabled, assetSupported: true, challengeExpired: false, merchantHost: new URL(canonical.resourceUrl).hostname, merchantMode: policy.merchantMode, allowedHosts: policy.allowedHosts, deniedHosts: policy.deniedHosts, amountAtomic, balanceAtomic, settledTodayAtomic: "0", reservedTodayAtomic: reservations._sum.amountAtomic?.toString() ?? "0", perTransactionLimitAtomic: policy.perTransactionLimitAtomic.toString(), dailyLimitAtomic: policy.dailyLimitAtomic.toString(), overLimitAction: policy.overLimitAction });
-  const validUntil = new Date(Date.now() + 15 * 60_000);
-  const fingerprint = paymentFingerprint({ network: agent.network, scheme: "exact", payerAccountId: account?.accountId ?? "unavailable", payeeAccountId: listing.provider.settlementAccountId, assetId: policy.assetId, amountAtomic, resourceUrl: canonical.resourceUrl, validUntil: validUntil.toISOString() });
-  const status = decision.decision === "ALLOW" ? "AUTHORIZED" : decision.decision === "DENY" ? "DENIED" : "APPROVAL_PENDING";
-  const intent = await db.paymentIntent.create({ data: { organizationId: agent.organizationId, agentId, idempotencyKey, requestHash, resourceUrl: canonical.resourceUrl, merchantHost: new URL(canonical.resourceUrl).hostname, purpose: input.purpose, status, quote: { create: { x402Version: 2, scheme: "exact", network: agent.network, resourceDescription: listing.description, payToAccountId: listing.provider.settlementAccountId, assetId: policy.assetId, amountAtomic, validUntil, fingerprint, rawChallenge: { x402Version: 2, accepts: [{ scheme: "exact", network: agent.network, amount: amountAtomic, payTo: listing.provider.settlementAccountId }] } } }, decisions: { create: { policyVersionId: policy.id, outcome: decision.decision, reasonCodes: decision.reasonCodes, factsHash: hash({ canonical, amountAtomic, balanceAtomic }), spendBeforeAtomic: "0", reservedBeforeAtomic: reservations._sum.amountAtomic ?? 0, projectedAtomic: decision.projectedSpendAtomic } }, reservation: decision.decision === "DENY" ? undefined : { create: { agentId, assetId: policy.assetId, amountAtomic, windowStart: dayStart, windowEnd: new Date(dayStart.getTime() + 86_400_000), expiresAt: validUntil } }, approval: decision.decision === "REQUIRE_APPROVAL" ? { create: { requestPurpose: input.purpose, expiresAt: validUntil } } : undefined } });
-  if (status === "AUTHORIZED") return executeAuthorizedIntent(intent.id);
-  return db.paymentIntent.findUniqueOrThrow({ where: { id: intent.id }, include: { quote: { include: { asset: true } }, approval: true, attempts: { include: { settlement: true } } } });
+  const preexisting = await db.paymentIntent.findFirst({ where: { agentId, idempotencyKey }, include: { quote: { include: { asset: true } }, approval: true, fulfillment: true, attempts: { include: { settlement: true } } } });
+  if (preexisting) { if (preexisting.requestHash !== requestHash) throw new Error("IDEMPOTENCY_CONFLICT"); return preexisting; }
+  const required = await discoverX402(resourceUrl);
+  const result = await retrySerializable(() => db.$transaction(async (tx) => {
+    const agent = await tx.agent.findUniqueOrThrow({ where: { id: agentId }, include: { organization: true, effectivePolicy: { include: { asset: true } }, accounts: { where: { status: "ACTIVE" }, include: { balances: { orderBy: { asOf: "desc" }, take: 1 } } } } });
+    const existing = await tx.paymentIntent.findUnique({ where: { organizationId_agentId_idempotencyKey: { organizationId: agent.organizationId, agentId, idempotencyKey } }, include: { quote: { include: { asset: true } }, approval: true, attempts: { include: { settlement: true } } } });
+    if (existing) {
+      if (existing.requestHash !== requestHash) throw new Error("IDEMPOTENCY_CONFLICT");
+      return { intent: existing, shouldExecute: false };
+    }
+    await assertPlanLimit(tx, agent.organizationId, "PAYMENT_INTENTS");
+    const policy = agent.effectivePolicy;
+    if (!policy) throw new Error("POLICY_NOT_PUBLISHED");
+    const listing = await tx.resourceListing.findFirst({ where: { OR: [{ endpoint: canonical.resourceUrl }, { slug: resourceUrl.pathname.split("/").filter(Boolean).at(-1) }], status: "ACTIVE" }, include: { provider: true, prices: { where: { assetId: policy.assetId }, take: 1 } } });
+    if (!listing?.prices[0]) throw new Error("RESOURCE_PRICE_NOT_FOUND");
+    const requirement = selectRequirement(required, { network: agent.network, asset: policy.asset.type === "NATIVE" ? "0.0.0" : policy.asset.hederaTokenId ?? "", amount: listing.prices[0].atomicAmount.toString(), payTo: listing.provider.settlementAccountId, resourceUrl: canonical.resourceUrl });
+    const amountAtomic = requirement.amount;
+    if (input.maxAmountAtomic && BigInt(amountAtomic) > BigInt(input.maxAmountAtomic)) throw new Error("MAX_AMOUNT_EXCEEDED");
+    const account = agent.accounts[0];
+    if (!account) throw new Error("PAYMENT_ACCOUNT_UNAVAILABLE");
+    const now = new Date();
+    const rawBalanceAtomic = account.balances[0]?.spendableAtomic.toString() ?? "0";
+    const dayStart = new Date(now); dayStart.setUTCHours(0, 0, 0, 0);
+    const hourStart = new Date(now); hourStart.setUTCMinutes(0, 0, 0);
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const sharedTreasury = account.custodyType === "PLATFORM_MANAGED_TESTNET";
+    const scope = sharedTreasury ? { agent: { organizationId: agent.organizationId } } : { agentId };
+    const spentStatuses = ["ACTIVE", "CONSUMED", "SETTLED"] as const;
+    const [daily, hourly, monthly, active, lastReservation] = await Promise.all([
+      tx.spendReservation.aggregate({ where: { ...scope, assetId: policy.assetId, createdAt: { gte: dayStart }, status: { in: [...spentStatuses] } }, _sum: { amountAtomic: true } }),
+      tx.spendReservation.aggregate({ where: { ...scope, assetId: policy.assetId, createdAt: { gte: hourStart }, status: { in: [...spentStatuses] } }, _sum: { amountAtomic: true }, _count: { _all: true } }),
+      tx.spendReservation.aggregate({ where: { ...scope, assetId: policy.assetId, createdAt: { gte: monthStart }, status: { in: [...spentStatuses] } }, _sum: { amountAtomic: true } }),
+      tx.spendReservation.aggregate({ where: { ...scope, assetId: policy.assetId, status: "ACTIVE", expiresAt: { gt: now } }, _sum: { amountAtomic: true } }),
+      tx.spendReservation.findFirst({ where: { ...scope, assetId: policy.assetId, status: { in: [...spentStatuses] } }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }),
+    ]);
+    const availableBalance = BigInt(rawBalanceAtomic) - BigInt(active._sum.amountAtomic?.toString() ?? "0");
+    const balanceAtomic = (availableBalance > 0n ? availableBalance : 0n).toString();
+    const decision = evaluatePolicy({
+      agentStatus: agent.status,
+      organizationKillSwitch: agent.organization.killSwitchEnabled,
+      assetSupported: true,
+      challengeExpired: false,
+      merchantHost: resourceUrl.hostname,
+      merchantCategory: listing.category,
+      merchantMode: policy.merchantMode,
+      allowedHosts: policy.allowedHosts,
+      deniedHosts: policy.deniedHosts,
+      allowedMerchantCategories: policy.allowedMerchantCategories,
+      evaluatedAt: now,
+      activeFrom: policy.activeFrom,
+      activeUntil: policy.activeUntil,
+      allowedWeekdays: policy.allowedWeekdays,
+      allowedStartMinute: policy.allowedStartMinute,
+      allowedEndMinute: policy.allowedEndMinute,
+      amountAtomic,
+      balanceAtomic,
+      settledTodayAtomic: "0",
+      reservedTodayAtomic: daily._sum.amountAtomic?.toString() ?? "0",
+      perTransactionLimitAtomic: policy.perTransactionLimitAtomic.toString(),
+      dailyLimitAtomic: policy.dailyLimitAtomic.toString(),
+      hourlySpendAtomic: hourly._sum.amountAtomic?.toString() ?? "0",
+      hourlyLimitAtomic: policy.hourlyLimitAtomic?.toString(),
+      monthlySpendAtomic: monthly._sum.amountAtomic?.toString() ?? "0",
+      monthlyLimitAtomic: policy.monthlyLimitAtomic?.toString(),
+      transactionsLastHour: hourly._count._all,
+      maxTransactionsPerHour: policy.maxTransactionsPerHour,
+      lastTransactionAt: lastReservation?.createdAt,
+      cooldownSeconds: policy.cooldownSeconds,
+      overLimitAction: policy.overLimitAction,
+    });
+    const challengeValidUntil = new Date(now.getTime() + requirement.maxTimeoutSeconds * 1000);
+    const validUntil = policy.activeUntil && policy.activeUntil < challengeValidUntil ? policy.activeUntil : challengeValidUntil;
+    const fingerprint = paymentFingerprint({ network: requirement.network, scheme: requirement.scheme, payerAccountId: account.accountId, payeeAccountId: requirement.payTo, assetId: policy.assetId, amountAtomic, resourceUrl: canonical.resourceUrl, validUntil: validUntil.toISOString() });
+    const status = decision.decision === "ALLOW" ? "AUTHORIZED" : decision.decision === "DENY" ? "DENIED" : "APPROVAL_PENDING";
+    const rawChallenge = JSON.parse(JSON.stringify(required));
+    const intent = await tx.paymentIntent.create({
+      data: {
+        organizationId: agent.organizationId,
+        agentId,
+        idempotencyKey,
+        requestHash,
+        resourceUrl: canonical.resourceUrl,
+        merchantHost: resourceUrl.hostname,
+        purpose: input.purpose,
+        status,
+        quote: { create: { x402Version: 2, scheme: requirement.scheme, network: requirement.network, resourceDescription: required.resource.description ?? listing.description, payToAccountId: requirement.payTo, assetId: policy.assetId, amountAtomic, validUntil, fingerprint, rawChallenge } },
+        decisions: { create: { policyVersionId: policy.id, outcome: decision.decision, reasonCodes: decision.reasonCodes, factsHash: hash({ canonical, amountAtomic, balanceAtomic, policyVersionId: policy.id }), spendBeforeAtomic: daily._sum.amountAtomic ?? 0, reservedBeforeAtomic: active._sum.amountAtomic ?? 0, projectedAtomic: decision.projectedSpendAtomic } },
+        reservation: decision.decision === "DENY" ? undefined : { create: { agentId, assetId: policy.assetId, amountAtomic, windowStart: dayStart, windowEnd: new Date(dayStart.getTime() + 86_400_000), expiresAt: validUntil } },
+        approval: decision.decision === "REQUIRE_APPROVAL" ? { create: { requestPurpose: input.purpose, expiresAt: validUntil, requiredApprovals: policy.approvalThreshold, requiredRejections: policy.rejectionThreshold } } : undefined,
+      },
+      include: { quote: { include: { asset: true } }, approval: true, fulfillment: true, attempts: { include: { settlement: true } } },
+    });
+    return { intent, shouldExecute: status === "AUTHORIZED" };
+  }, { isolationLevel: "Serializable" }));
+  return result.shouldExecute ? executeAuthorizedIntent(result.intent.id) : result.intent;
 }

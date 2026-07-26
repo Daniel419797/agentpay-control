@@ -3,6 +3,7 @@ import { serve } from "@hono/node-server";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { z } from "zod";
+import { boundedJson, sameRequirement } from "./security.js";
 
 const env = z.object({
   FACILITATOR_URL: z.string().default("http://localhost:8787"),
@@ -10,9 +11,25 @@ const env = z.object({
   NETWORK: z.string().default("hedera:testnet"),
   PROVIDER_ACCOUNT_ID: z.string(),
   USDC_TOKEN_ID: z.string().optional(),
+  FACILITATOR_FEE_PAYER_ID: z.string().optional(),
+  FACILITATOR_API_KEY: z.string().min(32).optional(),
 }).parse(process.env);
 
-type AssetPrice = { type: string; amount: string; hederaTokenId?: string };
+type AssetPrice = { type: "NATIVE" | "TOKEN"; amount: string; hederaTokenId?: string };
+const requirementSchema = z.object({
+  scheme: z.literal("exact"),
+  network: z.string().min(1),
+  amount: z.string().regex(/^\d+$/),
+  payTo: z.string().min(1),
+  asset: z.string().min(1),
+  maxTimeoutSeconds: z.number().int().positive().max(3600),
+  extra: z.record(z.string(), z.unknown()).default({}),
+});
+const paymentPayloadSchema = z.object({
+  x402Version: z.literal(2),
+  accepted: requirementSchema,
+  payload: z.record(z.string(), z.unknown()),
+}).passthrough();
 
 const prices: Record<string, AssetPrice> = {
   hbar: { type: "NATIVE", amount: "5000000" },
@@ -28,10 +45,16 @@ function paymentRequirements(asset: "hbar" | "usdc", resourceUrl: string) {
       network: env.NETWORK,
       amount: p.amount,
       payTo: env.PROVIDER_ACCOUNT_ID,
-      asset: { type: p.type, hederaTokenId: p.type === "TOKEN" ? p.hederaTokenId : undefined },
+      asset: p.type === "TOKEN" ? p.hederaTokenId : "0.0.0",
+      maxTimeoutSeconds: 900,
+      extra: env.FACILITATOR_FEE_PAYER_ID ? { feePayer: env.FACILITATOR_FEE_PAYER_ID } : {},
     }],
-    resource: resourceUrl,
-    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    resource: {
+      url: resourceUrl,
+      description: "AgentPay protected resource",
+      mimeType: "application/json",
+      serviceName: "AgentPay Resource Server",
+    },
   };
 }
 
@@ -113,46 +136,59 @@ app.get("/catalog", (c: Context) => c.json(catalog));
 async function handlePaidRequest(c: Context, category: string, resourceId: string, data: unknown) {
   const paymentSignature = c.req.header("PAYMENT-SIGNATURE");
   const paymentRequirementsHeader = c.req.header("PAYMENT-REQUIREMENTS");
+  const canonical = paymentRequirements("hbar", c.req.url);
+  const canonicalRequirement = requirementSchema.parse(canonical.accepts[0]);
 
   if (!paymentSignature) {
-    const reqs = paymentRequirements("hbar", c.req.url);
-    c.header("PAYMENT-REQUIRED", JSON.stringify(reqs));
+    c.header("PAYMENT-REQUIRED", JSON.stringify(canonical));
     return c.json({
       code: "PAYMENT_REQUIRED",
       message: `Pay ${prices.hbar.amount} tinybars to access this ${category} resource`,
-      paymentRequirements: reqs,
+      paymentRequirements: canonical,
     }, 402);
+  }
+  if (paymentSignature.length > 128 * 1024 || !paymentRequirementsHeader || paymentRequirementsHeader.length > 64 * 1024) {
+    return c.json({ code: "PAYMENT_PAYLOAD_TOO_LARGE", message: "The payment headers exceed the allowed size." }, 413);
   }
 
   try {
-    const parsed = JSON.parse(paymentRequirementsHeader || "{}");
+    const parsed = requirementSchema.parse(JSON.parse(paymentRequirementsHeader));
+    const payload = paymentPayloadSchema.parse(JSON.parse(paymentSignature));
+    if (!sameRequirement(parsed, canonicalRequirement) || !sameRequirement(payload.accepted, canonicalRequirement)) {
+      return c.json({ code: "PAYMENT_REQUIREMENT_MISMATCH", message: "The signed payment does not match this resource price and payee." }, 402);
+    }
     const verifyBody = {
-      paymentPayload: JSON.parse(paymentSignature),
-      paymentRequirements: parsed,
+      paymentPayload: payload,
+      paymentRequirements: canonicalRequirement,
     };
+    const idempotencyKey = `resource:${resourceId}:${createHash("sha256").update(paymentSignature).digest("hex")}`;
     const verifyRes = await fetch(`${env.FACILITATOR_URL}/verify`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(env.FACILITATOR_API_KEY ? { authorization: `Bearer ${env.FACILITATOR_API_KEY}` } : {}) },
       body: JSON.stringify(verifyBody),
+      signal: AbortSignal.timeout(15_000),
     });
-    const verifyResult = await verifyRes.json() as { isValid: boolean; invalidReason?: string };
-    if (!verifyResult.isValid) {
+    const verifyResult = await verifyRes.json().catch(() => ({})) as { isValid?: boolean; invalidReason?: string };
+    if (!verifyRes.ok || verifyResult.isValid !== true) {
       return c.json({ code: "PAYMENT_INVALID", message: verifyResult.invalidReason || "Payment verification failed" }, 402);
     }
 
     const settleRes = await fetch(`${env.FACILITATOR_URL}/settle`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(env.FACILITATOR_API_KEY ? { authorization: `Bearer ${env.FACILITATOR_API_KEY}` } : {}) },
       body: JSON.stringify(verifyBody),
+      signal: AbortSignal.timeout(30_000),
     });
-    const settleResult = await settleRes.json() as { success: boolean; transactionId?: string; errorReason?: string };
-    if (!settleResult.success) {
+    const settleResult = await settleRes.json().catch(() => ({})) as { success?: boolean; transaction?: string; transactionId?: string; errorReason?: string };
+    if (!settleRes.ok || settleResult.success !== true) {
       return c.json({ code: "SETTLEMENT_FAILED", message: settleResult.errorReason || "Settlement failed" }, 422);
     }
+    const transactionId = settleResult.transaction ?? settleResult.transactionId;
+    if (!transactionId) return c.json({ code: "SETTLEMENT_EVIDENCE_MISSING", message: "Facilitator did not return a transaction ID" }, 502);
 
     const paymentResponse = {
       x402Version: 2,
-      transactionId: settleResult.transactionId,
+      transactionId,
       network: env.NETWORK,
       settledAt: new Date().toISOString(),
     };
@@ -163,8 +199,8 @@ async function handlePaidRequest(c: Context, category: string, resourceId: strin
       category,
       content: data,
       settled: {
-        transactionId: settleResult.transactionId,
-        hashscanUrl: `https://hashscan.io/testnet/transaction/${settleResult.transactionId}`,
+        transactionId,
+        hashscanUrl: `https://hashscan.io/testnet/transaction/${transactionId}`,
       },
     };
     return c.json(response);
@@ -174,7 +210,7 @@ async function handlePaidRequest(c: Context, category: string, resourceId: strin
 }
 
 app.get("/v1/market-data/:symbol", async (c: Context) => {
-  const symbol = c.req.param("symbol").toUpperCase();
+  const symbol = (c.req.param("symbol") ?? "").toUpperCase();
   const data = marketData[symbol];
   if (!data) return c.json({ code: "NOT_FOUND", message: `Unknown symbol: ${symbol}` }, 404);
   return handlePaidRequest(c, "MARKET_DATA", `market-data-${symbol}`, {
@@ -185,7 +221,7 @@ app.get("/v1/market-data/:symbol", async (c: Context) => {
 });
 
 app.get("/v1/files/:fileId", async (c: Context) => {
-  const fileId = c.req.param("fileId");
+  const fileId = c.req.param("fileId") ?? "";
   const files: Record<string, { name: string; content: string }> = {
     "report-q2": { name: "Q2-2026-Market-Report.pdf", content: "Executive Summary: Q2 2026 saw continued growth in decentralized finance...\n\nKey findings:\n- Total value locked increased 34% YoY\n- Institutional adoption reached 22% of surveyed funds\n- Regulatory clarity improved in 3 major jurisdictions" },
     "whitepaper": { name: "AgentPay-Whitepaper.pdf", content: "AgentPay: A Policy-Controlled Payment Layer for Autonomous Software Agents\n\nAbstract: This paper describes a novel approach to machine-to-machine payments..." },
@@ -196,8 +232,10 @@ app.get("/v1/files/:fileId", async (c: Context) => {
 });
 
 app.post("/v1/inference/:model", async (c: Context) => {
-  const model = c.req.param("model");
-  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  const model = c.req.param("model") ?? "";
+  let body: Record<string, unknown>;
+  try { body = await boundedJson(c.req.raw) as Record<string, unknown>; }
+  catch (error) { return c.json({ code: error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE" ? "REQUEST_BODY_TOO_LARGE" : "INVALID_JSON" }, error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE" ? 413 : 400); }
   const prompt = String(body.prompt || "Explain the benefits of Hedera hashgraph for microtransactions.");
   return handlePaidRequest(c, "AI_INFERENCE", `inference-${model}`, {
     model,
@@ -209,7 +247,9 @@ app.post("/v1/inference/:model", async (c: Context) => {
 });
 
 app.post("/v1/research", async (c: Context) => {
-  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  let body: Record<string, unknown>;
+  try { body = await boundedJson(c.req.raw) as Record<string, unknown>; }
+  catch (error) { return c.json({ code: error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE" ? "REQUEST_BODY_TOO_LARGE" : "INVALID_JSON" }, error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE" ? 413 : 400); }
   const query = String(body.query || "latest developments in decentralized AI");
   return handlePaidRequest(c, "WEB_RESEARCH", "research-default", {
     query,

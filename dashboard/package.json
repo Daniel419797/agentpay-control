@@ -25,6 +25,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "verify:governance": "tsx scripts/verify-governance.ts",
     "db:studio": "prisma studio",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build"
   },

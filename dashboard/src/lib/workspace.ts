@@ -8,9 +8,12 @@ import {
   type OperatorSession,
 } from "@/lib/session";
 
+export const workspaceRoles = ["OWNER", "OPERATOR", "APPROVER", "VIEWER", "PROVIDER_ADMIN"] as const;
+export type WorkspaceRole = (typeof workspaceRoles)[number];
+
 export async function workspaceForSession(session: OperatorSession) {
   const membership = await db.membership.findFirst({
-    where: { userId: session.sub },
+    where: { userId: session.sub, status: "ACTIVE", organization: { status: "ACTIVE" } },
     include: { organization: true, user: true },
     orderBy: { id: "asc" },
   });
@@ -31,4 +34,11 @@ export async function currentWorkspace() {
   } catch {
     return null;
   }
+}
+
+export function workspaceHasRole(
+  workspace: Awaited<ReturnType<typeof workspaceForSession>>,
+  allowed: readonly WorkspaceRole[],
+) {
+  return workspace.membership.roles.some((role) => allowed.includes(role));
 }

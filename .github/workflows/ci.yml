@@ -2,92 +2,48 @@ name: CI
 
 on:
   push:
-    branches: [master]
   pull_request:
-    branches: [master]
 
-env:
-  NODE_VERSION: "22"
+permissions:
+  contents: read
 
 jobs:
-  lint-typecheck:
+  verify:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: dashboard
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: "npm"
-          cache-dependency-path: dashboard/package-lock.json
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
-
-  test:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: dashboard
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:17-alpine
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: agentpay_test
-        ports:
-          - 5432:5432
+          POSTGRES_USER: agentpay
+          POSTGRES_PASSWORD: agentpay
+          POSTGRES_DB: agentpay
+        ports: ["5432:5432"]
         options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          --health-cmd "pg_isready -U agentpay -d agentpay"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://agentpay:agentpay@localhost:5432/agentpay?schema=public
+      AUTH_SECRET: ci-auth-secret-that-is-at-least-thirty-two-characters
+      KEY_ENCRYPTION_MASTER_KEY: ci-encryption-key-that-is-at-least-thirty-two-characters
+      CRON_SECRET: ci-cron-secret-that-is-at-least-thirty-two-characters
+      APP_ENV: test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: "npm"
-          cache-dependency-path: dashboard/package-lock.json
+          node-version: 22
+          cache: npm
       - run: npm ci
-      - run: npx prisma generate
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/agentpay_test
-      - run: npx prisma migrate deploy
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/agentpay_test
-      - run: npm test
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/agentpay_test
-          AUTH_SECRET: test-secret-at-least-32-chars-long!!
-          HEDERA_NETWORK: testnet
-          HEDERA_OPERATOR_ID: "0.0.9651467"
-          HEDERA_OPERATOR_KEY: "0x0000000000000000000000000000000000000000000000000000000000000000"
-          SUPABASE_URL: https://test.supabase.co
-          SUPABASE_ANON_KEY: test-anon-key
-
-  build:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
+      - name: Apply database migrations
         working-directory: dashboard
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: "npm"
-          cache-dependency-path: dashboard/package-lock.json
-      - run: npm ci
-      - run: npm run build
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/agentpay_test
-          AUTH_SECRET: test-secret-at-least-32-chars-long!!
-          HEDERA_NETWORK: testnet
-          HEDERA_OPERATOR_ID: "0.0.9651467"
-          HEDERA_OPERATOR_KEY: "0x0000000000000000000000000000000000000000000000000000000000000000"
-          SUPABASE_URL: https://test.supabase.co
-          SUPABASE_ANON_KEY: test-anon-key
+        run: npm run db:deploy
+      - name: Verify dashboard
+        working-directory: dashboard
+        run: npm run verify
+      - name: Verify facilitator
+        working-directory: facilitator
+        run: npm run typecheck && npm test
+      - name: Verify resource server
+        working-directory: resource-server
+        run: npm run typecheck && npm test

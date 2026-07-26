@@ -44,6 +44,10 @@ export type ResourceListingMinAggregateOutputType = {
   endpoint: string | null
   status: $Enums.ResourceStatus | null
   version: number | null
+  public: boolean | null
+  termsUrl: string | null
+  healthStatus: $Enums.ResourceHealthStatus | null
+  lastHealthCheckAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -58,6 +62,10 @@ export type ResourceListingMaxAggregateOutputType = {
   endpoint: string | null
   status: $Enums.ResourceStatus | null
   version: number | null
+  public: boolean | null
+  termsUrl: string | null
+  healthStatus: $Enums.ResourceHealthStatus | null
+  lastHealthCheckAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -74,6 +82,12 @@ export type ResourceListingCountAggregateOutputType = {
   inputSchema: number
   outputContentTypes: number
   version: number
+  public: number
+  tags: number
+  termsUrl: number
+  serviceLevel: number
+  healthStatus: number
+  lastHealthCheckAt: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -98,6 +112,10 @@ export type ResourceListingMinAggregateInputType = {
   endpoint?: true
   status?: true
   version?: true
+  public?: true
+  termsUrl?: true
+  healthStatus?: true
+  lastHealthCheckAt?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -112,6 +130,10 @@ export type ResourceListingMaxAggregateInputType = {
   endpoint?: true
   status?: true
   version?: true
+  public?: true
+  termsUrl?: true
+  healthStatus?: true
+  lastHealthCheckAt?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -128,6 +150,12 @@ export type ResourceListingCountAggregateInputType = {
   inputSchema?: true
   outputContentTypes?: true
   version?: true
+  public?: true
+  tags?: true
+  termsUrl?: true
+  serviceLevel?: true
+  healthStatus?: true
+  lastHealthCheckAt?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -231,6 +259,12 @@ export type ResourceListingGroupByOutputType = {
   inputSchema: runtime.JsonValue
   outputContentTypes: string[]
   version: number
+  public: boolean
+  tags: string[]
+  termsUrl: string | null
+  serviceLevel: runtime.JsonValue | null
+  healthStatus: $Enums.ResourceHealthStatus
+  lastHealthCheckAt: Date | null
   createdAt: Date
   updatedAt: Date
   _count: ResourceListingCountAggregateOutputType | null
@@ -270,10 +304,18 @@ export type ResourceListingWhereInput = {
   inputSchema?: Prisma.JsonFilter<"ResourceListing">
   outputContentTypes?: Prisma.StringNullableListFilter<"ResourceListing">
   version?: Prisma.IntFilter<"ResourceListing"> | number
+  public?: Prisma.BoolFilter<"ResourceListing"> | boolean
+  tags?: Prisma.StringNullableListFilter<"ResourceListing">
+  termsUrl?: Prisma.StringNullableFilter<"ResourceListing"> | string | null
+  serviceLevel?: Prisma.JsonNullableFilter<"ResourceListing">
+  healthStatus?: Prisma.EnumResourceHealthStatusFilter<"ResourceListing"> | $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Prisma.DateTimeNullableFilter<"ResourceListing"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"ResourceListing"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"ResourceListing"> | Date | string
   provider?: Prisma.XOR<Prisma.ResourceProviderScalarRelationFilter, Prisma.ResourceProviderWhereInput>
   prices?: Prisma.ResourcePriceListRelationFilter
+  reviews?: Prisma.ResourceReviewListRelationFilter
+  healthChecks?: Prisma.ResourceHealthCheckListRelationFilter
 }
 
 export type ResourceListingOrderByWithRelationInput = {
@@ -288,10 +330,18 @@ export type ResourceListingOrderByWithRelationInput = {
   inputSchema?: Prisma.SortOrder
   outputContentTypes?: Prisma.SortOrder
   version?: Prisma.SortOrder
+  public?: Prisma.SortOrder
+  tags?: Prisma.SortOrder
+  termsUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  serviceLevel?: Prisma.SortOrderInput | Prisma.SortOrder
+  healthStatus?: Prisma.SortOrder
+  lastHealthCheckAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   provider?: Prisma.ResourceProviderOrderByWithRelationInput
   prices?: Prisma.ResourcePriceOrderByRelationAggregateInput
+  reviews?: Prisma.ResourceReviewOrderByRelationAggregateInput
+  healthChecks?: Prisma.ResourceHealthCheckOrderByRelationAggregateInput
 }
 
 export type ResourceListingWhereUniqueInput = Prisma.AtLeast<{
@@ -309,10 +359,18 @@ export type ResourceListingWhereUniqueInput = Prisma.AtLeast<{
   inputSchema?: Prisma.JsonFilter<"ResourceListing">
   outputContentTypes?: Prisma.StringNullableListFilter<"ResourceListing">
   version?: Prisma.IntFilter<"ResourceListing"> | number
+  public?: Prisma.BoolFilter<"ResourceListing"> | boolean
+  tags?: Prisma.StringNullableListFilter<"ResourceListing">
+  termsUrl?: Prisma.StringNullableFilter<"ResourceListing"> | string | null
+  serviceLevel?: Prisma.JsonNullableFilter<"ResourceListing">
+  healthStatus?: Prisma.EnumResourceHealthStatusFilter<"ResourceListing"> | $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Prisma.DateTimeNullableFilter<"ResourceListing"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"ResourceListing"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"ResourceListing"> | Date | string
   provider?: Prisma.XOR<Prisma.ResourceProviderScalarRelationFilter, Prisma.ResourceProviderWhereInput>
   prices?: Prisma.ResourcePriceListRelationFilter
+  reviews?: Prisma.ResourceReviewListRelationFilter
+  healthChecks?: Prisma.ResourceHealthCheckListRelationFilter
 }, "id" | "slug">
 
 export type ResourceListingOrderByWithAggregationInput = {
@@ -327,6 +385,12 @@ export type ResourceListingOrderByWithAggregationInput = {
   inputSchema?: Prisma.SortOrder
   outputContentTypes?: Prisma.SortOrder
   version?: Prisma.SortOrder
+  public?: Prisma.SortOrder
+  tags?: Prisma.SortOrder
+  termsUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  serviceLevel?: Prisma.SortOrderInput | Prisma.SortOrder
+  healthStatus?: Prisma.SortOrder
+  lastHealthCheckAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.ResourceListingCountOrderByAggregateInput
@@ -351,6 +415,12 @@ export type ResourceListingScalarWhereWithAggregatesInput = {
   inputSchema?: Prisma.JsonWithAggregatesFilter<"ResourceListing">
   outputContentTypes?: Prisma.StringNullableListFilter<"ResourceListing">
   version?: Prisma.IntWithAggregatesFilter<"ResourceListing"> | number
+  public?: Prisma.BoolWithAggregatesFilter<"ResourceListing"> | boolean
+  tags?: Prisma.StringNullableListFilter<"ResourceListing">
+  termsUrl?: Prisma.StringNullableWithAggregatesFilter<"ResourceListing"> | string | null
+  serviceLevel?: Prisma.JsonNullableWithAggregatesFilter<"ResourceListing">
+  healthStatus?: Prisma.EnumResourceHealthStatusWithAggregatesFilter<"ResourceListing"> | $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ResourceListing"> | Date | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"ResourceListing"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"ResourceListing"> | Date | string
 }
@@ -366,10 +436,18 @@ export type ResourceListingCreateInput = {
   inputSchema: Prisma.JsonNullValueInput | runtime.InputJsonValue
   outputContentTypes?: Prisma.ResourceListingCreateoutputContentTypesInput | string[]
   version?: number
+  public?: boolean
+  tags?: Prisma.ResourceListingCreatetagsInput | string[]
+  termsUrl?: string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   provider: Prisma.ResourceProviderCreateNestedOneWithoutResourcesInput
   prices?: Prisma.ResourcePriceCreateNestedManyWithoutResourceListingInput
+  reviews?: Prisma.ResourceReviewCreateNestedManyWithoutResourceInput
+  healthChecks?: Prisma.ResourceHealthCheckCreateNestedManyWithoutResourceInput
 }
 
 export type ResourceListingUncheckedCreateInput = {
@@ -384,9 +462,17 @@ export type ResourceListingUncheckedCreateInput = {
   inputSchema: Prisma.JsonNullValueInput | runtime.InputJsonValue
   outputContentTypes?: Prisma.ResourceListingCreateoutputContentTypesInput | string[]
   version?: number
+  public?: boolean
+  tags?: Prisma.ResourceListingCreatetagsInput | string[]
+  termsUrl?: string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   prices?: Prisma.ResourcePriceUncheckedCreateNestedManyWithoutResourceListingInput
+  reviews?: Prisma.ResourceReviewUncheckedCreateNestedManyWithoutResourceInput
+  healthChecks?: Prisma.ResourceHealthCheckUncheckedCreateNestedManyWithoutResourceInput
 }
 
 export type ResourceListingUpdateInput = {
@@ -400,10 +486,18 @@ export type ResourceListingUpdateInput = {
   inputSchema?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   outputContentTypes?: Prisma.ResourceListingUpdateoutputContentTypesInput | string[]
   version?: Prisma.IntFieldUpdateOperationsInput | number
+  public?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  tags?: Prisma.ResourceListingUpdatetagsInput | string[]
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: Prisma.EnumResourceHealthStatusFieldUpdateOperationsInput | $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   provider?: Prisma.ResourceProviderUpdateOneRequiredWithoutResourcesNestedInput
   prices?: Prisma.ResourcePriceUpdateManyWithoutResourceListingNestedInput
+  reviews?: Prisma.ResourceReviewUpdateManyWithoutResourceNestedInput
+  healthChecks?: Prisma.ResourceHealthCheckUpdateManyWithoutResourceNestedInput
 }
 
 export type ResourceListingUncheckedUpdateInput = {
@@ -418,9 +512,17 @@ export type ResourceListingUncheckedUpdateInput = {
   inputSchema?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   outputContentTypes?: Prisma.ResourceListingUpdateoutputContentTypesInput | string[]
   version?: Prisma.IntFieldUpdateOperationsInput | number
+  public?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  tags?: Prisma.ResourceListingUpdatetagsInput | string[]
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: Prisma.EnumResourceHealthStatusFieldUpdateOperationsInput | $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   prices?: Prisma.ResourcePriceUncheckedUpdateManyWithoutResourceListingNestedInput
+  reviews?: Prisma.ResourceReviewUncheckedUpdateManyWithoutResourceNestedInput
+  healthChecks?: Prisma.ResourceHealthCheckUncheckedUpdateManyWithoutResourceNestedInput
 }
 
 export type ResourceListingCreateManyInput = {
@@ -435,6 +537,12 @@ export type ResourceListingCreateManyInput = {
   inputSchema: Prisma.JsonNullValueInput | runtime.InputJsonValue
   outputContentTypes?: Prisma.ResourceListingCreateoutputContentTypesInput | string[]
   version?: number
+  public?: boolean
+  tags?: Prisma.ResourceListingCreatetagsInput | string[]
+  termsUrl?: string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -450,6 +558,12 @@ export type ResourceListingUpdateManyMutationInput = {
   inputSchema?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   outputContentTypes?: Prisma.ResourceListingUpdateoutputContentTypesInput | string[]
   version?: Prisma.IntFieldUpdateOperationsInput | number
+  public?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  tags?: Prisma.ResourceListingUpdatetagsInput | string[]
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: Prisma.EnumResourceHealthStatusFieldUpdateOperationsInput | $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -466,6 +580,12 @@ export type ResourceListingUncheckedUpdateManyInput = {
   inputSchema?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   outputContentTypes?: Prisma.ResourceListingUpdateoutputContentTypesInput | string[]
   version?: Prisma.IntFieldUpdateOperationsInput | number
+  public?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  tags?: Prisma.ResourceListingUpdatetagsInput | string[]
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: Prisma.EnumResourceHealthStatusFieldUpdateOperationsInput | $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -492,6 +612,12 @@ export type ResourceListingCountOrderByAggregateInput = {
   inputSchema?: Prisma.SortOrder
   outputContentTypes?: Prisma.SortOrder
   version?: Prisma.SortOrder
+  public?: Prisma.SortOrder
+  tags?: Prisma.SortOrder
+  termsUrl?: Prisma.SortOrder
+  serviceLevel?: Prisma.SortOrder
+  healthStatus?: Prisma.SortOrder
+  lastHealthCheckAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -510,6 +636,10 @@ export type ResourceListingMaxOrderByAggregateInput = {
   endpoint?: Prisma.SortOrder
   status?: Prisma.SortOrder
   version?: Prisma.SortOrder
+  public?: Prisma.SortOrder
+  termsUrl?: Prisma.SortOrder
+  healthStatus?: Prisma.SortOrder
+  lastHealthCheckAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -524,6 +654,10 @@ export type ResourceListingMinOrderByAggregateInput = {
   endpoint?: Prisma.SortOrder
   status?: Prisma.SortOrder
   version?: Prisma.SortOrder
+  public?: Prisma.SortOrder
+  termsUrl?: Prisma.SortOrder
+  healthStatus?: Prisma.SortOrder
+  lastHealthCheckAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -583,6 +717,10 @@ export type ResourceListingCreateoutputContentTypesInput = {
   set: string[]
 }
 
+export type ResourceListingCreatetagsInput = {
+  set: string[]
+}
+
 export type EnumResourceCategoryFieldUpdateOperationsInput = {
   set?: $Enums.ResourceCategory
 }
@@ -594,6 +732,15 @@ export type EnumResourceStatusFieldUpdateOperationsInput = {
 export type ResourceListingUpdateoutputContentTypesInput = {
   set?: string[]
   push?: string | string[]
+}
+
+export type ResourceListingUpdatetagsInput = {
+  set?: string[]
+  push?: string | string[]
+}
+
+export type EnumResourceHealthStatusFieldUpdateOperationsInput = {
+  set?: $Enums.ResourceHealthStatus
 }
 
 export type ResourceListingCreateNestedOneWithoutPricesInput = {
@@ -610,6 +757,34 @@ export type ResourceListingUpdateOneRequiredWithoutPricesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.ResourceListingUpdateToOneWithWhereWithoutPricesInput, Prisma.ResourceListingUpdateWithoutPricesInput>, Prisma.ResourceListingUncheckedUpdateWithoutPricesInput>
 }
 
+export type ResourceListingCreateNestedOneWithoutReviewsInput = {
+  create?: Prisma.XOR<Prisma.ResourceListingCreateWithoutReviewsInput, Prisma.ResourceListingUncheckedCreateWithoutReviewsInput>
+  connectOrCreate?: Prisma.ResourceListingCreateOrConnectWithoutReviewsInput
+  connect?: Prisma.ResourceListingWhereUniqueInput
+}
+
+export type ResourceListingUpdateOneRequiredWithoutReviewsNestedInput = {
+  create?: Prisma.XOR<Prisma.ResourceListingCreateWithoutReviewsInput, Prisma.ResourceListingUncheckedCreateWithoutReviewsInput>
+  connectOrCreate?: Prisma.ResourceListingCreateOrConnectWithoutReviewsInput
+  upsert?: Prisma.ResourceListingUpsertWithoutReviewsInput
+  connect?: Prisma.ResourceListingWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ResourceListingUpdateToOneWithWhereWithoutReviewsInput, Prisma.ResourceListingUpdateWithoutReviewsInput>, Prisma.ResourceListingUncheckedUpdateWithoutReviewsInput>
+}
+
+export type ResourceListingCreateNestedOneWithoutHealthChecksInput = {
+  create?: Prisma.XOR<Prisma.ResourceListingCreateWithoutHealthChecksInput, Prisma.ResourceListingUncheckedCreateWithoutHealthChecksInput>
+  connectOrCreate?: Prisma.ResourceListingCreateOrConnectWithoutHealthChecksInput
+  connect?: Prisma.ResourceListingWhereUniqueInput
+}
+
+export type ResourceListingUpdateOneRequiredWithoutHealthChecksNestedInput = {
+  create?: Prisma.XOR<Prisma.ResourceListingCreateWithoutHealthChecksInput, Prisma.ResourceListingUncheckedCreateWithoutHealthChecksInput>
+  connectOrCreate?: Prisma.ResourceListingCreateOrConnectWithoutHealthChecksInput
+  upsert?: Prisma.ResourceListingUpsertWithoutHealthChecksInput
+  connect?: Prisma.ResourceListingWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ResourceListingUpdateToOneWithWhereWithoutHealthChecksInput, Prisma.ResourceListingUpdateWithoutHealthChecksInput>, Prisma.ResourceListingUncheckedUpdateWithoutHealthChecksInput>
+}
+
 export type ResourceListingCreateWithoutProviderInput = {
   id?: string
   category: $Enums.ResourceCategory
@@ -621,9 +796,17 @@ export type ResourceListingCreateWithoutProviderInput = {
   inputSchema: Prisma.JsonNullValueInput | runtime.InputJsonValue
   outputContentTypes?: Prisma.ResourceListingCreateoutputContentTypesInput | string[]
   version?: number
+  public?: boolean
+  tags?: Prisma.ResourceListingCreatetagsInput | string[]
+  termsUrl?: string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   prices?: Prisma.ResourcePriceCreateNestedManyWithoutResourceListingInput
+  reviews?: Prisma.ResourceReviewCreateNestedManyWithoutResourceInput
+  healthChecks?: Prisma.ResourceHealthCheckCreateNestedManyWithoutResourceInput
 }
 
 export type ResourceListingUncheckedCreateWithoutProviderInput = {
@@ -637,9 +820,17 @@ export type ResourceListingUncheckedCreateWithoutProviderInput = {
   inputSchema: Prisma.JsonNullValueInput | runtime.InputJsonValue
   outputContentTypes?: Prisma.ResourceListingCreateoutputContentTypesInput | string[]
   version?: number
+  public?: boolean
+  tags?: Prisma.ResourceListingCreatetagsInput | string[]
+  termsUrl?: string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   prices?: Prisma.ResourcePriceUncheckedCreateNestedManyWithoutResourceListingInput
+  reviews?: Prisma.ResourceReviewUncheckedCreateNestedManyWithoutResourceInput
+  healthChecks?: Prisma.ResourceHealthCheckUncheckedCreateNestedManyWithoutResourceInput
 }
 
 export type ResourceListingCreateOrConnectWithoutProviderInput = {
@@ -683,6 +874,12 @@ export type ResourceListingScalarWhereInput = {
   inputSchema?: Prisma.JsonFilter<"ResourceListing">
   outputContentTypes?: Prisma.StringNullableListFilter<"ResourceListing">
   version?: Prisma.IntFilter<"ResourceListing"> | number
+  public?: Prisma.BoolFilter<"ResourceListing"> | boolean
+  tags?: Prisma.StringNullableListFilter<"ResourceListing">
+  termsUrl?: Prisma.StringNullableFilter<"ResourceListing"> | string | null
+  serviceLevel?: Prisma.JsonNullableFilter<"ResourceListing">
+  healthStatus?: Prisma.EnumResourceHealthStatusFilter<"ResourceListing"> | $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Prisma.DateTimeNullableFilter<"ResourceListing"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"ResourceListing"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"ResourceListing"> | Date | string
 }
@@ -698,9 +895,17 @@ export type ResourceListingCreateWithoutPricesInput = {
   inputSchema: Prisma.JsonNullValueInput | runtime.InputJsonValue
   outputContentTypes?: Prisma.ResourceListingCreateoutputContentTypesInput | string[]
   version?: number
+  public?: boolean
+  tags?: Prisma.ResourceListingCreatetagsInput | string[]
+  termsUrl?: string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   provider: Prisma.ResourceProviderCreateNestedOneWithoutResourcesInput
+  reviews?: Prisma.ResourceReviewCreateNestedManyWithoutResourceInput
+  healthChecks?: Prisma.ResourceHealthCheckCreateNestedManyWithoutResourceInput
 }
 
 export type ResourceListingUncheckedCreateWithoutPricesInput = {
@@ -715,8 +920,16 @@ export type ResourceListingUncheckedCreateWithoutPricesInput = {
   inputSchema: Prisma.JsonNullValueInput | runtime.InputJsonValue
   outputContentTypes?: Prisma.ResourceListingCreateoutputContentTypesInput | string[]
   version?: number
+  public?: boolean
+  tags?: Prisma.ResourceListingCreatetagsInput | string[]
+  termsUrl?: string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  reviews?: Prisma.ResourceReviewUncheckedCreateNestedManyWithoutResourceInput
+  healthChecks?: Prisma.ResourceHealthCheckUncheckedCreateNestedManyWithoutResourceInput
 }
 
 export type ResourceListingCreateOrConnectWithoutPricesInput = {
@@ -746,9 +959,17 @@ export type ResourceListingUpdateWithoutPricesInput = {
   inputSchema?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   outputContentTypes?: Prisma.ResourceListingUpdateoutputContentTypesInput | string[]
   version?: Prisma.IntFieldUpdateOperationsInput | number
+  public?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  tags?: Prisma.ResourceListingUpdatetagsInput | string[]
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: Prisma.EnumResourceHealthStatusFieldUpdateOperationsInput | $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   provider?: Prisma.ResourceProviderUpdateOneRequiredWithoutResourcesNestedInput
+  reviews?: Prisma.ResourceReviewUpdateManyWithoutResourceNestedInput
+  healthChecks?: Prisma.ResourceHealthCheckUpdateManyWithoutResourceNestedInput
 }
 
 export type ResourceListingUncheckedUpdateWithoutPricesInput = {
@@ -763,8 +984,240 @@ export type ResourceListingUncheckedUpdateWithoutPricesInput = {
   inputSchema?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   outputContentTypes?: Prisma.ResourceListingUpdateoutputContentTypesInput | string[]
   version?: Prisma.IntFieldUpdateOperationsInput | number
+  public?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  tags?: Prisma.ResourceListingUpdatetagsInput | string[]
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: Prisma.EnumResourceHealthStatusFieldUpdateOperationsInput | $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  reviews?: Prisma.ResourceReviewUncheckedUpdateManyWithoutResourceNestedInput
+  healthChecks?: Prisma.ResourceHealthCheckUncheckedUpdateManyWithoutResourceNestedInput
+}
+
+export type ResourceListingCreateWithoutReviewsInput = {
+  id?: string
+  category: $Enums.ResourceCategory
+  name: string
+  slug: string
+  description: string
+  endpoint: string
+  status?: $Enums.ResourceStatus
+  inputSchema: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  outputContentTypes?: Prisma.ResourceListingCreateoutputContentTypesInput | string[]
+  version?: number
+  public?: boolean
+  tags?: Prisma.ResourceListingCreatetagsInput | string[]
+  termsUrl?: string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  provider: Prisma.ResourceProviderCreateNestedOneWithoutResourcesInput
+  prices?: Prisma.ResourcePriceCreateNestedManyWithoutResourceListingInput
+  healthChecks?: Prisma.ResourceHealthCheckCreateNestedManyWithoutResourceInput
+}
+
+export type ResourceListingUncheckedCreateWithoutReviewsInput = {
+  id?: string
+  providerId: string
+  category: $Enums.ResourceCategory
+  name: string
+  slug: string
+  description: string
+  endpoint: string
+  status?: $Enums.ResourceStatus
+  inputSchema: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  outputContentTypes?: Prisma.ResourceListingCreateoutputContentTypesInput | string[]
+  version?: number
+  public?: boolean
+  tags?: Prisma.ResourceListingCreatetagsInput | string[]
+  termsUrl?: string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  prices?: Prisma.ResourcePriceUncheckedCreateNestedManyWithoutResourceListingInput
+  healthChecks?: Prisma.ResourceHealthCheckUncheckedCreateNestedManyWithoutResourceInput
+}
+
+export type ResourceListingCreateOrConnectWithoutReviewsInput = {
+  where: Prisma.ResourceListingWhereUniqueInput
+  create: Prisma.XOR<Prisma.ResourceListingCreateWithoutReviewsInput, Prisma.ResourceListingUncheckedCreateWithoutReviewsInput>
+}
+
+export type ResourceListingUpsertWithoutReviewsInput = {
+  update: Prisma.XOR<Prisma.ResourceListingUpdateWithoutReviewsInput, Prisma.ResourceListingUncheckedUpdateWithoutReviewsInput>
+  create: Prisma.XOR<Prisma.ResourceListingCreateWithoutReviewsInput, Prisma.ResourceListingUncheckedCreateWithoutReviewsInput>
+  where?: Prisma.ResourceListingWhereInput
+}
+
+export type ResourceListingUpdateToOneWithWhereWithoutReviewsInput = {
+  where?: Prisma.ResourceListingWhereInput
+  data: Prisma.XOR<Prisma.ResourceListingUpdateWithoutReviewsInput, Prisma.ResourceListingUncheckedUpdateWithoutReviewsInput>
+}
+
+export type ResourceListingUpdateWithoutReviewsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  category?: Prisma.EnumResourceCategoryFieldUpdateOperationsInput | $Enums.ResourceCategory
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  endpoint?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumResourceStatusFieldUpdateOperationsInput | $Enums.ResourceStatus
+  inputSchema?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  outputContentTypes?: Prisma.ResourceListingUpdateoutputContentTypesInput | string[]
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  public?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  tags?: Prisma.ResourceListingUpdatetagsInput | string[]
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: Prisma.EnumResourceHealthStatusFieldUpdateOperationsInput | $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  provider?: Prisma.ResourceProviderUpdateOneRequiredWithoutResourcesNestedInput
+  prices?: Prisma.ResourcePriceUpdateManyWithoutResourceListingNestedInput
+  healthChecks?: Prisma.ResourceHealthCheckUpdateManyWithoutResourceNestedInput
+}
+
+export type ResourceListingUncheckedUpdateWithoutReviewsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  providerId?: Prisma.StringFieldUpdateOperationsInput | string
+  category?: Prisma.EnumResourceCategoryFieldUpdateOperationsInput | $Enums.ResourceCategory
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  endpoint?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumResourceStatusFieldUpdateOperationsInput | $Enums.ResourceStatus
+  inputSchema?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  outputContentTypes?: Prisma.ResourceListingUpdateoutputContentTypesInput | string[]
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  public?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  tags?: Prisma.ResourceListingUpdatetagsInput | string[]
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: Prisma.EnumResourceHealthStatusFieldUpdateOperationsInput | $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  prices?: Prisma.ResourcePriceUncheckedUpdateManyWithoutResourceListingNestedInput
+  healthChecks?: Prisma.ResourceHealthCheckUncheckedUpdateManyWithoutResourceNestedInput
+}
+
+export type ResourceListingCreateWithoutHealthChecksInput = {
+  id?: string
+  category: $Enums.ResourceCategory
+  name: string
+  slug: string
+  description: string
+  endpoint: string
+  status?: $Enums.ResourceStatus
+  inputSchema: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  outputContentTypes?: Prisma.ResourceListingCreateoutputContentTypesInput | string[]
+  version?: number
+  public?: boolean
+  tags?: Prisma.ResourceListingCreatetagsInput | string[]
+  termsUrl?: string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  provider: Prisma.ResourceProviderCreateNestedOneWithoutResourcesInput
+  prices?: Prisma.ResourcePriceCreateNestedManyWithoutResourceListingInput
+  reviews?: Prisma.ResourceReviewCreateNestedManyWithoutResourceInput
+}
+
+export type ResourceListingUncheckedCreateWithoutHealthChecksInput = {
+  id?: string
+  providerId: string
+  category: $Enums.ResourceCategory
+  name: string
+  slug: string
+  description: string
+  endpoint: string
+  status?: $Enums.ResourceStatus
+  inputSchema: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  outputContentTypes?: Prisma.ResourceListingCreateoutputContentTypesInput | string[]
+  version?: number
+  public?: boolean
+  tags?: Prisma.ResourceListingCreatetagsInput | string[]
+  termsUrl?: string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  prices?: Prisma.ResourcePriceUncheckedCreateNestedManyWithoutResourceListingInput
+  reviews?: Prisma.ResourceReviewUncheckedCreateNestedManyWithoutResourceInput
+}
+
+export type ResourceListingCreateOrConnectWithoutHealthChecksInput = {
+  where: Prisma.ResourceListingWhereUniqueInput
+  create: Prisma.XOR<Prisma.ResourceListingCreateWithoutHealthChecksInput, Prisma.ResourceListingUncheckedCreateWithoutHealthChecksInput>
+}
+
+export type ResourceListingUpsertWithoutHealthChecksInput = {
+  update: Prisma.XOR<Prisma.ResourceListingUpdateWithoutHealthChecksInput, Prisma.ResourceListingUncheckedUpdateWithoutHealthChecksInput>
+  create: Prisma.XOR<Prisma.ResourceListingCreateWithoutHealthChecksInput, Prisma.ResourceListingUncheckedCreateWithoutHealthChecksInput>
+  where?: Prisma.ResourceListingWhereInput
+}
+
+export type ResourceListingUpdateToOneWithWhereWithoutHealthChecksInput = {
+  where?: Prisma.ResourceListingWhereInput
+  data: Prisma.XOR<Prisma.ResourceListingUpdateWithoutHealthChecksInput, Prisma.ResourceListingUncheckedUpdateWithoutHealthChecksInput>
+}
+
+export type ResourceListingUpdateWithoutHealthChecksInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  category?: Prisma.EnumResourceCategoryFieldUpdateOperationsInput | $Enums.ResourceCategory
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  endpoint?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumResourceStatusFieldUpdateOperationsInput | $Enums.ResourceStatus
+  inputSchema?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  outputContentTypes?: Prisma.ResourceListingUpdateoutputContentTypesInput | string[]
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  public?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  tags?: Prisma.ResourceListingUpdatetagsInput | string[]
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: Prisma.EnumResourceHealthStatusFieldUpdateOperationsInput | $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  provider?: Prisma.ResourceProviderUpdateOneRequiredWithoutResourcesNestedInput
+  prices?: Prisma.ResourcePriceUpdateManyWithoutResourceListingNestedInput
+  reviews?: Prisma.ResourceReviewUpdateManyWithoutResourceNestedInput
+}
+
+export type ResourceListingUncheckedUpdateWithoutHealthChecksInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  providerId?: Prisma.StringFieldUpdateOperationsInput | string
+  category?: Prisma.EnumResourceCategoryFieldUpdateOperationsInput | $Enums.ResourceCategory
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  endpoint?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumResourceStatusFieldUpdateOperationsInput | $Enums.ResourceStatus
+  inputSchema?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  outputContentTypes?: Prisma.ResourceListingUpdateoutputContentTypesInput | string[]
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  public?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  tags?: Prisma.ResourceListingUpdatetagsInput | string[]
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: Prisma.EnumResourceHealthStatusFieldUpdateOperationsInput | $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  prices?: Prisma.ResourcePriceUncheckedUpdateManyWithoutResourceListingNestedInput
+  reviews?: Prisma.ResourceReviewUncheckedUpdateManyWithoutResourceNestedInput
 }
 
 export type ResourceListingCreateManyProviderInput = {
@@ -778,6 +1231,12 @@ export type ResourceListingCreateManyProviderInput = {
   inputSchema: Prisma.JsonNullValueInput | runtime.InputJsonValue
   outputContentTypes?: Prisma.ResourceListingCreateoutputContentTypesInput | string[]
   version?: number
+  public?: boolean
+  tags?: Prisma.ResourceListingCreatetagsInput | string[]
+  termsUrl?: string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -793,9 +1252,17 @@ export type ResourceListingUpdateWithoutProviderInput = {
   inputSchema?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   outputContentTypes?: Prisma.ResourceListingUpdateoutputContentTypesInput | string[]
   version?: Prisma.IntFieldUpdateOperationsInput | number
+  public?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  tags?: Prisma.ResourceListingUpdatetagsInput | string[]
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: Prisma.EnumResourceHealthStatusFieldUpdateOperationsInput | $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   prices?: Prisma.ResourcePriceUpdateManyWithoutResourceListingNestedInput
+  reviews?: Prisma.ResourceReviewUpdateManyWithoutResourceNestedInput
+  healthChecks?: Prisma.ResourceHealthCheckUpdateManyWithoutResourceNestedInput
 }
 
 export type ResourceListingUncheckedUpdateWithoutProviderInput = {
@@ -809,9 +1276,17 @@ export type ResourceListingUncheckedUpdateWithoutProviderInput = {
   inputSchema?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   outputContentTypes?: Prisma.ResourceListingUpdateoutputContentTypesInput | string[]
   version?: Prisma.IntFieldUpdateOperationsInput | number
+  public?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  tags?: Prisma.ResourceListingUpdatetagsInput | string[]
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: Prisma.EnumResourceHealthStatusFieldUpdateOperationsInput | $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   prices?: Prisma.ResourcePriceUncheckedUpdateManyWithoutResourceListingNestedInput
+  reviews?: Prisma.ResourceReviewUncheckedUpdateManyWithoutResourceNestedInput
+  healthChecks?: Prisma.ResourceHealthCheckUncheckedUpdateManyWithoutResourceNestedInput
 }
 
 export type ResourceListingUncheckedUpdateManyWithoutProviderInput = {
@@ -825,6 +1300,12 @@ export type ResourceListingUncheckedUpdateManyWithoutProviderInput = {
   inputSchema?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   outputContentTypes?: Prisma.ResourceListingUpdateoutputContentTypesInput | string[]
   version?: Prisma.IntFieldUpdateOperationsInput | number
+  public?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  tags?: Prisma.ResourceListingUpdatetagsInput | string[]
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceLevel?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  healthStatus?: Prisma.EnumResourceHealthStatusFieldUpdateOperationsInput | $Enums.ResourceHealthStatus
+  lastHealthCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -836,10 +1317,14 @@ export type ResourceListingUncheckedUpdateManyWithoutProviderInput = {
 
 export type ResourceListingCountOutputType = {
   prices: number
+  reviews: number
+  healthChecks: number
 }
 
 export type ResourceListingCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   prices?: boolean | ResourceListingCountOutputTypeCountPricesArgs
+  reviews?: boolean | ResourceListingCountOutputTypeCountReviewsArgs
+  healthChecks?: boolean | ResourceListingCountOutputTypeCountHealthChecksArgs
 }
 
 /**
@@ -859,6 +1344,20 @@ export type ResourceListingCountOutputTypeCountPricesArgs<ExtArgs extends runtim
   where?: Prisma.ResourcePriceWhereInput
 }
 
+/**
+ * ResourceListingCountOutputType without action
+ */
+export type ResourceListingCountOutputTypeCountReviewsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ResourceReviewWhereInput
+}
+
+/**
+ * ResourceListingCountOutputType without action
+ */
+export type ResourceListingCountOutputTypeCountHealthChecksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ResourceHealthCheckWhereInput
+}
+
 
 export type ResourceListingSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -872,10 +1371,18 @@ export type ResourceListingSelect<ExtArgs extends runtime.Types.Extensions.Inter
   inputSchema?: boolean
   outputContentTypes?: boolean
   version?: boolean
+  public?: boolean
+  tags?: boolean
+  termsUrl?: boolean
+  serviceLevel?: boolean
+  healthStatus?: boolean
+  lastHealthCheckAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   provider?: boolean | Prisma.ResourceProviderDefaultArgs<ExtArgs>
   prices?: boolean | Prisma.ResourceListing$pricesArgs<ExtArgs>
+  reviews?: boolean | Prisma.ResourceListing$reviewsArgs<ExtArgs>
+  healthChecks?: boolean | Prisma.ResourceListing$healthChecksArgs<ExtArgs>
   _count?: boolean | Prisma.ResourceListingCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["resourceListing"]>
 
@@ -891,6 +1398,12 @@ export type ResourceListingSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
   inputSchema?: boolean
   outputContentTypes?: boolean
   version?: boolean
+  public?: boolean
+  tags?: boolean
+  termsUrl?: boolean
+  serviceLevel?: boolean
+  healthStatus?: boolean
+  lastHealthCheckAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   provider?: boolean | Prisma.ResourceProviderDefaultArgs<ExtArgs>
@@ -908,6 +1421,12 @@ export type ResourceListingSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
   inputSchema?: boolean
   outputContentTypes?: boolean
   version?: boolean
+  public?: boolean
+  tags?: boolean
+  termsUrl?: boolean
+  serviceLevel?: boolean
+  healthStatus?: boolean
+  lastHealthCheckAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   provider?: boolean | Prisma.ResourceProviderDefaultArgs<ExtArgs>
@@ -925,14 +1444,22 @@ export type ResourceListingSelectScalar = {
   inputSchema?: boolean
   outputContentTypes?: boolean
   version?: boolean
+  public?: boolean
+  tags?: boolean
+  termsUrl?: boolean
+  serviceLevel?: boolean
+  healthStatus?: boolean
+  lastHealthCheckAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type ResourceListingOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "providerId" | "category" | "name" | "slug" | "description" | "endpoint" | "status" | "inputSchema" | "outputContentTypes" | "version" | "createdAt" | "updatedAt", ExtArgs["result"]["resourceListing"]>
+export type ResourceListingOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "providerId" | "category" | "name" | "slug" | "description" | "endpoint" | "status" | "inputSchema" | "outputContentTypes" | "version" | "public" | "tags" | "termsUrl" | "serviceLevel" | "healthStatus" | "lastHealthCheckAt" | "createdAt" | "updatedAt", ExtArgs["result"]["resourceListing"]>
 export type ResourceListingInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   provider?: boolean | Prisma.ResourceProviderDefaultArgs<ExtArgs>
   prices?: boolean | Prisma.ResourceListing$pricesArgs<ExtArgs>
+  reviews?: boolean | Prisma.ResourceListing$reviewsArgs<ExtArgs>
+  healthChecks?: boolean | Prisma.ResourceListing$healthChecksArgs<ExtArgs>
   _count?: boolean | Prisma.ResourceListingCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type ResourceListingIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -947,6 +1474,8 @@ export type $ResourceListingPayload<ExtArgs extends runtime.Types.Extensions.Int
   objects: {
     provider: Prisma.$ResourceProviderPayload<ExtArgs>
     prices: Prisma.$ResourcePricePayload<ExtArgs>[]
+    reviews: Prisma.$ResourceReviewPayload<ExtArgs>[]
+    healthChecks: Prisma.$ResourceHealthCheckPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -960,6 +1489,12 @@ export type $ResourceListingPayload<ExtArgs extends runtime.Types.Extensions.Int
     inputSchema: runtime.JsonValue
     outputContentTypes: string[]
     version: number
+    public: boolean
+    tags: string[]
+    termsUrl: string | null
+    serviceLevel: runtime.JsonValue | null
+    healthStatus: $Enums.ResourceHealthStatus
+    lastHealthCheckAt: Date | null
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["resourceListing"]>
@@ -1358,6 +1893,8 @@ export interface Prisma__ResourceListingClient<T, Null = never, ExtArgs extends 
   readonly [Symbol.toStringTag]: "PrismaPromise"
   provider<T extends Prisma.ResourceProviderDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ResourceProviderDefaultArgs<ExtArgs>>): Prisma.Prisma__ResourceProviderClient<runtime.Types.Result.GetResult<Prisma.$ResourceProviderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   prices<T extends Prisma.ResourceListing$pricesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ResourceListing$pricesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ResourcePricePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  reviews<T extends Prisma.ResourceListing$reviewsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ResourceListing$reviewsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ResourceReviewPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  healthChecks<T extends Prisma.ResourceListing$healthChecksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ResourceListing$healthChecksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ResourceHealthCheckPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1398,6 +1935,12 @@ export interface ResourceListingFieldRefs {
   readonly inputSchema: Prisma.FieldRef<"ResourceListing", 'Json'>
   readonly outputContentTypes: Prisma.FieldRef<"ResourceListing", 'String[]'>
   readonly version: Prisma.FieldRef<"ResourceListing", 'Int'>
+  readonly public: Prisma.FieldRef<"ResourceListing", 'Boolean'>
+  readonly tags: Prisma.FieldRef<"ResourceListing", 'String[]'>
+  readonly termsUrl: Prisma.FieldRef<"ResourceListing", 'String'>
+  readonly serviceLevel: Prisma.FieldRef<"ResourceListing", 'Json'>
+  readonly healthStatus: Prisma.FieldRef<"ResourceListing", 'ResourceHealthStatus'>
+  readonly lastHealthCheckAt: Prisma.FieldRef<"ResourceListing", 'DateTime'>
   readonly createdAt: Prisma.FieldRef<"ResourceListing", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"ResourceListing", 'DateTime'>
 }
@@ -1822,6 +2365,54 @@ export type ResourceListing$pricesArgs<ExtArgs extends runtime.Types.Extensions.
   take?: number
   skip?: number
   distinct?: Prisma.ResourcePriceScalarFieldEnum | Prisma.ResourcePriceScalarFieldEnum[]
+}
+
+/**
+ * ResourceListing.reviews
+ */
+export type ResourceListing$reviewsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ResourceReview
+   */
+  select?: Prisma.ResourceReviewSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ResourceReview
+   */
+  omit?: Prisma.ResourceReviewOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ResourceReviewInclude<ExtArgs> | null
+  where?: Prisma.ResourceReviewWhereInput
+  orderBy?: Prisma.ResourceReviewOrderByWithRelationInput | Prisma.ResourceReviewOrderByWithRelationInput[]
+  cursor?: Prisma.ResourceReviewWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ResourceReviewScalarFieldEnum | Prisma.ResourceReviewScalarFieldEnum[]
+}
+
+/**
+ * ResourceListing.healthChecks
+ */
+export type ResourceListing$healthChecksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ResourceHealthCheck
+   */
+  select?: Prisma.ResourceHealthCheckSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ResourceHealthCheck
+   */
+  omit?: Prisma.ResourceHealthCheckOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ResourceHealthCheckInclude<ExtArgs> | null
+  where?: Prisma.ResourceHealthCheckWhereInput
+  orderBy?: Prisma.ResourceHealthCheckOrderByWithRelationInput | Prisma.ResourceHealthCheckOrderByWithRelationInput[]
+  cursor?: Prisma.ResourceHealthCheckWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ResourceHealthCheckScalarFieldEnum | Prisma.ResourceHealthCheckScalarFieldEnum[]
 }
 
 /**

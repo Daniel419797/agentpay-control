@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "node --env-file=.env --import tsx --watch src/index.ts",
     "start": "node --env-file=.env --import tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/security.test.ts"
   },
   "dependencies": {
     "@hono/node-server": "1.19.11",

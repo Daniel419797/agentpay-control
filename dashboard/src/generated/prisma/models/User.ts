@@ -176,6 +176,11 @@ export type UserWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   memberships?: Prisma.MembershipListRelationFilter
   identities?: Prisma.WalletIdentityListRelationFilter
+  approvalDecisions?: Prisma.ApprovalDecisionListRelationFilter
+  cardholderProfiles?: Prisma.CardholderProfileListRelationFilter
+  resourceReviews?: Prisma.ResourceReviewListRelationFilter
+  automationDecisions?: Prisma.AutomationExecutionDecisionListRelationFilter
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -185,6 +190,11 @@ export type UserOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   memberships?: Prisma.MembershipOrderByRelationAggregateInput
   identities?: Prisma.WalletIdentityOrderByRelationAggregateInput
+  approvalDecisions?: Prisma.ApprovalDecisionOrderByRelationAggregateInput
+  cardholderProfiles?: Prisma.CardholderProfileOrderByRelationAggregateInput
+  resourceReviews?: Prisma.ResourceReviewOrderByRelationAggregateInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionOrderByRelationAggregateInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -197,6 +207,11 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   memberships?: Prisma.MembershipListRelationFilter
   identities?: Prisma.WalletIdentityListRelationFilter
+  approvalDecisions?: Prisma.ApprovalDecisionListRelationFilter
+  cardholderProfiles?: Prisma.CardholderProfileListRelationFilter
+  resourceReviews?: Prisma.ResourceReviewListRelationFilter
+  automationDecisions?: Prisma.AutomationExecutionDecisionListRelationFilter
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionListRelationFilter
 }, "id" | "email">
 
 export type UserOrderByWithAggregationInput = {
@@ -226,6 +241,11 @@ export type UserCreateInput = {
   createdAt?: Date | string
   memberships?: Prisma.MembershipCreateNestedManyWithoutUserInput
   identities?: Prisma.WalletIdentityCreateNestedManyWithoutUserInput
+  approvalDecisions?: Prisma.ApprovalDecisionCreateNestedManyWithoutUserInput
+  cardholderProfiles?: Prisma.CardholderProfileCreateNestedManyWithoutUserInput
+  resourceReviews?: Prisma.ResourceReviewCreateNestedManyWithoutUserInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionCreateNestedManyWithoutUserInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionCreateNestedManyWithoutTriggeredByInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -235,6 +255,11 @@ export type UserUncheckedCreateInput = {
   createdAt?: Date | string
   memberships?: Prisma.MembershipUncheckedCreateNestedManyWithoutUserInput
   identities?: Prisma.WalletIdentityUncheckedCreateNestedManyWithoutUserInput
+  approvalDecisions?: Prisma.ApprovalDecisionUncheckedCreateNestedManyWithoutUserInput
+  cardholderProfiles?: Prisma.CardholderProfileUncheckedCreateNestedManyWithoutUserInput
+  resourceReviews?: Prisma.ResourceReviewUncheckedCreateNestedManyWithoutUserInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUncheckedCreateNestedManyWithoutUserInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUncheckedCreateNestedManyWithoutTriggeredByInput
 }
 
 export type UserUpdateInput = {
@@ -244,6 +269,11 @@ export type UserUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   memberships?: Prisma.MembershipUpdateManyWithoutUserNestedInput
   identities?: Prisma.WalletIdentityUpdateManyWithoutUserNestedInput
+  approvalDecisions?: Prisma.ApprovalDecisionUpdateManyWithoutUserNestedInput
+  cardholderProfiles?: Prisma.CardholderProfileUpdateManyWithoutUserNestedInput
+  resourceReviews?: Prisma.ResourceReviewUpdateManyWithoutUserNestedInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUpdateManyWithoutUserNestedInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUpdateManyWithoutTriggeredByNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -253,6 +283,11 @@ export type UserUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   memberships?: Prisma.MembershipUncheckedUpdateManyWithoutUserNestedInput
   identities?: Prisma.WalletIdentityUncheckedUpdateManyWithoutUserNestedInput
+  approvalDecisions?: Prisma.ApprovalDecisionUncheckedUpdateManyWithoutUserNestedInput
+  cardholderProfiles?: Prisma.CardholderProfileUncheckedUpdateManyWithoutUserNestedInput
+  resourceReviews?: Prisma.ResourceReviewUncheckedUpdateManyWithoutUserNestedInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUncheckedUpdateManyWithoutUserNestedInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUncheckedUpdateManyWithoutTriggeredByNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -302,6 +337,11 @@ export type UserScalarRelationFilter = {
   isNot?: Prisma.UserWhereInput
 }
 
+export type UserNullableScalarRelationFilter = {
+  is?: Prisma.UserWhereInput | null
+  isNot?: Prisma.UserWhereInput | null
+}
+
 export type StringFieldUpdateOperationsInput = {
   set?: string
 }
@@ -342,12 +382,91 @@ export type UserUpdateOneRequiredWithoutIdentitiesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutIdentitiesInput, Prisma.UserUpdateWithoutIdentitiesInput>, Prisma.UserUncheckedUpdateWithoutIdentitiesInput>
 }
 
+export type UserCreateNestedOneWithoutApprovalDecisionsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutApprovalDecisionsInput, Prisma.UserUncheckedCreateWithoutApprovalDecisionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutApprovalDecisionsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutApprovalDecisionsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutApprovalDecisionsInput, Prisma.UserUncheckedCreateWithoutApprovalDecisionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutApprovalDecisionsInput
+  upsert?: Prisma.UserUpsertWithoutApprovalDecisionsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutApprovalDecisionsInput, Prisma.UserUpdateWithoutApprovalDecisionsInput>, Prisma.UserUncheckedUpdateWithoutApprovalDecisionsInput>
+}
+
+export type UserCreateNestedOneWithoutResourceReviewsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutResourceReviewsInput, Prisma.UserUncheckedCreateWithoutResourceReviewsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutResourceReviewsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutResourceReviewsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutResourceReviewsInput, Prisma.UserUncheckedCreateWithoutResourceReviewsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutResourceReviewsInput
+  upsert?: Prisma.UserUpsertWithoutResourceReviewsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutResourceReviewsInput, Prisma.UserUpdateWithoutResourceReviewsInput>, Prisma.UserUncheckedUpdateWithoutResourceReviewsInput>
+}
+
+export type UserCreateNestedOneWithoutTriggeredAutomationExecutionsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutTriggeredAutomationExecutionsInput, Prisma.UserUncheckedCreateWithoutTriggeredAutomationExecutionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutTriggeredAutomationExecutionsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneWithoutTriggeredAutomationExecutionsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutTriggeredAutomationExecutionsInput, Prisma.UserUncheckedCreateWithoutTriggeredAutomationExecutionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutTriggeredAutomationExecutionsInput
+  upsert?: Prisma.UserUpsertWithoutTriggeredAutomationExecutionsInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutTriggeredAutomationExecutionsInput, Prisma.UserUpdateWithoutTriggeredAutomationExecutionsInput>, Prisma.UserUncheckedUpdateWithoutTriggeredAutomationExecutionsInput>
+}
+
+export type UserCreateNestedOneWithoutAutomationDecisionsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutAutomationDecisionsInput, Prisma.UserUncheckedCreateWithoutAutomationDecisionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutAutomationDecisionsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutAutomationDecisionsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutAutomationDecisionsInput, Prisma.UserUncheckedCreateWithoutAutomationDecisionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutAutomationDecisionsInput
+  upsert?: Prisma.UserUpsertWithoutAutomationDecisionsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutAutomationDecisionsInput, Prisma.UserUpdateWithoutAutomationDecisionsInput>, Prisma.UserUncheckedUpdateWithoutAutomationDecisionsInput>
+}
+
+export type UserCreateNestedOneWithoutCardholderProfilesInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCardholderProfilesInput, Prisma.UserUncheckedCreateWithoutCardholderProfilesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCardholderProfilesInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneWithoutCardholderProfilesNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCardholderProfilesInput, Prisma.UserUncheckedCreateWithoutCardholderProfilesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCardholderProfilesInput
+  upsert?: Prisma.UserUpsertWithoutCardholderProfilesInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutCardholderProfilesInput, Prisma.UserUpdateWithoutCardholderProfilesInput>, Prisma.UserUncheckedUpdateWithoutCardholderProfilesInput>
+}
+
 export type UserCreateWithoutMembershipsInput = {
   id?: string
   email?: string | null
   displayName: string
   createdAt?: Date | string
   identities?: Prisma.WalletIdentityCreateNestedManyWithoutUserInput
+  approvalDecisions?: Prisma.ApprovalDecisionCreateNestedManyWithoutUserInput
+  cardholderProfiles?: Prisma.CardholderProfileCreateNestedManyWithoutUserInput
+  resourceReviews?: Prisma.ResourceReviewCreateNestedManyWithoutUserInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionCreateNestedManyWithoutUserInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionCreateNestedManyWithoutTriggeredByInput
 }
 
 export type UserUncheckedCreateWithoutMembershipsInput = {
@@ -356,6 +475,11 @@ export type UserUncheckedCreateWithoutMembershipsInput = {
   displayName: string
   createdAt?: Date | string
   identities?: Prisma.WalletIdentityUncheckedCreateNestedManyWithoutUserInput
+  approvalDecisions?: Prisma.ApprovalDecisionUncheckedCreateNestedManyWithoutUserInput
+  cardholderProfiles?: Prisma.CardholderProfileUncheckedCreateNestedManyWithoutUserInput
+  resourceReviews?: Prisma.ResourceReviewUncheckedCreateNestedManyWithoutUserInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUncheckedCreateNestedManyWithoutUserInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUncheckedCreateNestedManyWithoutTriggeredByInput
 }
 
 export type UserCreateOrConnectWithoutMembershipsInput = {
@@ -380,6 +504,11 @@ export type UserUpdateWithoutMembershipsInput = {
   displayName?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   identities?: Prisma.WalletIdentityUpdateManyWithoutUserNestedInput
+  approvalDecisions?: Prisma.ApprovalDecisionUpdateManyWithoutUserNestedInput
+  cardholderProfiles?: Prisma.CardholderProfileUpdateManyWithoutUserNestedInput
+  resourceReviews?: Prisma.ResourceReviewUpdateManyWithoutUserNestedInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUpdateManyWithoutUserNestedInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUpdateManyWithoutTriggeredByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutMembershipsInput = {
@@ -388,6 +517,11 @@ export type UserUncheckedUpdateWithoutMembershipsInput = {
   displayName?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   identities?: Prisma.WalletIdentityUncheckedUpdateManyWithoutUserNestedInput
+  approvalDecisions?: Prisma.ApprovalDecisionUncheckedUpdateManyWithoutUserNestedInput
+  cardholderProfiles?: Prisma.CardholderProfileUncheckedUpdateManyWithoutUserNestedInput
+  resourceReviews?: Prisma.ResourceReviewUncheckedUpdateManyWithoutUserNestedInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUncheckedUpdateManyWithoutUserNestedInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUncheckedUpdateManyWithoutTriggeredByNestedInput
 }
 
 export type UserCreateWithoutIdentitiesInput = {
@@ -396,6 +530,11 @@ export type UserCreateWithoutIdentitiesInput = {
   displayName: string
   createdAt?: Date | string
   memberships?: Prisma.MembershipCreateNestedManyWithoutUserInput
+  approvalDecisions?: Prisma.ApprovalDecisionCreateNestedManyWithoutUserInput
+  cardholderProfiles?: Prisma.CardholderProfileCreateNestedManyWithoutUserInput
+  resourceReviews?: Prisma.ResourceReviewCreateNestedManyWithoutUserInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionCreateNestedManyWithoutUserInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionCreateNestedManyWithoutTriggeredByInput
 }
 
 export type UserUncheckedCreateWithoutIdentitiesInput = {
@@ -404,6 +543,11 @@ export type UserUncheckedCreateWithoutIdentitiesInput = {
   displayName: string
   createdAt?: Date | string
   memberships?: Prisma.MembershipUncheckedCreateNestedManyWithoutUserInput
+  approvalDecisions?: Prisma.ApprovalDecisionUncheckedCreateNestedManyWithoutUserInput
+  cardholderProfiles?: Prisma.CardholderProfileUncheckedCreateNestedManyWithoutUserInput
+  resourceReviews?: Prisma.ResourceReviewUncheckedCreateNestedManyWithoutUserInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUncheckedCreateNestedManyWithoutUserInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUncheckedCreateNestedManyWithoutTriggeredByInput
 }
 
 export type UserCreateOrConnectWithoutIdentitiesInput = {
@@ -428,6 +572,11 @@ export type UserUpdateWithoutIdentitiesInput = {
   displayName?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   memberships?: Prisma.MembershipUpdateManyWithoutUserNestedInput
+  approvalDecisions?: Prisma.ApprovalDecisionUpdateManyWithoutUserNestedInput
+  cardholderProfiles?: Prisma.CardholderProfileUpdateManyWithoutUserNestedInput
+  resourceReviews?: Prisma.ResourceReviewUpdateManyWithoutUserNestedInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUpdateManyWithoutUserNestedInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUpdateManyWithoutTriggeredByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutIdentitiesInput = {
@@ -436,6 +585,351 @@ export type UserUncheckedUpdateWithoutIdentitiesInput = {
   displayName?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   memberships?: Prisma.MembershipUncheckedUpdateManyWithoutUserNestedInput
+  approvalDecisions?: Prisma.ApprovalDecisionUncheckedUpdateManyWithoutUserNestedInput
+  cardholderProfiles?: Prisma.CardholderProfileUncheckedUpdateManyWithoutUserNestedInput
+  resourceReviews?: Prisma.ResourceReviewUncheckedUpdateManyWithoutUserNestedInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUncheckedUpdateManyWithoutUserNestedInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUncheckedUpdateManyWithoutTriggeredByNestedInput
+}
+
+export type UserCreateWithoutApprovalDecisionsInput = {
+  id?: string
+  email?: string | null
+  displayName: string
+  createdAt?: Date | string
+  memberships?: Prisma.MembershipCreateNestedManyWithoutUserInput
+  identities?: Prisma.WalletIdentityCreateNestedManyWithoutUserInput
+  cardholderProfiles?: Prisma.CardholderProfileCreateNestedManyWithoutUserInput
+  resourceReviews?: Prisma.ResourceReviewCreateNestedManyWithoutUserInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionCreateNestedManyWithoutUserInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionCreateNestedManyWithoutTriggeredByInput
+}
+
+export type UserUncheckedCreateWithoutApprovalDecisionsInput = {
+  id?: string
+  email?: string | null
+  displayName: string
+  createdAt?: Date | string
+  memberships?: Prisma.MembershipUncheckedCreateNestedManyWithoutUserInput
+  identities?: Prisma.WalletIdentityUncheckedCreateNestedManyWithoutUserInput
+  cardholderProfiles?: Prisma.CardholderProfileUncheckedCreateNestedManyWithoutUserInput
+  resourceReviews?: Prisma.ResourceReviewUncheckedCreateNestedManyWithoutUserInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUncheckedCreateNestedManyWithoutUserInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUncheckedCreateNestedManyWithoutTriggeredByInput
+}
+
+export type UserCreateOrConnectWithoutApprovalDecisionsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutApprovalDecisionsInput, Prisma.UserUncheckedCreateWithoutApprovalDecisionsInput>
+}
+
+export type UserUpsertWithoutApprovalDecisionsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutApprovalDecisionsInput, Prisma.UserUncheckedUpdateWithoutApprovalDecisionsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutApprovalDecisionsInput, Prisma.UserUncheckedCreateWithoutApprovalDecisionsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutApprovalDecisionsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutApprovalDecisionsInput, Prisma.UserUncheckedUpdateWithoutApprovalDecisionsInput>
+}
+
+export type UserUpdateWithoutApprovalDecisionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUpdateManyWithoutUserNestedInput
+  identities?: Prisma.WalletIdentityUpdateManyWithoutUserNestedInput
+  cardholderProfiles?: Prisma.CardholderProfileUpdateManyWithoutUserNestedInput
+  resourceReviews?: Prisma.ResourceReviewUpdateManyWithoutUserNestedInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUpdateManyWithoutUserNestedInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUpdateManyWithoutTriggeredByNestedInput
+}
+
+export type UserUncheckedUpdateWithoutApprovalDecisionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUncheckedUpdateManyWithoutUserNestedInput
+  identities?: Prisma.WalletIdentityUncheckedUpdateManyWithoutUserNestedInput
+  cardholderProfiles?: Prisma.CardholderProfileUncheckedUpdateManyWithoutUserNestedInput
+  resourceReviews?: Prisma.ResourceReviewUncheckedUpdateManyWithoutUserNestedInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUncheckedUpdateManyWithoutUserNestedInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUncheckedUpdateManyWithoutTriggeredByNestedInput
+}
+
+export type UserCreateWithoutResourceReviewsInput = {
+  id?: string
+  email?: string | null
+  displayName: string
+  createdAt?: Date | string
+  memberships?: Prisma.MembershipCreateNestedManyWithoutUserInput
+  identities?: Prisma.WalletIdentityCreateNestedManyWithoutUserInput
+  approvalDecisions?: Prisma.ApprovalDecisionCreateNestedManyWithoutUserInput
+  cardholderProfiles?: Prisma.CardholderProfileCreateNestedManyWithoutUserInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionCreateNestedManyWithoutUserInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionCreateNestedManyWithoutTriggeredByInput
+}
+
+export type UserUncheckedCreateWithoutResourceReviewsInput = {
+  id?: string
+  email?: string | null
+  displayName: string
+  createdAt?: Date | string
+  memberships?: Prisma.MembershipUncheckedCreateNestedManyWithoutUserInput
+  identities?: Prisma.WalletIdentityUncheckedCreateNestedManyWithoutUserInput
+  approvalDecisions?: Prisma.ApprovalDecisionUncheckedCreateNestedManyWithoutUserInput
+  cardholderProfiles?: Prisma.CardholderProfileUncheckedCreateNestedManyWithoutUserInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUncheckedCreateNestedManyWithoutUserInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUncheckedCreateNestedManyWithoutTriggeredByInput
+}
+
+export type UserCreateOrConnectWithoutResourceReviewsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutResourceReviewsInput, Prisma.UserUncheckedCreateWithoutResourceReviewsInput>
+}
+
+export type UserUpsertWithoutResourceReviewsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutResourceReviewsInput, Prisma.UserUncheckedUpdateWithoutResourceReviewsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutResourceReviewsInput, Prisma.UserUncheckedCreateWithoutResourceReviewsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutResourceReviewsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutResourceReviewsInput, Prisma.UserUncheckedUpdateWithoutResourceReviewsInput>
+}
+
+export type UserUpdateWithoutResourceReviewsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUpdateManyWithoutUserNestedInput
+  identities?: Prisma.WalletIdentityUpdateManyWithoutUserNestedInput
+  approvalDecisions?: Prisma.ApprovalDecisionUpdateManyWithoutUserNestedInput
+  cardholderProfiles?: Prisma.CardholderProfileUpdateManyWithoutUserNestedInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUpdateManyWithoutUserNestedInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUpdateManyWithoutTriggeredByNestedInput
+}
+
+export type UserUncheckedUpdateWithoutResourceReviewsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUncheckedUpdateManyWithoutUserNestedInput
+  identities?: Prisma.WalletIdentityUncheckedUpdateManyWithoutUserNestedInput
+  approvalDecisions?: Prisma.ApprovalDecisionUncheckedUpdateManyWithoutUserNestedInput
+  cardholderProfiles?: Prisma.CardholderProfileUncheckedUpdateManyWithoutUserNestedInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUncheckedUpdateManyWithoutUserNestedInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUncheckedUpdateManyWithoutTriggeredByNestedInput
+}
+
+export type UserCreateWithoutTriggeredAutomationExecutionsInput = {
+  id?: string
+  email?: string | null
+  displayName: string
+  createdAt?: Date | string
+  memberships?: Prisma.MembershipCreateNestedManyWithoutUserInput
+  identities?: Prisma.WalletIdentityCreateNestedManyWithoutUserInput
+  approvalDecisions?: Prisma.ApprovalDecisionCreateNestedManyWithoutUserInput
+  cardholderProfiles?: Prisma.CardholderProfileCreateNestedManyWithoutUserInput
+  resourceReviews?: Prisma.ResourceReviewCreateNestedManyWithoutUserInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutTriggeredAutomationExecutionsInput = {
+  id?: string
+  email?: string | null
+  displayName: string
+  createdAt?: Date | string
+  memberships?: Prisma.MembershipUncheckedCreateNestedManyWithoutUserInput
+  identities?: Prisma.WalletIdentityUncheckedCreateNestedManyWithoutUserInput
+  approvalDecisions?: Prisma.ApprovalDecisionUncheckedCreateNestedManyWithoutUserInput
+  cardholderProfiles?: Prisma.CardholderProfileUncheckedCreateNestedManyWithoutUserInput
+  resourceReviews?: Prisma.ResourceReviewUncheckedCreateNestedManyWithoutUserInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutTriggeredAutomationExecutionsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutTriggeredAutomationExecutionsInput, Prisma.UserUncheckedCreateWithoutTriggeredAutomationExecutionsInput>
+}
+
+export type UserUpsertWithoutTriggeredAutomationExecutionsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutTriggeredAutomationExecutionsInput, Prisma.UserUncheckedUpdateWithoutTriggeredAutomationExecutionsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutTriggeredAutomationExecutionsInput, Prisma.UserUncheckedCreateWithoutTriggeredAutomationExecutionsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutTriggeredAutomationExecutionsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutTriggeredAutomationExecutionsInput, Prisma.UserUncheckedUpdateWithoutTriggeredAutomationExecutionsInput>
+}
+
+export type UserUpdateWithoutTriggeredAutomationExecutionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUpdateManyWithoutUserNestedInput
+  identities?: Prisma.WalletIdentityUpdateManyWithoutUserNestedInput
+  approvalDecisions?: Prisma.ApprovalDecisionUpdateManyWithoutUserNestedInput
+  cardholderProfiles?: Prisma.CardholderProfileUpdateManyWithoutUserNestedInput
+  resourceReviews?: Prisma.ResourceReviewUpdateManyWithoutUserNestedInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutTriggeredAutomationExecutionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUncheckedUpdateManyWithoutUserNestedInput
+  identities?: Prisma.WalletIdentityUncheckedUpdateManyWithoutUserNestedInput
+  approvalDecisions?: Prisma.ApprovalDecisionUncheckedUpdateManyWithoutUserNestedInput
+  cardholderProfiles?: Prisma.CardholderProfileUncheckedUpdateManyWithoutUserNestedInput
+  resourceReviews?: Prisma.ResourceReviewUncheckedUpdateManyWithoutUserNestedInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutAutomationDecisionsInput = {
+  id?: string
+  email?: string | null
+  displayName: string
+  createdAt?: Date | string
+  memberships?: Prisma.MembershipCreateNestedManyWithoutUserInput
+  identities?: Prisma.WalletIdentityCreateNestedManyWithoutUserInput
+  approvalDecisions?: Prisma.ApprovalDecisionCreateNestedManyWithoutUserInput
+  cardholderProfiles?: Prisma.CardholderProfileCreateNestedManyWithoutUserInput
+  resourceReviews?: Prisma.ResourceReviewCreateNestedManyWithoutUserInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionCreateNestedManyWithoutTriggeredByInput
+}
+
+export type UserUncheckedCreateWithoutAutomationDecisionsInput = {
+  id?: string
+  email?: string | null
+  displayName: string
+  createdAt?: Date | string
+  memberships?: Prisma.MembershipUncheckedCreateNestedManyWithoutUserInput
+  identities?: Prisma.WalletIdentityUncheckedCreateNestedManyWithoutUserInput
+  approvalDecisions?: Prisma.ApprovalDecisionUncheckedCreateNestedManyWithoutUserInput
+  cardholderProfiles?: Prisma.CardholderProfileUncheckedCreateNestedManyWithoutUserInput
+  resourceReviews?: Prisma.ResourceReviewUncheckedCreateNestedManyWithoutUserInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUncheckedCreateNestedManyWithoutTriggeredByInput
+}
+
+export type UserCreateOrConnectWithoutAutomationDecisionsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutAutomationDecisionsInput, Prisma.UserUncheckedCreateWithoutAutomationDecisionsInput>
+}
+
+export type UserUpsertWithoutAutomationDecisionsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutAutomationDecisionsInput, Prisma.UserUncheckedUpdateWithoutAutomationDecisionsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutAutomationDecisionsInput, Prisma.UserUncheckedCreateWithoutAutomationDecisionsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutAutomationDecisionsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutAutomationDecisionsInput, Prisma.UserUncheckedUpdateWithoutAutomationDecisionsInput>
+}
+
+export type UserUpdateWithoutAutomationDecisionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUpdateManyWithoutUserNestedInput
+  identities?: Prisma.WalletIdentityUpdateManyWithoutUserNestedInput
+  approvalDecisions?: Prisma.ApprovalDecisionUpdateManyWithoutUserNestedInput
+  cardholderProfiles?: Prisma.CardholderProfileUpdateManyWithoutUserNestedInput
+  resourceReviews?: Prisma.ResourceReviewUpdateManyWithoutUserNestedInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUpdateManyWithoutTriggeredByNestedInput
+}
+
+export type UserUncheckedUpdateWithoutAutomationDecisionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUncheckedUpdateManyWithoutUserNestedInput
+  identities?: Prisma.WalletIdentityUncheckedUpdateManyWithoutUserNestedInput
+  approvalDecisions?: Prisma.ApprovalDecisionUncheckedUpdateManyWithoutUserNestedInput
+  cardholderProfiles?: Prisma.CardholderProfileUncheckedUpdateManyWithoutUserNestedInput
+  resourceReviews?: Prisma.ResourceReviewUncheckedUpdateManyWithoutUserNestedInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUncheckedUpdateManyWithoutTriggeredByNestedInput
+}
+
+export type UserCreateWithoutCardholderProfilesInput = {
+  id?: string
+  email?: string | null
+  displayName: string
+  createdAt?: Date | string
+  memberships?: Prisma.MembershipCreateNestedManyWithoutUserInput
+  identities?: Prisma.WalletIdentityCreateNestedManyWithoutUserInput
+  approvalDecisions?: Prisma.ApprovalDecisionCreateNestedManyWithoutUserInput
+  resourceReviews?: Prisma.ResourceReviewCreateNestedManyWithoutUserInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionCreateNestedManyWithoutUserInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionCreateNestedManyWithoutTriggeredByInput
+}
+
+export type UserUncheckedCreateWithoutCardholderProfilesInput = {
+  id?: string
+  email?: string | null
+  displayName: string
+  createdAt?: Date | string
+  memberships?: Prisma.MembershipUncheckedCreateNestedManyWithoutUserInput
+  identities?: Prisma.WalletIdentityUncheckedCreateNestedManyWithoutUserInput
+  approvalDecisions?: Prisma.ApprovalDecisionUncheckedCreateNestedManyWithoutUserInput
+  resourceReviews?: Prisma.ResourceReviewUncheckedCreateNestedManyWithoutUserInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUncheckedCreateNestedManyWithoutUserInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUncheckedCreateNestedManyWithoutTriggeredByInput
+}
+
+export type UserCreateOrConnectWithoutCardholderProfilesInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutCardholderProfilesInput, Prisma.UserUncheckedCreateWithoutCardholderProfilesInput>
+}
+
+export type UserUpsertWithoutCardholderProfilesInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutCardholderProfilesInput, Prisma.UserUncheckedUpdateWithoutCardholderProfilesInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutCardholderProfilesInput, Prisma.UserUncheckedCreateWithoutCardholderProfilesInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutCardholderProfilesInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutCardholderProfilesInput, Prisma.UserUncheckedUpdateWithoutCardholderProfilesInput>
+}
+
+export type UserUpdateWithoutCardholderProfilesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUpdateManyWithoutUserNestedInput
+  identities?: Prisma.WalletIdentityUpdateManyWithoutUserNestedInput
+  approvalDecisions?: Prisma.ApprovalDecisionUpdateManyWithoutUserNestedInput
+  resourceReviews?: Prisma.ResourceReviewUpdateManyWithoutUserNestedInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUpdateManyWithoutUserNestedInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUpdateManyWithoutTriggeredByNestedInput
+}
+
+export type UserUncheckedUpdateWithoutCardholderProfilesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUncheckedUpdateManyWithoutUserNestedInput
+  identities?: Prisma.WalletIdentityUncheckedUpdateManyWithoutUserNestedInput
+  approvalDecisions?: Prisma.ApprovalDecisionUncheckedUpdateManyWithoutUserNestedInput
+  resourceReviews?: Prisma.ResourceReviewUncheckedUpdateManyWithoutUserNestedInput
+  automationDecisions?: Prisma.AutomationExecutionDecisionUncheckedUpdateManyWithoutUserNestedInput
+  triggeredAutomationExecutions?: Prisma.AutomationExecutionUncheckedUpdateManyWithoutTriggeredByNestedInput
 }
 
 
@@ -446,11 +940,21 @@ export type UserUncheckedUpdateWithoutIdentitiesInput = {
 export type UserCountOutputType = {
   memberships: number
   identities: number
+  approvalDecisions: number
+  cardholderProfiles: number
+  resourceReviews: number
+  automationDecisions: number
+  triggeredAutomationExecutions: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   memberships?: boolean | UserCountOutputTypeCountMembershipsArgs
   identities?: boolean | UserCountOutputTypeCountIdentitiesArgs
+  approvalDecisions?: boolean | UserCountOutputTypeCountApprovalDecisionsArgs
+  cardholderProfiles?: boolean | UserCountOutputTypeCountCardholderProfilesArgs
+  resourceReviews?: boolean | UserCountOutputTypeCountResourceReviewsArgs
+  automationDecisions?: boolean | UserCountOutputTypeCountAutomationDecisionsArgs
+  triggeredAutomationExecutions?: boolean | UserCountOutputTypeCountTriggeredAutomationExecutionsArgs
 }
 
 /**
@@ -477,6 +981,41 @@ export type UserCountOutputTypeCountIdentitiesArgs<ExtArgs extends runtime.Types
   where?: Prisma.WalletIdentityWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountApprovalDecisionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ApprovalDecisionWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountCardholderProfilesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CardholderProfileWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountResourceReviewsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ResourceReviewWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountAutomationDecisionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.AutomationExecutionDecisionWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountTriggeredAutomationExecutionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.AutomationExecutionWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -485,6 +1024,11 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   createdAt?: boolean
   memberships?: boolean | Prisma.User$membershipsArgs<ExtArgs>
   identities?: boolean | Prisma.User$identitiesArgs<ExtArgs>
+  approvalDecisions?: boolean | Prisma.User$approvalDecisionsArgs<ExtArgs>
+  cardholderProfiles?: boolean | Prisma.User$cardholderProfilesArgs<ExtArgs>
+  resourceReviews?: boolean | Prisma.User$resourceReviewsArgs<ExtArgs>
+  automationDecisions?: boolean | Prisma.User$automationDecisionsArgs<ExtArgs>
+  triggeredAutomationExecutions?: boolean | Prisma.User$triggeredAutomationExecutionsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -513,6 +1057,11 @@ export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = run
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   memberships?: boolean | Prisma.User$membershipsArgs<ExtArgs>
   identities?: boolean | Prisma.User$identitiesArgs<ExtArgs>
+  approvalDecisions?: boolean | Prisma.User$approvalDecisionsArgs<ExtArgs>
+  cardholderProfiles?: boolean | Prisma.User$cardholderProfilesArgs<ExtArgs>
+  resourceReviews?: boolean | Prisma.User$resourceReviewsArgs<ExtArgs>
+  automationDecisions?: boolean | Prisma.User$automationDecisionsArgs<ExtArgs>
+  triggeredAutomationExecutions?: boolean | Prisma.User$triggeredAutomationExecutionsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -523,6 +1072,11 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   objects: {
     memberships: Prisma.$MembershipPayload<ExtArgs>[]
     identities: Prisma.$WalletIdentityPayload<ExtArgs>[]
+    approvalDecisions: Prisma.$ApprovalDecisionPayload<ExtArgs>[]
+    cardholderProfiles: Prisma.$CardholderProfilePayload<ExtArgs>[]
+    resourceReviews: Prisma.$ResourceReviewPayload<ExtArgs>[]
+    automationDecisions: Prisma.$AutomationExecutionDecisionPayload<ExtArgs>[]
+    triggeredAutomationExecutions: Prisma.$AutomationExecutionPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -925,6 +1479,11 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   readonly [Symbol.toStringTag]: "PrismaPromise"
   memberships<T extends Prisma.User$membershipsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$membershipsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MembershipPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   identities<T extends Prisma.User$identitiesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$identitiesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WalletIdentityPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  approvalDecisions<T extends Prisma.User$approvalDecisionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$approvalDecisionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ApprovalDecisionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  cardholderProfiles<T extends Prisma.User$cardholderProfilesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$cardholderProfilesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CardholderProfilePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  resourceReviews<T extends Prisma.User$resourceReviewsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$resourceReviewsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ResourceReviewPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  automationDecisions<T extends Prisma.User$automationDecisionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$automationDecisionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AutomationExecutionDecisionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  triggeredAutomationExecutions<T extends Prisma.User$triggeredAutomationExecutionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$triggeredAutomationExecutionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AutomationExecutionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1396,6 +1955,126 @@ export type User$identitiesArgs<ExtArgs extends runtime.Types.Extensions.Interna
   take?: number
   skip?: number
   distinct?: Prisma.WalletIdentityScalarFieldEnum | Prisma.WalletIdentityScalarFieldEnum[]
+}
+
+/**
+ * User.approvalDecisions
+ */
+export type User$approvalDecisionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ApprovalDecision
+   */
+  select?: Prisma.ApprovalDecisionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ApprovalDecision
+   */
+  omit?: Prisma.ApprovalDecisionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ApprovalDecisionInclude<ExtArgs> | null
+  where?: Prisma.ApprovalDecisionWhereInput
+  orderBy?: Prisma.ApprovalDecisionOrderByWithRelationInput | Prisma.ApprovalDecisionOrderByWithRelationInput[]
+  cursor?: Prisma.ApprovalDecisionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ApprovalDecisionScalarFieldEnum | Prisma.ApprovalDecisionScalarFieldEnum[]
+}
+
+/**
+ * User.cardholderProfiles
+ */
+export type User$cardholderProfilesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CardholderProfile
+   */
+  select?: Prisma.CardholderProfileSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CardholderProfile
+   */
+  omit?: Prisma.CardholderProfileOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CardholderProfileInclude<ExtArgs> | null
+  where?: Prisma.CardholderProfileWhereInput
+  orderBy?: Prisma.CardholderProfileOrderByWithRelationInput | Prisma.CardholderProfileOrderByWithRelationInput[]
+  cursor?: Prisma.CardholderProfileWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CardholderProfileScalarFieldEnum | Prisma.CardholderProfileScalarFieldEnum[]
+}
+
+/**
+ * User.resourceReviews
+ */
+export type User$resourceReviewsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ResourceReview
+   */
+  select?: Prisma.ResourceReviewSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ResourceReview
+   */
+  omit?: Prisma.ResourceReviewOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ResourceReviewInclude<ExtArgs> | null
+  where?: Prisma.ResourceReviewWhereInput
+  orderBy?: Prisma.ResourceReviewOrderByWithRelationInput | Prisma.ResourceReviewOrderByWithRelationInput[]
+  cursor?: Prisma.ResourceReviewWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ResourceReviewScalarFieldEnum | Prisma.ResourceReviewScalarFieldEnum[]
+}
+
+/**
+ * User.automationDecisions
+ */
+export type User$automationDecisionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the AutomationExecutionDecision
+   */
+  select?: Prisma.AutomationExecutionDecisionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the AutomationExecutionDecision
+   */
+  omit?: Prisma.AutomationExecutionDecisionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AutomationExecutionDecisionInclude<ExtArgs> | null
+  where?: Prisma.AutomationExecutionDecisionWhereInput
+  orderBy?: Prisma.AutomationExecutionDecisionOrderByWithRelationInput | Prisma.AutomationExecutionDecisionOrderByWithRelationInput[]
+  cursor?: Prisma.AutomationExecutionDecisionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.AutomationExecutionDecisionScalarFieldEnum | Prisma.AutomationExecutionDecisionScalarFieldEnum[]
+}
+
+/**
+ * User.triggeredAutomationExecutions
+ */
+export type User$triggeredAutomationExecutionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the AutomationExecution
+   */
+  select?: Prisma.AutomationExecutionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the AutomationExecution
+   */
+  omit?: Prisma.AutomationExecutionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AutomationExecutionInclude<ExtArgs> | null
+  where?: Prisma.AutomationExecutionWhereInput
+  orderBy?: Prisma.AutomationExecutionOrderByWithRelationInput | Prisma.AutomationExecutionOrderByWithRelationInput[]
+  cursor?: Prisma.AutomationExecutionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.AutomationExecutionScalarFieldEnum | Prisma.AutomationExecutionScalarFieldEnum[]
 }
 
 /**

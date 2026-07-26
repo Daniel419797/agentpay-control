@@ -40,6 +40,7 @@ export type PaymentAttemptMinAggregateOutputType = {
   attemptNumber: number | null
   status: $Enums.AttemptStatus | null
   facilitatorRequestId: string | null
+  candidateTransactionId: string | null
   signatureFingerprint: string | null
   errorCode: string | null
   createdAt: Date | null
@@ -52,6 +53,7 @@ export type PaymentAttemptMaxAggregateOutputType = {
   attemptNumber: number | null
   status: $Enums.AttemptStatus | null
   facilitatorRequestId: string | null
+  candidateTransactionId: string | null
   signatureFingerprint: string | null
   errorCode: string | null
   createdAt: Date | null
@@ -64,6 +66,7 @@ export type PaymentAttemptCountAggregateOutputType = {
   attemptNumber: number
   status: number
   facilitatorRequestId: number
+  candidateTransactionId: number
   signatureFingerprint: number
   errorCode: number
   createdAt: number
@@ -86,6 +89,7 @@ export type PaymentAttemptMinAggregateInputType = {
   attemptNumber?: true
   status?: true
   facilitatorRequestId?: true
+  candidateTransactionId?: true
   signatureFingerprint?: true
   errorCode?: true
   createdAt?: true
@@ -98,6 +102,7 @@ export type PaymentAttemptMaxAggregateInputType = {
   attemptNumber?: true
   status?: true
   facilitatorRequestId?: true
+  candidateTransactionId?: true
   signatureFingerprint?: true
   errorCode?: true
   createdAt?: true
@@ -110,6 +115,7 @@ export type PaymentAttemptCountAggregateInputType = {
   attemptNumber?: true
   status?: true
   facilitatorRequestId?: true
+  candidateTransactionId?: true
   signatureFingerprint?: true
   errorCode?: true
   createdAt?: true
@@ -209,6 +215,7 @@ export type PaymentAttemptGroupByOutputType = {
   attemptNumber: number
   status: $Enums.AttemptStatus
   facilitatorRequestId: string | null
+  candidateTransactionId: string | null
   signatureFingerprint: string | null
   errorCode: string | null
   createdAt: Date
@@ -244,6 +251,7 @@ export type PaymentAttemptWhereInput = {
   attemptNumber?: Prisma.IntFilter<"PaymentAttempt"> | number
   status?: Prisma.EnumAttemptStatusFilter<"PaymentAttempt"> | $Enums.AttemptStatus
   facilitatorRequestId?: Prisma.StringNullableFilter<"PaymentAttempt"> | string | null
+  candidateTransactionId?: Prisma.StringNullableFilter<"PaymentAttempt"> | string | null
   signatureFingerprint?: Prisma.StringNullableFilter<"PaymentAttempt"> | string | null
   errorCode?: Prisma.StringNullableFilter<"PaymentAttempt"> | string | null
   createdAt?: Prisma.DateTimeFilter<"PaymentAttempt"> | Date | string
@@ -258,6 +266,7 @@ export type PaymentAttemptOrderByWithRelationInput = {
   attemptNumber?: Prisma.SortOrder
   status?: Prisma.SortOrder
   facilitatorRequestId?: Prisma.SortOrderInput | Prisma.SortOrder
+  candidateTransactionId?: Prisma.SortOrderInput | Prisma.SortOrder
   signatureFingerprint?: Prisma.SortOrderInput | Prisma.SortOrder
   errorCode?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -276,6 +285,7 @@ export type PaymentAttemptWhereUniqueInput = Prisma.AtLeast<{
   attemptNumber?: Prisma.IntFilter<"PaymentAttempt"> | number
   status?: Prisma.EnumAttemptStatusFilter<"PaymentAttempt"> | $Enums.AttemptStatus
   facilitatorRequestId?: Prisma.StringNullableFilter<"PaymentAttempt"> | string | null
+  candidateTransactionId?: Prisma.StringNullableFilter<"PaymentAttempt"> | string | null
   signatureFingerprint?: Prisma.StringNullableFilter<"PaymentAttempt"> | string | null
   errorCode?: Prisma.StringNullableFilter<"PaymentAttempt"> | string | null
   createdAt?: Prisma.DateTimeFilter<"PaymentAttempt"> | Date | string
@@ -290,6 +300,7 @@ export type PaymentAttemptOrderByWithAggregationInput = {
   attemptNumber?: Prisma.SortOrder
   status?: Prisma.SortOrder
   facilitatorRequestId?: Prisma.SortOrderInput | Prisma.SortOrder
+  candidateTransactionId?: Prisma.SortOrderInput | Prisma.SortOrder
   signatureFingerprint?: Prisma.SortOrderInput | Prisma.SortOrder
   errorCode?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -310,6 +321,7 @@ export type PaymentAttemptScalarWhereWithAggregatesInput = {
   attemptNumber?: Prisma.IntWithAggregatesFilter<"PaymentAttempt"> | number
   status?: Prisma.EnumAttemptStatusWithAggregatesFilter<"PaymentAttempt"> | $Enums.AttemptStatus
   facilitatorRequestId?: Prisma.StringNullableWithAggregatesFilter<"PaymentAttempt"> | string | null
+  candidateTransactionId?: Prisma.StringNullableWithAggregatesFilter<"PaymentAttempt"> | string | null
   signatureFingerprint?: Prisma.StringNullableWithAggregatesFilter<"PaymentAttempt"> | string | null
   errorCode?: Prisma.StringNullableWithAggregatesFilter<"PaymentAttempt"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"PaymentAttempt"> | Date | string
@@ -321,6 +333,7 @@ export type PaymentAttemptCreateInput = {
   attemptNumber: number
   status: $Enums.AttemptStatus
   facilitatorRequestId?: string | null
+  candidateTransactionId?: string | null
   signatureFingerprint?: string | null
   errorCode?: string | null
   createdAt?: Date | string
@@ -335,6 +348,7 @@ export type PaymentAttemptUncheckedCreateInput = {
   attemptNumber: number
   status: $Enums.AttemptStatus
   facilitatorRequestId?: string | null
+  candidateTransactionId?: string | null
   signatureFingerprint?: string | null
   errorCode?: string | null
   createdAt?: Date | string
@@ -347,6 +361,7 @@ export type PaymentAttemptUpdateInput = {
   attemptNumber?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumAttemptStatusFieldUpdateOperationsInput | $Enums.AttemptStatus
   facilitatorRequestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candidateTransactionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signatureFingerprint?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -361,6 +376,7 @@ export type PaymentAttemptUncheckedUpdateInput = {
   attemptNumber?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumAttemptStatusFieldUpdateOperationsInput | $Enums.AttemptStatus
   facilitatorRequestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candidateTransactionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signatureFingerprint?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -374,6 +390,7 @@ export type PaymentAttemptCreateManyInput = {
   attemptNumber: number
   status: $Enums.AttemptStatus
   facilitatorRequestId?: string | null
+  candidateTransactionId?: string | null
   signatureFingerprint?: string | null
   errorCode?: string | null
   createdAt?: Date | string
@@ -385,6 +402,7 @@ export type PaymentAttemptUpdateManyMutationInput = {
   attemptNumber?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumAttemptStatusFieldUpdateOperationsInput | $Enums.AttemptStatus
   facilitatorRequestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candidateTransactionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signatureFingerprint?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -397,6 +415,7 @@ export type PaymentAttemptUncheckedUpdateManyInput = {
   attemptNumber?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumAttemptStatusFieldUpdateOperationsInput | $Enums.AttemptStatus
   facilitatorRequestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candidateTransactionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signatureFingerprint?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -424,6 +443,7 @@ export type PaymentAttemptCountOrderByAggregateInput = {
   attemptNumber?: Prisma.SortOrder
   status?: Prisma.SortOrder
   facilitatorRequestId?: Prisma.SortOrder
+  candidateTransactionId?: Prisma.SortOrder
   signatureFingerprint?: Prisma.SortOrder
   errorCode?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -440,6 +460,7 @@ export type PaymentAttemptMaxOrderByAggregateInput = {
   attemptNumber?: Prisma.SortOrder
   status?: Prisma.SortOrder
   facilitatorRequestId?: Prisma.SortOrder
+  candidateTransactionId?: Prisma.SortOrder
   signatureFingerprint?: Prisma.SortOrder
   errorCode?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -452,6 +473,7 @@ export type PaymentAttemptMinOrderByAggregateInput = {
   attemptNumber?: Prisma.SortOrder
   status?: Prisma.SortOrder
   facilitatorRequestId?: Prisma.SortOrder
+  candidateTransactionId?: Prisma.SortOrder
   signatureFingerprint?: Prisma.SortOrder
   errorCode?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -532,6 +554,7 @@ export type PaymentAttemptCreateWithoutPaymentIntentInput = {
   attemptNumber: number
   status: $Enums.AttemptStatus
   facilitatorRequestId?: string | null
+  candidateTransactionId?: string | null
   signatureFingerprint?: string | null
   errorCode?: string | null
   createdAt?: Date | string
@@ -544,6 +567,7 @@ export type PaymentAttemptUncheckedCreateWithoutPaymentIntentInput = {
   attemptNumber: number
   status: $Enums.AttemptStatus
   facilitatorRequestId?: string | null
+  candidateTransactionId?: string | null
   signatureFingerprint?: string | null
   errorCode?: string | null
   createdAt?: Date | string
@@ -586,6 +610,7 @@ export type PaymentAttemptScalarWhereInput = {
   attemptNumber?: Prisma.IntFilter<"PaymentAttempt"> | number
   status?: Prisma.EnumAttemptStatusFilter<"PaymentAttempt"> | $Enums.AttemptStatus
   facilitatorRequestId?: Prisma.StringNullableFilter<"PaymentAttempt"> | string | null
+  candidateTransactionId?: Prisma.StringNullableFilter<"PaymentAttempt"> | string | null
   signatureFingerprint?: Prisma.StringNullableFilter<"PaymentAttempt"> | string | null
   errorCode?: Prisma.StringNullableFilter<"PaymentAttempt"> | string | null
   createdAt?: Prisma.DateTimeFilter<"PaymentAttempt"> | Date | string
@@ -597,6 +622,7 @@ export type PaymentAttemptCreateWithoutSettlementInput = {
   attemptNumber: number
   status: $Enums.AttemptStatus
   facilitatorRequestId?: string | null
+  candidateTransactionId?: string | null
   signatureFingerprint?: string | null
   errorCode?: string | null
   createdAt?: Date | string
@@ -610,6 +636,7 @@ export type PaymentAttemptUncheckedCreateWithoutSettlementInput = {
   attemptNumber: number
   status: $Enums.AttemptStatus
   facilitatorRequestId?: string | null
+  candidateTransactionId?: string | null
   signatureFingerprint?: string | null
   errorCode?: string | null
   createdAt?: Date | string
@@ -637,6 +664,7 @@ export type PaymentAttemptUpdateWithoutSettlementInput = {
   attemptNumber?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumAttemptStatusFieldUpdateOperationsInput | $Enums.AttemptStatus
   facilitatorRequestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candidateTransactionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signatureFingerprint?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -650,6 +678,7 @@ export type PaymentAttemptUncheckedUpdateWithoutSettlementInput = {
   attemptNumber?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumAttemptStatusFieldUpdateOperationsInput | $Enums.AttemptStatus
   facilitatorRequestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candidateTransactionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signatureFingerprint?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -661,6 +690,7 @@ export type PaymentAttemptCreateManyPaymentIntentInput = {
   attemptNumber: number
   status: $Enums.AttemptStatus
   facilitatorRequestId?: string | null
+  candidateTransactionId?: string | null
   signatureFingerprint?: string | null
   errorCode?: string | null
   createdAt?: Date | string
@@ -672,6 +702,7 @@ export type PaymentAttemptUpdateWithoutPaymentIntentInput = {
   attemptNumber?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumAttemptStatusFieldUpdateOperationsInput | $Enums.AttemptStatus
   facilitatorRequestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candidateTransactionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signatureFingerprint?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -684,6 +715,7 @@ export type PaymentAttemptUncheckedUpdateWithoutPaymentIntentInput = {
   attemptNumber?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumAttemptStatusFieldUpdateOperationsInput | $Enums.AttemptStatus
   facilitatorRequestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candidateTransactionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signatureFingerprint?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -696,6 +728,7 @@ export type PaymentAttemptUncheckedUpdateManyWithoutPaymentIntentInput = {
   attemptNumber?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumAttemptStatusFieldUpdateOperationsInput | $Enums.AttemptStatus
   facilitatorRequestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candidateTransactionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signatureFingerprint?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -710,6 +743,7 @@ export type PaymentAttemptSelect<ExtArgs extends runtime.Types.Extensions.Intern
   attemptNumber?: boolean
   status?: boolean
   facilitatorRequestId?: boolean
+  candidateTransactionId?: boolean
   signatureFingerprint?: boolean
   errorCode?: boolean
   createdAt?: boolean
@@ -724,6 +758,7 @@ export type PaymentAttemptSelectCreateManyAndReturn<ExtArgs extends runtime.Type
   attemptNumber?: boolean
   status?: boolean
   facilitatorRequestId?: boolean
+  candidateTransactionId?: boolean
   signatureFingerprint?: boolean
   errorCode?: boolean
   createdAt?: boolean
@@ -737,6 +772,7 @@ export type PaymentAttemptSelectUpdateManyAndReturn<ExtArgs extends runtime.Type
   attemptNumber?: boolean
   status?: boolean
   facilitatorRequestId?: boolean
+  candidateTransactionId?: boolean
   signatureFingerprint?: boolean
   errorCode?: boolean
   createdAt?: boolean
@@ -750,13 +786,14 @@ export type PaymentAttemptSelectScalar = {
   attemptNumber?: boolean
   status?: boolean
   facilitatorRequestId?: boolean
+  candidateTransactionId?: boolean
   signatureFingerprint?: boolean
   errorCode?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type PaymentAttemptOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "paymentIntentId" | "attemptNumber" | "status" | "facilitatorRequestId" | "signatureFingerprint" | "errorCode" | "createdAt" | "updatedAt", ExtArgs["result"]["paymentAttempt"]>
+export type PaymentAttemptOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "paymentIntentId" | "attemptNumber" | "status" | "facilitatorRequestId" | "candidateTransactionId" | "signatureFingerprint" | "errorCode" | "createdAt" | "updatedAt", ExtArgs["result"]["paymentAttempt"]>
 export type PaymentAttemptInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   paymentIntent?: boolean | Prisma.PaymentIntentDefaultArgs<ExtArgs>
   settlement?: boolean | Prisma.PaymentAttempt$settlementArgs<ExtArgs>
@@ -780,6 +817,7 @@ export type $PaymentAttemptPayload<ExtArgs extends runtime.Types.Extensions.Inte
     attemptNumber: number
     status: $Enums.AttemptStatus
     facilitatorRequestId: string | null
+    candidateTransactionId: string | null
     signatureFingerprint: string | null
     errorCode: string | null
     createdAt: Date
@@ -1214,6 +1252,7 @@ export interface PaymentAttemptFieldRefs {
   readonly attemptNumber: Prisma.FieldRef<"PaymentAttempt", 'Int'>
   readonly status: Prisma.FieldRef<"PaymentAttempt", 'AttemptStatus'>
   readonly facilitatorRequestId: Prisma.FieldRef<"PaymentAttempt", 'String'>
+  readonly candidateTransactionId: Prisma.FieldRef<"PaymentAttempt", 'String'>
   readonly signatureFingerprint: Prisma.FieldRef<"PaymentAttempt", 'String'>
   readonly errorCode: Prisma.FieldRef<"PaymentAttempt", 'String'>
   readonly createdAt: Prisma.FieldRef<"PaymentAttempt", 'DateTime'>

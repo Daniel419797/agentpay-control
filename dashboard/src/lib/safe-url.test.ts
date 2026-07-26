@@ -1,0 +1,27 @@
+import { describe, expect, it } from "vitest";
+
+import { isPrivateAddress, validateResourceUrl } from "@/lib/safe-url";
+
+describe("resource URL safety", () => {
+  it.each(["127.0.0.1", "10.2.3.4", "172.20.1.2", "192.168.1.1", "::1", "fd00::1"])("blocks private address %s", (address) => {
+    expect(isPrivateAddress(address)).toBe(true);
+  });
+
+  it.each(["8.8.8.8", "1.1.1.1", "2606:4700:4700::1111"])("accepts public address %s", (address) => {
+    expect(isPrivateAddress(address)).toBe(false);
+  });
+
+  it("requires HTTPS in production", () => {
+    expect(() => validateResourceUrl("http://api.example.com/resource", true)).toThrow("RESOURCE_URL_HTTPS_REQUIRED");
+  });
+
+  it("allows local HTTP only outside production", () => {
+    expect(validateResourceUrl("http://localhost:3200/resource", false).hostname).toBe("localhost");
+    expect(() => validateResourceUrl("http://localhost:3200/resource", true)).toThrow();
+  });
+
+  it("rejects embedded credentials and fragments", () => {
+    expect(() => validateResourceUrl("https://user:pass@example.com/resource", true)).toThrow("RESOURCE_URL_UNSAFE");
+    expect(() => validateResourceUrl("https://example.com/resource#token", true)).toThrow("RESOURCE_URL_UNSAFE");
+  });
+});

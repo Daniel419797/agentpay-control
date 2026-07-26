@@ -84,6 +84,9 @@ npm test
 npm run build
 ```
 
+Production deployment, recovery, monitoring, and incident procedures are documented in [docs/production-runbook.md](docs/production-runbook.md).
+Roadmap-to-release traceability is maintained in [docs/implementation-status.md](docs/implementation-status.md).
+
 ## License
 
 MIT

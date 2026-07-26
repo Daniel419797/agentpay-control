@@ -20,8 +20,18 @@ export type AuditEventModel = runtime.Types.Result.DefaultSelection<Prisma.$Audi
 
 export type AggregateAuditEvent = {
   _count: AuditEventCountAggregateOutputType | null
+  _avg: AuditEventAvgAggregateOutputType | null
+  _sum: AuditEventSumAggregateOutputType | null
   _min: AuditEventMinAggregateOutputType | null
   _max: AuditEventMaxAggregateOutputType | null
+}
+
+export type AuditEventAvgAggregateOutputType = {
+  chainSequence: number | null
+}
+
+export type AuditEventSumAggregateOutputType = {
+  chainSequence: bigint | null
 }
 
 export type AuditEventMinAggregateOutputType = {
@@ -35,6 +45,9 @@ export type AuditEventMinAggregateOutputType = {
   result: $Enums.AuditResult | null
   requestId: string | null
   occurredAt: Date | null
+  chainSequence: bigint | null
+  previousHash: string | null
+  eventHash: string | null
 }
 
 export type AuditEventMaxAggregateOutputType = {
@@ -48,6 +61,9 @@ export type AuditEventMaxAggregateOutputType = {
   result: $Enums.AuditResult | null
   requestId: string | null
   occurredAt: Date | null
+  chainSequence: bigint | null
+  previousHash: string | null
+  eventHash: string | null
 }
 
 export type AuditEventCountAggregateOutputType = {
@@ -62,9 +78,20 @@ export type AuditEventCountAggregateOutputType = {
   requestId: number
   metadata: number
   occurredAt: number
+  chainSequence: number
+  previousHash: number
+  eventHash: number
   _all: number
 }
 
+
+export type AuditEventAvgAggregateInputType = {
+  chainSequence?: true
+}
+
+export type AuditEventSumAggregateInputType = {
+  chainSequence?: true
+}
 
 export type AuditEventMinAggregateInputType = {
   id?: true
@@ -77,6 +104,9 @@ export type AuditEventMinAggregateInputType = {
   result?: true
   requestId?: true
   occurredAt?: true
+  chainSequence?: true
+  previousHash?: true
+  eventHash?: true
 }
 
 export type AuditEventMaxAggregateInputType = {
@@ -90,6 +120,9 @@ export type AuditEventMaxAggregateInputType = {
   result?: true
   requestId?: true
   occurredAt?: true
+  chainSequence?: true
+  previousHash?: true
+  eventHash?: true
 }
 
 export type AuditEventCountAggregateInputType = {
@@ -104,6 +137,9 @@ export type AuditEventCountAggregateInputType = {
   requestId?: true
   metadata?: true
   occurredAt?: true
+  chainSequence?: true
+  previousHash?: true
+  eventHash?: true
   _all?: true
 }
 
@@ -145,6 +181,18 @@ export type AuditEventAggregateArgs<ExtArgs extends runtime.Types.Extensions.Int
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    * 
+   * Select which fields to average
+  **/
+  _avg?: AuditEventAvgAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
+   * Select which fields to sum
+  **/
+  _sum?: AuditEventSumAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
    * Select which fields to find the minimum value
   **/
   _min?: AuditEventMinAggregateInputType
@@ -175,6 +223,8 @@ export type AuditEventGroupByArgs<ExtArgs extends runtime.Types.Extensions.Inter
   take?: number
   skip?: number
   _count?: AuditEventCountAggregateInputType | true
+  _avg?: AuditEventAvgAggregateInputType
+  _sum?: AuditEventSumAggregateInputType
   _min?: AuditEventMinAggregateInputType
   _max?: AuditEventMaxAggregateInputType
 }
@@ -191,7 +241,12 @@ export type AuditEventGroupByOutputType = {
   requestId: string | null
   metadata: runtime.JsonValue
   occurredAt: Date
+  chainSequence: bigint
+  previousHash: string | null
+  eventHash: string
   _count: AuditEventCountAggregateOutputType | null
+  _avg: AuditEventAvgAggregateOutputType | null
+  _sum: AuditEventSumAggregateOutputType | null
   _min: AuditEventMinAggregateOutputType | null
   _max: AuditEventMaxAggregateOutputType | null
 }
@@ -226,6 +281,9 @@ export type AuditEventWhereInput = {
   requestId?: Prisma.StringNullableFilter<"AuditEvent"> | string | null
   metadata?: Prisma.JsonFilter<"AuditEvent">
   occurredAt?: Prisma.DateTimeFilter<"AuditEvent"> | Date | string
+  chainSequence?: Prisma.BigIntFilter<"AuditEvent"> | bigint | number
+  previousHash?: Prisma.StringNullableFilter<"AuditEvent"> | string | null
+  eventHash?: Prisma.StringFilter<"AuditEvent"> | string
   organization?: Prisma.XOR<Prisma.OrganizationScalarRelationFilter, Prisma.OrganizationWhereInput>
 }
 
@@ -241,11 +299,16 @@ export type AuditEventOrderByWithRelationInput = {
   requestId?: Prisma.SortOrderInput | Prisma.SortOrder
   metadata?: Prisma.SortOrder
   occurredAt?: Prisma.SortOrder
+  chainSequence?: Prisma.SortOrder
+  previousHash?: Prisma.SortOrderInput | Prisma.SortOrder
+  eventHash?: Prisma.SortOrder
   organization?: Prisma.OrganizationOrderByWithRelationInput
 }
 
 export type AuditEventWhereUniqueInput = Prisma.AtLeast<{
   id?: string
+  eventHash?: string
+  organizationId_chainSequence?: Prisma.AuditEventOrganizationIdChainSequenceCompoundUniqueInput
   AND?: Prisma.AuditEventWhereInput | Prisma.AuditEventWhereInput[]
   OR?: Prisma.AuditEventWhereInput[]
   NOT?: Prisma.AuditEventWhereInput | Prisma.AuditEventWhereInput[]
@@ -259,8 +322,10 @@ export type AuditEventWhereUniqueInput = Prisma.AtLeast<{
   requestId?: Prisma.StringNullableFilter<"AuditEvent"> | string | null
   metadata?: Prisma.JsonFilter<"AuditEvent">
   occurredAt?: Prisma.DateTimeFilter<"AuditEvent"> | Date | string
+  chainSequence?: Prisma.BigIntFilter<"AuditEvent"> | bigint | number
+  previousHash?: Prisma.StringNullableFilter<"AuditEvent"> | string | null
   organization?: Prisma.XOR<Prisma.OrganizationScalarRelationFilter, Prisma.OrganizationWhereInput>
-}, "id">
+}, "id" | "eventHash" | "organizationId_chainSequence">
 
 export type AuditEventOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -274,9 +339,14 @@ export type AuditEventOrderByWithAggregationInput = {
   requestId?: Prisma.SortOrderInput | Prisma.SortOrder
   metadata?: Prisma.SortOrder
   occurredAt?: Prisma.SortOrder
+  chainSequence?: Prisma.SortOrder
+  previousHash?: Prisma.SortOrderInput | Prisma.SortOrder
+  eventHash?: Prisma.SortOrder
   _count?: Prisma.AuditEventCountOrderByAggregateInput
+  _avg?: Prisma.AuditEventAvgOrderByAggregateInput
   _max?: Prisma.AuditEventMaxOrderByAggregateInput
   _min?: Prisma.AuditEventMinOrderByAggregateInput
+  _sum?: Prisma.AuditEventSumOrderByAggregateInput
 }
 
 export type AuditEventScalarWhereWithAggregatesInput = {
@@ -294,6 +364,9 @@ export type AuditEventScalarWhereWithAggregatesInput = {
   requestId?: Prisma.StringNullableWithAggregatesFilter<"AuditEvent"> | string | null
   metadata?: Prisma.JsonWithAggregatesFilter<"AuditEvent">
   occurredAt?: Prisma.DateTimeWithAggregatesFilter<"AuditEvent"> | Date | string
+  chainSequence?: Prisma.BigIntWithAggregatesFilter<"AuditEvent"> | bigint | number
+  previousHash?: Prisma.StringNullableWithAggregatesFilter<"AuditEvent"> | string | null
+  eventHash?: Prisma.StringWithAggregatesFilter<"AuditEvent"> | string
 }
 
 export type AuditEventCreateInput = {
@@ -307,6 +380,9 @@ export type AuditEventCreateInput = {
   requestId?: string | null
   metadata: Prisma.JsonNullValueInput | runtime.InputJsonValue
   occurredAt?: Date | string
+  chainSequence?: bigint | number
+  previousHash?: string | null
+  eventHash?: string
   organization: Prisma.OrganizationCreateNestedOneWithoutAuditEventsInput
 }
 
@@ -322,6 +398,9 @@ export type AuditEventUncheckedCreateInput = {
   requestId?: string | null
   metadata: Prisma.JsonNullValueInput | runtime.InputJsonValue
   occurredAt?: Date | string
+  chainSequence?: bigint | number
+  previousHash?: string | null
+  eventHash?: string
 }
 
 export type AuditEventUpdateInput = {
@@ -335,6 +414,9 @@ export type AuditEventUpdateInput = {
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   occurredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  chainSequence?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  previousHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  eventHash?: Prisma.StringFieldUpdateOperationsInput | string
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutAuditEventsNestedInput
 }
 
@@ -350,6 +432,9 @@ export type AuditEventUncheckedUpdateInput = {
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   occurredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  chainSequence?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  previousHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  eventHash?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 export type AuditEventCreateManyInput = {
@@ -364,6 +449,9 @@ export type AuditEventCreateManyInput = {
   requestId?: string | null
   metadata: Prisma.JsonNullValueInput | runtime.InputJsonValue
   occurredAt?: Date | string
+  chainSequence?: bigint | number
+  previousHash?: string | null
+  eventHash?: string
 }
 
 export type AuditEventUpdateManyMutationInput = {
@@ -377,6 +465,9 @@ export type AuditEventUpdateManyMutationInput = {
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   occurredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  chainSequence?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  previousHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  eventHash?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 export type AuditEventUncheckedUpdateManyInput = {
@@ -391,6 +482,9 @@ export type AuditEventUncheckedUpdateManyInput = {
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   occurredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  chainSequence?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  previousHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  eventHash?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 export type AuditEventListRelationFilter = {
@@ -401,6 +495,11 @@ export type AuditEventListRelationFilter = {
 
 export type AuditEventOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
+}
+
+export type AuditEventOrganizationIdChainSequenceCompoundUniqueInput = {
+  organizationId: string
+  chainSequence: bigint | number
 }
 
 export type AuditEventCountOrderByAggregateInput = {
@@ -415,6 +514,13 @@ export type AuditEventCountOrderByAggregateInput = {
   requestId?: Prisma.SortOrder
   metadata?: Prisma.SortOrder
   occurredAt?: Prisma.SortOrder
+  chainSequence?: Prisma.SortOrder
+  previousHash?: Prisma.SortOrder
+  eventHash?: Prisma.SortOrder
+}
+
+export type AuditEventAvgOrderByAggregateInput = {
+  chainSequence?: Prisma.SortOrder
 }
 
 export type AuditEventMaxOrderByAggregateInput = {
@@ -428,6 +534,9 @@ export type AuditEventMaxOrderByAggregateInput = {
   result?: Prisma.SortOrder
   requestId?: Prisma.SortOrder
   occurredAt?: Prisma.SortOrder
+  chainSequence?: Prisma.SortOrder
+  previousHash?: Prisma.SortOrder
+  eventHash?: Prisma.SortOrder
 }
 
 export type AuditEventMinOrderByAggregateInput = {
@@ -441,6 +550,13 @@ export type AuditEventMinOrderByAggregateInput = {
   result?: Prisma.SortOrder
   requestId?: Prisma.SortOrder
   occurredAt?: Prisma.SortOrder
+  chainSequence?: Prisma.SortOrder
+  previousHash?: Prisma.SortOrder
+  eventHash?: Prisma.SortOrder
+}
+
+export type AuditEventSumOrderByAggregateInput = {
+  chainSequence?: Prisma.SortOrder
 }
 
 export type AuditEventCreateNestedManyWithoutOrganizationInput = {
@@ -500,6 +616,9 @@ export type AuditEventCreateWithoutOrganizationInput = {
   requestId?: string | null
   metadata: Prisma.JsonNullValueInput | runtime.InputJsonValue
   occurredAt?: Date | string
+  chainSequence?: bigint | number
+  previousHash?: string | null
+  eventHash?: string
 }
 
 export type AuditEventUncheckedCreateWithoutOrganizationInput = {
@@ -513,6 +632,9 @@ export type AuditEventUncheckedCreateWithoutOrganizationInput = {
   requestId?: string | null
   metadata: Prisma.JsonNullValueInput | runtime.InputJsonValue
   occurredAt?: Date | string
+  chainSequence?: bigint | number
+  previousHash?: string | null
+  eventHash?: string
 }
 
 export type AuditEventCreateOrConnectWithoutOrganizationInput = {
@@ -556,6 +678,9 @@ export type AuditEventScalarWhereInput = {
   requestId?: Prisma.StringNullableFilter<"AuditEvent"> | string | null
   metadata?: Prisma.JsonFilter<"AuditEvent">
   occurredAt?: Prisma.DateTimeFilter<"AuditEvent"> | Date | string
+  chainSequence?: Prisma.BigIntFilter<"AuditEvent"> | bigint | number
+  previousHash?: Prisma.StringNullableFilter<"AuditEvent"> | string | null
+  eventHash?: Prisma.StringFilter<"AuditEvent"> | string
 }
 
 export type AuditEventCreateManyOrganizationInput = {
@@ -569,6 +694,9 @@ export type AuditEventCreateManyOrganizationInput = {
   requestId?: string | null
   metadata: Prisma.JsonNullValueInput | runtime.InputJsonValue
   occurredAt?: Date | string
+  chainSequence?: bigint | number
+  previousHash?: string | null
+  eventHash?: string
 }
 
 export type AuditEventUpdateWithoutOrganizationInput = {
@@ -582,6 +710,9 @@ export type AuditEventUpdateWithoutOrganizationInput = {
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   occurredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  chainSequence?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  previousHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  eventHash?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 export type AuditEventUncheckedUpdateWithoutOrganizationInput = {
@@ -595,6 +726,9 @@ export type AuditEventUncheckedUpdateWithoutOrganizationInput = {
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   occurredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  chainSequence?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  previousHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  eventHash?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 export type AuditEventUncheckedUpdateManyWithoutOrganizationInput = {
@@ -608,6 +742,9 @@ export type AuditEventUncheckedUpdateManyWithoutOrganizationInput = {
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   occurredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  chainSequence?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  previousHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  eventHash?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 
@@ -624,6 +761,9 @@ export type AuditEventSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   requestId?: boolean
   metadata?: boolean
   occurredAt?: boolean
+  chainSequence?: boolean
+  previousHash?: boolean
+  eventHash?: boolean
   organization?: boolean | Prisma.OrganizationDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["auditEvent"]>
 
@@ -639,6 +779,9 @@ export type AuditEventSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ex
   requestId?: boolean
   metadata?: boolean
   occurredAt?: boolean
+  chainSequence?: boolean
+  previousHash?: boolean
+  eventHash?: boolean
   organization?: boolean | Prisma.OrganizationDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["auditEvent"]>
 
@@ -654,6 +797,9 @@ export type AuditEventSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ex
   requestId?: boolean
   metadata?: boolean
   occurredAt?: boolean
+  chainSequence?: boolean
+  previousHash?: boolean
+  eventHash?: boolean
   organization?: boolean | Prisma.OrganizationDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["auditEvent"]>
 
@@ -669,9 +815,12 @@ export type AuditEventSelectScalar = {
   requestId?: boolean
   metadata?: boolean
   occurredAt?: boolean
+  chainSequence?: boolean
+  previousHash?: boolean
+  eventHash?: boolean
 }
 
-export type AuditEventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "organizationId" | "actorType" | "actorId" | "action" | "targetType" | "targetId" | "result" | "requestId" | "metadata" | "occurredAt", ExtArgs["result"]["auditEvent"]>
+export type AuditEventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "organizationId" | "actorType" | "actorId" | "action" | "targetType" | "targetId" | "result" | "requestId" | "metadata" | "occurredAt" | "chainSequence" | "previousHash" | "eventHash", ExtArgs["result"]["auditEvent"]>
 export type AuditEventInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organization?: boolean | Prisma.OrganizationDefaultArgs<ExtArgs>
 }
@@ -699,6 +848,9 @@ export type $AuditEventPayload<ExtArgs extends runtime.Types.Extensions.Internal
     requestId: string | null
     metadata: runtime.JsonValue
     occurredAt: Date
+    chainSequence: bigint
+    previousHash: string | null
+    eventHash: string
   }, ExtArgs["result"]["auditEvent"]>
   composites: {}
 }
@@ -1134,6 +1286,9 @@ export interface AuditEventFieldRefs {
   readonly requestId: Prisma.FieldRef<"AuditEvent", 'String'>
   readonly metadata: Prisma.FieldRef<"AuditEvent", 'Json'>
   readonly occurredAt: Prisma.FieldRef<"AuditEvent", 'DateTime'>
+  readonly chainSequence: Prisma.FieldRef<"AuditEvent", 'BigInt'>
+  readonly previousHash: Prisma.FieldRef<"AuditEvent", 'String'>
+  readonly eventHash: Prisma.FieldRef<"AuditEvent", 'String'>
 }
     
 

@@ -230,6 +230,16 @@ export type AgentWhereInput = {
   policies?: Prisma.PolicyListRelationFilter
   paymentIntents?: Prisma.PaymentIntentListRelationFilter
   reservations?: Prisma.SpendReservationListRelationFilter
+  virtualCards?: Prisma.VirtualCardListRelationFilter
+  issuedInvoices?: Prisma.AgentInvoiceListRelationFilter
+  receivedInvoices?: Prisma.AgentInvoiceListRelationFilter
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteListRelationFilter
+  crossChainTransfers?: Prisma.CrossChainTransferListRelationFilter
+  automationRules?: Prisma.AutomationRuleListRelationFilter
+  financialObservations?: Prisma.FinancialObservationDailyListRelationFilter
+  forecasts?: Prisma.SpendForecastListRelationFilter
+  financialAnomalies?: Prisma.FinancialAnomalyListRelationFilter
+  budgetRecommendations?: Prisma.BudgetRecommendationListRelationFilter
 }
 
 export type AgentOrderByWithRelationInput = {
@@ -251,6 +261,16 @@ export type AgentOrderByWithRelationInput = {
   policies?: Prisma.PolicyOrderByRelationAggregateInput
   paymentIntents?: Prisma.PaymentIntentOrderByRelationAggregateInput
   reservations?: Prisma.SpendReservationOrderByRelationAggregateInput
+  virtualCards?: Prisma.VirtualCardOrderByRelationAggregateInput
+  issuedInvoices?: Prisma.AgentInvoiceOrderByRelationAggregateInput
+  receivedInvoices?: Prisma.AgentInvoiceOrderByRelationAggregateInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteOrderByRelationAggregateInput
+  crossChainTransfers?: Prisma.CrossChainTransferOrderByRelationAggregateInput
+  automationRules?: Prisma.AutomationRuleOrderByRelationAggregateInput
+  financialObservations?: Prisma.FinancialObservationDailyOrderByRelationAggregateInput
+  forecasts?: Prisma.SpendForecastOrderByRelationAggregateInput
+  financialAnomalies?: Prisma.FinancialAnomalyOrderByRelationAggregateInput
+  budgetRecommendations?: Prisma.BudgetRecommendationOrderByRelationAggregateInput
 }
 
 export type AgentWhereUniqueInput = Prisma.AtLeast<{
@@ -275,6 +295,16 @@ export type AgentWhereUniqueInput = Prisma.AtLeast<{
   policies?: Prisma.PolicyListRelationFilter
   paymentIntents?: Prisma.PaymentIntentListRelationFilter
   reservations?: Prisma.SpendReservationListRelationFilter
+  virtualCards?: Prisma.VirtualCardListRelationFilter
+  issuedInvoices?: Prisma.AgentInvoiceListRelationFilter
+  receivedInvoices?: Prisma.AgentInvoiceListRelationFilter
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteListRelationFilter
+  crossChainTransfers?: Prisma.CrossChainTransferListRelationFilter
+  automationRules?: Prisma.AutomationRuleListRelationFilter
+  financialObservations?: Prisma.FinancialObservationDailyListRelationFilter
+  forecasts?: Prisma.SpendForecastListRelationFilter
+  financialAnomalies?: Prisma.FinancialAnomalyListRelationFilter
+  budgetRecommendations?: Prisma.BudgetRecommendationListRelationFilter
 }, "id">
 
 export type AgentOrderByWithAggregationInput = {
@@ -325,6 +355,16 @@ export type AgentCreateInput = {
   policies?: Prisma.PolicyCreateNestedManyWithoutAgentInput
   paymentIntents?: Prisma.PaymentIntentCreateNestedManyWithoutAgentInput
   reservations?: Prisma.SpendReservationCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAgentInput
 }
 
 export type AgentUncheckedCreateInput = {
@@ -343,6 +383,16 @@ export type AgentUncheckedCreateInput = {
   policies?: Prisma.PolicyUncheckedCreateNestedManyWithoutAgentInput
   paymentIntents?: Prisma.PaymentIntentUncheckedCreateNestedManyWithoutAgentInput
   reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardUncheckedCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleUncheckedCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastUncheckedCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAgentInput
 }
 
 export type AgentUpdateInput = {
@@ -361,6 +411,16 @@ export type AgentUpdateInput = {
   policies?: Prisma.PolicyUpdateManyWithoutAgentNestedInput
   paymentIntents?: Prisma.PaymentIntentUpdateManyWithoutAgentNestedInput
   reservations?: Prisma.SpendReservationUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAgentNestedInput
 }
 
 export type AgentUncheckedUpdateInput = {
@@ -379,6 +439,16 @@ export type AgentUncheckedUpdateInput = {
   policies?: Prisma.PolicyUncheckedUpdateManyWithoutAgentNestedInput
   paymentIntents?: Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentNestedInput
   reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUncheckedUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUncheckedUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUncheckedUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAgentNestedInput
 }
 
 export type AgentCreateManyInput = {
@@ -469,6 +539,11 @@ export type AgentMinOrderByAggregateInput = {
 export type AgentScalarRelationFilter = {
   is?: Prisma.AgentWhereInput
   isNot?: Prisma.AgentWhereInput
+}
+
+export type AgentNullableScalarRelationFilter = {
+  is?: Prisma.AgentWhereInput | null
+  isNot?: Prisma.AgentWhereInput | null
 }
 
 export type AgentCreateNestedManyWithoutOrganizationInput = {
@@ -671,6 +746,152 @@ export type AgentUpdateOneRequiredWithoutReservationsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.AgentUpdateToOneWithWhereWithoutReservationsInput, Prisma.AgentUpdateWithoutReservationsInput>, Prisma.AgentUncheckedUpdateWithoutReservationsInput>
 }
 
+export type AgentCreateNestedOneWithoutIssuedInvoicesInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutIssuedInvoicesInput, Prisma.AgentUncheckedCreateWithoutIssuedInvoicesInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutIssuedInvoicesInput
+  connect?: Prisma.AgentWhereUniqueInput
+}
+
+export type AgentCreateNestedOneWithoutReceivedInvoicesInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutReceivedInvoicesInput, Prisma.AgentUncheckedCreateWithoutReceivedInvoicesInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutReceivedInvoicesInput
+  connect?: Prisma.AgentWhereUniqueInput
+}
+
+export type AgentUpdateOneRequiredWithoutIssuedInvoicesNestedInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutIssuedInvoicesInput, Prisma.AgentUncheckedCreateWithoutIssuedInvoicesInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutIssuedInvoicesInput
+  upsert?: Prisma.AgentUpsertWithoutIssuedInvoicesInput
+  connect?: Prisma.AgentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AgentUpdateToOneWithWhereWithoutIssuedInvoicesInput, Prisma.AgentUpdateWithoutIssuedInvoicesInput>, Prisma.AgentUncheckedUpdateWithoutIssuedInvoicesInput>
+}
+
+export type AgentUpdateOneRequiredWithoutReceivedInvoicesNestedInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutReceivedInvoicesInput, Prisma.AgentUncheckedCreateWithoutReceivedInvoicesInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutReceivedInvoicesInput
+  upsert?: Prisma.AgentUpsertWithoutReceivedInvoicesInput
+  connect?: Prisma.AgentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AgentUpdateToOneWithWhereWithoutReceivedInvoicesInput, Prisma.AgentUpdateWithoutReceivedInvoicesInput>, Prisma.AgentUncheckedUpdateWithoutReceivedInvoicesInput>
+}
+
+export type AgentCreateNestedOneWithoutCrossChainQuotesInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutCrossChainQuotesInput, Prisma.AgentUncheckedCreateWithoutCrossChainQuotesInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutCrossChainQuotesInput
+  connect?: Prisma.AgentWhereUniqueInput
+}
+
+export type AgentUpdateOneRequiredWithoutCrossChainQuotesNestedInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutCrossChainQuotesInput, Prisma.AgentUncheckedCreateWithoutCrossChainQuotesInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutCrossChainQuotesInput
+  upsert?: Prisma.AgentUpsertWithoutCrossChainQuotesInput
+  connect?: Prisma.AgentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AgentUpdateToOneWithWhereWithoutCrossChainQuotesInput, Prisma.AgentUpdateWithoutCrossChainQuotesInput>, Prisma.AgentUncheckedUpdateWithoutCrossChainQuotesInput>
+}
+
+export type AgentCreateNestedOneWithoutCrossChainTransfersInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutCrossChainTransfersInput, Prisma.AgentUncheckedCreateWithoutCrossChainTransfersInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutCrossChainTransfersInput
+  connect?: Prisma.AgentWhereUniqueInput
+}
+
+export type AgentUpdateOneRequiredWithoutCrossChainTransfersNestedInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutCrossChainTransfersInput, Prisma.AgentUncheckedCreateWithoutCrossChainTransfersInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutCrossChainTransfersInput
+  upsert?: Prisma.AgentUpsertWithoutCrossChainTransfersInput
+  connect?: Prisma.AgentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AgentUpdateToOneWithWhereWithoutCrossChainTransfersInput, Prisma.AgentUpdateWithoutCrossChainTransfersInput>, Prisma.AgentUncheckedUpdateWithoutCrossChainTransfersInput>
+}
+
+export type AgentCreateNestedOneWithoutAutomationRulesInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutAutomationRulesInput, Prisma.AgentUncheckedCreateWithoutAutomationRulesInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutAutomationRulesInput
+  connect?: Prisma.AgentWhereUniqueInput
+}
+
+export type AgentUpdateOneRequiredWithoutAutomationRulesNestedInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutAutomationRulesInput, Prisma.AgentUncheckedCreateWithoutAutomationRulesInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutAutomationRulesInput
+  upsert?: Prisma.AgentUpsertWithoutAutomationRulesInput
+  connect?: Prisma.AgentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AgentUpdateToOneWithWhereWithoutAutomationRulesInput, Prisma.AgentUpdateWithoutAutomationRulesInput>, Prisma.AgentUncheckedUpdateWithoutAutomationRulesInput>
+}
+
+export type AgentCreateNestedOneWithoutFinancialObservationsInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutFinancialObservationsInput, Prisma.AgentUncheckedCreateWithoutFinancialObservationsInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutFinancialObservationsInput
+  connect?: Prisma.AgentWhereUniqueInput
+}
+
+export type AgentUpdateOneWithoutFinancialObservationsNestedInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutFinancialObservationsInput, Prisma.AgentUncheckedCreateWithoutFinancialObservationsInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutFinancialObservationsInput
+  upsert?: Prisma.AgentUpsertWithoutFinancialObservationsInput
+  disconnect?: Prisma.AgentWhereInput | boolean
+  delete?: Prisma.AgentWhereInput | boolean
+  connect?: Prisma.AgentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AgentUpdateToOneWithWhereWithoutFinancialObservationsInput, Prisma.AgentUpdateWithoutFinancialObservationsInput>, Prisma.AgentUncheckedUpdateWithoutFinancialObservationsInput>
+}
+
+export type AgentCreateNestedOneWithoutForecastsInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutForecastsInput, Prisma.AgentUncheckedCreateWithoutForecastsInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutForecastsInput
+  connect?: Prisma.AgentWhereUniqueInput
+}
+
+export type AgentUpdateOneWithoutForecastsNestedInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutForecastsInput, Prisma.AgentUncheckedCreateWithoutForecastsInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutForecastsInput
+  upsert?: Prisma.AgentUpsertWithoutForecastsInput
+  disconnect?: Prisma.AgentWhereInput | boolean
+  delete?: Prisma.AgentWhereInput | boolean
+  connect?: Prisma.AgentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AgentUpdateToOneWithWhereWithoutForecastsInput, Prisma.AgentUpdateWithoutForecastsInput>, Prisma.AgentUncheckedUpdateWithoutForecastsInput>
+}
+
+export type AgentCreateNestedOneWithoutFinancialAnomaliesInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutFinancialAnomaliesInput, Prisma.AgentUncheckedCreateWithoutFinancialAnomaliesInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutFinancialAnomaliesInput
+  connect?: Prisma.AgentWhereUniqueInput
+}
+
+export type AgentUpdateOneWithoutFinancialAnomaliesNestedInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutFinancialAnomaliesInput, Prisma.AgentUncheckedCreateWithoutFinancialAnomaliesInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutFinancialAnomaliesInput
+  upsert?: Prisma.AgentUpsertWithoutFinancialAnomaliesInput
+  disconnect?: Prisma.AgentWhereInput | boolean
+  delete?: Prisma.AgentWhereInput | boolean
+  connect?: Prisma.AgentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AgentUpdateToOneWithWhereWithoutFinancialAnomaliesInput, Prisma.AgentUpdateWithoutFinancialAnomaliesInput>, Prisma.AgentUncheckedUpdateWithoutFinancialAnomaliesInput>
+}
+
+export type AgentCreateNestedOneWithoutBudgetRecommendationsInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutBudgetRecommendationsInput, Prisma.AgentUncheckedCreateWithoutBudgetRecommendationsInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutBudgetRecommendationsInput
+  connect?: Prisma.AgentWhereUniqueInput
+}
+
+export type AgentUpdateOneRequiredWithoutBudgetRecommendationsNestedInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutBudgetRecommendationsInput, Prisma.AgentUncheckedCreateWithoutBudgetRecommendationsInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutBudgetRecommendationsInput
+  upsert?: Prisma.AgentUpsertWithoutBudgetRecommendationsInput
+  connect?: Prisma.AgentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AgentUpdateToOneWithWhereWithoutBudgetRecommendationsInput, Prisma.AgentUpdateWithoutBudgetRecommendationsInput>, Prisma.AgentUncheckedUpdateWithoutBudgetRecommendationsInput>
+}
+
+export type AgentCreateNestedOneWithoutVirtualCardsInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutVirtualCardsInput, Prisma.AgentUncheckedCreateWithoutVirtualCardsInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutVirtualCardsInput
+  connect?: Prisma.AgentWhereUniqueInput
+}
+
+export type AgentUpdateOneRequiredWithoutVirtualCardsNestedInput = {
+  create?: Prisma.XOR<Prisma.AgentCreateWithoutVirtualCardsInput, Prisma.AgentUncheckedCreateWithoutVirtualCardsInput>
+  connectOrCreate?: Prisma.AgentCreateOrConnectWithoutVirtualCardsInput
+  upsert?: Prisma.AgentUpsertWithoutVirtualCardsInput
+  connect?: Prisma.AgentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AgentUpdateToOneWithWhereWithoutVirtualCardsInput, Prisma.AgentUpdateWithoutVirtualCardsInput>, Prisma.AgentUncheckedUpdateWithoutVirtualCardsInput>
+}
+
 export type AgentCreateWithoutOrganizationInput = {
   id?: string
   name: string
@@ -686,6 +907,16 @@ export type AgentCreateWithoutOrganizationInput = {
   policies?: Prisma.PolicyCreateNestedManyWithoutAgentInput
   paymentIntents?: Prisma.PaymentIntentCreateNestedManyWithoutAgentInput
   reservations?: Prisma.SpendReservationCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAgentInput
 }
 
 export type AgentUncheckedCreateWithoutOrganizationInput = {
@@ -703,6 +934,16 @@ export type AgentUncheckedCreateWithoutOrganizationInput = {
   policies?: Prisma.PolicyUncheckedCreateNestedManyWithoutAgentInput
   paymentIntents?: Prisma.PaymentIntentUncheckedCreateNestedManyWithoutAgentInput
   reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardUncheckedCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleUncheckedCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastUncheckedCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAgentInput
 }
 
 export type AgentCreateOrConnectWithoutOrganizationInput = {
@@ -762,6 +1003,16 @@ export type AgentCreateWithoutAccountsInput = {
   policies?: Prisma.PolicyCreateNestedManyWithoutAgentInput
   paymentIntents?: Prisma.PaymentIntentCreateNestedManyWithoutAgentInput
   reservations?: Prisma.SpendReservationCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAgentInput
 }
 
 export type AgentUncheckedCreateWithoutAccountsInput = {
@@ -779,6 +1030,16 @@ export type AgentUncheckedCreateWithoutAccountsInput = {
   policies?: Prisma.PolicyUncheckedCreateNestedManyWithoutAgentInput
   paymentIntents?: Prisma.PaymentIntentUncheckedCreateNestedManyWithoutAgentInput
   reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardUncheckedCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleUncheckedCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastUncheckedCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAgentInput
 }
 
 export type AgentCreateOrConnectWithoutAccountsInput = {
@@ -812,6 +1073,16 @@ export type AgentUpdateWithoutAccountsInput = {
   policies?: Prisma.PolicyUpdateManyWithoutAgentNestedInput
   paymentIntents?: Prisma.PaymentIntentUpdateManyWithoutAgentNestedInput
   reservations?: Prisma.SpendReservationUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAgentNestedInput
 }
 
 export type AgentUncheckedUpdateWithoutAccountsInput = {
@@ -829,6 +1100,16 @@ export type AgentUncheckedUpdateWithoutAccountsInput = {
   policies?: Prisma.PolicyUncheckedUpdateManyWithoutAgentNestedInput
   paymentIntents?: Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentNestedInput
   reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUncheckedUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUncheckedUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUncheckedUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAgentNestedInput
 }
 
 export type AgentCreateWithoutDefaultAssetInput = {
@@ -846,6 +1127,16 @@ export type AgentCreateWithoutDefaultAssetInput = {
   policies?: Prisma.PolicyCreateNestedManyWithoutAgentInput
   paymentIntents?: Prisma.PaymentIntentCreateNestedManyWithoutAgentInput
   reservations?: Prisma.SpendReservationCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAgentInput
 }
 
 export type AgentUncheckedCreateWithoutDefaultAssetInput = {
@@ -863,6 +1154,16 @@ export type AgentUncheckedCreateWithoutDefaultAssetInput = {
   policies?: Prisma.PolicyUncheckedCreateNestedManyWithoutAgentInput
   paymentIntents?: Prisma.PaymentIntentUncheckedCreateNestedManyWithoutAgentInput
   reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardUncheckedCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleUncheckedCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastUncheckedCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAgentInput
 }
 
 export type AgentCreateOrConnectWithoutDefaultAssetInput = {
@@ -906,6 +1207,16 @@ export type AgentCreateWithoutCredentialsInput = {
   policies?: Prisma.PolicyCreateNestedManyWithoutAgentInput
   paymentIntents?: Prisma.PaymentIntentCreateNestedManyWithoutAgentInput
   reservations?: Prisma.SpendReservationCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAgentInput
 }
 
 export type AgentUncheckedCreateWithoutCredentialsInput = {
@@ -923,6 +1234,16 @@ export type AgentUncheckedCreateWithoutCredentialsInput = {
   policies?: Prisma.PolicyUncheckedCreateNestedManyWithoutAgentInput
   paymentIntents?: Prisma.PaymentIntentUncheckedCreateNestedManyWithoutAgentInput
   reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardUncheckedCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleUncheckedCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastUncheckedCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAgentInput
 }
 
 export type AgentCreateOrConnectWithoutCredentialsInput = {
@@ -956,6 +1277,16 @@ export type AgentUpdateWithoutCredentialsInput = {
   policies?: Prisma.PolicyUpdateManyWithoutAgentNestedInput
   paymentIntents?: Prisma.PaymentIntentUpdateManyWithoutAgentNestedInput
   reservations?: Prisma.SpendReservationUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAgentNestedInput
 }
 
 export type AgentUncheckedUpdateWithoutCredentialsInput = {
@@ -973,6 +1304,16 @@ export type AgentUncheckedUpdateWithoutCredentialsInput = {
   policies?: Prisma.PolicyUncheckedUpdateManyWithoutAgentNestedInput
   paymentIntents?: Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentNestedInput
   reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUncheckedUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUncheckedUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUncheckedUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAgentNestedInput
 }
 
 export type AgentCreateWithoutPoliciesInput = {
@@ -990,6 +1331,16 @@ export type AgentCreateWithoutPoliciesInput = {
   credentials?: Prisma.AgentCredentialCreateNestedManyWithoutAgentInput
   paymentIntents?: Prisma.PaymentIntentCreateNestedManyWithoutAgentInput
   reservations?: Prisma.SpendReservationCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAgentInput
 }
 
 export type AgentUncheckedCreateWithoutPoliciesInput = {
@@ -1007,6 +1358,16 @@ export type AgentUncheckedCreateWithoutPoliciesInput = {
   credentials?: Prisma.AgentCredentialUncheckedCreateNestedManyWithoutAgentInput
   paymentIntents?: Prisma.PaymentIntentUncheckedCreateNestedManyWithoutAgentInput
   reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardUncheckedCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleUncheckedCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastUncheckedCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAgentInput
 }
 
 export type AgentCreateOrConnectWithoutPoliciesInput = {
@@ -1040,6 +1401,16 @@ export type AgentUpdateWithoutPoliciesInput = {
   credentials?: Prisma.AgentCredentialUpdateManyWithoutAgentNestedInput
   paymentIntents?: Prisma.PaymentIntentUpdateManyWithoutAgentNestedInput
   reservations?: Prisma.SpendReservationUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAgentNestedInput
 }
 
 export type AgentUncheckedUpdateWithoutPoliciesInput = {
@@ -1057,6 +1428,16 @@ export type AgentUncheckedUpdateWithoutPoliciesInput = {
   credentials?: Prisma.AgentCredentialUncheckedUpdateManyWithoutAgentNestedInput
   paymentIntents?: Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentNestedInput
   reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUncheckedUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUncheckedUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUncheckedUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAgentNestedInput
 }
 
 export type AgentCreateWithoutEffectivePolicyInput = {
@@ -1074,6 +1455,16 @@ export type AgentCreateWithoutEffectivePolicyInput = {
   policies?: Prisma.PolicyCreateNestedManyWithoutAgentInput
   paymentIntents?: Prisma.PaymentIntentCreateNestedManyWithoutAgentInput
   reservations?: Prisma.SpendReservationCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAgentInput
 }
 
 export type AgentUncheckedCreateWithoutEffectivePolicyInput = {
@@ -1091,6 +1482,16 @@ export type AgentUncheckedCreateWithoutEffectivePolicyInput = {
   policies?: Prisma.PolicyUncheckedCreateNestedManyWithoutAgentInput
   paymentIntents?: Prisma.PaymentIntentUncheckedCreateNestedManyWithoutAgentInput
   reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardUncheckedCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleUncheckedCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastUncheckedCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAgentInput
 }
 
 export type AgentCreateOrConnectWithoutEffectivePolicyInput = {
@@ -1134,6 +1535,16 @@ export type AgentCreateWithoutPaymentIntentsInput = {
   credentials?: Prisma.AgentCredentialCreateNestedManyWithoutAgentInput
   policies?: Prisma.PolicyCreateNestedManyWithoutAgentInput
   reservations?: Prisma.SpendReservationCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAgentInput
 }
 
 export type AgentUncheckedCreateWithoutPaymentIntentsInput = {
@@ -1151,6 +1562,16 @@ export type AgentUncheckedCreateWithoutPaymentIntentsInput = {
   credentials?: Prisma.AgentCredentialUncheckedCreateNestedManyWithoutAgentInput
   policies?: Prisma.PolicyUncheckedCreateNestedManyWithoutAgentInput
   reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardUncheckedCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleUncheckedCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastUncheckedCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAgentInput
 }
 
 export type AgentCreateOrConnectWithoutPaymentIntentsInput = {
@@ -1184,6 +1605,16 @@ export type AgentUpdateWithoutPaymentIntentsInput = {
   credentials?: Prisma.AgentCredentialUpdateManyWithoutAgentNestedInput
   policies?: Prisma.PolicyUpdateManyWithoutAgentNestedInput
   reservations?: Prisma.SpendReservationUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAgentNestedInput
 }
 
 export type AgentUncheckedUpdateWithoutPaymentIntentsInput = {
@@ -1201,6 +1632,16 @@ export type AgentUncheckedUpdateWithoutPaymentIntentsInput = {
   credentials?: Prisma.AgentCredentialUncheckedUpdateManyWithoutAgentNestedInput
   policies?: Prisma.PolicyUncheckedUpdateManyWithoutAgentNestedInput
   reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUncheckedUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUncheckedUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUncheckedUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAgentNestedInput
 }
 
 export type AgentCreateWithoutReservationsInput = {
@@ -1218,6 +1659,16 @@ export type AgentCreateWithoutReservationsInput = {
   credentials?: Prisma.AgentCredentialCreateNestedManyWithoutAgentInput
   policies?: Prisma.PolicyCreateNestedManyWithoutAgentInput
   paymentIntents?: Prisma.PaymentIntentCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAgentInput
 }
 
 export type AgentUncheckedCreateWithoutReservationsInput = {
@@ -1235,6 +1686,16 @@ export type AgentUncheckedCreateWithoutReservationsInput = {
   credentials?: Prisma.AgentCredentialUncheckedCreateNestedManyWithoutAgentInput
   policies?: Prisma.PolicyUncheckedCreateNestedManyWithoutAgentInput
   paymentIntents?: Prisma.PaymentIntentUncheckedCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardUncheckedCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleUncheckedCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastUncheckedCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAgentInput
 }
 
 export type AgentCreateOrConnectWithoutReservationsInput = {
@@ -1268,6 +1729,16 @@ export type AgentUpdateWithoutReservationsInput = {
   credentials?: Prisma.AgentCredentialUpdateManyWithoutAgentNestedInput
   policies?: Prisma.PolicyUpdateManyWithoutAgentNestedInput
   paymentIntents?: Prisma.PaymentIntentUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAgentNestedInput
 }
 
 export type AgentUncheckedUpdateWithoutReservationsInput = {
@@ -1285,6 +1756,1256 @@ export type AgentUncheckedUpdateWithoutReservationsInput = {
   credentials?: Prisma.AgentCredentialUncheckedUpdateManyWithoutAgentNestedInput
   policies?: Prisma.PolicyUncheckedUpdateManyWithoutAgentNestedInput
   paymentIntents?: Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUncheckedUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUncheckedUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUncheckedUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentCreateWithoutIssuedInvoicesInput = {
+  id?: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  organization: Prisma.OrganizationCreateNestedOneWithoutAgentsInput
+  defaultAsset?: Prisma.AssetCreateNestedOneWithoutAgentsInput
+  effectivePolicy?: Prisma.PolicyVersionCreateNestedOneWithoutActiveForAgentsInput
+  accounts?: Prisma.PaymentAccountCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardCreateNestedManyWithoutAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAgentInput
+}
+
+export type AgentUncheckedCreateWithoutIssuedInvoicesInput = {
+  id?: string
+  organizationId: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  defaultAssetId?: string | null
+  effectivePolicyId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  accounts?: Prisma.PaymentAccountUncheckedCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialUncheckedCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyUncheckedCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardUncheckedCreateNestedManyWithoutAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleUncheckedCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastUncheckedCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAgentInput
+}
+
+export type AgentCreateOrConnectWithoutIssuedInvoicesInput = {
+  where: Prisma.AgentWhereUniqueInput
+  create: Prisma.XOR<Prisma.AgentCreateWithoutIssuedInvoicesInput, Prisma.AgentUncheckedCreateWithoutIssuedInvoicesInput>
+}
+
+export type AgentCreateWithoutReceivedInvoicesInput = {
+  id?: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  organization: Prisma.OrganizationCreateNestedOneWithoutAgentsInput
+  defaultAsset?: Prisma.AssetCreateNestedOneWithoutAgentsInput
+  effectivePolicy?: Prisma.PolicyVersionCreateNestedOneWithoutActiveForAgentsInput
+  accounts?: Prisma.PaymentAccountCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutIssuerAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAgentInput
+}
+
+export type AgentUncheckedCreateWithoutReceivedInvoicesInput = {
+  id?: string
+  organizationId: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  defaultAssetId?: string | null
+  effectivePolicyId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  accounts?: Prisma.PaymentAccountUncheckedCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialUncheckedCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyUncheckedCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardUncheckedCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutIssuerAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleUncheckedCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastUncheckedCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAgentInput
+}
+
+export type AgentCreateOrConnectWithoutReceivedInvoicesInput = {
+  where: Prisma.AgentWhereUniqueInput
+  create: Prisma.XOR<Prisma.AgentCreateWithoutReceivedInvoicesInput, Prisma.AgentUncheckedCreateWithoutReceivedInvoicesInput>
+}
+
+export type AgentUpsertWithoutIssuedInvoicesInput = {
+  update: Prisma.XOR<Prisma.AgentUpdateWithoutIssuedInvoicesInput, Prisma.AgentUncheckedUpdateWithoutIssuedInvoicesInput>
+  create: Prisma.XOR<Prisma.AgentCreateWithoutIssuedInvoicesInput, Prisma.AgentUncheckedCreateWithoutIssuedInvoicesInput>
+  where?: Prisma.AgentWhereInput
+}
+
+export type AgentUpdateToOneWithWhereWithoutIssuedInvoicesInput = {
+  where?: Prisma.AgentWhereInput
+  data: Prisma.XOR<Prisma.AgentUpdateWithoutIssuedInvoicesInput, Prisma.AgentUncheckedUpdateWithoutIssuedInvoicesInput>
+}
+
+export type AgentUpdateWithoutIssuedInvoicesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutAgentsNestedInput
+  defaultAsset?: Prisma.AssetUpdateOneWithoutAgentsNestedInput
+  effectivePolicy?: Prisma.PolicyVersionUpdateOneWithoutActiveForAgentsNestedInput
+  accounts?: Prisma.PaymentAccountUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUpdateManyWithoutAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentUncheckedUpdateWithoutIssuedInvoicesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  defaultAssetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  effectivePolicyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  accounts?: Prisma.PaymentAccountUncheckedUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUncheckedUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUncheckedUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUncheckedUpdateManyWithoutAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUncheckedUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUncheckedUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentUpsertWithoutReceivedInvoicesInput = {
+  update: Prisma.XOR<Prisma.AgentUpdateWithoutReceivedInvoicesInput, Prisma.AgentUncheckedUpdateWithoutReceivedInvoicesInput>
+  create: Prisma.XOR<Prisma.AgentCreateWithoutReceivedInvoicesInput, Prisma.AgentUncheckedCreateWithoutReceivedInvoicesInput>
+  where?: Prisma.AgentWhereInput
+}
+
+export type AgentUpdateToOneWithWhereWithoutReceivedInvoicesInput = {
+  where?: Prisma.AgentWhereInput
+  data: Prisma.XOR<Prisma.AgentUpdateWithoutReceivedInvoicesInput, Prisma.AgentUncheckedUpdateWithoutReceivedInvoicesInput>
+}
+
+export type AgentUpdateWithoutReceivedInvoicesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutAgentsNestedInput
+  defaultAsset?: Prisma.AssetUpdateOneWithoutAgentsNestedInput
+  effectivePolicy?: Prisma.PolicyVersionUpdateOneWithoutActiveForAgentsNestedInput
+  accounts?: Prisma.PaymentAccountUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutIssuerAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentUncheckedUpdateWithoutReceivedInvoicesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  defaultAssetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  effectivePolicyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  accounts?: Prisma.PaymentAccountUncheckedUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUncheckedUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUncheckedUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUncheckedUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutIssuerAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUncheckedUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUncheckedUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentCreateWithoutCrossChainQuotesInput = {
+  id?: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  organization: Prisma.OrganizationCreateNestedOneWithoutAgentsInput
+  defaultAsset?: Prisma.AssetCreateNestedOneWithoutAgentsInput
+  effectivePolicy?: Prisma.PolicyVersionCreateNestedOneWithoutActiveForAgentsInput
+  accounts?: Prisma.PaymentAccountCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutRecipientAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAgentInput
+}
+
+export type AgentUncheckedCreateWithoutCrossChainQuotesInput = {
+  id?: string
+  organizationId: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  defaultAssetId?: string | null
+  effectivePolicyId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  accounts?: Prisma.PaymentAccountUncheckedCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialUncheckedCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyUncheckedCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardUncheckedCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutRecipientAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleUncheckedCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastUncheckedCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAgentInput
+}
+
+export type AgentCreateOrConnectWithoutCrossChainQuotesInput = {
+  where: Prisma.AgentWhereUniqueInput
+  create: Prisma.XOR<Prisma.AgentCreateWithoutCrossChainQuotesInput, Prisma.AgentUncheckedCreateWithoutCrossChainQuotesInput>
+}
+
+export type AgentUpsertWithoutCrossChainQuotesInput = {
+  update: Prisma.XOR<Prisma.AgentUpdateWithoutCrossChainQuotesInput, Prisma.AgentUncheckedUpdateWithoutCrossChainQuotesInput>
+  create: Prisma.XOR<Prisma.AgentCreateWithoutCrossChainQuotesInput, Prisma.AgentUncheckedCreateWithoutCrossChainQuotesInput>
+  where?: Prisma.AgentWhereInput
+}
+
+export type AgentUpdateToOneWithWhereWithoutCrossChainQuotesInput = {
+  where?: Prisma.AgentWhereInput
+  data: Prisma.XOR<Prisma.AgentUpdateWithoutCrossChainQuotesInput, Prisma.AgentUncheckedUpdateWithoutCrossChainQuotesInput>
+}
+
+export type AgentUpdateWithoutCrossChainQuotesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutAgentsNestedInput
+  defaultAsset?: Prisma.AssetUpdateOneWithoutAgentsNestedInput
+  effectivePolicy?: Prisma.PolicyVersionUpdateOneWithoutActiveForAgentsNestedInput
+  accounts?: Prisma.PaymentAccountUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutRecipientAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentUncheckedUpdateWithoutCrossChainQuotesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  defaultAssetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  effectivePolicyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  accounts?: Prisma.PaymentAccountUncheckedUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUncheckedUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUncheckedUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUncheckedUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutRecipientAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUncheckedUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUncheckedUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentCreateWithoutCrossChainTransfersInput = {
+  id?: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  organization: Prisma.OrganizationCreateNestedOneWithoutAgentsInput
+  defaultAsset?: Prisma.AssetCreateNestedOneWithoutAgentsInput
+  effectivePolicy?: Prisma.PolicyVersionCreateNestedOneWithoutActiveForAgentsInput
+  accounts?: Prisma.PaymentAccountCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAgentInput
+}
+
+export type AgentUncheckedCreateWithoutCrossChainTransfersInput = {
+  id?: string
+  organizationId: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  defaultAssetId?: string | null
+  effectivePolicyId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  accounts?: Prisma.PaymentAccountUncheckedCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialUncheckedCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyUncheckedCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardUncheckedCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleUncheckedCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastUncheckedCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAgentInput
+}
+
+export type AgentCreateOrConnectWithoutCrossChainTransfersInput = {
+  where: Prisma.AgentWhereUniqueInput
+  create: Prisma.XOR<Prisma.AgentCreateWithoutCrossChainTransfersInput, Prisma.AgentUncheckedCreateWithoutCrossChainTransfersInput>
+}
+
+export type AgentUpsertWithoutCrossChainTransfersInput = {
+  update: Prisma.XOR<Prisma.AgentUpdateWithoutCrossChainTransfersInput, Prisma.AgentUncheckedUpdateWithoutCrossChainTransfersInput>
+  create: Prisma.XOR<Prisma.AgentCreateWithoutCrossChainTransfersInput, Prisma.AgentUncheckedCreateWithoutCrossChainTransfersInput>
+  where?: Prisma.AgentWhereInput
+}
+
+export type AgentUpdateToOneWithWhereWithoutCrossChainTransfersInput = {
+  where?: Prisma.AgentWhereInput
+  data: Prisma.XOR<Prisma.AgentUpdateWithoutCrossChainTransfersInput, Prisma.AgentUncheckedUpdateWithoutCrossChainTransfersInput>
+}
+
+export type AgentUpdateWithoutCrossChainTransfersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutAgentsNestedInput
+  defaultAsset?: Prisma.AssetUpdateOneWithoutAgentsNestedInput
+  effectivePolicy?: Prisma.PolicyVersionUpdateOneWithoutActiveForAgentsNestedInput
+  accounts?: Prisma.PaymentAccountUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentUncheckedUpdateWithoutCrossChainTransfersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  defaultAssetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  effectivePolicyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  accounts?: Prisma.PaymentAccountUncheckedUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUncheckedUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUncheckedUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUncheckedUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUncheckedUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUncheckedUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentCreateWithoutAutomationRulesInput = {
+  id?: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  organization: Prisma.OrganizationCreateNestedOneWithoutAgentsInput
+  defaultAsset?: Prisma.AssetCreateNestedOneWithoutAgentsInput
+  effectivePolicy?: Prisma.PolicyVersionCreateNestedOneWithoutActiveForAgentsInput
+  accounts?: Prisma.PaymentAccountCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAgentInput
+}
+
+export type AgentUncheckedCreateWithoutAutomationRulesInput = {
+  id?: string
+  organizationId: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  defaultAssetId?: string | null
+  effectivePolicyId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  accounts?: Prisma.PaymentAccountUncheckedCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialUncheckedCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyUncheckedCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardUncheckedCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastUncheckedCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAgentInput
+}
+
+export type AgentCreateOrConnectWithoutAutomationRulesInput = {
+  where: Prisma.AgentWhereUniqueInput
+  create: Prisma.XOR<Prisma.AgentCreateWithoutAutomationRulesInput, Prisma.AgentUncheckedCreateWithoutAutomationRulesInput>
+}
+
+export type AgentUpsertWithoutAutomationRulesInput = {
+  update: Prisma.XOR<Prisma.AgentUpdateWithoutAutomationRulesInput, Prisma.AgentUncheckedUpdateWithoutAutomationRulesInput>
+  create: Prisma.XOR<Prisma.AgentCreateWithoutAutomationRulesInput, Prisma.AgentUncheckedCreateWithoutAutomationRulesInput>
+  where?: Prisma.AgentWhereInput
+}
+
+export type AgentUpdateToOneWithWhereWithoutAutomationRulesInput = {
+  where?: Prisma.AgentWhereInput
+  data: Prisma.XOR<Prisma.AgentUpdateWithoutAutomationRulesInput, Prisma.AgentUncheckedUpdateWithoutAutomationRulesInput>
+}
+
+export type AgentUpdateWithoutAutomationRulesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutAgentsNestedInput
+  defaultAsset?: Prisma.AssetUpdateOneWithoutAgentsNestedInput
+  effectivePolicy?: Prisma.PolicyVersionUpdateOneWithoutActiveForAgentsNestedInput
+  accounts?: Prisma.PaymentAccountUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentUncheckedUpdateWithoutAutomationRulesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  defaultAssetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  effectivePolicyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  accounts?: Prisma.PaymentAccountUncheckedUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUncheckedUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUncheckedUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUncheckedUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUncheckedUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentCreateWithoutFinancialObservationsInput = {
+  id?: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  organization: Prisma.OrganizationCreateNestedOneWithoutAgentsInput
+  defaultAsset?: Prisma.AssetCreateNestedOneWithoutAgentsInput
+  effectivePolicy?: Prisma.PolicyVersionCreateNestedOneWithoutActiveForAgentsInput
+  accounts?: Prisma.PaymentAccountCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAgentInput
+}
+
+export type AgentUncheckedCreateWithoutFinancialObservationsInput = {
+  id?: string
+  organizationId: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  defaultAssetId?: string | null
+  effectivePolicyId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  accounts?: Prisma.PaymentAccountUncheckedCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialUncheckedCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyUncheckedCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardUncheckedCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleUncheckedCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastUncheckedCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAgentInput
+}
+
+export type AgentCreateOrConnectWithoutFinancialObservationsInput = {
+  where: Prisma.AgentWhereUniqueInput
+  create: Prisma.XOR<Prisma.AgentCreateWithoutFinancialObservationsInput, Prisma.AgentUncheckedCreateWithoutFinancialObservationsInput>
+}
+
+export type AgentUpsertWithoutFinancialObservationsInput = {
+  update: Prisma.XOR<Prisma.AgentUpdateWithoutFinancialObservationsInput, Prisma.AgentUncheckedUpdateWithoutFinancialObservationsInput>
+  create: Prisma.XOR<Prisma.AgentCreateWithoutFinancialObservationsInput, Prisma.AgentUncheckedCreateWithoutFinancialObservationsInput>
+  where?: Prisma.AgentWhereInput
+}
+
+export type AgentUpdateToOneWithWhereWithoutFinancialObservationsInput = {
+  where?: Prisma.AgentWhereInput
+  data: Prisma.XOR<Prisma.AgentUpdateWithoutFinancialObservationsInput, Prisma.AgentUncheckedUpdateWithoutFinancialObservationsInput>
+}
+
+export type AgentUpdateWithoutFinancialObservationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutAgentsNestedInput
+  defaultAsset?: Prisma.AssetUpdateOneWithoutAgentsNestedInput
+  effectivePolicy?: Prisma.PolicyVersionUpdateOneWithoutActiveForAgentsNestedInput
+  accounts?: Prisma.PaymentAccountUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentUncheckedUpdateWithoutFinancialObservationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  defaultAssetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  effectivePolicyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  accounts?: Prisma.PaymentAccountUncheckedUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUncheckedUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUncheckedUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUncheckedUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUncheckedUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUncheckedUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentCreateWithoutForecastsInput = {
+  id?: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  organization: Prisma.OrganizationCreateNestedOneWithoutAgentsInput
+  defaultAsset?: Prisma.AssetCreateNestedOneWithoutAgentsInput
+  effectivePolicy?: Prisma.PolicyVersionCreateNestedOneWithoutActiveForAgentsInput
+  accounts?: Prisma.PaymentAccountCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAgentInput
+}
+
+export type AgentUncheckedCreateWithoutForecastsInput = {
+  id?: string
+  organizationId: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  defaultAssetId?: string | null
+  effectivePolicyId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  accounts?: Prisma.PaymentAccountUncheckedCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialUncheckedCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyUncheckedCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardUncheckedCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleUncheckedCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAgentInput
+}
+
+export type AgentCreateOrConnectWithoutForecastsInput = {
+  where: Prisma.AgentWhereUniqueInput
+  create: Prisma.XOR<Prisma.AgentCreateWithoutForecastsInput, Prisma.AgentUncheckedCreateWithoutForecastsInput>
+}
+
+export type AgentUpsertWithoutForecastsInput = {
+  update: Prisma.XOR<Prisma.AgentUpdateWithoutForecastsInput, Prisma.AgentUncheckedUpdateWithoutForecastsInput>
+  create: Prisma.XOR<Prisma.AgentCreateWithoutForecastsInput, Prisma.AgentUncheckedCreateWithoutForecastsInput>
+  where?: Prisma.AgentWhereInput
+}
+
+export type AgentUpdateToOneWithWhereWithoutForecastsInput = {
+  where?: Prisma.AgentWhereInput
+  data: Prisma.XOR<Prisma.AgentUpdateWithoutForecastsInput, Prisma.AgentUncheckedUpdateWithoutForecastsInput>
+}
+
+export type AgentUpdateWithoutForecastsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutAgentsNestedInput
+  defaultAsset?: Prisma.AssetUpdateOneWithoutAgentsNestedInput
+  effectivePolicy?: Prisma.PolicyVersionUpdateOneWithoutActiveForAgentsNestedInput
+  accounts?: Prisma.PaymentAccountUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentUncheckedUpdateWithoutForecastsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  defaultAssetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  effectivePolicyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  accounts?: Prisma.PaymentAccountUncheckedUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUncheckedUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUncheckedUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUncheckedUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUncheckedUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentCreateWithoutFinancialAnomaliesInput = {
+  id?: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  organization: Prisma.OrganizationCreateNestedOneWithoutAgentsInput
+  defaultAsset?: Prisma.AssetCreateNestedOneWithoutAgentsInput
+  effectivePolicy?: Prisma.PolicyVersionCreateNestedOneWithoutActiveForAgentsInput
+  accounts?: Prisma.PaymentAccountCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAgentInput
+}
+
+export type AgentUncheckedCreateWithoutFinancialAnomaliesInput = {
+  id?: string
+  organizationId: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  defaultAssetId?: string | null
+  effectivePolicyId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  accounts?: Prisma.PaymentAccountUncheckedCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialUncheckedCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyUncheckedCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardUncheckedCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleUncheckedCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastUncheckedCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAgentInput
+}
+
+export type AgentCreateOrConnectWithoutFinancialAnomaliesInput = {
+  where: Prisma.AgentWhereUniqueInput
+  create: Prisma.XOR<Prisma.AgentCreateWithoutFinancialAnomaliesInput, Prisma.AgentUncheckedCreateWithoutFinancialAnomaliesInput>
+}
+
+export type AgentUpsertWithoutFinancialAnomaliesInput = {
+  update: Prisma.XOR<Prisma.AgentUpdateWithoutFinancialAnomaliesInput, Prisma.AgentUncheckedUpdateWithoutFinancialAnomaliesInput>
+  create: Prisma.XOR<Prisma.AgentCreateWithoutFinancialAnomaliesInput, Prisma.AgentUncheckedCreateWithoutFinancialAnomaliesInput>
+  where?: Prisma.AgentWhereInput
+}
+
+export type AgentUpdateToOneWithWhereWithoutFinancialAnomaliesInput = {
+  where?: Prisma.AgentWhereInput
+  data: Prisma.XOR<Prisma.AgentUpdateWithoutFinancialAnomaliesInput, Prisma.AgentUncheckedUpdateWithoutFinancialAnomaliesInput>
+}
+
+export type AgentUpdateWithoutFinancialAnomaliesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutAgentsNestedInput
+  defaultAsset?: Prisma.AssetUpdateOneWithoutAgentsNestedInput
+  effectivePolicy?: Prisma.PolicyVersionUpdateOneWithoutActiveForAgentsNestedInput
+  accounts?: Prisma.PaymentAccountUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentUncheckedUpdateWithoutFinancialAnomaliesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  defaultAssetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  effectivePolicyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  accounts?: Prisma.PaymentAccountUncheckedUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUncheckedUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUncheckedUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUncheckedUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUncheckedUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUncheckedUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentCreateWithoutBudgetRecommendationsInput = {
+  id?: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  organization: Prisma.OrganizationCreateNestedOneWithoutAgentsInput
+  defaultAsset?: Prisma.AssetCreateNestedOneWithoutAgentsInput
+  effectivePolicy?: Prisma.PolicyVersionCreateNestedOneWithoutActiveForAgentsInput
+  accounts?: Prisma.PaymentAccountCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyCreateNestedManyWithoutAgentInput
+}
+
+export type AgentUncheckedCreateWithoutBudgetRecommendationsInput = {
+  id?: string
+  organizationId: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  defaultAssetId?: string | null
+  effectivePolicyId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  accounts?: Prisma.PaymentAccountUncheckedCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialUncheckedCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyUncheckedCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAgentInput
+  virtualCards?: Prisma.VirtualCardUncheckedCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleUncheckedCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastUncheckedCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedCreateNestedManyWithoutAgentInput
+}
+
+export type AgentCreateOrConnectWithoutBudgetRecommendationsInput = {
+  where: Prisma.AgentWhereUniqueInput
+  create: Prisma.XOR<Prisma.AgentCreateWithoutBudgetRecommendationsInput, Prisma.AgentUncheckedCreateWithoutBudgetRecommendationsInput>
+}
+
+export type AgentUpsertWithoutBudgetRecommendationsInput = {
+  update: Prisma.XOR<Prisma.AgentUpdateWithoutBudgetRecommendationsInput, Prisma.AgentUncheckedUpdateWithoutBudgetRecommendationsInput>
+  create: Prisma.XOR<Prisma.AgentCreateWithoutBudgetRecommendationsInput, Prisma.AgentUncheckedCreateWithoutBudgetRecommendationsInput>
+  where?: Prisma.AgentWhereInput
+}
+
+export type AgentUpdateToOneWithWhereWithoutBudgetRecommendationsInput = {
+  where?: Prisma.AgentWhereInput
+  data: Prisma.XOR<Prisma.AgentUpdateWithoutBudgetRecommendationsInput, Prisma.AgentUncheckedUpdateWithoutBudgetRecommendationsInput>
+}
+
+export type AgentUpdateWithoutBudgetRecommendationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutAgentsNestedInput
+  defaultAsset?: Prisma.AssetUpdateOneWithoutAgentsNestedInput
+  effectivePolicy?: Prisma.PolicyVersionUpdateOneWithoutActiveForAgentsNestedInput
+  accounts?: Prisma.PaymentAccountUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentUncheckedUpdateWithoutBudgetRecommendationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  defaultAssetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  effectivePolicyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  accounts?: Prisma.PaymentAccountUncheckedUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUncheckedUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUncheckedUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUncheckedUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUncheckedUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUncheckedUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentCreateWithoutVirtualCardsInput = {
+  id?: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  organization: Prisma.OrganizationCreateNestedOneWithoutAgentsInput
+  defaultAsset?: Prisma.AssetCreateNestedOneWithoutAgentsInput
+  effectivePolicy?: Prisma.PolicyVersionCreateNestedOneWithoutActiveForAgentsInput
+  accounts?: Prisma.PaymentAccountCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAgentInput
+}
+
+export type AgentUncheckedCreateWithoutVirtualCardsInput = {
+  id?: string
+  organizationId: string
+  name: string
+  description?: string | null
+  status?: $Enums.AgentStatus
+  network?: string
+  defaultAssetId?: string | null
+  effectivePolicyId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  accounts?: Prisma.PaymentAccountUncheckedCreateNestedManyWithoutAgentInput
+  credentials?: Prisma.AgentCredentialUncheckedCreateNestedManyWithoutAgentInput
+  policies?: Prisma.PolicyUncheckedCreateNestedManyWithoutAgentInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedCreateNestedManyWithoutAgentInput
+  reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAgentInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutIssuerAgentInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutRecipientAgentInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedCreateNestedManyWithoutAgentInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedCreateNestedManyWithoutAgentInput
+  automationRules?: Prisma.AutomationRuleUncheckedCreateNestedManyWithoutAgentInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedCreateNestedManyWithoutAgentInput
+  forecasts?: Prisma.SpendForecastUncheckedCreateNestedManyWithoutAgentInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedCreateNestedManyWithoutAgentInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAgentInput
+}
+
+export type AgentCreateOrConnectWithoutVirtualCardsInput = {
+  where: Prisma.AgentWhereUniqueInput
+  create: Prisma.XOR<Prisma.AgentCreateWithoutVirtualCardsInput, Prisma.AgentUncheckedCreateWithoutVirtualCardsInput>
+}
+
+export type AgentUpsertWithoutVirtualCardsInput = {
+  update: Prisma.XOR<Prisma.AgentUpdateWithoutVirtualCardsInput, Prisma.AgentUncheckedUpdateWithoutVirtualCardsInput>
+  create: Prisma.XOR<Prisma.AgentCreateWithoutVirtualCardsInput, Prisma.AgentUncheckedCreateWithoutVirtualCardsInput>
+  where?: Prisma.AgentWhereInput
+}
+
+export type AgentUpdateToOneWithWhereWithoutVirtualCardsInput = {
+  where?: Prisma.AgentWhereInput
+  data: Prisma.XOR<Prisma.AgentUpdateWithoutVirtualCardsInput, Prisma.AgentUncheckedUpdateWithoutVirtualCardsInput>
+}
+
+export type AgentUpdateWithoutVirtualCardsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutAgentsNestedInput
+  defaultAsset?: Prisma.AssetUpdateOneWithoutAgentsNestedInput
+  effectivePolicy?: Prisma.PolicyVersionUpdateOneWithoutActiveForAgentsNestedInput
+  accounts?: Prisma.PaymentAccountUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAgentNestedInput
+}
+
+export type AgentUncheckedUpdateWithoutVirtualCardsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumAgentStatusFieldUpdateOperationsInput | $Enums.AgentStatus
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  defaultAssetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  effectivePolicyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  accounts?: Prisma.PaymentAccountUncheckedUpdateManyWithoutAgentNestedInput
+  credentials?: Prisma.AgentCredentialUncheckedUpdateManyWithoutAgentNestedInput
+  policies?: Prisma.PolicyUncheckedUpdateManyWithoutAgentNestedInput
+  paymentIntents?: Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentNestedInput
+  reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUncheckedUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUncheckedUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAgentNestedInput
 }
 
 export type AgentCreateManyOrganizationInput = {
@@ -1314,6 +3035,16 @@ export type AgentUpdateWithoutOrganizationInput = {
   policies?: Prisma.PolicyUpdateManyWithoutAgentNestedInput
   paymentIntents?: Prisma.PaymentIntentUpdateManyWithoutAgentNestedInput
   reservations?: Prisma.SpendReservationUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAgentNestedInput
 }
 
 export type AgentUncheckedUpdateWithoutOrganizationInput = {
@@ -1331,6 +3062,16 @@ export type AgentUncheckedUpdateWithoutOrganizationInput = {
   policies?: Prisma.PolicyUncheckedUpdateManyWithoutAgentNestedInput
   paymentIntents?: Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentNestedInput
   reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUncheckedUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUncheckedUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUncheckedUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAgentNestedInput
 }
 
 export type AgentUncheckedUpdateManyWithoutOrganizationInput = {
@@ -1372,6 +3113,16 @@ export type AgentUpdateWithoutDefaultAssetInput = {
   policies?: Prisma.PolicyUpdateManyWithoutAgentNestedInput
   paymentIntents?: Prisma.PaymentIntentUpdateManyWithoutAgentNestedInput
   reservations?: Prisma.SpendReservationUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAgentNestedInput
 }
 
 export type AgentUncheckedUpdateWithoutDefaultAssetInput = {
@@ -1389,6 +3140,16 @@ export type AgentUncheckedUpdateWithoutDefaultAssetInput = {
   policies?: Prisma.PolicyUncheckedUpdateManyWithoutAgentNestedInput
   paymentIntents?: Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentNestedInput
   reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUncheckedUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUncheckedUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUncheckedUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAgentNestedInput
 }
 
 export type AgentUncheckedUpdateManyWithoutDefaultAssetInput = {
@@ -1430,6 +3191,16 @@ export type AgentUpdateWithoutEffectivePolicyInput = {
   policies?: Prisma.PolicyUpdateManyWithoutAgentNestedInput
   paymentIntents?: Prisma.PaymentIntentUpdateManyWithoutAgentNestedInput
   reservations?: Prisma.SpendReservationUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAgentNestedInput
 }
 
 export type AgentUncheckedUpdateWithoutEffectivePolicyInput = {
@@ -1447,6 +3218,16 @@ export type AgentUncheckedUpdateWithoutEffectivePolicyInput = {
   policies?: Prisma.PolicyUncheckedUpdateManyWithoutAgentNestedInput
   paymentIntents?: Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentNestedInput
   reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAgentNestedInput
+  virtualCards?: Prisma.VirtualCardUncheckedUpdateManyWithoutAgentNestedInput
+  issuedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutIssuerAgentNestedInput
+  receivedInvoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutRecipientAgentNestedInput
+  crossChainQuotes?: Prisma.CrossChainRouteQuoteUncheckedUpdateManyWithoutAgentNestedInput
+  crossChainTransfers?: Prisma.CrossChainTransferUncheckedUpdateManyWithoutAgentNestedInput
+  automationRules?: Prisma.AutomationRuleUncheckedUpdateManyWithoutAgentNestedInput
+  financialObservations?: Prisma.FinancialObservationDailyUncheckedUpdateManyWithoutAgentNestedInput
+  forecasts?: Prisma.SpendForecastUncheckedUpdateManyWithoutAgentNestedInput
+  financialAnomalies?: Prisma.FinancialAnomalyUncheckedUpdateManyWithoutAgentNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAgentNestedInput
 }
 
 export type AgentUncheckedUpdateManyWithoutEffectivePolicyInput = {
@@ -1472,6 +3253,16 @@ export type AgentCountOutputType = {
   policies: number
   paymentIntents: number
   reservations: number
+  virtualCards: number
+  issuedInvoices: number
+  receivedInvoices: number
+  crossChainQuotes: number
+  crossChainTransfers: number
+  automationRules: number
+  financialObservations: number
+  forecasts: number
+  financialAnomalies: number
+  budgetRecommendations: number
 }
 
 export type AgentCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1480,6 +3271,16 @@ export type AgentCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.
   policies?: boolean | AgentCountOutputTypeCountPoliciesArgs
   paymentIntents?: boolean | AgentCountOutputTypeCountPaymentIntentsArgs
   reservations?: boolean | AgentCountOutputTypeCountReservationsArgs
+  virtualCards?: boolean | AgentCountOutputTypeCountVirtualCardsArgs
+  issuedInvoices?: boolean | AgentCountOutputTypeCountIssuedInvoicesArgs
+  receivedInvoices?: boolean | AgentCountOutputTypeCountReceivedInvoicesArgs
+  crossChainQuotes?: boolean | AgentCountOutputTypeCountCrossChainQuotesArgs
+  crossChainTransfers?: boolean | AgentCountOutputTypeCountCrossChainTransfersArgs
+  automationRules?: boolean | AgentCountOutputTypeCountAutomationRulesArgs
+  financialObservations?: boolean | AgentCountOutputTypeCountFinancialObservationsArgs
+  forecasts?: boolean | AgentCountOutputTypeCountForecastsArgs
+  financialAnomalies?: boolean | AgentCountOutputTypeCountFinancialAnomaliesArgs
+  budgetRecommendations?: boolean | AgentCountOutputTypeCountBudgetRecommendationsArgs
 }
 
 /**
@@ -1527,6 +3328,76 @@ export type AgentCountOutputTypeCountReservationsArgs<ExtArgs extends runtime.Ty
   where?: Prisma.SpendReservationWhereInput
 }
 
+/**
+ * AgentCountOutputType without action
+ */
+export type AgentCountOutputTypeCountVirtualCardsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.VirtualCardWhereInput
+}
+
+/**
+ * AgentCountOutputType without action
+ */
+export type AgentCountOutputTypeCountIssuedInvoicesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.AgentInvoiceWhereInput
+}
+
+/**
+ * AgentCountOutputType without action
+ */
+export type AgentCountOutputTypeCountReceivedInvoicesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.AgentInvoiceWhereInput
+}
+
+/**
+ * AgentCountOutputType without action
+ */
+export type AgentCountOutputTypeCountCrossChainQuotesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CrossChainRouteQuoteWhereInput
+}
+
+/**
+ * AgentCountOutputType without action
+ */
+export type AgentCountOutputTypeCountCrossChainTransfersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CrossChainTransferWhereInput
+}
+
+/**
+ * AgentCountOutputType without action
+ */
+export type AgentCountOutputTypeCountAutomationRulesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.AutomationRuleWhereInput
+}
+
+/**
+ * AgentCountOutputType without action
+ */
+export type AgentCountOutputTypeCountFinancialObservationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.FinancialObservationDailyWhereInput
+}
+
+/**
+ * AgentCountOutputType without action
+ */
+export type AgentCountOutputTypeCountForecastsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.SpendForecastWhereInput
+}
+
+/**
+ * AgentCountOutputType without action
+ */
+export type AgentCountOutputTypeCountFinancialAnomaliesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.FinancialAnomalyWhereInput
+}
+
+/**
+ * AgentCountOutputType without action
+ */
+export type AgentCountOutputTypeCountBudgetRecommendationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.BudgetRecommendationWhereInput
+}
+
 
 export type AgentSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1547,6 +3418,16 @@ export type AgentSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   policies?: boolean | Prisma.Agent$policiesArgs<ExtArgs>
   paymentIntents?: boolean | Prisma.Agent$paymentIntentsArgs<ExtArgs>
   reservations?: boolean | Prisma.Agent$reservationsArgs<ExtArgs>
+  virtualCards?: boolean | Prisma.Agent$virtualCardsArgs<ExtArgs>
+  issuedInvoices?: boolean | Prisma.Agent$issuedInvoicesArgs<ExtArgs>
+  receivedInvoices?: boolean | Prisma.Agent$receivedInvoicesArgs<ExtArgs>
+  crossChainQuotes?: boolean | Prisma.Agent$crossChainQuotesArgs<ExtArgs>
+  crossChainTransfers?: boolean | Prisma.Agent$crossChainTransfersArgs<ExtArgs>
+  automationRules?: boolean | Prisma.Agent$automationRulesArgs<ExtArgs>
+  financialObservations?: boolean | Prisma.Agent$financialObservationsArgs<ExtArgs>
+  forecasts?: boolean | Prisma.Agent$forecastsArgs<ExtArgs>
+  financialAnomalies?: boolean | Prisma.Agent$financialAnomaliesArgs<ExtArgs>
+  budgetRecommendations?: boolean | Prisma.Agent$budgetRecommendationsArgs<ExtArgs>
   _count?: boolean | Prisma.AgentCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["agent"]>
 
@@ -1605,6 +3486,16 @@ export type AgentInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   policies?: boolean | Prisma.Agent$policiesArgs<ExtArgs>
   paymentIntents?: boolean | Prisma.Agent$paymentIntentsArgs<ExtArgs>
   reservations?: boolean | Prisma.Agent$reservationsArgs<ExtArgs>
+  virtualCards?: boolean | Prisma.Agent$virtualCardsArgs<ExtArgs>
+  issuedInvoices?: boolean | Prisma.Agent$issuedInvoicesArgs<ExtArgs>
+  receivedInvoices?: boolean | Prisma.Agent$receivedInvoicesArgs<ExtArgs>
+  crossChainQuotes?: boolean | Prisma.Agent$crossChainQuotesArgs<ExtArgs>
+  crossChainTransfers?: boolean | Prisma.Agent$crossChainTransfersArgs<ExtArgs>
+  automationRules?: boolean | Prisma.Agent$automationRulesArgs<ExtArgs>
+  financialObservations?: boolean | Prisma.Agent$financialObservationsArgs<ExtArgs>
+  forecasts?: boolean | Prisma.Agent$forecastsArgs<ExtArgs>
+  financialAnomalies?: boolean | Prisma.Agent$financialAnomaliesArgs<ExtArgs>
+  budgetRecommendations?: boolean | Prisma.Agent$budgetRecommendationsArgs<ExtArgs>
   _count?: boolean | Prisma.AgentCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type AgentIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1629,6 +3520,16 @@ export type $AgentPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     policies: Prisma.$PolicyPayload<ExtArgs>[]
     paymentIntents: Prisma.$PaymentIntentPayload<ExtArgs>[]
     reservations: Prisma.$SpendReservationPayload<ExtArgs>[]
+    virtualCards: Prisma.$VirtualCardPayload<ExtArgs>[]
+    issuedInvoices: Prisma.$AgentInvoicePayload<ExtArgs>[]
+    receivedInvoices: Prisma.$AgentInvoicePayload<ExtArgs>[]
+    crossChainQuotes: Prisma.$CrossChainRouteQuotePayload<ExtArgs>[]
+    crossChainTransfers: Prisma.$CrossChainTransferPayload<ExtArgs>[]
+    automationRules: Prisma.$AutomationRulePayload<ExtArgs>[]
+    financialObservations: Prisma.$FinancialObservationDailyPayload<ExtArgs>[]
+    forecasts: Prisma.$SpendForecastPayload<ExtArgs>[]
+    financialAnomalies: Prisma.$FinancialAnomalyPayload<ExtArgs>[]
+    budgetRecommendations: Prisma.$BudgetRecommendationPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2043,6 +3944,16 @@ export interface Prisma__AgentClient<T, Null = never, ExtArgs extends runtime.Ty
   policies<T extends Prisma.Agent$policiesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Agent$policiesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PolicyPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   paymentIntents<T extends Prisma.Agent$paymentIntentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Agent$paymentIntentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PaymentIntentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   reservations<T extends Prisma.Agent$reservationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Agent$reservationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SpendReservationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  virtualCards<T extends Prisma.Agent$virtualCardsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Agent$virtualCardsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VirtualCardPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  issuedInvoices<T extends Prisma.Agent$issuedInvoicesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Agent$issuedInvoicesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AgentInvoicePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  receivedInvoices<T extends Prisma.Agent$receivedInvoicesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Agent$receivedInvoicesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AgentInvoicePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  crossChainQuotes<T extends Prisma.Agent$crossChainQuotesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Agent$crossChainQuotesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CrossChainRouteQuotePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  crossChainTransfers<T extends Prisma.Agent$crossChainTransfersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Agent$crossChainTransfersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CrossChainTransferPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  automationRules<T extends Prisma.Agent$automationRulesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Agent$automationRulesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AutomationRulePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  financialObservations<T extends Prisma.Agent$financialObservationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Agent$financialObservationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FinancialObservationDailyPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  forecasts<T extends Prisma.Agent$forecastsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Agent$forecastsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SpendForecastPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  financialAnomalies<T extends Prisma.Agent$financialAnomaliesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Agent$financialAnomaliesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FinancialAnomalyPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  budgetRecommendations<T extends Prisma.Agent$budgetRecommendationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Agent$budgetRecommendationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BudgetRecommendationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2638,6 +4549,246 @@ export type Agent$reservationsArgs<ExtArgs extends runtime.Types.Extensions.Inte
   take?: number
   skip?: number
   distinct?: Prisma.SpendReservationScalarFieldEnum | Prisma.SpendReservationScalarFieldEnum[]
+}
+
+/**
+ * Agent.virtualCards
+ */
+export type Agent$virtualCardsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the VirtualCard
+   */
+  select?: Prisma.VirtualCardSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the VirtualCard
+   */
+  omit?: Prisma.VirtualCardOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.VirtualCardInclude<ExtArgs> | null
+  where?: Prisma.VirtualCardWhereInput
+  orderBy?: Prisma.VirtualCardOrderByWithRelationInput | Prisma.VirtualCardOrderByWithRelationInput[]
+  cursor?: Prisma.VirtualCardWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.VirtualCardScalarFieldEnum | Prisma.VirtualCardScalarFieldEnum[]
+}
+
+/**
+ * Agent.issuedInvoices
+ */
+export type Agent$issuedInvoicesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the AgentInvoice
+   */
+  select?: Prisma.AgentInvoiceSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the AgentInvoice
+   */
+  omit?: Prisma.AgentInvoiceOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AgentInvoiceInclude<ExtArgs> | null
+  where?: Prisma.AgentInvoiceWhereInput
+  orderBy?: Prisma.AgentInvoiceOrderByWithRelationInput | Prisma.AgentInvoiceOrderByWithRelationInput[]
+  cursor?: Prisma.AgentInvoiceWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.AgentInvoiceScalarFieldEnum | Prisma.AgentInvoiceScalarFieldEnum[]
+}
+
+/**
+ * Agent.receivedInvoices
+ */
+export type Agent$receivedInvoicesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the AgentInvoice
+   */
+  select?: Prisma.AgentInvoiceSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the AgentInvoice
+   */
+  omit?: Prisma.AgentInvoiceOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AgentInvoiceInclude<ExtArgs> | null
+  where?: Prisma.AgentInvoiceWhereInput
+  orderBy?: Prisma.AgentInvoiceOrderByWithRelationInput | Prisma.AgentInvoiceOrderByWithRelationInput[]
+  cursor?: Prisma.AgentInvoiceWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.AgentInvoiceScalarFieldEnum | Prisma.AgentInvoiceScalarFieldEnum[]
+}
+
+/**
+ * Agent.crossChainQuotes
+ */
+export type Agent$crossChainQuotesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CrossChainRouteQuote
+   */
+  select?: Prisma.CrossChainRouteQuoteSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CrossChainRouteQuote
+   */
+  omit?: Prisma.CrossChainRouteQuoteOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CrossChainRouteQuoteInclude<ExtArgs> | null
+  where?: Prisma.CrossChainRouteQuoteWhereInput
+  orderBy?: Prisma.CrossChainRouteQuoteOrderByWithRelationInput | Prisma.CrossChainRouteQuoteOrderByWithRelationInput[]
+  cursor?: Prisma.CrossChainRouteQuoteWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CrossChainRouteQuoteScalarFieldEnum | Prisma.CrossChainRouteQuoteScalarFieldEnum[]
+}
+
+/**
+ * Agent.crossChainTransfers
+ */
+export type Agent$crossChainTransfersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CrossChainTransfer
+   */
+  select?: Prisma.CrossChainTransferSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CrossChainTransfer
+   */
+  omit?: Prisma.CrossChainTransferOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CrossChainTransferInclude<ExtArgs> | null
+  where?: Prisma.CrossChainTransferWhereInput
+  orderBy?: Prisma.CrossChainTransferOrderByWithRelationInput | Prisma.CrossChainTransferOrderByWithRelationInput[]
+  cursor?: Prisma.CrossChainTransferWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CrossChainTransferScalarFieldEnum | Prisma.CrossChainTransferScalarFieldEnum[]
+}
+
+/**
+ * Agent.automationRules
+ */
+export type Agent$automationRulesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the AutomationRule
+   */
+  select?: Prisma.AutomationRuleSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the AutomationRule
+   */
+  omit?: Prisma.AutomationRuleOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AutomationRuleInclude<ExtArgs> | null
+  where?: Prisma.AutomationRuleWhereInput
+  orderBy?: Prisma.AutomationRuleOrderByWithRelationInput | Prisma.AutomationRuleOrderByWithRelationInput[]
+  cursor?: Prisma.AutomationRuleWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.AutomationRuleScalarFieldEnum | Prisma.AutomationRuleScalarFieldEnum[]
+}
+
+/**
+ * Agent.financialObservations
+ */
+export type Agent$financialObservationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FinancialObservationDaily
+   */
+  select?: Prisma.FinancialObservationDailySelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the FinancialObservationDaily
+   */
+  omit?: Prisma.FinancialObservationDailyOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FinancialObservationDailyInclude<ExtArgs> | null
+  where?: Prisma.FinancialObservationDailyWhereInput
+  orderBy?: Prisma.FinancialObservationDailyOrderByWithRelationInput | Prisma.FinancialObservationDailyOrderByWithRelationInput[]
+  cursor?: Prisma.FinancialObservationDailyWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.FinancialObservationDailyScalarFieldEnum | Prisma.FinancialObservationDailyScalarFieldEnum[]
+}
+
+/**
+ * Agent.forecasts
+ */
+export type Agent$forecastsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the SpendForecast
+   */
+  select?: Prisma.SpendForecastSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the SpendForecast
+   */
+  omit?: Prisma.SpendForecastOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SpendForecastInclude<ExtArgs> | null
+  where?: Prisma.SpendForecastWhereInput
+  orderBy?: Prisma.SpendForecastOrderByWithRelationInput | Prisma.SpendForecastOrderByWithRelationInput[]
+  cursor?: Prisma.SpendForecastWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.SpendForecastScalarFieldEnum | Prisma.SpendForecastScalarFieldEnum[]
+}
+
+/**
+ * Agent.financialAnomalies
+ */
+export type Agent$financialAnomaliesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FinancialAnomaly
+   */
+  select?: Prisma.FinancialAnomalySelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the FinancialAnomaly
+   */
+  omit?: Prisma.FinancialAnomalyOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FinancialAnomalyInclude<ExtArgs> | null
+  where?: Prisma.FinancialAnomalyWhereInput
+  orderBy?: Prisma.FinancialAnomalyOrderByWithRelationInput | Prisma.FinancialAnomalyOrderByWithRelationInput[]
+  cursor?: Prisma.FinancialAnomalyWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.FinancialAnomalyScalarFieldEnum | Prisma.FinancialAnomalyScalarFieldEnum[]
+}
+
+/**
+ * Agent.budgetRecommendations
+ */
+export type Agent$budgetRecommendationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the BudgetRecommendation
+   */
+  select?: Prisma.BudgetRecommendationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the BudgetRecommendation
+   */
+  omit?: Prisma.BudgetRecommendationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.BudgetRecommendationInclude<ExtArgs> | null
+  where?: Prisma.BudgetRecommendationWhereInput
+  orderBy?: Prisma.BudgetRecommendationOrderByWithRelationInput | Prisma.BudgetRecommendationOrderByWithRelationInput[]
+  cursor?: Prisma.BudgetRecommendationWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.BudgetRecommendationScalarFieldEnum | Prisma.BudgetRecommendationScalarFieldEnum[]
 }
 
 /**

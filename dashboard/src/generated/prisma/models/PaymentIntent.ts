@@ -237,6 +237,9 @@ export type PaymentIntentWhereInput = {
   reservation?: Prisma.XOR<Prisma.SpendReservationNullableScalarRelationFilter, Prisma.SpendReservationWhereInput> | null
   approval?: Prisma.XOR<Prisma.ApprovalRequestNullableScalarRelationFilter, Prisma.ApprovalRequestWhereInput> | null
   attempts?: Prisma.PaymentAttemptListRelationFilter
+  fulfillment?: Prisma.XOR<Prisma.ResourceFulfillmentNullableScalarRelationFilter, Prisma.ResourceFulfillmentWhereInput> | null
+  invoiceSettlement?: Prisma.XOR<Prisma.InvoiceSettlementNullableScalarRelationFilter, Prisma.InvoiceSettlementWhereInput> | null
+  resourceReview?: Prisma.XOR<Prisma.ResourceReviewNullableScalarRelationFilter, Prisma.ResourceReviewWhereInput> | null
 }
 
 export type PaymentIntentOrderByWithRelationInput = {
@@ -258,6 +261,9 @@ export type PaymentIntentOrderByWithRelationInput = {
   reservation?: Prisma.SpendReservationOrderByWithRelationInput
   approval?: Prisma.ApprovalRequestOrderByWithRelationInput
   attempts?: Prisma.PaymentAttemptOrderByRelationAggregateInput
+  fulfillment?: Prisma.ResourceFulfillmentOrderByWithRelationInput
+  invoiceSettlement?: Prisma.InvoiceSettlementOrderByWithRelationInput
+  resourceReview?: Prisma.ResourceReviewOrderByWithRelationInput
 }
 
 export type PaymentIntentWhereUniqueInput = Prisma.AtLeast<{
@@ -283,6 +289,9 @@ export type PaymentIntentWhereUniqueInput = Prisma.AtLeast<{
   reservation?: Prisma.XOR<Prisma.SpendReservationNullableScalarRelationFilter, Prisma.SpendReservationWhereInput> | null
   approval?: Prisma.XOR<Prisma.ApprovalRequestNullableScalarRelationFilter, Prisma.ApprovalRequestWhereInput> | null
   attempts?: Prisma.PaymentAttemptListRelationFilter
+  fulfillment?: Prisma.XOR<Prisma.ResourceFulfillmentNullableScalarRelationFilter, Prisma.ResourceFulfillmentWhereInput> | null
+  invoiceSettlement?: Prisma.XOR<Prisma.InvoiceSettlementNullableScalarRelationFilter, Prisma.InvoiceSettlementWhereInput> | null
+  resourceReview?: Prisma.XOR<Prisma.ResourceReviewNullableScalarRelationFilter, Prisma.ResourceReviewWhereInput> | null
 }, "id" | "organizationId_agentId_idempotencyKey">
 
 export type PaymentIntentOrderByWithAggregationInput = {
@@ -336,6 +345,9 @@ export type PaymentIntentCreateInput = {
   reservation?: Prisma.SpendReservationCreateNestedOneWithoutPaymentIntentInput
   approval?: Prisma.ApprovalRequestCreateNestedOneWithoutPaymentIntentInput
   attempts?: Prisma.PaymentAttemptCreateNestedManyWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentCreateNestedOneWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewCreateNestedOneWithoutPaymentIntentInput
 }
 
 export type PaymentIntentUncheckedCreateInput = {
@@ -355,6 +367,9 @@ export type PaymentIntentUncheckedCreateInput = {
   reservation?: Prisma.SpendReservationUncheckedCreateNestedOneWithoutPaymentIntentInput
   approval?: Prisma.ApprovalRequestUncheckedCreateNestedOneWithoutPaymentIntentInput
   attempts?: Prisma.PaymentAttemptUncheckedCreateNestedManyWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedCreateNestedOneWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewUncheckedCreateNestedOneWithoutPaymentIntentInput
 }
 
 export type PaymentIntentUpdateInput = {
@@ -374,6 +389,9 @@ export type PaymentIntentUpdateInput = {
   reservation?: Prisma.SpendReservationUpdateOneWithoutPaymentIntentNestedInput
   approval?: Prisma.ApprovalRequestUpdateOneWithoutPaymentIntentNestedInput
   attempts?: Prisma.PaymentAttemptUpdateManyWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUpdateOneWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUpdateOneWithoutPaymentIntentNestedInput
 }
 
 export type PaymentIntentUncheckedUpdateInput = {
@@ -393,6 +411,9 @@ export type PaymentIntentUncheckedUpdateInput = {
   reservation?: Prisma.SpendReservationUncheckedUpdateOneWithoutPaymentIntentNestedInput
   approval?: Prisma.ApprovalRequestUncheckedUpdateOneWithoutPaymentIntentNestedInput
   attempts?: Prisma.PaymentAttemptUncheckedUpdateManyWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUncheckedUpdateOneWithoutPaymentIntentNestedInput
 }
 
 export type PaymentIntentCreateManyInput = {
@@ -586,6 +607,20 @@ export type EnumPaymentStatusFieldUpdateOperationsInput = {
   set?: $Enums.PaymentStatus
 }
 
+export type PaymentIntentCreateNestedOneWithoutFulfillmentInput = {
+  create?: Prisma.XOR<Prisma.PaymentIntentCreateWithoutFulfillmentInput, Prisma.PaymentIntentUncheckedCreateWithoutFulfillmentInput>
+  connectOrCreate?: Prisma.PaymentIntentCreateOrConnectWithoutFulfillmentInput
+  connect?: Prisma.PaymentIntentWhereUniqueInput
+}
+
+export type PaymentIntentUpdateOneRequiredWithoutFulfillmentNestedInput = {
+  create?: Prisma.XOR<Prisma.PaymentIntentCreateWithoutFulfillmentInput, Prisma.PaymentIntentUncheckedCreateWithoutFulfillmentInput>
+  connectOrCreate?: Prisma.PaymentIntentCreateOrConnectWithoutFulfillmentInput
+  upsert?: Prisma.PaymentIntentUpsertWithoutFulfillmentInput
+  connect?: Prisma.PaymentIntentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.PaymentIntentUpdateToOneWithWhereWithoutFulfillmentInput, Prisma.PaymentIntentUpdateWithoutFulfillmentInput>, Prisma.PaymentIntentUncheckedUpdateWithoutFulfillmentInput>
+}
+
 export type PaymentIntentCreateNestedOneWithoutQuoteInput = {
   create?: Prisma.XOR<Prisma.PaymentIntentCreateWithoutQuoteInput, Prisma.PaymentIntentUncheckedCreateWithoutQuoteInput>
   connectOrCreate?: Prisma.PaymentIntentCreateOrConnectWithoutQuoteInput
@@ -656,6 +691,34 @@ export type PaymentIntentUpdateOneRequiredWithoutAttemptsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.PaymentIntentUpdateToOneWithWhereWithoutAttemptsInput, Prisma.PaymentIntentUpdateWithoutAttemptsInput>, Prisma.PaymentIntentUncheckedUpdateWithoutAttemptsInput>
 }
 
+export type PaymentIntentCreateNestedOneWithoutResourceReviewInput = {
+  create?: Prisma.XOR<Prisma.PaymentIntentCreateWithoutResourceReviewInput, Prisma.PaymentIntentUncheckedCreateWithoutResourceReviewInput>
+  connectOrCreate?: Prisma.PaymentIntentCreateOrConnectWithoutResourceReviewInput
+  connect?: Prisma.PaymentIntentWhereUniqueInput
+}
+
+export type PaymentIntentUpdateOneRequiredWithoutResourceReviewNestedInput = {
+  create?: Prisma.XOR<Prisma.PaymentIntentCreateWithoutResourceReviewInput, Prisma.PaymentIntentUncheckedCreateWithoutResourceReviewInput>
+  connectOrCreate?: Prisma.PaymentIntentCreateOrConnectWithoutResourceReviewInput
+  upsert?: Prisma.PaymentIntentUpsertWithoutResourceReviewInput
+  connect?: Prisma.PaymentIntentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.PaymentIntentUpdateToOneWithWhereWithoutResourceReviewInput, Prisma.PaymentIntentUpdateWithoutResourceReviewInput>, Prisma.PaymentIntentUncheckedUpdateWithoutResourceReviewInput>
+}
+
+export type PaymentIntentCreateNestedOneWithoutInvoiceSettlementInput = {
+  create?: Prisma.XOR<Prisma.PaymentIntentCreateWithoutInvoiceSettlementInput, Prisma.PaymentIntentUncheckedCreateWithoutInvoiceSettlementInput>
+  connectOrCreate?: Prisma.PaymentIntentCreateOrConnectWithoutInvoiceSettlementInput
+  connect?: Prisma.PaymentIntentWhereUniqueInput
+}
+
+export type PaymentIntentUpdateOneRequiredWithoutInvoiceSettlementNestedInput = {
+  create?: Prisma.XOR<Prisma.PaymentIntentCreateWithoutInvoiceSettlementInput, Prisma.PaymentIntentUncheckedCreateWithoutInvoiceSettlementInput>
+  connectOrCreate?: Prisma.PaymentIntentCreateOrConnectWithoutInvoiceSettlementInput
+  upsert?: Prisma.PaymentIntentUpsertWithoutInvoiceSettlementInput
+  connect?: Prisma.PaymentIntentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.PaymentIntentUpdateToOneWithWhereWithoutInvoiceSettlementInput, Prisma.PaymentIntentUpdateWithoutInvoiceSettlementInput>, Prisma.PaymentIntentUncheckedUpdateWithoutInvoiceSettlementInput>
+}
+
 export type PaymentIntentCreateWithoutOrganizationInput = {
   id?: string
   idempotencyKey: string
@@ -672,6 +735,9 @@ export type PaymentIntentCreateWithoutOrganizationInput = {
   reservation?: Prisma.SpendReservationCreateNestedOneWithoutPaymentIntentInput
   approval?: Prisma.ApprovalRequestCreateNestedOneWithoutPaymentIntentInput
   attempts?: Prisma.PaymentAttemptCreateNestedManyWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentCreateNestedOneWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewCreateNestedOneWithoutPaymentIntentInput
 }
 
 export type PaymentIntentUncheckedCreateWithoutOrganizationInput = {
@@ -690,6 +756,9 @@ export type PaymentIntentUncheckedCreateWithoutOrganizationInput = {
   reservation?: Prisma.SpendReservationUncheckedCreateNestedOneWithoutPaymentIntentInput
   approval?: Prisma.ApprovalRequestUncheckedCreateNestedOneWithoutPaymentIntentInput
   attempts?: Prisma.PaymentAttemptUncheckedCreateNestedManyWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedCreateNestedOneWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewUncheckedCreateNestedOneWithoutPaymentIntentInput
 }
 
 export type PaymentIntentCreateOrConnectWithoutOrganizationInput = {
@@ -751,6 +820,9 @@ export type PaymentIntentCreateWithoutAgentInput = {
   reservation?: Prisma.SpendReservationCreateNestedOneWithoutPaymentIntentInput
   approval?: Prisma.ApprovalRequestCreateNestedOneWithoutPaymentIntentInput
   attempts?: Prisma.PaymentAttemptCreateNestedManyWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentCreateNestedOneWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewCreateNestedOneWithoutPaymentIntentInput
 }
 
 export type PaymentIntentUncheckedCreateWithoutAgentInput = {
@@ -769,6 +841,9 @@ export type PaymentIntentUncheckedCreateWithoutAgentInput = {
   reservation?: Prisma.SpendReservationUncheckedCreateNestedOneWithoutPaymentIntentInput
   approval?: Prisma.ApprovalRequestUncheckedCreateNestedOneWithoutPaymentIntentInput
   attempts?: Prisma.PaymentAttemptUncheckedCreateNestedManyWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedCreateNestedOneWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewUncheckedCreateNestedOneWithoutPaymentIntentInput
 }
 
 export type PaymentIntentCreateOrConnectWithoutAgentInput = {
@@ -797,6 +872,106 @@ export type PaymentIntentUpdateManyWithWhereWithoutAgentInput = {
   data: Prisma.XOR<Prisma.PaymentIntentUpdateManyMutationInput, Prisma.PaymentIntentUncheckedUpdateManyWithoutAgentInput>
 }
 
+export type PaymentIntentCreateWithoutFulfillmentInput = {
+  id?: string
+  idempotencyKey: string
+  requestHash: string
+  resourceUrl: string
+  merchantHost: string
+  purpose?: string | null
+  status?: $Enums.PaymentStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  organization: Prisma.OrganizationCreateNestedOneWithoutPaymentIntentsInput
+  agent: Prisma.AgentCreateNestedOneWithoutPaymentIntentsInput
+  quote?: Prisma.PaymentQuoteCreateNestedOneWithoutPaymentIntentInput
+  decisions?: Prisma.PolicyDecisionCreateNestedManyWithoutPaymentIntentInput
+  reservation?: Prisma.SpendReservationCreateNestedOneWithoutPaymentIntentInput
+  approval?: Prisma.ApprovalRequestCreateNestedOneWithoutPaymentIntentInput
+  attempts?: Prisma.PaymentAttemptCreateNestedManyWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewCreateNestedOneWithoutPaymentIntentInput
+}
+
+export type PaymentIntentUncheckedCreateWithoutFulfillmentInput = {
+  id?: string
+  organizationId: string
+  agentId: string
+  idempotencyKey: string
+  requestHash: string
+  resourceUrl: string
+  merchantHost: string
+  purpose?: string | null
+  status?: $Enums.PaymentStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  quote?: Prisma.PaymentQuoteUncheckedCreateNestedOneWithoutPaymentIntentInput
+  decisions?: Prisma.PolicyDecisionUncheckedCreateNestedManyWithoutPaymentIntentInput
+  reservation?: Prisma.SpendReservationUncheckedCreateNestedOneWithoutPaymentIntentInput
+  approval?: Prisma.ApprovalRequestUncheckedCreateNestedOneWithoutPaymentIntentInput
+  attempts?: Prisma.PaymentAttemptUncheckedCreateNestedManyWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewUncheckedCreateNestedOneWithoutPaymentIntentInput
+}
+
+export type PaymentIntentCreateOrConnectWithoutFulfillmentInput = {
+  where: Prisma.PaymentIntentWhereUniqueInput
+  create: Prisma.XOR<Prisma.PaymentIntentCreateWithoutFulfillmentInput, Prisma.PaymentIntentUncheckedCreateWithoutFulfillmentInput>
+}
+
+export type PaymentIntentUpsertWithoutFulfillmentInput = {
+  update: Prisma.XOR<Prisma.PaymentIntentUpdateWithoutFulfillmentInput, Prisma.PaymentIntentUncheckedUpdateWithoutFulfillmentInput>
+  create: Prisma.XOR<Prisma.PaymentIntentCreateWithoutFulfillmentInput, Prisma.PaymentIntentUncheckedCreateWithoutFulfillmentInput>
+  where?: Prisma.PaymentIntentWhereInput
+}
+
+export type PaymentIntentUpdateToOneWithWhereWithoutFulfillmentInput = {
+  where?: Prisma.PaymentIntentWhereInput
+  data: Prisma.XOR<Prisma.PaymentIntentUpdateWithoutFulfillmentInput, Prisma.PaymentIntentUncheckedUpdateWithoutFulfillmentInput>
+}
+
+export type PaymentIntentUpdateWithoutFulfillmentInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  resourceUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  merchantHost?: Prisma.StringFieldUpdateOperationsInput | string
+  purpose?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutPaymentIntentsNestedInput
+  agent?: Prisma.AgentUpdateOneRequiredWithoutPaymentIntentsNestedInput
+  quote?: Prisma.PaymentQuoteUpdateOneWithoutPaymentIntentNestedInput
+  decisions?: Prisma.PolicyDecisionUpdateManyWithoutPaymentIntentNestedInput
+  reservation?: Prisma.SpendReservationUpdateOneWithoutPaymentIntentNestedInput
+  approval?: Prisma.ApprovalRequestUpdateOneWithoutPaymentIntentNestedInput
+  attempts?: Prisma.PaymentAttemptUpdateManyWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUpdateOneWithoutPaymentIntentNestedInput
+}
+
+export type PaymentIntentUncheckedUpdateWithoutFulfillmentInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  agentId?: Prisma.StringFieldUpdateOperationsInput | string
+  idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  resourceUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  merchantHost?: Prisma.StringFieldUpdateOperationsInput | string
+  purpose?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  quote?: Prisma.PaymentQuoteUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  decisions?: Prisma.PolicyDecisionUncheckedUpdateManyWithoutPaymentIntentNestedInput
+  reservation?: Prisma.SpendReservationUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  approval?: Prisma.ApprovalRequestUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  attempts?: Prisma.PaymentAttemptUncheckedUpdateManyWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUncheckedUpdateOneWithoutPaymentIntentNestedInput
+}
+
 export type PaymentIntentCreateWithoutQuoteInput = {
   id?: string
   idempotencyKey: string
@@ -813,6 +988,9 @@ export type PaymentIntentCreateWithoutQuoteInput = {
   reservation?: Prisma.SpendReservationCreateNestedOneWithoutPaymentIntentInput
   approval?: Prisma.ApprovalRequestCreateNestedOneWithoutPaymentIntentInput
   attempts?: Prisma.PaymentAttemptCreateNestedManyWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentCreateNestedOneWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewCreateNestedOneWithoutPaymentIntentInput
 }
 
 export type PaymentIntentUncheckedCreateWithoutQuoteInput = {
@@ -831,6 +1009,9 @@ export type PaymentIntentUncheckedCreateWithoutQuoteInput = {
   reservation?: Prisma.SpendReservationUncheckedCreateNestedOneWithoutPaymentIntentInput
   approval?: Prisma.ApprovalRequestUncheckedCreateNestedOneWithoutPaymentIntentInput
   attempts?: Prisma.PaymentAttemptUncheckedCreateNestedManyWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedCreateNestedOneWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewUncheckedCreateNestedOneWithoutPaymentIntentInput
 }
 
 export type PaymentIntentCreateOrConnectWithoutQuoteInput = {
@@ -865,6 +1046,9 @@ export type PaymentIntentUpdateWithoutQuoteInput = {
   reservation?: Prisma.SpendReservationUpdateOneWithoutPaymentIntentNestedInput
   approval?: Prisma.ApprovalRequestUpdateOneWithoutPaymentIntentNestedInput
   attempts?: Prisma.PaymentAttemptUpdateManyWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUpdateOneWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUpdateOneWithoutPaymentIntentNestedInput
 }
 
 export type PaymentIntentUncheckedUpdateWithoutQuoteInput = {
@@ -883,6 +1067,9 @@ export type PaymentIntentUncheckedUpdateWithoutQuoteInput = {
   reservation?: Prisma.SpendReservationUncheckedUpdateOneWithoutPaymentIntentNestedInput
   approval?: Prisma.ApprovalRequestUncheckedUpdateOneWithoutPaymentIntentNestedInput
   attempts?: Prisma.PaymentAttemptUncheckedUpdateManyWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUncheckedUpdateOneWithoutPaymentIntentNestedInput
 }
 
 export type PaymentIntentCreateWithoutDecisionsInput = {
@@ -901,6 +1088,9 @@ export type PaymentIntentCreateWithoutDecisionsInput = {
   reservation?: Prisma.SpendReservationCreateNestedOneWithoutPaymentIntentInput
   approval?: Prisma.ApprovalRequestCreateNestedOneWithoutPaymentIntentInput
   attempts?: Prisma.PaymentAttemptCreateNestedManyWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentCreateNestedOneWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewCreateNestedOneWithoutPaymentIntentInput
 }
 
 export type PaymentIntentUncheckedCreateWithoutDecisionsInput = {
@@ -919,6 +1109,9 @@ export type PaymentIntentUncheckedCreateWithoutDecisionsInput = {
   reservation?: Prisma.SpendReservationUncheckedCreateNestedOneWithoutPaymentIntentInput
   approval?: Prisma.ApprovalRequestUncheckedCreateNestedOneWithoutPaymentIntentInput
   attempts?: Prisma.PaymentAttemptUncheckedCreateNestedManyWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedCreateNestedOneWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewUncheckedCreateNestedOneWithoutPaymentIntentInput
 }
 
 export type PaymentIntentCreateOrConnectWithoutDecisionsInput = {
@@ -953,6 +1146,9 @@ export type PaymentIntentUpdateWithoutDecisionsInput = {
   reservation?: Prisma.SpendReservationUpdateOneWithoutPaymentIntentNestedInput
   approval?: Prisma.ApprovalRequestUpdateOneWithoutPaymentIntentNestedInput
   attempts?: Prisma.PaymentAttemptUpdateManyWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUpdateOneWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUpdateOneWithoutPaymentIntentNestedInput
 }
 
 export type PaymentIntentUncheckedUpdateWithoutDecisionsInput = {
@@ -971,6 +1167,9 @@ export type PaymentIntentUncheckedUpdateWithoutDecisionsInput = {
   reservation?: Prisma.SpendReservationUncheckedUpdateOneWithoutPaymentIntentNestedInput
   approval?: Prisma.ApprovalRequestUncheckedUpdateOneWithoutPaymentIntentNestedInput
   attempts?: Prisma.PaymentAttemptUncheckedUpdateManyWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUncheckedUpdateOneWithoutPaymentIntentNestedInput
 }
 
 export type PaymentIntentCreateWithoutReservationInput = {
@@ -989,6 +1188,9 @@ export type PaymentIntentCreateWithoutReservationInput = {
   decisions?: Prisma.PolicyDecisionCreateNestedManyWithoutPaymentIntentInput
   approval?: Prisma.ApprovalRequestCreateNestedOneWithoutPaymentIntentInput
   attempts?: Prisma.PaymentAttemptCreateNestedManyWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentCreateNestedOneWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewCreateNestedOneWithoutPaymentIntentInput
 }
 
 export type PaymentIntentUncheckedCreateWithoutReservationInput = {
@@ -1007,6 +1209,9 @@ export type PaymentIntentUncheckedCreateWithoutReservationInput = {
   decisions?: Prisma.PolicyDecisionUncheckedCreateNestedManyWithoutPaymentIntentInput
   approval?: Prisma.ApprovalRequestUncheckedCreateNestedOneWithoutPaymentIntentInput
   attempts?: Prisma.PaymentAttemptUncheckedCreateNestedManyWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedCreateNestedOneWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewUncheckedCreateNestedOneWithoutPaymentIntentInput
 }
 
 export type PaymentIntentCreateOrConnectWithoutReservationInput = {
@@ -1041,6 +1246,9 @@ export type PaymentIntentUpdateWithoutReservationInput = {
   decisions?: Prisma.PolicyDecisionUpdateManyWithoutPaymentIntentNestedInput
   approval?: Prisma.ApprovalRequestUpdateOneWithoutPaymentIntentNestedInput
   attempts?: Prisma.PaymentAttemptUpdateManyWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUpdateOneWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUpdateOneWithoutPaymentIntentNestedInput
 }
 
 export type PaymentIntentUncheckedUpdateWithoutReservationInput = {
@@ -1059,6 +1267,9 @@ export type PaymentIntentUncheckedUpdateWithoutReservationInput = {
   decisions?: Prisma.PolicyDecisionUncheckedUpdateManyWithoutPaymentIntentNestedInput
   approval?: Prisma.ApprovalRequestUncheckedUpdateOneWithoutPaymentIntentNestedInput
   attempts?: Prisma.PaymentAttemptUncheckedUpdateManyWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUncheckedUpdateOneWithoutPaymentIntentNestedInput
 }
 
 export type PaymentIntentCreateWithoutApprovalInput = {
@@ -1077,6 +1288,9 @@ export type PaymentIntentCreateWithoutApprovalInput = {
   decisions?: Prisma.PolicyDecisionCreateNestedManyWithoutPaymentIntentInput
   reservation?: Prisma.SpendReservationCreateNestedOneWithoutPaymentIntentInput
   attempts?: Prisma.PaymentAttemptCreateNestedManyWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentCreateNestedOneWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewCreateNestedOneWithoutPaymentIntentInput
 }
 
 export type PaymentIntentUncheckedCreateWithoutApprovalInput = {
@@ -1095,6 +1309,9 @@ export type PaymentIntentUncheckedCreateWithoutApprovalInput = {
   decisions?: Prisma.PolicyDecisionUncheckedCreateNestedManyWithoutPaymentIntentInput
   reservation?: Prisma.SpendReservationUncheckedCreateNestedOneWithoutPaymentIntentInput
   attempts?: Prisma.PaymentAttemptUncheckedCreateNestedManyWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedCreateNestedOneWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewUncheckedCreateNestedOneWithoutPaymentIntentInput
 }
 
 export type PaymentIntentCreateOrConnectWithoutApprovalInput = {
@@ -1129,6 +1346,9 @@ export type PaymentIntentUpdateWithoutApprovalInput = {
   decisions?: Prisma.PolicyDecisionUpdateManyWithoutPaymentIntentNestedInput
   reservation?: Prisma.SpendReservationUpdateOneWithoutPaymentIntentNestedInput
   attempts?: Prisma.PaymentAttemptUpdateManyWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUpdateOneWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUpdateOneWithoutPaymentIntentNestedInput
 }
 
 export type PaymentIntentUncheckedUpdateWithoutApprovalInput = {
@@ -1147,6 +1367,9 @@ export type PaymentIntentUncheckedUpdateWithoutApprovalInput = {
   decisions?: Prisma.PolicyDecisionUncheckedUpdateManyWithoutPaymentIntentNestedInput
   reservation?: Prisma.SpendReservationUncheckedUpdateOneWithoutPaymentIntentNestedInput
   attempts?: Prisma.PaymentAttemptUncheckedUpdateManyWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUncheckedUpdateOneWithoutPaymentIntentNestedInput
 }
 
 export type PaymentIntentCreateWithoutAttemptsInput = {
@@ -1165,6 +1388,9 @@ export type PaymentIntentCreateWithoutAttemptsInput = {
   decisions?: Prisma.PolicyDecisionCreateNestedManyWithoutPaymentIntentInput
   reservation?: Prisma.SpendReservationCreateNestedOneWithoutPaymentIntentInput
   approval?: Prisma.ApprovalRequestCreateNestedOneWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentCreateNestedOneWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewCreateNestedOneWithoutPaymentIntentInput
 }
 
 export type PaymentIntentUncheckedCreateWithoutAttemptsInput = {
@@ -1183,6 +1409,9 @@ export type PaymentIntentUncheckedCreateWithoutAttemptsInput = {
   decisions?: Prisma.PolicyDecisionUncheckedCreateNestedManyWithoutPaymentIntentInput
   reservation?: Prisma.SpendReservationUncheckedCreateNestedOneWithoutPaymentIntentInput
   approval?: Prisma.ApprovalRequestUncheckedCreateNestedOneWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedCreateNestedOneWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewUncheckedCreateNestedOneWithoutPaymentIntentInput
 }
 
 export type PaymentIntentCreateOrConnectWithoutAttemptsInput = {
@@ -1217,6 +1446,9 @@ export type PaymentIntentUpdateWithoutAttemptsInput = {
   decisions?: Prisma.PolicyDecisionUpdateManyWithoutPaymentIntentNestedInput
   reservation?: Prisma.SpendReservationUpdateOneWithoutPaymentIntentNestedInput
   approval?: Prisma.ApprovalRequestUpdateOneWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUpdateOneWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUpdateOneWithoutPaymentIntentNestedInput
 }
 
 export type PaymentIntentUncheckedUpdateWithoutAttemptsInput = {
@@ -1235,6 +1467,209 @@ export type PaymentIntentUncheckedUpdateWithoutAttemptsInput = {
   decisions?: Prisma.PolicyDecisionUncheckedUpdateManyWithoutPaymentIntentNestedInput
   reservation?: Prisma.SpendReservationUncheckedUpdateOneWithoutPaymentIntentNestedInput
   approval?: Prisma.ApprovalRequestUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUncheckedUpdateOneWithoutPaymentIntentNestedInput
+}
+
+export type PaymentIntentCreateWithoutResourceReviewInput = {
+  id?: string
+  idempotencyKey: string
+  requestHash: string
+  resourceUrl: string
+  merchantHost: string
+  purpose?: string | null
+  status?: $Enums.PaymentStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  organization: Prisma.OrganizationCreateNestedOneWithoutPaymentIntentsInput
+  agent: Prisma.AgentCreateNestedOneWithoutPaymentIntentsInput
+  quote?: Prisma.PaymentQuoteCreateNestedOneWithoutPaymentIntentInput
+  decisions?: Prisma.PolicyDecisionCreateNestedManyWithoutPaymentIntentInput
+  reservation?: Prisma.SpendReservationCreateNestedOneWithoutPaymentIntentInput
+  approval?: Prisma.ApprovalRequestCreateNestedOneWithoutPaymentIntentInput
+  attempts?: Prisma.PaymentAttemptCreateNestedManyWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentCreateNestedOneWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementCreateNestedOneWithoutPaymentIntentInput
+}
+
+export type PaymentIntentUncheckedCreateWithoutResourceReviewInput = {
+  id?: string
+  organizationId: string
+  agentId: string
+  idempotencyKey: string
+  requestHash: string
+  resourceUrl: string
+  merchantHost: string
+  purpose?: string | null
+  status?: $Enums.PaymentStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  quote?: Prisma.PaymentQuoteUncheckedCreateNestedOneWithoutPaymentIntentInput
+  decisions?: Prisma.PolicyDecisionUncheckedCreateNestedManyWithoutPaymentIntentInput
+  reservation?: Prisma.SpendReservationUncheckedCreateNestedOneWithoutPaymentIntentInput
+  approval?: Prisma.ApprovalRequestUncheckedCreateNestedOneWithoutPaymentIntentInput
+  attempts?: Prisma.PaymentAttemptUncheckedCreateNestedManyWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedCreateNestedOneWithoutPaymentIntentInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedCreateNestedOneWithoutPaymentIntentInput
+}
+
+export type PaymentIntentCreateOrConnectWithoutResourceReviewInput = {
+  where: Prisma.PaymentIntentWhereUniqueInput
+  create: Prisma.XOR<Prisma.PaymentIntentCreateWithoutResourceReviewInput, Prisma.PaymentIntentUncheckedCreateWithoutResourceReviewInput>
+}
+
+export type PaymentIntentUpsertWithoutResourceReviewInput = {
+  update: Prisma.XOR<Prisma.PaymentIntentUpdateWithoutResourceReviewInput, Prisma.PaymentIntentUncheckedUpdateWithoutResourceReviewInput>
+  create: Prisma.XOR<Prisma.PaymentIntentCreateWithoutResourceReviewInput, Prisma.PaymentIntentUncheckedCreateWithoutResourceReviewInput>
+  where?: Prisma.PaymentIntentWhereInput
+}
+
+export type PaymentIntentUpdateToOneWithWhereWithoutResourceReviewInput = {
+  where?: Prisma.PaymentIntentWhereInput
+  data: Prisma.XOR<Prisma.PaymentIntentUpdateWithoutResourceReviewInput, Prisma.PaymentIntentUncheckedUpdateWithoutResourceReviewInput>
+}
+
+export type PaymentIntentUpdateWithoutResourceReviewInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  resourceUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  merchantHost?: Prisma.StringFieldUpdateOperationsInput | string
+  purpose?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutPaymentIntentsNestedInput
+  agent?: Prisma.AgentUpdateOneRequiredWithoutPaymentIntentsNestedInput
+  quote?: Prisma.PaymentQuoteUpdateOneWithoutPaymentIntentNestedInput
+  decisions?: Prisma.PolicyDecisionUpdateManyWithoutPaymentIntentNestedInput
+  reservation?: Prisma.SpendReservationUpdateOneWithoutPaymentIntentNestedInput
+  approval?: Prisma.ApprovalRequestUpdateOneWithoutPaymentIntentNestedInput
+  attempts?: Prisma.PaymentAttemptUpdateManyWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUpdateOneWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUpdateOneWithoutPaymentIntentNestedInput
+}
+
+export type PaymentIntentUncheckedUpdateWithoutResourceReviewInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  agentId?: Prisma.StringFieldUpdateOperationsInput | string
+  idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  resourceUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  merchantHost?: Prisma.StringFieldUpdateOperationsInput | string
+  purpose?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  quote?: Prisma.PaymentQuoteUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  decisions?: Prisma.PolicyDecisionUncheckedUpdateManyWithoutPaymentIntentNestedInput
+  reservation?: Prisma.SpendReservationUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  approval?: Prisma.ApprovalRequestUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  attempts?: Prisma.PaymentAttemptUncheckedUpdateManyWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedUpdateOneWithoutPaymentIntentNestedInput
+}
+
+export type PaymentIntentCreateWithoutInvoiceSettlementInput = {
+  id?: string
+  idempotencyKey: string
+  requestHash: string
+  resourceUrl: string
+  merchantHost: string
+  purpose?: string | null
+  status?: $Enums.PaymentStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  organization: Prisma.OrganizationCreateNestedOneWithoutPaymentIntentsInput
+  agent: Prisma.AgentCreateNestedOneWithoutPaymentIntentsInput
+  quote?: Prisma.PaymentQuoteCreateNestedOneWithoutPaymentIntentInput
+  decisions?: Prisma.PolicyDecisionCreateNestedManyWithoutPaymentIntentInput
+  reservation?: Prisma.SpendReservationCreateNestedOneWithoutPaymentIntentInput
+  approval?: Prisma.ApprovalRequestCreateNestedOneWithoutPaymentIntentInput
+  attempts?: Prisma.PaymentAttemptCreateNestedManyWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewCreateNestedOneWithoutPaymentIntentInput
+}
+
+export type PaymentIntentUncheckedCreateWithoutInvoiceSettlementInput = {
+  id?: string
+  organizationId: string
+  agentId: string
+  idempotencyKey: string
+  requestHash: string
+  resourceUrl: string
+  merchantHost: string
+  purpose?: string | null
+  status?: $Enums.PaymentStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  quote?: Prisma.PaymentQuoteUncheckedCreateNestedOneWithoutPaymentIntentInput
+  decisions?: Prisma.PolicyDecisionUncheckedCreateNestedManyWithoutPaymentIntentInput
+  reservation?: Prisma.SpendReservationUncheckedCreateNestedOneWithoutPaymentIntentInput
+  approval?: Prisma.ApprovalRequestUncheckedCreateNestedOneWithoutPaymentIntentInput
+  attempts?: Prisma.PaymentAttemptUncheckedCreateNestedManyWithoutPaymentIntentInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedCreateNestedOneWithoutPaymentIntentInput
+  resourceReview?: Prisma.ResourceReviewUncheckedCreateNestedOneWithoutPaymentIntentInput
+}
+
+export type PaymentIntentCreateOrConnectWithoutInvoiceSettlementInput = {
+  where: Prisma.PaymentIntentWhereUniqueInput
+  create: Prisma.XOR<Prisma.PaymentIntentCreateWithoutInvoiceSettlementInput, Prisma.PaymentIntentUncheckedCreateWithoutInvoiceSettlementInput>
+}
+
+export type PaymentIntentUpsertWithoutInvoiceSettlementInput = {
+  update: Prisma.XOR<Prisma.PaymentIntentUpdateWithoutInvoiceSettlementInput, Prisma.PaymentIntentUncheckedUpdateWithoutInvoiceSettlementInput>
+  create: Prisma.XOR<Prisma.PaymentIntentCreateWithoutInvoiceSettlementInput, Prisma.PaymentIntentUncheckedCreateWithoutInvoiceSettlementInput>
+  where?: Prisma.PaymentIntentWhereInput
+}
+
+export type PaymentIntentUpdateToOneWithWhereWithoutInvoiceSettlementInput = {
+  where?: Prisma.PaymentIntentWhereInput
+  data: Prisma.XOR<Prisma.PaymentIntentUpdateWithoutInvoiceSettlementInput, Prisma.PaymentIntentUncheckedUpdateWithoutInvoiceSettlementInput>
+}
+
+export type PaymentIntentUpdateWithoutInvoiceSettlementInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  resourceUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  merchantHost?: Prisma.StringFieldUpdateOperationsInput | string
+  purpose?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutPaymentIntentsNestedInput
+  agent?: Prisma.AgentUpdateOneRequiredWithoutPaymentIntentsNestedInput
+  quote?: Prisma.PaymentQuoteUpdateOneWithoutPaymentIntentNestedInput
+  decisions?: Prisma.PolicyDecisionUpdateManyWithoutPaymentIntentNestedInput
+  reservation?: Prisma.SpendReservationUpdateOneWithoutPaymentIntentNestedInput
+  approval?: Prisma.ApprovalRequestUpdateOneWithoutPaymentIntentNestedInput
+  attempts?: Prisma.PaymentAttemptUpdateManyWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUpdateOneWithoutPaymentIntentNestedInput
+}
+
+export type PaymentIntentUncheckedUpdateWithoutInvoiceSettlementInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  agentId?: Prisma.StringFieldUpdateOperationsInput | string
+  idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  resourceUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  merchantHost?: Prisma.StringFieldUpdateOperationsInput | string
+  purpose?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  quote?: Prisma.PaymentQuoteUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  decisions?: Prisma.PolicyDecisionUncheckedUpdateManyWithoutPaymentIntentNestedInput
+  reservation?: Prisma.SpendReservationUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  approval?: Prisma.ApprovalRequestUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  attempts?: Prisma.PaymentAttemptUncheckedUpdateManyWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUncheckedUpdateOneWithoutPaymentIntentNestedInput
 }
 
 export type PaymentIntentCreateManyOrganizationInput = {
@@ -1266,6 +1701,9 @@ export type PaymentIntentUpdateWithoutOrganizationInput = {
   reservation?: Prisma.SpendReservationUpdateOneWithoutPaymentIntentNestedInput
   approval?: Prisma.ApprovalRequestUpdateOneWithoutPaymentIntentNestedInput
   attempts?: Prisma.PaymentAttemptUpdateManyWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUpdateOneWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUpdateOneWithoutPaymentIntentNestedInput
 }
 
 export type PaymentIntentUncheckedUpdateWithoutOrganizationInput = {
@@ -1284,6 +1722,9 @@ export type PaymentIntentUncheckedUpdateWithoutOrganizationInput = {
   reservation?: Prisma.SpendReservationUncheckedUpdateOneWithoutPaymentIntentNestedInput
   approval?: Prisma.ApprovalRequestUncheckedUpdateOneWithoutPaymentIntentNestedInput
   attempts?: Prisma.PaymentAttemptUncheckedUpdateManyWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUncheckedUpdateOneWithoutPaymentIntentNestedInput
 }
 
 export type PaymentIntentUncheckedUpdateManyWithoutOrganizationInput = {
@@ -1328,6 +1769,9 @@ export type PaymentIntentUpdateWithoutAgentInput = {
   reservation?: Prisma.SpendReservationUpdateOneWithoutPaymentIntentNestedInput
   approval?: Prisma.ApprovalRequestUpdateOneWithoutPaymentIntentNestedInput
   attempts?: Prisma.PaymentAttemptUpdateManyWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUpdateOneWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUpdateOneWithoutPaymentIntentNestedInput
 }
 
 export type PaymentIntentUncheckedUpdateWithoutAgentInput = {
@@ -1346,6 +1790,9 @@ export type PaymentIntentUncheckedUpdateWithoutAgentInput = {
   reservation?: Prisma.SpendReservationUncheckedUpdateOneWithoutPaymentIntentNestedInput
   approval?: Prisma.ApprovalRequestUncheckedUpdateOneWithoutPaymentIntentNestedInput
   attempts?: Prisma.PaymentAttemptUncheckedUpdateManyWithoutPaymentIntentNestedInput
+  fulfillment?: Prisma.ResourceFulfillmentUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  invoiceSettlement?: Prisma.InvoiceSettlementUncheckedUpdateOneWithoutPaymentIntentNestedInput
+  resourceReview?: Prisma.ResourceReviewUncheckedUpdateOneWithoutPaymentIntentNestedInput
 }
 
 export type PaymentIntentUncheckedUpdateManyWithoutAgentInput = {
@@ -1420,6 +1867,9 @@ export type PaymentIntentSelect<ExtArgs extends runtime.Types.Extensions.Interna
   reservation?: boolean | Prisma.PaymentIntent$reservationArgs<ExtArgs>
   approval?: boolean | Prisma.PaymentIntent$approvalArgs<ExtArgs>
   attempts?: boolean | Prisma.PaymentIntent$attemptsArgs<ExtArgs>
+  fulfillment?: boolean | Prisma.PaymentIntent$fulfillmentArgs<ExtArgs>
+  invoiceSettlement?: boolean | Prisma.PaymentIntent$invoiceSettlementArgs<ExtArgs>
+  resourceReview?: boolean | Prisma.PaymentIntent$resourceReviewArgs<ExtArgs>
   _count?: boolean | Prisma.PaymentIntentCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["paymentIntent"]>
 
@@ -1478,6 +1928,9 @@ export type PaymentIntentInclude<ExtArgs extends runtime.Types.Extensions.Intern
   reservation?: boolean | Prisma.PaymentIntent$reservationArgs<ExtArgs>
   approval?: boolean | Prisma.PaymentIntent$approvalArgs<ExtArgs>
   attempts?: boolean | Prisma.PaymentIntent$attemptsArgs<ExtArgs>
+  fulfillment?: boolean | Prisma.PaymentIntent$fulfillmentArgs<ExtArgs>
+  invoiceSettlement?: boolean | Prisma.PaymentIntent$invoiceSettlementArgs<ExtArgs>
+  resourceReview?: boolean | Prisma.PaymentIntent$resourceReviewArgs<ExtArgs>
   _count?: boolean | Prisma.PaymentIntentCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type PaymentIntentIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1499,6 +1952,9 @@ export type $PaymentIntentPayload<ExtArgs extends runtime.Types.Extensions.Inter
     reservation: Prisma.$SpendReservationPayload<ExtArgs> | null
     approval: Prisma.$ApprovalRequestPayload<ExtArgs> | null
     attempts: Prisma.$PaymentAttemptPayload<ExtArgs>[]
+    fulfillment: Prisma.$ResourceFulfillmentPayload<ExtArgs> | null
+    invoiceSettlement: Prisma.$InvoiceSettlementPayload<ExtArgs> | null
+    resourceReview: Prisma.$ResourceReviewPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1913,6 +2369,9 @@ export interface Prisma__PaymentIntentClient<T, Null = never, ExtArgs extends ru
   reservation<T extends Prisma.PaymentIntent$reservationArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.PaymentIntent$reservationArgs<ExtArgs>>): Prisma.Prisma__SpendReservationClient<runtime.Types.Result.GetResult<Prisma.$SpendReservationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   approval<T extends Prisma.PaymentIntent$approvalArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.PaymentIntent$approvalArgs<ExtArgs>>): Prisma.Prisma__ApprovalRequestClient<runtime.Types.Result.GetResult<Prisma.$ApprovalRequestPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   attempts<T extends Prisma.PaymentIntent$attemptsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.PaymentIntent$attemptsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PaymentAttemptPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  fulfillment<T extends Prisma.PaymentIntent$fulfillmentArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.PaymentIntent$fulfillmentArgs<ExtArgs>>): Prisma.Prisma__ResourceFulfillmentClient<runtime.Types.Result.GetResult<Prisma.$ResourceFulfillmentPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  invoiceSettlement<T extends Prisma.PaymentIntent$invoiceSettlementArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.PaymentIntent$invoiceSettlementArgs<ExtArgs>>): Prisma.Prisma__InvoiceSettlementClient<runtime.Types.Result.GetResult<Prisma.$InvoiceSettlementPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  resourceReview<T extends Prisma.PaymentIntent$resourceReviewArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.PaymentIntent$resourceReviewArgs<ExtArgs>>): Prisma.Prisma__ResourceReviewClient<runtime.Types.Result.GetResult<Prisma.$ResourceReviewPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2456,6 +2915,63 @@ export type PaymentIntent$attemptsArgs<ExtArgs extends runtime.Types.Extensions.
   take?: number
   skip?: number
   distinct?: Prisma.PaymentAttemptScalarFieldEnum | Prisma.PaymentAttemptScalarFieldEnum[]
+}
+
+/**
+ * PaymentIntent.fulfillment
+ */
+export type PaymentIntent$fulfillmentArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ResourceFulfillment
+   */
+  select?: Prisma.ResourceFulfillmentSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ResourceFulfillment
+   */
+  omit?: Prisma.ResourceFulfillmentOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ResourceFulfillmentInclude<ExtArgs> | null
+  where?: Prisma.ResourceFulfillmentWhereInput
+}
+
+/**
+ * PaymentIntent.invoiceSettlement
+ */
+export type PaymentIntent$invoiceSettlementArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the InvoiceSettlement
+   */
+  select?: Prisma.InvoiceSettlementSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the InvoiceSettlement
+   */
+  omit?: Prisma.InvoiceSettlementOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.InvoiceSettlementInclude<ExtArgs> | null
+  where?: Prisma.InvoiceSettlementWhereInput
+}
+
+/**
+ * PaymentIntent.resourceReview
+ */
+export type PaymentIntent$resourceReviewArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ResourceReview
+   */
+  select?: Prisma.ResourceReviewSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ResourceReview
+   */
+  omit?: Prisma.ResourceReviewOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ResourceReviewInclude<ExtArgs> | null
+  where?: Prisma.ResourceReviewWhereInput
 }
 
 /**

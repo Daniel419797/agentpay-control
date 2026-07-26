@@ -28,6 +28,15 @@ export const Role = {
 export type Role = (typeof Role)[keyof typeof Role]
 
 
+export const MembershipStatus = {
+  INVITED: 'INVITED',
+  ACTIVE: 'ACTIVE',
+  SUSPENDED: 'SUSPENDED'
+} as const
+
+export type MembershipStatus = (typeof MembershipStatus)[keyof typeof MembershipStatus]
+
+
 export const AgentStatus = {
   PROVISIONING: 'PROVISIONING',
   ACTIVE: 'ACTIVE',
@@ -143,6 +152,14 @@ export const ApprovalStatus = {
 export type ApprovalStatus = (typeof ApprovalStatus)[keyof typeof ApprovalStatus]
 
 
+export const ApprovalDecisionType = {
+  APPROVE: 'APPROVE',
+  REJECT: 'REJECT'
+} as const
+
+export type ApprovalDecisionType = (typeof ApprovalDecisionType)[keyof typeof ApprovalDecisionType]
+
+
 export const ReservationStatus = {
   ACTIVE: 'ACTIVE',
   CONSUMED: 'CONSUMED',
@@ -213,6 +230,48 @@ export const ProviderStatus = {
 export type ProviderStatus = (typeof ProviderStatus)[keyof typeof ProviderStatus]
 
 
+export const ProviderVerificationStatus = {
+  UNVERIFIED: 'UNVERIFIED',
+  PENDING: 'PENDING',
+  VERIFIED: 'VERIFIED',
+  REJECTED: 'REJECTED'
+} as const
+
+export type ProviderVerificationStatus = (typeof ProviderVerificationStatus)[keyof typeof ProviderVerificationStatus]
+
+
+export const ResourceHealthStatus = {
+  UNKNOWN: 'UNKNOWN',
+  HEALTHY: 'HEALTHY',
+  DEGRADED: 'DEGRADED',
+  DOWN: 'DOWN'
+} as const
+
+export type ResourceHealthStatus = (typeof ResourceHealthStatus)[keyof typeof ResourceHealthStatus]
+
+
+export const ReviewStatus = {
+  PUBLISHED: 'PUBLISHED',
+  HIDDEN: 'HIDDEN'
+} as const
+
+export type ReviewStatus = (typeof ReviewStatus)[keyof typeof ReviewStatus]
+
+
+export const InvoiceStatus = {
+  DRAFT: 'DRAFT',
+  SENT: 'SENT',
+  VIEWED: 'VIEWED',
+  APPROVAL_PENDING: 'APPROVAL_PENDING',
+  PAYMENT_PENDING: 'PAYMENT_PENDING',
+  PAID: 'PAID',
+  OVERDUE: 'OVERDUE',
+  VOID: 'VOID'
+} as const
+
+export type InvoiceStatus = (typeof InvoiceStatus)[keyof typeof InvoiceStatus]
+
+
 export const AuditResult = {
   SUCCESS: 'SUCCESS',
   FAILURE: 'FAILURE',
@@ -220,3 +279,281 @@ export const AuditResult = {
 } as const
 
 export type AuditResult = (typeof AuditResult)[keyof typeof AuditResult]
+
+
+export const FulfillmentStatus = {
+  PENDING: 'PENDING',
+  FULFILLED: 'FULFILLED',
+  FAILED: 'FAILED'
+} as const
+
+export type FulfillmentStatus = (typeof FulfillmentStatus)[keyof typeof FulfillmentStatus]
+
+
+export const NotificationChannelType = {
+  WEBHOOK: 'WEBHOOK',
+  EMAIL: 'EMAIL',
+  SLACK: 'SLACK'
+} as const
+
+export type NotificationChannelType = (typeof NotificationChannelType)[keyof typeof NotificationChannelType]
+
+
+export const NotificationEndpointStatus = {
+  ACTIVE: 'ACTIVE',
+  PAUSED: 'PAUSED'
+} as const
+
+export type NotificationEndpointStatus = (typeof NotificationEndpointStatus)[keyof typeof NotificationEndpointStatus]
+
+
+export const DeliveryStatus = {
+  PENDING: 'PENDING',
+  DELIVERED: 'DELIVERED',
+  RETRY_SCHEDULED: 'RETRY_SCHEDULED',
+  DEAD_LETTER: 'DEAD_LETTER'
+} as const
+
+export type DeliveryStatus = (typeof DeliveryStatus)[keyof typeof DeliveryStatus]
+
+
+export const DeletionRequestStatus = {
+  REQUESTED: 'REQUESTED',
+  CANCELED: 'CANCELED',
+  PROCESSING: 'PROCESSING',
+  COMPLETED: 'COMPLETED'
+} as const
+
+export type DeletionRequestStatus = (typeof DeletionRequestStatus)[keyof typeof DeletionRequestStatus]
+
+
+export const PlanTier = {
+  FREE: 'FREE',
+  STARTER: 'STARTER',
+  GROWTH: 'GROWTH',
+  ENTERPRISE: 'ENTERPRISE'
+} as const
+
+export type PlanTier = (typeof PlanTier)[keyof typeof PlanTier]
+
+
+export const SupportCaseStatus = {
+  OPEN: 'OPEN',
+  IN_PROGRESS: 'IN_PROGRESS',
+  WAITING_ON_CUSTOMER: 'WAITING_ON_CUSTOMER',
+  RESOLVED: 'RESOLVED',
+  CLOSED: 'CLOSED'
+} as const
+
+export type SupportCaseStatus = (typeof SupportCaseStatus)[keyof typeof SupportCaseStatus]
+
+
+export const SupportSeverity = {
+  LOW: 'LOW',
+  NORMAL: 'NORMAL',
+  HIGH: 'HIGH',
+  URGENT: 'URGENT'
+} as const
+
+export type SupportSeverity = (typeof SupportSeverity)[keyof typeof SupportSeverity]
+
+
+export const CardProvider = {
+  SANDBOX: 'SANDBOX',
+  STRIPE: 'STRIPE'
+} as const
+
+export type CardProvider = (typeof CardProvider)[keyof typeof CardProvider]
+
+
+export const CardholderStatus = {
+  PENDING: 'PENDING',
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
+  REJECTED: 'REJECTED'
+} as const
+
+export type CardholderStatus = (typeof CardholderStatus)[keyof typeof CardholderStatus]
+
+
+export const VirtualCardStatus = {
+  INACTIVE: 'INACTIVE',
+  ACTIVE: 'ACTIVE',
+  FROZEN: 'FROZEN',
+  CANCELED: 'CANCELED'
+} as const
+
+export type VirtualCardStatus = (typeof VirtualCardStatus)[keyof typeof VirtualCardStatus]
+
+
+export const CardAuthorizationStatus = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  DECLINED: 'DECLINED',
+  REVERSED: 'REVERSED',
+  CLOSED: 'CLOSED'
+} as const
+
+export type CardAuthorizationStatus = (typeof CardAuthorizationStatus)[keyof typeof CardAuthorizationStatus]
+
+
+export const FiatAccountStatus = {
+  PENDING: 'PENDING',
+  ACTIVE: 'ACTIVE',
+  RESTRICTED: 'RESTRICTED',
+  CLOSED: 'CLOSED'
+} as const
+
+export type FiatAccountStatus = (typeof FiatAccountStatus)[keyof typeof FiatAccountStatus]
+
+
+export const FiatTransferDirection = {
+  DEPOSIT: 'DEPOSIT',
+  WITHDRAWAL: 'WITHDRAWAL'
+} as const
+
+export type FiatTransferDirection = (typeof FiatTransferDirection)[keyof typeof FiatTransferDirection]
+
+
+export const FiatTransferStatus = {
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  SUBMISSION_UNKNOWN: 'SUBMISSION_UNKNOWN',
+  SUCCEEDED: 'SUCCEEDED',
+  FAILED: 'FAILED',
+  CANCELED: 'CANCELED'
+} as const
+
+export type FiatTransferStatus = (typeof FiatTransferStatus)[keyof typeof FiatTransferStatus]
+
+
+export const ProviderWebhookStatus = {
+  RECEIVED: 'RECEIVED',
+  PROCESSED: 'PROCESSED',
+  IGNORED: 'IGNORED',
+  FAILED: 'FAILED'
+} as const
+
+export type ProviderWebhookStatus = (typeof ProviderWebhookStatus)[keyof typeof ProviderWebhookStatus]
+
+
+export const ChainFamily = {
+  HEDERA: 'HEDERA',
+  EVM: 'EVM'
+} as const
+
+export type ChainFamily = (typeof ChainFamily)[keyof typeof ChainFamily]
+
+
+export const CrossChainQuoteStatus = {
+  ACTIVE: 'ACTIVE',
+  CONSUMED: 'CONSUMED',
+  EXPIRED: 'EXPIRED',
+  CANCELED: 'CANCELED'
+} as const
+
+export type CrossChainQuoteStatus = (typeof CrossChainQuoteStatus)[keyof typeof CrossChainQuoteStatus]
+
+
+export const CrossChainTransferStatus = {
+  QUOTED: 'QUOTED',
+  AWAITING_SIGNATURE: 'AWAITING_SIGNATURE',
+  SUBMITTED: 'SUBMITTED',
+  BRIDGING: 'BRIDGING',
+  DESTINATION_CONFIRMED: 'DESTINATION_CONFIRMED',
+  FAILED: 'FAILED',
+  REFUNDED: 'REFUNDED',
+  CANCELED: 'CANCELED'
+} as const
+
+export type CrossChainTransferStatus = (typeof CrossChainTransferStatus)[keyof typeof CrossChainTransferStatus]
+
+
+export const AutomationRuleStatus = {
+  DRAFT: 'DRAFT',
+  ACTIVE: 'ACTIVE',
+  PAUSED: 'PAUSED',
+  ARCHIVED: 'ARCHIVED'
+} as const
+
+export type AutomationRuleStatus = (typeof AutomationRuleStatus)[keyof typeof AutomationRuleStatus]
+
+
+export const AutomationTriggerType = {
+  MANUAL: 'MANUAL',
+  SCHEDULE: 'SCHEDULE',
+  BALANCE_THRESHOLD: 'BALANCE_THRESHOLD',
+  INVOICE_EVENT: 'INVOICE_EVENT',
+  WEBHOOK: 'WEBHOOK'
+} as const
+
+export type AutomationTriggerType = (typeof AutomationTriggerType)[keyof typeof AutomationTriggerType]
+
+
+export const AutomationActionType = {
+  CONTRACT_CALL: 'CONTRACT_CALL',
+  X402_PAYMENT: 'X402_PAYMENT',
+  CREATE_INVOICE: 'CREATE_INVOICE'
+} as const
+
+export type AutomationActionType = (typeof AutomationActionType)[keyof typeof AutomationActionType]
+
+
+export const AutomationExecutionStatus = {
+  PENDING: 'PENDING',
+  AWAITING_APPROVAL: 'AWAITING_APPROVAL',
+  EXECUTING: 'EXECUTING',
+  SUBMISSION_UNKNOWN: 'SUBMISSION_UNKNOWN',
+  SUCCEEDED: 'SUCCEEDED',
+  FAILED: 'FAILED',
+  CANCELED: 'CANCELED'
+} as const
+
+export type AutomationExecutionStatus = (typeof AutomationExecutionStatus)[keyof typeof AutomationExecutionStatus]
+
+
+export const AutomationDecisionType = {
+  APPROVE: 'APPROVE',
+  REJECT: 'REJECT'
+} as const
+
+export type AutomationDecisionType = (typeof AutomationDecisionType)[keyof typeof AutomationDecisionType]
+
+
+export const FinancialLedgerType = {
+  CRYPTO_PAYMENT: 'CRYPTO_PAYMENT',
+  VIRTUAL_CARD: 'VIRTUAL_CARD',
+  FIAT_TRANSFER: 'FIAT_TRANSFER',
+  INVOICE: 'INVOICE'
+} as const
+
+export type FinancialLedgerType = (typeof FinancialLedgerType)[keyof typeof FinancialLedgerType]
+
+
+export const IntelligenceRunStatus = {
+  RUNNING: 'RUNNING',
+  SUCCEEDED: 'SUCCEEDED',
+  FAILED: 'FAILED'
+} as const
+
+export type IntelligenceRunStatus = (typeof IntelligenceRunStatus)[keyof typeof IntelligenceRunStatus]
+
+
+export const FinancialAnomalyStatus = {
+  OPEN: 'OPEN',
+  ACKNOWLEDGED: 'ACKNOWLEDGED',
+  RESOLVED: 'RESOLVED',
+  DISMISSED: 'DISMISSED'
+} as const
+
+export type FinancialAnomalyStatus = (typeof FinancialAnomalyStatus)[keyof typeof FinancialAnomalyStatus]
+
+
+export const RecommendationStatus = {
+  OPEN: 'OPEN',
+  ACCEPTED: 'ACCEPTED',
+  DISMISSED: 'DISMISSED',
+  SUPERSEDED: 'SUPERSEDED'
+} as const
+
+export type RecommendationStatus = (typeof RecommendationStatus)[keyof typeof RecommendationStatus]

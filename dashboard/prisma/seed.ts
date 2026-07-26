@@ -3,6 +3,16 @@ import "dotenv/config";
 import { db } from "../src/lib/db";
 
 async function main() {
+  const networks = [
+    { id: "hedera:testnet", family: "HEDERA" as const, chainReference: "testnet", displayName: "Hedera Testnet", nativeSymbol: "HBAR", explorerTxUrlTemplate: "https://hashscan.io/testnet/transaction/{txHash}", finalitySeconds: 5, requiredConfirmations: 1, testnet: true, enabled: true, supportsContracts: true },
+    { id: "eip155:11155111", family: "EVM" as const, chainReference: "11155111", displayName: "Ethereum Sepolia", nativeSymbol: "ETH", explorerTxUrlTemplate: "https://sepolia.etherscan.io/tx/{txHash}", finalitySeconds: 180, requiredConfirmations: 3, testnet: true, enabled: true, supportsContracts: true },
+    { id: "eip155:84532", family: "EVM" as const, chainReference: "84532", displayName: "Base Sepolia", nativeSymbol: "ETH", explorerTxUrlTemplate: "https://sepolia.basescan.org/tx/{txHash}", finalitySeconds: 20, requiredConfirmations: 2, testnet: true, enabled: true, supportsContracts: true },
+    { id: "eip155:1", family: "EVM" as const, chainReference: "1", displayName: "Ethereum", nativeSymbol: "ETH", explorerTxUrlTemplate: "https://etherscan.io/tx/{txHash}", finalitySeconds: 900, requiredConfirmations: 12, testnet: false, enabled: false, supportsContracts: true },
+    { id: "eip155:42161", family: "EVM" as const, chainReference: "42161", displayName: "Arbitrum One", nativeSymbol: "ETH", explorerTxUrlTemplate: "https://arbiscan.io/tx/{txHash}", finalitySeconds: 60, requiredConfirmations: 20, testnet: false, enabled: false, supportsContracts: true },
+    { id: "eip155:8453", family: "EVM" as const, chainReference: "8453", displayName: "Base", nativeSymbol: "ETH", explorerTxUrlTemplate: "https://basescan.org/tx/{txHash}", finalitySeconds: 60, requiredConfirmations: 20, testnet: false, enabled: false, supportsContracts: true },
+  ];
+  for (const network of networks) await db.chainNetwork.upsert({ where: { id: network.id }, update: network, create: network });
+
   await db.asset.upsert({
     where: { network_symbol: { network: "hedera:testnet", symbol: "HBAR" } },
     update: { name: "Hedera", decimals: 8, verified: true, type: "NATIVE" },

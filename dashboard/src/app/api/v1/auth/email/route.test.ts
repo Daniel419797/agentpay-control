@@ -3,6 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/supabase-auth", () => ({
   supabaseAuthConfig: () => ({ url: "https://example.supabase.co", key: "test-anon-key" }),
 }));
+vi.mock("@/lib/rate-limit", () => ({
+  enforceRateLimit: vi.fn(async () => ({ allowed: true, remaining: 4, retryAfterSeconds: 900 })),
+}));
 
 import { POST } from "./route";
 

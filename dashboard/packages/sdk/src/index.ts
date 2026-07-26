@@ -16,6 +16,14 @@ export type PaymentIntent = {
     validUntil: string;
   } | null;
   approval?: { id: string; status: string } | null;
+  fulfillment?: {
+    status: "PENDING" | "FULFILLED" | "FAILED";
+    contentType?: string | null;
+    contentHash?: string | null;
+    contentBytes?: number | null;
+    responseBody?: unknown;
+    errorCode?: string | null;
+  } | null;
   attempts?: Array<{
     settlement?: { transactionId: string; hashscanUrl: string } | null;
   }> | null;
@@ -65,7 +73,7 @@ export class AgentPayClient {
         body.detail ?? body.message ?? "AgentPay request failed"
       );
     }
-    return body as T;
+    return (body.data ?? body) as T;
   }
 
   createPaidRequest(

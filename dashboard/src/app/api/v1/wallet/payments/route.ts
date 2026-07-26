@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { handleApiError, ok, problem, requestBody } from "@/lib/api";
+import { handleApiError, ok, problem, rateLimitProblem, requestBody } from "@/lib/api";
 import { getConfig } from "@/lib/config";
 import { db } from "@/lib/db";
 import {
@@ -10,6 +10,7 @@ import {
   type MirrorTransaction,
 } from "@/lib/hedera-payment";
 import { sessionFromRequest } from "@/lib/session";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { workspaceForSession } from "@/lib/workspace";
 
 const paymentSchema = z.object({
@@ -58,6 +59,8 @@ export async function POST(request: Request) {
   try {
     const session = await sessionFromRequest(request);
     if (!session) return problem(401, "AUTH_REQUIRED", "Sign in before recording a wallet payment.");
+    const rate = await enforceRateLimit(request, { scope: "wallet-payment", subject: session.sub, limit: 30, windowMs: 60_000 });
+    if (!rate.allowed) return rateLimitProblem(rate.retryAfterSeconds);
     const workspace = await workspaceForSession(session);
     const input = paymentSchema.parse(await requestBody(request));
     const transactionId = normalizeTransactionId(input.transactionId);
@@ -74,7 +77,7 @@ export async function POST(request: Request) {
 
     const mirrorResponse = await fetch(
       `${getConfig().HEDERA_MIRROR_NODE_URL}/api/v1/transactions/${encodeURIComponent(transactionId)}`,
-      { cache: "no-store" },
+      { cache: "no-store", signal: AbortSignal.timeout(10_000) },
     );
     if (mirrorResponse.status === 404) {
       return problem(409, "CONSENSUS_PENDING", "The payment is submitted but not visible on the mirror node yet.");
@@ -88,23 +91,28 @@ export async function POST(request: Request) {
       return problem(422, "PAYMENT_VERIFICATION_FAILED", "The Hedera transaction does not match the submitted payment details.");
     }
 
-    const event = await db.auditEvent.create({
-      data: {
-        organizationId: workspace.organization.id,
-        actorType: "USER",
-        actorId: session.sub,
-        action,
-        targetType: "HEDERA_TRANSACTION",
-        targetId: transaction.transaction_id,
-        result: "SUCCESS",
-        metadata: {
-          payerAccountId: identity.accountId,
-          payeeAccountId: input.payeeAccountId,
-          amountHbar: formatTinybarsAsHbar(input.amountTinybar),
-          consensusTimestamp: transaction.consensus_timestamp,
-          purpose: input.purpose,
+    const event = await db.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`wallet-payment:${workspace.organization.id}:${transactionId}`}, 0))`;
+      const duplicate = await tx.auditEvent.findFirst({ where: { organizationId: workspace.organization.id, actorId: session.sub, action, targetId: transactionId } });
+      if (duplicate) return duplicate;
+      return tx.auditEvent.create({
+        data: {
+          organizationId: workspace.organization.id,
+          actorType: "USER",
+          actorId: session.sub,
+          action,
+          targetType: "HEDERA_TRANSACTION",
+          targetId: transaction.transaction_id,
+          result: "SUCCESS",
+          metadata: {
+            payerAccountId: identity.accountId,
+            payeeAccountId: input.payeeAccountId,
+            amountHbar: formatTinybarsAsHbar(input.amountTinybar),
+            consensusTimestamp: transaction.consensus_timestamp,
+            purpose: input.purpose,
+          },
         },
-      },
+      });
     });
     return ok(paymentView(event), { status: 201 });
   } catch (error) {

@@ -279,7 +279,6 @@ export type PaymentAccountOrderByWithRelationInput = {
 
 export type PaymentAccountWhereUniqueInput = Prisma.AtLeast<{
   id?: string
-  network_accountId?: Prisma.PaymentAccountNetworkAccountIdCompoundUniqueInput
   AND?: Prisma.PaymentAccountWhereInput | Prisma.PaymentAccountWhereInput[]
   OR?: Prisma.PaymentAccountWhereInput[]
   NOT?: Prisma.PaymentAccountWhereInput | Prisma.PaymentAccountWhereInput[]
@@ -298,7 +297,7 @@ export type PaymentAccountWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"PaymentAccount"> | Date | string
   agent?: Prisma.XOR<Prisma.AgentScalarRelationFilter, Prisma.AgentWhereInput>
   balances?: Prisma.BalanceSnapshotListRelationFilter
-}, "id" | "network_accountId">
+}, "id">
 
 export type PaymentAccountOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -472,11 +471,6 @@ export type PaymentAccountOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
 }
 
-export type PaymentAccountNetworkAccountIdCompoundUniqueInput = {
-  network: string
-  accountId: string
-}
-
 export type PaymentAccountCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   agentId?: Prisma.SortOrder
@@ -585,10 +579,6 @@ export type EnumSigningModeFieldUpdateOperationsInput = {
 
 export type EnumAccountStatusFieldUpdateOperationsInput = {
   set?: $Enums.AccountStatus
-}
-
-export type NullableDateTimeFieldUpdateOperationsInput = {
-  set?: Date | string | null
 }
 
 export type PaymentAccountCreateNestedOneWithoutBalancesInput = {

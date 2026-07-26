@@ -1,38 +1,83 @@
 import { z } from "zod";
 
 import { executeAuthorizedIntent } from "@/domain/payment-service";
-import { handleApiError, ok, problem } from "@/lib/api";
+import { boundedJson, handleApiError, ok, problem } from "@/lib/api";
 import { db } from "@/lib/db";
-import { workspaceFromRequest } from "@/lib/workspace";
+import { workspaceFromRequest, workspaceHasRole } from "@/lib/workspace";
+import { retrySerializable } from "@/lib/retry";
 
 const schema = z.object({ decision: z.enum(["APPROVE", "REJECT"]), note: z.string().max(500).optional() });
+
+function errorCode(error: unknown) {
+  return typeof error === "object" && error && "code" in error ? String(error.code) : undefined;
+}
 
 export async function POST(request: Request, { params }: { params: Promise<{ approvalId: string }> }) {
   try {
     const workspace = await workspaceFromRequest(request);
     if (!workspace) return problem(401, "AUTH_REQUIRED", "Sign in before deciding an approval.");
+    if (!workspaceHasRole(workspace, ["OWNER", "APPROVER"])) return problem(403, "ROLE_REQUIRED", "Owner or Approver access is required.");
     const { approvalId } = await params;
-    const input = schema.parse(await request.json());
-    const approval = await db.approvalRequest.findFirst({
-      where: { id: approvalId, paymentIntent: { organizationId: workspace.organization.id } },
-      include: { paymentIntent: true },
-    });
-    if (!approval) return problem(404, "APPROVAL_NOT_FOUND", "Approval not found.");
-    if (approval.status !== "PENDING" || approval.expiresAt <= new Date()) return problem(409, "APPROVAL_NOT_PENDING", "Approval is no longer pending.");
-    if (input.decision === "REJECT") {
-      await db.$transaction([
-        db.approvalRequest.update({ where: { id: approvalId }, data: { status: "REJECTED", decidedAt: new Date(), decidedBy: workspace.user.id, decisionNote: input.note } }),
-        db.paymentIntent.update({ where: { id: approval.paymentIntentId }, data: { status: "REJECTED" } }),
-        db.spendReservation.updateMany({ where: { paymentIntentId: approval.paymentIntentId }, data: { status: "RELEASED" } }),
-      ]);
-      return ok({ status: "REJECTED" });
-    }
-    await db.$transaction([
-      db.approvalRequest.update({ where: { id: approvalId }, data: { status: "CONSUMED", decidedAt: new Date(), decidedBy: workspace.user.id, decisionNote: input.note } }),
-      db.paymentIntent.update({ where: { id: approval.paymentIntentId }, data: { status: "AUTHORIZED" } }),
-    ]);
-    return ok(await executeAuthorizedIntent(approval.paymentIntentId));
+    const input = schema.parse(await boundedJson(request));
+
+    const result = await retrySerializable(() => db.$transaction(async (tx) => {
+      const approval = await tx.approvalRequest.findFirst({
+        where: { id: approvalId, paymentIntent: { organizationId: workspace.organization.id } },
+        include: { paymentIntent: true },
+      });
+      if (!approval) return { kind: "NOT_FOUND" as const };
+      if (approval.status !== "PENDING" || approval.expiresAt <= new Date()) return { kind: "NOT_PENDING" as const };
+
+      await tx.approvalDecision.create({
+        data: { approvalRequestId: approval.id, userId: workspace.user.id, decision: input.decision, note: input.note },
+      });
+      const grouped = await tx.approvalDecision.groupBy({
+        by: ["decision"],
+        where: { approvalRequestId: approval.id },
+        _count: { _all: true },
+      });
+      const approvals = grouped.find((row) => row.decision === "APPROVE")?._count._all ?? 0;
+      const rejections = grouped.find((row) => row.decision === "REJECT")?._count._all ?? 0;
+      let status: "PENDING" | "REJECTED" | "CONSUMED" = "PENDING";
+
+      if (rejections >= approval.requiredRejections) {
+        const stopped = await tx.paymentIntent.updateMany({ where: { id: approval.paymentIntentId, status: "APPROVAL_PENDING" }, data: { status: "REJECTED" } });
+        if (stopped.count !== 1) throw new Error("APPROVAL_INTENT_STATE_INVALID");
+        await tx.approvalRequest.update({ where: { id: approval.id }, data: { status: "REJECTED", decidedAt: new Date(), decidedBy: workspace.user.id, decisionNote: input.note } });
+        await tx.spendReservation.updateMany({ where: { paymentIntentId: approval.paymentIntentId, status: "ACTIVE" }, data: { status: "RELEASED" } });
+        status = "REJECTED";
+      } else if (approvals >= approval.requiredApprovals) {
+        const authorized = await tx.paymentIntent.updateMany({ where: { id: approval.paymentIntentId, status: "APPROVAL_PENDING" }, data: { status: "AUTHORIZED" } });
+        if (authorized.count !== 1) throw new Error("APPROVAL_INTENT_STATE_INVALID");
+        await tx.approvalRequest.update({ where: { id: approval.id }, data: { status: "CONSUMED", decidedAt: new Date(), decidedBy: workspace.user.id, decisionNote: input.note } });
+        status = "CONSUMED";
+      }
+
+      await tx.auditEvent.create({
+        data: {
+          organizationId: workspace.organization.id,
+          actorType: "USER",
+          actorId: workspace.user.id,
+          action: `PAYMENT_APPROVAL_${input.decision}`,
+          targetType: "APPROVAL_REQUEST",
+          targetId: approval.id,
+          result: "SUCCESS",
+          metadata: { approvals, rejections, requiredApprovals: approval.requiredApprovals, requiredRejections: approval.requiredRejections, status },
+        },
+      });
+      return { kind: "DECIDED" as const, paymentIntentId: approval.paymentIntentId, status, approvals, rejections, requiredApprovals: approval.requiredApprovals, requiredRejections: approval.requiredRejections };
+    }, { isolationLevel: "Serializable" }));
+
+    if (result.kind === "NOT_FOUND") return problem(404, "APPROVAL_NOT_FOUND", "Approval not found.");
+    if (result.kind === "NOT_PENDING") return problem(409, "APPROVAL_NOT_PENDING", "Approval is no longer pending.");
+    if (result.status === "CONSUMED") return ok(await executeAuthorizedIntent(result.paymentIntentId));
+    return ok(result);
   } catch (error) {
+    if (errorCode(error) === "P2002") return problem(409, "APPROVAL_ALREADY_DECIDED", "You have already voted on this approval.");
+    if (errorCode(error) === "P2034") return problem(409, "APPROVAL_CONCURRENT_UPDATE", "Another approval vote was recorded. Retry with the latest state.");
+    if (error instanceof Error && ["PAYMENT_QUOTE_EXPIRED", "SPEND_RESERVATION_INVALID", "POLICY_CHANGED", "POLICY_NOT_ACTIVE", "POLICY_EXPIRED", "OUTSIDE_POLICY_SCHEDULE"].includes(error.message)) {
+      return problem(409, error.message, error.message.replaceAll("_", " "));
+    }
     return handleApiError(error);
   }
 }

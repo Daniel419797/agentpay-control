@@ -25,7 +25,7 @@ export default async function TransactionPage({ params }: { params: Promise<{ tr
   }
   const intent = await db.paymentIntent.findFirst({
     where: { id: transactionId, organizationId: workspace.organization.id },
-    include: { quote: true, decisions: true, attempts: { include: { settlement: true } } },
+    include: { quote: true, decisions: true, fulfillment: true, attempts: { include: { settlement: true } } },
   });
   if (!intent) notFound();
   return <FormPage title="Transaction detail" description={`Intent ${intent.id}`}>
@@ -33,6 +33,7 @@ export default async function TransactionPage({ params }: { params: Promise<{ tr
       <li><strong>Request created</strong><span>{intent.createdAt.toLocaleString()}</span></li>
       {intent.decisions.map((decision) => <li key={decision.id}><strong>Policy {decision.outcome}</strong><span>{decision.reasonCodes.join(", ") || "No policy exceptions"}</span></li>)}
       {intent.attempts.map((attempt) => <li key={attempt.id}><strong>Attempt {attempt.status}</strong><span>{attempt.settlement?.transactionId ?? attempt.errorCode ?? "Awaiting settlement"}</span></li>)}
+      {intent.fulfillment && <li><strong>Resource {intent.fulfillment.status}</strong><span>{intent.fulfillment.contentHash ?? intent.fulfillment.errorCode ?? "Awaiting fulfillment evidence"}</span></li>}
     </ol>
   </FormPage>;
 }

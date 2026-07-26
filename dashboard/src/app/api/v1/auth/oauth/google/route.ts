@@ -7,6 +7,7 @@ export async function GET(request: Request) {
   const challenge = createHash("sha256").update(verifier).digest("base64url");
   const callback = new URL("/api/v1/auth/oauth/callback", request.url);
   const authorize = new URL(`${config.url}/auth/v1/authorize`);
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
   authorize.searchParams.set("provider", "google");
   authorize.searchParams.set("redirect_to", callback.toString());
   authorize.searchParams.set("code_challenge", challenge);
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
     status: 303,
     headers: {
       location: authorize.toString(),
-      "set-cookie": `agentpay_oauth=${verifier}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600`
+      "set-cookie": `agentpay_oauth=${verifier}; Path=/; HttpOnly; SameSite=Lax${secure}; Max-Age=600`
     }
   });
 }

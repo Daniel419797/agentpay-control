@@ -2,20 +2,62 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { db } from "@/lib/db";
+import { logError } from "@/lib/logger";
 
 export function ok<T>(data: T, init?: ResponseInit) { return NextResponse.json({ data }, init); }
 export function problem(status: number, code: string, detail: string, meta?: unknown) { return NextResponse.json({ type: `https://agentpay.dev/problems/${code.toLowerCase()}`, title: code.replaceAll("_", " "), status, detail, code, meta }, { status }); }
+export function rateLimitProblem(retryAfterSeconds: number) {
+  return NextResponse.json({
+    type: "https://agentpay.dev/problems/rate-limited",
+    title: "RATE LIMITED",
+    status: 429,
+    detail: "Too many requests. Try again after the indicated delay.",
+    code: "RATE_LIMITED",
+  }, { status: 429, headers: { "retry-after": String(retryAfterSeconds) } });
+}
 export function handleApiError(error: unknown) {
   if (error instanceof ZodError) return problem(422, "VALIDATION_ERROR", "The request did not pass validation.", error.flatten());
-  console.error(error);
+  if (error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE") return problem(413, "REQUEST_BODY_TOO_LARGE", "The request body exceeds the allowed size.");
+  if (error instanceof SyntaxError) return problem(400, "INVALID_JSON", "The request body is not valid JSON.");
+  logError("api_request_failed", error);
   return problem(500, "INTERNAL_ERROR", "The request could not be completed.");
 }
 
 export async function requestBody(request: Request): Promise<unknown> {
   const contentType = request.headers.get("content-type") ?? "";
-  if (contentType.includes("application/json")) return request.json();
+  if (contentType.includes("application/json")) return boundedJson(request);
   const form = await request.formData();
   return Object.fromEntries(form.entries());
+}
+
+export async function boundedJson(request: Request, maxBytes = 64 * 1024): Promise<unknown> {
+  return JSON.parse(await boundedText(request, maxBytes));
+}
+
+export async function boundedText(request: Request, maxBytes = 64 * 1024): Promise<string> {
+  const declared = Number(request.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declared) && declared > maxBytes) throw new Error("REQUEST_BODY_TOO_LARGE");
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel();
+      throw new Error("REQUEST_BODY_TOO_LARGE");
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
 }
 
 export async function authorizeAgentRequest(request: Request, agentId: string, scope: string) {

@@ -55,6 +55,7 @@ export const ModelName = {
   Organization: 'Organization',
   Membership: 'Membership',
   WalletIdentity: 'WalletIdentity',
+  WalletAuthChallenge: 'WalletAuthChallenge',
   Agent: 'Agent',
   PaymentAccount: 'PaymentAccount',
   Asset: 'Asset',
@@ -63,17 +64,52 @@ export const ModelName = {
   Policy: 'Policy',
   PolicyVersion: 'PolicyVersion',
   PaymentIntent: 'PaymentIntent',
+  ResourceFulfillment: 'ResourceFulfillment',
   PaymentQuote: 'PaymentQuote',
   PolicyDecision: 'PolicyDecision',
   SpendReservation: 'SpendReservation',
   ApprovalRequest: 'ApprovalRequest',
+  ApprovalDecision: 'ApprovalDecision',
   PaymentAttempt: 'PaymentAttempt',
   Settlement: 'Settlement',
   ResourceProvider: 'ResourceProvider',
   ResourceListing: 'ResourceListing',
   ResourcePrice: 'ResourcePrice',
+  ResourceReview: 'ResourceReview',
+  ResourceHealthCheck: 'ResourceHealthCheck',
+  AgentInvoice: 'AgentInvoice',
+  InvoiceSequence: 'InvoiceSequence',
+  InvoiceItem: 'InvoiceItem',
+  InvoiceEvent: 'InvoiceEvent',
+  InvoiceSettlement: 'InvoiceSettlement',
   AuditEvent: 'AuditEvent',
-  OutboxEvent: 'OutboxEvent'
+  OutboxEvent: 'OutboxEvent',
+  NotificationEndpoint: 'NotificationEndpoint',
+  NotificationDelivery: 'NotificationDelivery',
+  DataRetentionPolicy: 'DataRetentionPolicy',
+  DeletionRequest: 'DeletionRequest',
+  OrganizationEntitlement: 'OrganizationEntitlement',
+  SupportCase: 'SupportCase',
+  SupportMessage: 'SupportMessage',
+  RateLimitBucket: 'RateLimitBucket',
+  ChainNetwork: 'ChainNetwork',
+  CrossChainRouteQuote: 'CrossChainRouteQuote',
+  CrossChainTransfer: 'CrossChainTransfer',
+  ContractAllowlistEntry: 'ContractAllowlistEntry',
+  AutomationRule: 'AutomationRule',
+  AutomationExecution: 'AutomationExecution',
+  AutomationExecutionDecision: 'AutomationExecutionDecision',
+  FinancialObservationDaily: 'FinancialObservationDaily',
+  SpendForecast: 'SpendForecast',
+  FinancialAnomaly: 'FinancialAnomaly',
+  BudgetRecommendation: 'BudgetRecommendation',
+  IntelligenceRun: 'IntelligenceRun',
+  CardholderProfile: 'CardholderProfile',
+  VirtualCard: 'VirtualCard',
+  CardAuthorization: 'CardAuthorization',
+  FiatAccount: 'FiatAccount',
+  FiatTransfer: 'FiatTransfer',
+  ProviderWebhookEvent: 'ProviderWebhookEvent'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -121,7 +157,11 @@ export const MembershipScalarFieldEnum = {
   id: 'id',
   organizationId: 'organizationId',
   userId: 'userId',
-  roles: 'roles'
+  roles: 'roles',
+  status: 'status',
+  invitedAt: 'invitedAt',
+  activatedAt: 'activatedAt',
+  suspendedAt: 'suspendedAt'
 } as const
 
 export type MembershipScalarFieldEnum = (typeof MembershipScalarFieldEnum)[keyof typeof MembershipScalarFieldEnum]
@@ -137,6 +177,18 @@ export const WalletIdentityScalarFieldEnum = {
 } as const
 
 export type WalletIdentityScalarFieldEnum = (typeof WalletIdentityScalarFieldEnum)[keyof typeof WalletIdentityScalarFieldEnum]
+
+
+export const WalletAuthChallengeScalarFieldEnum = {
+  id: 'id',
+  accountId: 'accountId',
+  nonceHash: 'nonceHash',
+  expiresAt: 'expiresAt',
+  consumedAt: 'consumedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type WalletAuthChallengeScalarFieldEnum = (typeof WalletAuthChallengeScalarFieldEnum)[keyof typeof WalletAuthChallengeScalarFieldEnum]
 
 
 export const AgentScalarFieldEnum = {
@@ -241,6 +293,18 @@ export const PolicyVersionScalarFieldEnum = {
   merchantMode: 'merchantMode',
   allowedHosts: 'allowedHosts',
   deniedHosts: 'deniedHosts',
+  approvalThreshold: 'approvalThreshold',
+  rejectionThreshold: 'rejectionThreshold',
+  allowedMerchantCategories: 'allowedMerchantCategories',
+  activeFrom: 'activeFrom',
+  activeUntil: 'activeUntil',
+  allowedWeekdays: 'allowedWeekdays',
+  allowedStartMinute: 'allowedStartMinute',
+  allowedEndMinute: 'allowedEndMinute',
+  hourlyLimitAtomic: 'hourlyLimitAtomic',
+  monthlyLimitAtomic: 'monthlyLimitAtomic',
+  maxTransactionsPerHour: 'maxTransactionsPerHour',
+  cooldownSeconds: 'cooldownSeconds',
   createdBy: 'createdBy',
   createdAt: 'createdAt',
   publishedAt: 'publishedAt'
@@ -264,6 +328,23 @@ export const PaymentIntentScalarFieldEnum = {
 } as const
 
 export type PaymentIntentScalarFieldEnum = (typeof PaymentIntentScalarFieldEnum)[keyof typeof PaymentIntentScalarFieldEnum]
+
+
+export const ResourceFulfillmentScalarFieldEnum = {
+  id: 'id',
+  paymentIntentId: 'paymentIntentId',
+  status: 'status',
+  contentType: 'contentType',
+  contentHash: 'contentHash',
+  contentBytes: 'contentBytes',
+  responseBody: 'responseBody',
+  errorCode: 'errorCode',
+  fulfilledAt: 'fulfilledAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ResourceFulfillmentScalarFieldEnum = (typeof ResourceFulfillmentScalarFieldEnum)[keyof typeof ResourceFulfillmentScalarFieldEnum]
 
 
 export const PaymentQuoteScalarFieldEnum = {
@@ -326,10 +407,24 @@ export const ApprovalRequestScalarFieldEnum = {
   expiresAt: 'expiresAt',
   decidedAt: 'decidedAt',
   decidedBy: 'decidedBy',
-  decisionNote: 'decisionNote'
+  decisionNote: 'decisionNote',
+  requiredApprovals: 'requiredApprovals',
+  requiredRejections: 'requiredRejections'
 } as const
 
 export type ApprovalRequestScalarFieldEnum = (typeof ApprovalRequestScalarFieldEnum)[keyof typeof ApprovalRequestScalarFieldEnum]
+
+
+export const ApprovalDecisionScalarFieldEnum = {
+  id: 'id',
+  approvalRequestId: 'approvalRequestId',
+  userId: 'userId',
+  decision: 'decision',
+  note: 'note',
+  createdAt: 'createdAt'
+} as const
+
+export type ApprovalDecisionScalarFieldEnum = (typeof ApprovalDecisionScalarFieldEnum)[keyof typeof ApprovalDecisionScalarFieldEnum]
 
 
 export const PaymentAttemptScalarFieldEnum = {
@@ -338,6 +433,7 @@ export const PaymentAttemptScalarFieldEnum = {
   attemptNumber: 'attemptNumber',
   status: 'status',
   facilitatorRequestId: 'facilitatorRequestId',
+  candidateTransactionId: 'candidateTransactionId',
   signatureFingerprint: 'signatureFingerprint',
   errorCode: 'errorCode',
   createdAt: 'createdAt',
@@ -370,7 +466,15 @@ export const ResourceProviderScalarFieldEnum = {
   id: 'id',
   organizationId: 'organizationId',
   name: 'name',
+  publicSlug: 'publicSlug',
+  description: 'description',
+  websiteUrl: 'websiteUrl',
+  supportEmail: 'supportEmail',
+  termsUrl: 'termsUrl',
+  privacyUrl: 'privacyUrl',
   status: 'status',
+  verificationStatus: 'verificationStatus',
+  verifiedAt: 'verifiedAt',
   settlementAccountId: 'settlementAccountId',
   settlementAccountVerified: 'settlementAccountVerified',
   createdAt: 'createdAt'
@@ -391,6 +495,12 @@ export const ResourceListingScalarFieldEnum = {
   inputSchema: 'inputSchema',
   outputContentTypes: 'outputContentTypes',
   version: 'version',
+  public: 'public',
+  tags: 'tags',
+  termsUrl: 'termsUrl',
+  serviceLevel: 'serviceLevel',
+  healthStatus: 'healthStatus',
+  lastHealthCheckAt: 'lastHealthCheckAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -409,6 +519,109 @@ export const ResourcePriceScalarFieldEnum = {
 export type ResourcePriceScalarFieldEnum = (typeof ResourcePriceScalarFieldEnum)[keyof typeof ResourcePriceScalarFieldEnum]
 
 
+export const ResourceReviewScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  userId: 'userId',
+  resourceId: 'resourceId',
+  paymentIntentId: 'paymentIntentId',
+  rating: 'rating',
+  comment: 'comment',
+  status: 'status',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ResourceReviewScalarFieldEnum = (typeof ResourceReviewScalarFieldEnum)[keyof typeof ResourceReviewScalarFieldEnum]
+
+
+export const ResourceHealthCheckScalarFieldEnum = {
+  id: 'id',
+  resourceId: 'resourceId',
+  status: 'status',
+  httpStatus: 'httpStatus',
+  latencyMs: 'latencyMs',
+  errorCode: 'errorCode',
+  checkedAt: 'checkedAt'
+} as const
+
+export type ResourceHealthCheckScalarFieldEnum = (typeof ResourceHealthCheckScalarFieldEnum)[keyof typeof ResourceHealthCheckScalarFieldEnum]
+
+
+export const AgentInvoiceScalarFieldEnum = {
+  id: 'id',
+  issuerOrganizationId: 'issuerOrganizationId',
+  recipientOrganizationId: 'recipientOrganizationId',
+  issuerAgentId: 'issuerAgentId',
+  recipientAgentId: 'recipientAgentId',
+  assetId: 'assetId',
+  number: 'number',
+  status: 'status',
+  title: 'title',
+  memo: 'memo',
+  subtotalAtomic: 'subtotalAtomic',
+  totalAtomic: 'totalAtomic',
+  dueAt: 'dueAt',
+  createdBy: 'createdBy',
+  sentAt: 'sentAt',
+  viewedAt: 'viewedAt',
+  paidAt: 'paidAt',
+  voidedAt: 'voidedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AgentInvoiceScalarFieldEnum = (typeof AgentInvoiceScalarFieldEnum)[keyof typeof AgentInvoiceScalarFieldEnum]
+
+
+export const InvoiceSequenceScalarFieldEnum = {
+  organizationId: 'organizationId',
+  nextNumber: 'nextNumber',
+  updatedAt: 'updatedAt'
+} as const
+
+export type InvoiceSequenceScalarFieldEnum = (typeof InvoiceSequenceScalarFieldEnum)[keyof typeof InvoiceSequenceScalarFieldEnum]
+
+
+export const InvoiceItemScalarFieldEnum = {
+  id: 'id',
+  invoiceId: 'invoiceId',
+  description: 'description',
+  quantity: 'quantity',
+  unitAmountAtomic: 'unitAmountAtomic',
+  totalAtomic: 'totalAtomic',
+  position: 'position'
+} as const
+
+export type InvoiceItemScalarFieldEnum = (typeof InvoiceItemScalarFieldEnum)[keyof typeof InvoiceItemScalarFieldEnum]
+
+
+export const InvoiceEventScalarFieldEnum = {
+  id: 'id',
+  invoiceId: 'invoiceId',
+  actorType: 'actorType',
+  actorId: 'actorId',
+  action: 'action',
+  metadata: 'metadata',
+  occurredAt: 'occurredAt'
+} as const
+
+export type InvoiceEventScalarFieldEnum = (typeof InvoiceEventScalarFieldEnum)[keyof typeof InvoiceEventScalarFieldEnum]
+
+
+export const InvoiceSettlementScalarFieldEnum = {
+  id: 'id',
+  invoiceId: 'invoiceId',
+  paymentIntentId: 'paymentIntentId',
+  transactionId: 'transactionId',
+  network: 'network',
+  settledAt: 'settledAt',
+  createdAt: 'createdAt'
+} as const
+
+export type InvoiceSettlementScalarFieldEnum = (typeof InvoiceSettlementScalarFieldEnum)[keyof typeof InvoiceSettlementScalarFieldEnum]
+
+
 export const AuditEventScalarFieldEnum = {
   id: 'id',
   organizationId: 'organizationId',
@@ -420,7 +633,10 @@ export const AuditEventScalarFieldEnum = {
   result: 'result',
   requestId: 'requestId',
   metadata: 'metadata',
-  occurredAt: 'occurredAt'
+  occurredAt: 'occurredAt',
+  chainSequence: 'chainSequence',
+  previousHash: 'previousHash',
+  eventHash: 'eventHash'
 } as const
 
 export type AuditEventScalarFieldEnum = (typeof AuditEventScalarFieldEnum)[keyof typeof AuditEventScalarFieldEnum]
@@ -436,10 +652,502 @@ export const OutboxEventScalarFieldEnum = {
   attempts: 'attempts',
   availableAt: 'availableAt',
   processedAt: 'processedAt',
+  claimedAt: 'claimedAt',
+  claimToken: 'claimToken',
+  lastError: 'lastError',
+  deadLetteredAt: 'deadLetteredAt',
+  directChannel: 'directChannel',
+  directDestination: 'directDestination',
   createdAt: 'createdAt'
 } as const
 
 export type OutboxEventScalarFieldEnum = (typeof OutboxEventScalarFieldEnum)[keyof typeof OutboxEventScalarFieldEnum]
+
+
+export const NotificationEndpointScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  type: 'type',
+  name: 'name',
+  destination: 'destination',
+  eventTypes: 'eventTypes',
+  status: 'status',
+  signingSecretEncrypted: 'signingSecretEncrypted',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type NotificationEndpointScalarFieldEnum = (typeof NotificationEndpointScalarFieldEnum)[keyof typeof NotificationEndpointScalarFieldEnum]
+
+
+export const NotificationDeliveryScalarFieldEnum = {
+  id: 'id',
+  outboxEventId: 'outboxEventId',
+  endpointId: 'endpointId',
+  status: 'status',
+  attemptCount: 'attemptCount',
+  lastHttpStatus: 'lastHttpStatus',
+  lastError: 'lastError',
+  nextAttemptAt: 'nextAttemptAt',
+  deliveredAt: 'deliveredAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type NotificationDeliveryScalarFieldEnum = (typeof NotificationDeliveryScalarFieldEnum)[keyof typeof NotificationDeliveryScalarFieldEnum]
+
+
+export const DataRetentionPolicyScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  auditDays: 'auditDays',
+  financialRecordDays: 'financialRecordDays',
+  fulfillmentBodyDays: 'fulfillmentBodyDays',
+  notificationDays: 'notificationDays',
+  updatedAt: 'updatedAt'
+} as const
+
+export type DataRetentionPolicyScalarFieldEnum = (typeof DataRetentionPolicyScalarFieldEnum)[keyof typeof DataRetentionPolicyScalarFieldEnum]
+
+
+export const DeletionRequestScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  requestedBy: 'requestedBy',
+  status: 'status',
+  requestedAt: 'requestedAt',
+  scheduledFor: 'scheduledFor',
+  previousKillSwitch: 'previousKillSwitch',
+  snapshot: 'snapshot',
+  canceledAt: 'canceledAt',
+  completedAt: 'completedAt'
+} as const
+
+export type DeletionRequestScalarFieldEnum = (typeof DeletionRequestScalarFieldEnum)[keyof typeof DeletionRequestScalarFieldEnum]
+
+
+export const OrganizationEntitlementScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  tier: 'tier',
+  maxActiveAgents: 'maxActiveAgents',
+  maxMembers: 'maxMembers',
+  maxMonthlyPaymentIntents: 'maxMonthlyPaymentIntents',
+  maxNotificationEndpoints: 'maxNotificationEndpoints',
+  active: 'active',
+  currentPeriodStart: 'currentPeriodStart',
+  currentPeriodEnd: 'currentPeriodEnd',
+  updatedAt: 'updatedAt'
+} as const
+
+export type OrganizationEntitlementScalarFieldEnum = (typeof OrganizationEntitlementScalarFieldEnum)[keyof typeof OrganizationEntitlementScalarFieldEnum]
+
+
+export const SupportCaseScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  createdBy: 'createdBy',
+  sourceType: 'sourceType',
+  sourceId: 'sourceId',
+  title: 'title',
+  description: 'description',
+  category: 'category',
+  severity: 'severity',
+  status: 'status',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type SupportCaseScalarFieldEnum = (typeof SupportCaseScalarFieldEnum)[keyof typeof SupportCaseScalarFieldEnum]
+
+
+export const SupportMessageScalarFieldEnum = {
+  id: 'id',
+  supportCaseId: 'supportCaseId',
+  authorId: 'authorId',
+  authorType: 'authorType',
+  body: 'body',
+  createdAt: 'createdAt'
+} as const
+
+export type SupportMessageScalarFieldEnum = (typeof SupportMessageScalarFieldEnum)[keyof typeof SupportMessageScalarFieldEnum]
+
+
+export const RateLimitBucketScalarFieldEnum = {
+  key: 'key',
+  count: 'count',
+  windowStart: 'windowStart',
+  expiresAt: 'expiresAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type RateLimitBucketScalarFieldEnum = (typeof RateLimitBucketScalarFieldEnum)[keyof typeof RateLimitBucketScalarFieldEnum]
+
+
+export const ChainNetworkScalarFieldEnum = {
+  id: 'id',
+  family: 'family',
+  chainReference: 'chainReference',
+  displayName: 'displayName',
+  nativeSymbol: 'nativeSymbol',
+  explorerTxUrlTemplate: 'explorerTxUrlTemplate',
+  finalitySeconds: 'finalitySeconds',
+  requiredConfirmations: 'requiredConfirmations',
+  testnet: 'testnet',
+  enabled: 'enabled',
+  supportsContracts: 'supportsContracts',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ChainNetworkScalarFieldEnum = (typeof ChainNetworkScalarFieldEnum)[keyof typeof ChainNetworkScalarFieldEnum]
+
+
+export const CrossChainRouteQuoteScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  agentId: 'agentId',
+  sourceNetworkId: 'sourceNetworkId',
+  destinationNetworkId: 'destinationNetworkId',
+  sourceToken: 'sourceToken',
+  destinationToken: 'destinationToken',
+  sourceAddress: 'sourceAddress',
+  destinationAddress: 'destinationAddress',
+  inputAmountAtomic: 'inputAmountAtomic',
+  estimatedOutputAtomic: 'estimatedOutputAtomic',
+  minimumOutputAtomic: 'minimumOutputAtomic',
+  provider: 'provider',
+  externalQuoteId: 'externalQuoteId',
+  tool: 'tool',
+  feeSummary: 'feeSummary',
+  transactionRequestEncrypted: 'transactionRequestEncrypted',
+  requestHash: 'requestHash',
+  status: 'status',
+  expiresAt: 'expiresAt',
+  createdAt: 'createdAt'
+} as const
+
+export type CrossChainRouteQuoteScalarFieldEnum = (typeof CrossChainRouteQuoteScalarFieldEnum)[keyof typeof CrossChainRouteQuoteScalarFieldEnum]
+
+
+export const CrossChainTransferScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  agentId: 'agentId',
+  quoteId: 'quoteId',
+  idempotencyKey: 'idempotencyKey',
+  status: 'status',
+  sourceTransactionHash: 'sourceTransactionHash',
+  sourceVerifiedAt: 'sourceVerifiedAt',
+  sourceBlockNumber: 'sourceBlockNumber',
+  destinationTransactionHash: 'destinationTransactionHash',
+  providerStatus: 'providerStatus',
+  errorCode: 'errorCode',
+  submittedAt: 'submittedAt',
+  completedAt: 'completedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CrossChainTransferScalarFieldEnum = (typeof CrossChainTransferScalarFieldEnum)[keyof typeof CrossChainTransferScalarFieldEnum]
+
+
+export const ContractAllowlistEntryScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  networkId: 'networkId',
+  contractAddress: 'contractAddress',
+  name: 'name',
+  allowedFunctionSelectors: 'allowedFunctionSelectors',
+  maxGas: 'maxGas',
+  maxPayableAtomic: 'maxPayableAtomic',
+  expectedCodeHash: 'expectedCodeHash',
+  active: 'active',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ContractAllowlistEntryScalarFieldEnum = (typeof ContractAllowlistEntryScalarFieldEnum)[keyof typeof ContractAllowlistEntryScalarFieldEnum]
+
+
+export const AutomationRuleScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  agentId: 'agentId',
+  name: 'name',
+  description: 'description',
+  status: 'status',
+  triggerType: 'triggerType',
+  triggerConfig: 'triggerConfig',
+  actionType: 'actionType',
+  actionConfigEncrypted: 'actionConfigEncrypted',
+  approvalThreshold: 'approvalThreshold',
+  maxExecutionsPerDay: 'maxExecutionsPerDay',
+  nextRunAt: 'nextRunAt',
+  version: 'version',
+  createdBy: 'createdBy',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AutomationRuleScalarFieldEnum = (typeof AutomationRuleScalarFieldEnum)[keyof typeof AutomationRuleScalarFieldEnum]
+
+
+export const AutomationExecutionScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  ruleId: 'ruleId',
+  idempotencyKey: 'idempotencyKey',
+  status: 'status',
+  triggerFactsHash: 'triggerFactsHash',
+  requiredApprovals: 'requiredApprovals',
+  triggeredByUserId: 'triggeredByUserId',
+  transactionId: 'transactionId',
+  result: 'result',
+  errorCode: 'errorCode',
+  startedAt: 'startedAt',
+  completedAt: 'completedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AutomationExecutionScalarFieldEnum = (typeof AutomationExecutionScalarFieldEnum)[keyof typeof AutomationExecutionScalarFieldEnum]
+
+
+export const AutomationExecutionDecisionScalarFieldEnum = {
+  id: 'id',
+  executionId: 'executionId',
+  userId: 'userId',
+  decision: 'decision',
+  note: 'note',
+  createdAt: 'createdAt'
+} as const
+
+export type AutomationExecutionDecisionScalarFieldEnum = (typeof AutomationExecutionDecisionScalarFieldEnum)[keyof typeof AutomationExecutionDecisionScalarFieldEnum]
+
+
+export const FinancialObservationDailyScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  agentId: 'agentId',
+  scopeKey: 'scopeKey',
+  ledgerType: 'ledgerType',
+  assetCode: 'assetCode',
+  observationDate: 'observationDate',
+  outflowAtomic: 'outflowAtomic',
+  inflowAtomic: 'inflowAtomic',
+  transactionCount: 'transactionCount',
+  declinedCount: 'declinedCount',
+  averageAtomic: 'averageAtomic',
+  maximumAtomic: 'maximumAtomic',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FinancialObservationDailyScalarFieldEnum = (typeof FinancialObservationDailyScalarFieldEnum)[keyof typeof FinancialObservationDailyScalarFieldEnum]
+
+
+export const SpendForecastScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  agentId: 'agentId',
+  ledgerType: 'ledgerType',
+  assetCode: 'assetCode',
+  horizonDays: 'horizonDays',
+  predictedOutflowAtomic: 'predictedOutflowAtomic',
+  lowerBoundAtomic: 'lowerBoundAtomic',
+  upperBoundAtomic: 'upperBoundAtomic',
+  confidence: 'confidence',
+  modelName: 'modelName',
+  modelVersion: 'modelVersion',
+  trainingDays: 'trainingDays',
+  trainedThrough: 'trainedThrough',
+  generatedAt: 'generatedAt'
+} as const
+
+export type SpendForecastScalarFieldEnum = (typeof SpendForecastScalarFieldEnum)[keyof typeof SpendForecastScalarFieldEnum]
+
+
+export const FinancialAnomalyScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  agentId: 'agentId',
+  ledgerType: 'ledgerType',
+  assetCode: 'assetCode',
+  anomalyKey: 'anomalyKey',
+  severity: 'severity',
+  reasonCode: 'reasonCode',
+  observedAtomic: 'observedAtomic',
+  expectedAtomic: 'expectedAtomic',
+  deviationScore: 'deviationScore',
+  sourceType: 'sourceType',
+  sourceId: 'sourceId',
+  explanation: 'explanation',
+  status: 'status',
+  detectedAt: 'detectedAt',
+  acknowledgedAt: 'acknowledgedAt',
+  resolvedAt: 'resolvedAt'
+} as const
+
+export type FinancialAnomalyScalarFieldEnum = (typeof FinancialAnomalyScalarFieldEnum)[keyof typeof FinancialAnomalyScalarFieldEnum]
+
+
+export const BudgetRecommendationScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  agentId: 'agentId',
+  assetId: 'assetId',
+  recommendedPerTransactionAtomic: 'recommendedPerTransactionAtomic',
+  recommendedDailyAtomic: 'recommendedDailyAtomic',
+  recommendedMonthlyAtomic: 'recommendedMonthlyAtomic',
+  confidence: 'confidence',
+  rationale: 'rationale',
+  status: 'status',
+  basedOnThrough: 'basedOnThrough',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type BudgetRecommendationScalarFieldEnum = (typeof BudgetRecommendationScalarFieldEnum)[keyof typeof BudgetRecommendationScalarFieldEnum]
+
+
+export const IntelligenceRunScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  status: 'status',
+  windowStart: 'windowStart',
+  windowEnd: 'windowEnd',
+  observations: 'observations',
+  forecasts: 'forecasts',
+  anomalies: 'anomalies',
+  recommendations: 'recommendations',
+  errorCode: 'errorCode',
+  startedAt: 'startedAt',
+  completedAt: 'completedAt'
+} as const
+
+export type IntelligenceRunScalarFieldEnum = (typeof IntelligenceRunScalarFieldEnum)[keyof typeof IntelligenceRunScalarFieldEnum]
+
+
+export const CardholderProfileScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  userId: 'userId',
+  provider: 'provider',
+  externalCardholderId: 'externalCardholderId',
+  status: 'status',
+  name: 'name',
+  email: 'email',
+  phone: 'phone',
+  billingAddress: 'billingAddress',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CardholderProfileScalarFieldEnum = (typeof CardholderProfileScalarFieldEnum)[keyof typeof CardholderProfileScalarFieldEnum]
+
+
+export const VirtualCardScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  agentId: 'agentId',
+  cardholderProfileId: 'cardholderProfileId',
+  provider: 'provider',
+  externalCardId: 'externalCardId',
+  status: 'status',
+  currency: 'currency',
+  last4: 'last4',
+  brand: 'brand',
+  expMonth: 'expMonth',
+  expYear: 'expYear',
+  nickname: 'nickname',
+  spendingLimitMinor: 'spendingLimitMinor',
+  spendingInterval: 'spendingInterval',
+  allowedCategories: 'allowedCategories',
+  blockedCategories: 'blockedCategories',
+  allowedCountries: 'allowedCountries',
+  version: 'version',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type VirtualCardScalarFieldEnum = (typeof VirtualCardScalarFieldEnum)[keyof typeof VirtualCardScalarFieldEnum]
+
+
+export const CardAuthorizationScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  virtualCardId: 'virtualCardId',
+  provider: 'provider',
+  externalAuthorizationId: 'externalAuthorizationId',
+  status: 'status',
+  amountMinor: 'amountMinor',
+  currency: 'currency',
+  merchantName: 'merchantName',
+  merchantCategory: 'merchantCategory',
+  merchantCountry: 'merchantCountry',
+  approved: 'approved',
+  decisionReasons: 'decisionReasons',
+  requestedAt: 'requestedAt',
+  resolvedAt: 'resolvedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CardAuthorizationScalarFieldEnum = (typeof CardAuthorizationScalarFieldEnum)[keyof typeof CardAuthorizationScalarFieldEnum]
+
+
+export const FiatAccountScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  provider: 'provider',
+  externalAccountId: 'externalAccountId',
+  status: 'status',
+  currency: 'currency',
+  availableMinor: 'availableMinor',
+  pendingMinor: 'pendingMinor',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FiatAccountScalarFieldEnum = (typeof FiatAccountScalarFieldEnum)[keyof typeof FiatAccountScalarFieldEnum]
+
+
+export const FiatTransferScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  fiatAccountId: 'fiatAccountId',
+  provider: 'provider',
+  externalTransferId: 'externalTransferId',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  direction: 'direction',
+  status: 'status',
+  amountMinor: 'amountMinor',
+  currency: 'currency',
+  failureCode: 'failureCode',
+  instrumentIdEncrypted: 'instrumentIdEncrypted',
+  description: 'description',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FiatTransferScalarFieldEnum = (typeof FiatTransferScalarFieldEnum)[keyof typeof FiatTransferScalarFieldEnum]
+
+
+export const ProviderWebhookEventScalarFieldEnum = {
+  id: 'id',
+  provider: 'provider',
+  externalEventId: 'externalEventId',
+  eventType: 'eventType',
+  payloadHash: 'payloadHash',
+  status: 'status',
+  errorCode: 'errorCode',
+  receivedAt: 'receivedAt',
+  processedAt: 'processedAt'
+} as const
+
+export type ProviderWebhookEventScalarFieldEnum = (typeof ProviderWebhookEventScalarFieldEnum)[keyof typeof ProviderWebhookEventScalarFieldEnum]
 
 
 export const SortOrder = {

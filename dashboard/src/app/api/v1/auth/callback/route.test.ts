@@ -45,4 +45,14 @@ describe("magic-link callback", () => {
     expect(invalid.headers.get("location")).toBe("http://localhost:3100/sign-in?error=verification_failed");
     expect(createSessionResponseMock).not.toHaveBeenCalled();
   });
+
+  it("rejects unsupported verification types before contacting Supabase", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await GET(new Request(
+      "http://localhost:3100/api/v1/auth/callback?token_hash=token-hash&type=unexpected"
+    ));
+    expect(response.headers.get("location")).toBe("http://localhost:3100/sign-in?error=invalid_link");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

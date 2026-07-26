@@ -22,6 +22,8 @@ export default async function PolicyPage({ params }: { params: Promise<{ agentId
       <div><span>Over-limit action</span><strong>{policy.overLimitAction.replaceAll("_", " ")}</strong></div>
       <div><span>Merchant rule</span><strong>{policy.merchantMode.replaceAll("_", " ")}</strong></div>
       <div><span>Denied hosts</span><strong>{policy.deniedHosts.join(", ") || "None"}</strong></div>
+      <div><span>Approval threshold</span><strong>{policy.approvalThreshold} approver{policy.approvalThreshold === 1 ? "" : "s"}</strong></div>
+      <div><span>Rejection threshold</span><strong>{policy.rejectionThreshold} rejection{policy.rejectionThreshold === 1 ? "" : "s"}</strong></div>
     </div> : <div className="empty-state"><strong>No policy published</strong><p>Publish a policy before this agent can create x402 payment intents.</p></div>}
   </FormPage>;
 }

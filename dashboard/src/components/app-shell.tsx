@@ -6,18 +6,26 @@ import type { Route } from "next";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  Activity, Bot, Boxes, CircleDollarSign, ClipboardCheck, FileClock, LayoutDashboard,
-  Menu, Plus, ReceiptText, ShieldCheck
+  Activity, Bot, Boxes, BrainCircuit, CircleDollarSign, ClipboardCheck, CreditCard,
+  FileClock, FileText, GitBranch, LayoutDashboard, Menu, Plus, ReceiptText, Repeat2,
+  Settings, ShieldCheck, Store
 } from "lucide-react";
 import { HederaWalletConnect } from "@/components/hedera-wallet-connect";
 
-const navigation: Array<{ label: string; href: Route; icon: typeof LayoutDashboard; active?: boolean }> = [
-  { label: "Overview", href: "/app/overview", icon: LayoutDashboard, active: true },
+const navigation: Array<{ label: string; href: Route; icon: typeof LayoutDashboard; group?: string }> = [
+  { label: "Overview", href: "/app/overview", icon: LayoutDashboard, group: "Operate" },
   { label: "Agents", href: "/app/agents", icon: Bot },
-  { label: "Resources", href: "/app/resources", icon: Boxes },
   { label: "Approvals", href: "/app/approvals", icon: ClipboardCheck },
   { label: "Transactions", href: "/app/transactions", icon: ReceiptText },
-  { label: "Audit", href: "/app/audit", icon: FileClock }
+  { label: "Cards & fiat", href: "/app/cards", icon: CreditCard, group: "Money" },
+  { label: "Invoices", href: "/app/invoices", icon: FileText },
+  { label: "Cross-chain", href: "/app/cross-chain", icon: Repeat2 },
+  { label: "Marketplace", href: "/app/marketplace", icon: Store, group: "Build" },
+  { label: "Resources", href: "/app/resources", icon: Boxes },
+  { label: "Automations", href: "/app/automations", icon: GitBranch },
+  { label: "Intelligence", href: "/app/intelligence", icon: BrainCircuit, group: "Review" },
+  { label: "Audit", href: "/app/audit", icon: FileClock },
+  { label: "Settings", href: "/app/settings", icon: Settings }
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -47,11 +55,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {/* <span>Control</span> */}
         </div>
         <nav className="nav-list">
-          {navigation.map((item) => (
-            <Link className={`nav-link${pathname === item.href || (item.href !== "/app/overview" && pathname.startsWith(`${item.href}/`)) ? " active" : ""}`} href={item.href} key={item.href} onClick={() => setNavOpen(false)}>
-              <item.icon aria-hidden="true" size={18} />{item.label}
-            </Link>
-          ))}
+          {navigation.map((item) => <div className="nav-entry" key={item.href}>{item.group && <span className="nav-group">{item.group}</span>}<Link className={`nav-link${pathname === item.href || (item.href !== "/app/overview" && pathname.startsWith(`${item.href}/`)) ? " active" : ""}`} href={item.href} onClick={() => setNavOpen(false)}><item.icon aria-hidden="true" size={17} />{item.label}</Link></div>)}
         </nav>
         <div className="sidebar-spacer" />
         <div className="sidebar-context">

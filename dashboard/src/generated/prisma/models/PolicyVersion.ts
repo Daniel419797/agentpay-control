@@ -30,12 +30,30 @@ export type PolicyVersionAvgAggregateOutputType = {
   version: number | null
   perTransactionLimitAtomic: runtime.Decimal | null
   dailyLimitAtomic: runtime.Decimal | null
+  approvalThreshold: number | null
+  rejectionThreshold: number | null
+  allowedWeekdays: number | null
+  allowedStartMinute: number | null
+  allowedEndMinute: number | null
+  hourlyLimitAtomic: runtime.Decimal | null
+  monthlyLimitAtomic: runtime.Decimal | null
+  maxTransactionsPerHour: number | null
+  cooldownSeconds: number | null
 }
 
 export type PolicyVersionSumAggregateOutputType = {
   version: number | null
   perTransactionLimitAtomic: runtime.Decimal | null
   dailyLimitAtomic: runtime.Decimal | null
+  approvalThreshold: number | null
+  rejectionThreshold: number | null
+  allowedWeekdays: number[]
+  allowedStartMinute: number | null
+  allowedEndMinute: number | null
+  hourlyLimitAtomic: runtime.Decimal | null
+  monthlyLimitAtomic: runtime.Decimal | null
+  maxTransactionsPerHour: number | null
+  cooldownSeconds: number | null
 }
 
 export type PolicyVersionMinAggregateOutputType = {
@@ -48,6 +66,16 @@ export type PolicyVersionMinAggregateOutputType = {
   dailyLimitAtomic: runtime.Decimal | null
   overLimitAction: $Enums.OverLimitAction | null
   merchantMode: $Enums.MerchantMode | null
+  approvalThreshold: number | null
+  rejectionThreshold: number | null
+  activeFrom: Date | null
+  activeUntil: Date | null
+  allowedStartMinute: number | null
+  allowedEndMinute: number | null
+  hourlyLimitAtomic: runtime.Decimal | null
+  monthlyLimitAtomic: runtime.Decimal | null
+  maxTransactionsPerHour: number | null
+  cooldownSeconds: number | null
   createdBy: string | null
   createdAt: Date | null
   publishedAt: Date | null
@@ -63,6 +91,16 @@ export type PolicyVersionMaxAggregateOutputType = {
   dailyLimitAtomic: runtime.Decimal | null
   overLimitAction: $Enums.OverLimitAction | null
   merchantMode: $Enums.MerchantMode | null
+  approvalThreshold: number | null
+  rejectionThreshold: number | null
+  activeFrom: Date | null
+  activeUntil: Date | null
+  allowedStartMinute: number | null
+  allowedEndMinute: number | null
+  hourlyLimitAtomic: runtime.Decimal | null
+  monthlyLimitAtomic: runtime.Decimal | null
+  maxTransactionsPerHour: number | null
+  cooldownSeconds: number | null
   createdBy: string | null
   createdAt: Date | null
   publishedAt: Date | null
@@ -80,6 +118,18 @@ export type PolicyVersionCountAggregateOutputType = {
   merchantMode: number
   allowedHosts: number
   deniedHosts: number
+  approvalThreshold: number
+  rejectionThreshold: number
+  allowedMerchantCategories: number
+  activeFrom: number
+  activeUntil: number
+  allowedWeekdays: number
+  allowedStartMinute: number
+  allowedEndMinute: number
+  hourlyLimitAtomic: number
+  monthlyLimitAtomic: number
+  maxTransactionsPerHour: number
+  cooldownSeconds: number
   createdBy: number
   createdAt: number
   publishedAt: number
@@ -91,12 +141,30 @@ export type PolicyVersionAvgAggregateInputType = {
   version?: true
   perTransactionLimitAtomic?: true
   dailyLimitAtomic?: true
+  approvalThreshold?: true
+  rejectionThreshold?: true
+  allowedWeekdays?: true
+  allowedStartMinute?: true
+  allowedEndMinute?: true
+  hourlyLimitAtomic?: true
+  monthlyLimitAtomic?: true
+  maxTransactionsPerHour?: true
+  cooldownSeconds?: true
 }
 
 export type PolicyVersionSumAggregateInputType = {
   version?: true
   perTransactionLimitAtomic?: true
   dailyLimitAtomic?: true
+  approvalThreshold?: true
+  rejectionThreshold?: true
+  allowedWeekdays?: true
+  allowedStartMinute?: true
+  allowedEndMinute?: true
+  hourlyLimitAtomic?: true
+  monthlyLimitAtomic?: true
+  maxTransactionsPerHour?: true
+  cooldownSeconds?: true
 }
 
 export type PolicyVersionMinAggregateInputType = {
@@ -109,6 +177,16 @@ export type PolicyVersionMinAggregateInputType = {
   dailyLimitAtomic?: true
   overLimitAction?: true
   merchantMode?: true
+  approvalThreshold?: true
+  rejectionThreshold?: true
+  activeFrom?: true
+  activeUntil?: true
+  allowedStartMinute?: true
+  allowedEndMinute?: true
+  hourlyLimitAtomic?: true
+  monthlyLimitAtomic?: true
+  maxTransactionsPerHour?: true
+  cooldownSeconds?: true
   createdBy?: true
   createdAt?: true
   publishedAt?: true
@@ -124,6 +202,16 @@ export type PolicyVersionMaxAggregateInputType = {
   dailyLimitAtomic?: true
   overLimitAction?: true
   merchantMode?: true
+  approvalThreshold?: true
+  rejectionThreshold?: true
+  activeFrom?: true
+  activeUntil?: true
+  allowedStartMinute?: true
+  allowedEndMinute?: true
+  hourlyLimitAtomic?: true
+  monthlyLimitAtomic?: true
+  maxTransactionsPerHour?: true
+  cooldownSeconds?: true
   createdBy?: true
   createdAt?: true
   publishedAt?: true
@@ -141,6 +229,18 @@ export type PolicyVersionCountAggregateInputType = {
   merchantMode?: true
   allowedHosts?: true
   deniedHosts?: true
+  approvalThreshold?: true
+  rejectionThreshold?: true
+  allowedMerchantCategories?: true
+  activeFrom?: true
+  activeUntil?: true
+  allowedWeekdays?: true
+  allowedStartMinute?: true
+  allowedEndMinute?: true
+  hourlyLimitAtomic?: true
+  monthlyLimitAtomic?: true
+  maxTransactionsPerHour?: true
+  cooldownSeconds?: true
   createdBy?: true
   createdAt?: true
   publishedAt?: true
@@ -245,6 +345,18 @@ export type PolicyVersionGroupByOutputType = {
   merchantMode: $Enums.MerchantMode
   allowedHosts: string[]
   deniedHosts: string[]
+  approvalThreshold: number
+  rejectionThreshold: number
+  allowedMerchantCategories: string[]
+  activeFrom: Date | null
+  activeUntil: Date | null
+  allowedWeekdays: number[]
+  allowedStartMinute: number | null
+  allowedEndMinute: number | null
+  hourlyLimitAtomic: runtime.Decimal | null
+  monthlyLimitAtomic: runtime.Decimal | null
+  maxTransactionsPerHour: number | null
+  cooldownSeconds: number | null
   createdBy: string
   createdAt: Date
   publishedAt: Date | null
@@ -285,6 +397,18 @@ export type PolicyVersionWhereInput = {
   merchantMode?: Prisma.EnumMerchantModeFilter<"PolicyVersion"> | $Enums.MerchantMode
   allowedHosts?: Prisma.StringNullableListFilter<"PolicyVersion">
   deniedHosts?: Prisma.StringNullableListFilter<"PolicyVersion">
+  approvalThreshold?: Prisma.IntFilter<"PolicyVersion"> | number
+  rejectionThreshold?: Prisma.IntFilter<"PolicyVersion"> | number
+  allowedMerchantCategories?: Prisma.StringNullableListFilter<"PolicyVersion">
+  activeFrom?: Prisma.DateTimeNullableFilter<"PolicyVersion"> | Date | string | null
+  activeUntil?: Prisma.DateTimeNullableFilter<"PolicyVersion"> | Date | string | null
+  allowedWeekdays?: Prisma.IntNullableListFilter<"PolicyVersion">
+  allowedStartMinute?: Prisma.IntNullableFilter<"PolicyVersion"> | number | null
+  allowedEndMinute?: Prisma.IntNullableFilter<"PolicyVersion"> | number | null
+  hourlyLimitAtomic?: Prisma.DecimalNullableFilter<"PolicyVersion"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: Prisma.DecimalNullableFilter<"PolicyVersion"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: Prisma.IntNullableFilter<"PolicyVersion"> | number | null
+  cooldownSeconds?: Prisma.IntNullableFilter<"PolicyVersion"> | number | null
   createdBy?: Prisma.UuidFilter<"PolicyVersion"> | string
   createdAt?: Prisma.DateTimeFilter<"PolicyVersion"> | Date | string
   publishedAt?: Prisma.DateTimeNullableFilter<"PolicyVersion"> | Date | string | null
@@ -306,6 +430,18 @@ export type PolicyVersionOrderByWithRelationInput = {
   merchantMode?: Prisma.SortOrder
   allowedHosts?: Prisma.SortOrder
   deniedHosts?: Prisma.SortOrder
+  approvalThreshold?: Prisma.SortOrder
+  rejectionThreshold?: Prisma.SortOrder
+  allowedMerchantCategories?: Prisma.SortOrder
+  activeFrom?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeUntil?: Prisma.SortOrderInput | Prisma.SortOrder
+  allowedWeekdays?: Prisma.SortOrder
+  allowedStartMinute?: Prisma.SortOrderInput | Prisma.SortOrder
+  allowedEndMinute?: Prisma.SortOrderInput | Prisma.SortOrder
+  hourlyLimitAtomic?: Prisma.SortOrderInput | Prisma.SortOrder
+  monthlyLimitAtomic?: Prisma.SortOrderInput | Prisma.SortOrder
+  maxTransactionsPerHour?: Prisma.SortOrderInput | Prisma.SortOrder
+  cooldownSeconds?: Prisma.SortOrderInput | Prisma.SortOrder
   createdBy?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -331,6 +467,18 @@ export type PolicyVersionWhereUniqueInput = Prisma.AtLeast<{
   merchantMode?: Prisma.EnumMerchantModeFilter<"PolicyVersion"> | $Enums.MerchantMode
   allowedHosts?: Prisma.StringNullableListFilter<"PolicyVersion">
   deniedHosts?: Prisma.StringNullableListFilter<"PolicyVersion">
+  approvalThreshold?: Prisma.IntFilter<"PolicyVersion"> | number
+  rejectionThreshold?: Prisma.IntFilter<"PolicyVersion"> | number
+  allowedMerchantCategories?: Prisma.StringNullableListFilter<"PolicyVersion">
+  activeFrom?: Prisma.DateTimeNullableFilter<"PolicyVersion"> | Date | string | null
+  activeUntil?: Prisma.DateTimeNullableFilter<"PolicyVersion"> | Date | string | null
+  allowedWeekdays?: Prisma.IntNullableListFilter<"PolicyVersion">
+  allowedStartMinute?: Prisma.IntNullableFilter<"PolicyVersion"> | number | null
+  allowedEndMinute?: Prisma.IntNullableFilter<"PolicyVersion"> | number | null
+  hourlyLimitAtomic?: Prisma.DecimalNullableFilter<"PolicyVersion"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: Prisma.DecimalNullableFilter<"PolicyVersion"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: Prisma.IntNullableFilter<"PolicyVersion"> | number | null
+  cooldownSeconds?: Prisma.IntNullableFilter<"PolicyVersion"> | number | null
   createdBy?: Prisma.UuidFilter<"PolicyVersion"> | string
   createdAt?: Prisma.DateTimeFilter<"PolicyVersion"> | Date | string
   publishedAt?: Prisma.DateTimeNullableFilter<"PolicyVersion"> | Date | string | null
@@ -352,6 +500,18 @@ export type PolicyVersionOrderByWithAggregationInput = {
   merchantMode?: Prisma.SortOrder
   allowedHosts?: Prisma.SortOrder
   deniedHosts?: Prisma.SortOrder
+  approvalThreshold?: Prisma.SortOrder
+  rejectionThreshold?: Prisma.SortOrder
+  allowedMerchantCategories?: Prisma.SortOrder
+  activeFrom?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeUntil?: Prisma.SortOrderInput | Prisma.SortOrder
+  allowedWeekdays?: Prisma.SortOrder
+  allowedStartMinute?: Prisma.SortOrderInput | Prisma.SortOrder
+  allowedEndMinute?: Prisma.SortOrderInput | Prisma.SortOrder
+  hourlyLimitAtomic?: Prisma.SortOrderInput | Prisma.SortOrder
+  monthlyLimitAtomic?: Prisma.SortOrderInput | Prisma.SortOrder
+  maxTransactionsPerHour?: Prisma.SortOrderInput | Prisma.SortOrder
+  cooldownSeconds?: Prisma.SortOrderInput | Prisma.SortOrder
   createdBy?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -377,6 +537,18 @@ export type PolicyVersionScalarWhereWithAggregatesInput = {
   merchantMode?: Prisma.EnumMerchantModeWithAggregatesFilter<"PolicyVersion"> | $Enums.MerchantMode
   allowedHosts?: Prisma.StringNullableListFilter<"PolicyVersion">
   deniedHosts?: Prisma.StringNullableListFilter<"PolicyVersion">
+  approvalThreshold?: Prisma.IntWithAggregatesFilter<"PolicyVersion"> | number
+  rejectionThreshold?: Prisma.IntWithAggregatesFilter<"PolicyVersion"> | number
+  allowedMerchantCategories?: Prisma.StringNullableListFilter<"PolicyVersion">
+  activeFrom?: Prisma.DateTimeNullableWithAggregatesFilter<"PolicyVersion"> | Date | string | null
+  activeUntil?: Prisma.DateTimeNullableWithAggregatesFilter<"PolicyVersion"> | Date | string | null
+  allowedWeekdays?: Prisma.IntNullableListFilter<"PolicyVersion">
+  allowedStartMinute?: Prisma.IntNullableWithAggregatesFilter<"PolicyVersion"> | number | null
+  allowedEndMinute?: Prisma.IntNullableWithAggregatesFilter<"PolicyVersion"> | number | null
+  hourlyLimitAtomic?: Prisma.DecimalNullableWithAggregatesFilter<"PolicyVersion"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: Prisma.DecimalNullableWithAggregatesFilter<"PolicyVersion"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: Prisma.IntNullableWithAggregatesFilter<"PolicyVersion"> | number | null
+  cooldownSeconds?: Prisma.IntNullableWithAggregatesFilter<"PolicyVersion"> | number | null
   createdBy?: Prisma.UuidWithAggregatesFilter<"PolicyVersion"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"PolicyVersion"> | Date | string
   publishedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"PolicyVersion"> | Date | string | null
@@ -392,6 +564,18 @@ export type PolicyVersionCreateInput = {
   merchantMode?: $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionCreateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionCreatedeniedHostsInput | string[]
+  approvalThreshold?: number
+  rejectionThreshold?: number
+  allowedMerchantCategories?: Prisma.PolicyVersionCreateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Date | string | null
+  activeUntil?: Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionCreateallowedWeekdaysInput | number[]
+  allowedStartMinute?: number | null
+  allowedEndMinute?: number | null
+  hourlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: number | null
+  cooldownSeconds?: number | null
   createdBy: string
   createdAt?: Date | string
   publishedAt?: Date | string | null
@@ -413,6 +597,18 @@ export type PolicyVersionUncheckedCreateInput = {
   merchantMode?: $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionCreateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionCreatedeniedHostsInput | string[]
+  approvalThreshold?: number
+  rejectionThreshold?: number
+  allowedMerchantCategories?: Prisma.PolicyVersionCreateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Date | string | null
+  activeUntil?: Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionCreateallowedWeekdaysInput | number[]
+  allowedStartMinute?: number | null
+  allowedEndMinute?: number | null
+  hourlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: number | null
+  cooldownSeconds?: number | null
   createdBy: string
   createdAt?: Date | string
   publishedAt?: Date | string | null
@@ -430,6 +626,18 @@ export type PolicyVersionUpdateInput = {
   merchantMode?: Prisma.EnumMerchantModeFieldUpdateOperationsInput | $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionUpdateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionUpdatedeniedHostsInput | string[]
+  approvalThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  rejectionThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  allowedMerchantCategories?: Prisma.PolicyVersionUpdateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  activeUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionUpdateallowedWeekdaysInput | number[]
+  allowedStartMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  allowedEndMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  hourlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  cooldownSeconds?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdBy?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -451,6 +659,18 @@ export type PolicyVersionUncheckedUpdateInput = {
   merchantMode?: Prisma.EnumMerchantModeFieldUpdateOperationsInput | $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionUpdateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionUpdatedeniedHostsInput | string[]
+  approvalThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  rejectionThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  allowedMerchantCategories?: Prisma.PolicyVersionUpdateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  activeUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionUpdateallowedWeekdaysInput | number[]
+  allowedStartMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  allowedEndMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  hourlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  cooldownSeconds?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdBy?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -470,6 +690,18 @@ export type PolicyVersionCreateManyInput = {
   merchantMode?: $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionCreateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionCreatedeniedHostsInput | string[]
+  approvalThreshold?: number
+  rejectionThreshold?: number
+  allowedMerchantCategories?: Prisma.PolicyVersionCreateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Date | string | null
+  activeUntil?: Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionCreateallowedWeekdaysInput | number[]
+  allowedStartMinute?: number | null
+  allowedEndMinute?: number | null
+  hourlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: number | null
+  cooldownSeconds?: number | null
   createdBy: string
   createdAt?: Date | string
   publishedAt?: Date | string | null
@@ -485,6 +717,18 @@ export type PolicyVersionUpdateManyMutationInput = {
   merchantMode?: Prisma.EnumMerchantModeFieldUpdateOperationsInput | $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionUpdateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionUpdatedeniedHostsInput | string[]
+  approvalThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  rejectionThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  allowedMerchantCategories?: Prisma.PolicyVersionUpdateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  activeUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionUpdateallowedWeekdaysInput | number[]
+  allowedStartMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  allowedEndMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  hourlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  cooldownSeconds?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdBy?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -502,6 +746,18 @@ export type PolicyVersionUncheckedUpdateManyInput = {
   merchantMode?: Prisma.EnumMerchantModeFieldUpdateOperationsInput | $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionUpdateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionUpdatedeniedHostsInput | string[]
+  approvalThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  rejectionThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  allowedMerchantCategories?: Prisma.PolicyVersionUpdateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  activeUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionUpdateallowedWeekdaysInput | number[]
+  allowedStartMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  allowedEndMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  hourlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  cooldownSeconds?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdBy?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -522,6 +778,14 @@ export type PolicyVersionOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
 }
 
+export type IntNullableListFilter<$PrismaModel = never> = {
+  equals?: number[] | Prisma.ListIntFieldRefInput<$PrismaModel> | null
+  has?: number | Prisma.IntFieldRefInput<$PrismaModel> | null
+  hasEvery?: number[] | Prisma.ListIntFieldRefInput<$PrismaModel>
+  hasSome?: number[] | Prisma.ListIntFieldRefInput<$PrismaModel>
+  isEmpty?: boolean
+}
+
 export type PolicyVersionPolicyIdVersionCompoundUniqueInput = {
   policyId: string
   version: number
@@ -539,6 +803,18 @@ export type PolicyVersionCountOrderByAggregateInput = {
   merchantMode?: Prisma.SortOrder
   allowedHosts?: Prisma.SortOrder
   deniedHosts?: Prisma.SortOrder
+  approvalThreshold?: Prisma.SortOrder
+  rejectionThreshold?: Prisma.SortOrder
+  allowedMerchantCategories?: Prisma.SortOrder
+  activeFrom?: Prisma.SortOrder
+  activeUntil?: Prisma.SortOrder
+  allowedWeekdays?: Prisma.SortOrder
+  allowedStartMinute?: Prisma.SortOrder
+  allowedEndMinute?: Prisma.SortOrder
+  hourlyLimitAtomic?: Prisma.SortOrder
+  monthlyLimitAtomic?: Prisma.SortOrder
+  maxTransactionsPerHour?: Prisma.SortOrder
+  cooldownSeconds?: Prisma.SortOrder
   createdBy?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
@@ -548,6 +824,15 @@ export type PolicyVersionAvgOrderByAggregateInput = {
   version?: Prisma.SortOrder
   perTransactionLimitAtomic?: Prisma.SortOrder
   dailyLimitAtomic?: Prisma.SortOrder
+  approvalThreshold?: Prisma.SortOrder
+  rejectionThreshold?: Prisma.SortOrder
+  allowedWeekdays?: Prisma.SortOrder
+  allowedStartMinute?: Prisma.SortOrder
+  allowedEndMinute?: Prisma.SortOrder
+  hourlyLimitAtomic?: Prisma.SortOrder
+  monthlyLimitAtomic?: Prisma.SortOrder
+  maxTransactionsPerHour?: Prisma.SortOrder
+  cooldownSeconds?: Prisma.SortOrder
 }
 
 export type PolicyVersionMaxOrderByAggregateInput = {
@@ -560,6 +845,16 @@ export type PolicyVersionMaxOrderByAggregateInput = {
   dailyLimitAtomic?: Prisma.SortOrder
   overLimitAction?: Prisma.SortOrder
   merchantMode?: Prisma.SortOrder
+  approvalThreshold?: Prisma.SortOrder
+  rejectionThreshold?: Prisma.SortOrder
+  activeFrom?: Prisma.SortOrder
+  activeUntil?: Prisma.SortOrder
+  allowedStartMinute?: Prisma.SortOrder
+  allowedEndMinute?: Prisma.SortOrder
+  hourlyLimitAtomic?: Prisma.SortOrder
+  monthlyLimitAtomic?: Prisma.SortOrder
+  maxTransactionsPerHour?: Prisma.SortOrder
+  cooldownSeconds?: Prisma.SortOrder
   createdBy?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
@@ -575,6 +870,16 @@ export type PolicyVersionMinOrderByAggregateInput = {
   dailyLimitAtomic?: Prisma.SortOrder
   overLimitAction?: Prisma.SortOrder
   merchantMode?: Prisma.SortOrder
+  approvalThreshold?: Prisma.SortOrder
+  rejectionThreshold?: Prisma.SortOrder
+  activeFrom?: Prisma.SortOrder
+  activeUntil?: Prisma.SortOrder
+  allowedStartMinute?: Prisma.SortOrder
+  allowedEndMinute?: Prisma.SortOrder
+  hourlyLimitAtomic?: Prisma.SortOrder
+  monthlyLimitAtomic?: Prisma.SortOrder
+  maxTransactionsPerHour?: Prisma.SortOrder
+  cooldownSeconds?: Prisma.SortOrder
   createdBy?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
@@ -584,6 +889,15 @@ export type PolicyVersionSumOrderByAggregateInput = {
   version?: Prisma.SortOrder
   perTransactionLimitAtomic?: Prisma.SortOrder
   dailyLimitAtomic?: Prisma.SortOrder
+  approvalThreshold?: Prisma.SortOrder
+  rejectionThreshold?: Prisma.SortOrder
+  allowedWeekdays?: Prisma.SortOrder
+  allowedStartMinute?: Prisma.SortOrder
+  allowedEndMinute?: Prisma.SortOrder
+  hourlyLimitAtomic?: Prisma.SortOrder
+  monthlyLimitAtomic?: Prisma.SortOrder
+  maxTransactionsPerHour?: Prisma.SortOrder
+  cooldownSeconds?: Prisma.SortOrder
 }
 
 export type PolicyVersionScalarRelationFilter = {
@@ -699,6 +1013,14 @@ export type PolicyVersionCreatedeniedHostsInput = {
   set: string[]
 }
 
+export type PolicyVersionCreateallowedMerchantCategoriesInput = {
+  set: string[]
+}
+
+export type PolicyVersionCreateallowedWeekdaysInput = {
+  set: number[]
+}
+
 export type EnumPolicyStatusFieldUpdateOperationsInput = {
   set?: $Enums.PolicyStatus
 }
@@ -719,6 +1041,32 @@ export type PolicyVersionUpdateallowedHostsInput = {
 export type PolicyVersionUpdatedeniedHostsInput = {
   set?: string[]
   push?: string | string[]
+}
+
+export type PolicyVersionUpdateallowedMerchantCategoriesInput = {
+  set?: string[]
+  push?: string | string[]
+}
+
+export type PolicyVersionUpdateallowedWeekdaysInput = {
+  set?: number[]
+  push?: number | number[]
+}
+
+export type NullableIntFieldUpdateOperationsInput = {
+  set?: number | null
+  increment?: number
+  decrement?: number
+  multiply?: number
+  divide?: number
+}
+
+export type NullableDecimalFieldUpdateOperationsInput = {
+  set?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  increment?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  decrement?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  multiply?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  divide?: runtime.Decimal | runtime.DecimalJsLike | number | string
 }
 
 export type PolicyVersionCreateNestedOneWithoutDecisionsInput = {
@@ -745,6 +1093,18 @@ export type PolicyVersionCreateWithoutActiveForAgentsInput = {
   merchantMode?: $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionCreateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionCreatedeniedHostsInput | string[]
+  approvalThreshold?: number
+  rejectionThreshold?: number
+  allowedMerchantCategories?: Prisma.PolicyVersionCreateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Date | string | null
+  activeUntil?: Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionCreateallowedWeekdaysInput | number[]
+  allowedStartMinute?: number | null
+  allowedEndMinute?: number | null
+  hourlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: number | null
+  cooldownSeconds?: number | null
   createdBy: string
   createdAt?: Date | string
   publishedAt?: Date | string | null
@@ -765,6 +1125,18 @@ export type PolicyVersionUncheckedCreateWithoutActiveForAgentsInput = {
   merchantMode?: $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionCreateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionCreatedeniedHostsInput | string[]
+  approvalThreshold?: number
+  rejectionThreshold?: number
+  allowedMerchantCategories?: Prisma.PolicyVersionCreateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Date | string | null
+  activeUntil?: Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionCreateallowedWeekdaysInput | number[]
+  allowedStartMinute?: number | null
+  allowedEndMinute?: number | null
+  hourlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: number | null
+  cooldownSeconds?: number | null
   createdBy: string
   createdAt?: Date | string
   publishedAt?: Date | string | null
@@ -797,6 +1169,18 @@ export type PolicyVersionUpdateWithoutActiveForAgentsInput = {
   merchantMode?: Prisma.EnumMerchantModeFieldUpdateOperationsInput | $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionUpdateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionUpdatedeniedHostsInput | string[]
+  approvalThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  rejectionThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  allowedMerchantCategories?: Prisma.PolicyVersionUpdateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  activeUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionUpdateallowedWeekdaysInput | number[]
+  allowedStartMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  allowedEndMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  hourlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  cooldownSeconds?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdBy?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -817,6 +1201,18 @@ export type PolicyVersionUncheckedUpdateWithoutActiveForAgentsInput = {
   merchantMode?: Prisma.EnumMerchantModeFieldUpdateOperationsInput | $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionUpdateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionUpdatedeniedHostsInput | string[]
+  approvalThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  rejectionThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  allowedMerchantCategories?: Prisma.PolicyVersionUpdateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  activeUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionUpdateallowedWeekdaysInput | number[]
+  allowedStartMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  allowedEndMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  hourlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  cooldownSeconds?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdBy?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -833,6 +1229,18 @@ export type PolicyVersionCreateWithoutAssetInput = {
   merchantMode?: $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionCreateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionCreatedeniedHostsInput | string[]
+  approvalThreshold?: number
+  rejectionThreshold?: number
+  allowedMerchantCategories?: Prisma.PolicyVersionCreateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Date | string | null
+  activeUntil?: Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionCreateallowedWeekdaysInput | number[]
+  allowedStartMinute?: number | null
+  allowedEndMinute?: number | null
+  hourlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: number | null
+  cooldownSeconds?: number | null
   createdBy: string
   createdAt?: Date | string
   publishedAt?: Date | string | null
@@ -852,6 +1260,18 @@ export type PolicyVersionUncheckedCreateWithoutAssetInput = {
   merchantMode?: $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionCreateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionCreatedeniedHostsInput | string[]
+  approvalThreshold?: number
+  rejectionThreshold?: number
+  allowedMerchantCategories?: Prisma.PolicyVersionCreateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Date | string | null
+  activeUntil?: Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionCreateallowedWeekdaysInput | number[]
+  allowedStartMinute?: number | null
+  allowedEndMinute?: number | null
+  hourlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: number | null
+  cooldownSeconds?: number | null
   createdBy: string
   createdAt?: Date | string
   publishedAt?: Date | string | null
@@ -900,6 +1320,18 @@ export type PolicyVersionScalarWhereInput = {
   merchantMode?: Prisma.EnumMerchantModeFilter<"PolicyVersion"> | $Enums.MerchantMode
   allowedHosts?: Prisma.StringNullableListFilter<"PolicyVersion">
   deniedHosts?: Prisma.StringNullableListFilter<"PolicyVersion">
+  approvalThreshold?: Prisma.IntFilter<"PolicyVersion"> | number
+  rejectionThreshold?: Prisma.IntFilter<"PolicyVersion"> | number
+  allowedMerchantCategories?: Prisma.StringNullableListFilter<"PolicyVersion">
+  activeFrom?: Prisma.DateTimeNullableFilter<"PolicyVersion"> | Date | string | null
+  activeUntil?: Prisma.DateTimeNullableFilter<"PolicyVersion"> | Date | string | null
+  allowedWeekdays?: Prisma.IntNullableListFilter<"PolicyVersion">
+  allowedStartMinute?: Prisma.IntNullableFilter<"PolicyVersion"> | number | null
+  allowedEndMinute?: Prisma.IntNullableFilter<"PolicyVersion"> | number | null
+  hourlyLimitAtomic?: Prisma.DecimalNullableFilter<"PolicyVersion"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: Prisma.DecimalNullableFilter<"PolicyVersion"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: Prisma.IntNullableFilter<"PolicyVersion"> | number | null
+  cooldownSeconds?: Prisma.IntNullableFilter<"PolicyVersion"> | number | null
   createdBy?: Prisma.UuidFilter<"PolicyVersion"> | string
   createdAt?: Prisma.DateTimeFilter<"PolicyVersion"> | Date | string
   publishedAt?: Prisma.DateTimeNullableFilter<"PolicyVersion"> | Date | string | null
@@ -915,6 +1347,18 @@ export type PolicyVersionCreateWithoutPolicyInput = {
   merchantMode?: $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionCreateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionCreatedeniedHostsInput | string[]
+  approvalThreshold?: number
+  rejectionThreshold?: number
+  allowedMerchantCategories?: Prisma.PolicyVersionCreateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Date | string | null
+  activeUntil?: Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionCreateallowedWeekdaysInput | number[]
+  allowedStartMinute?: number | null
+  allowedEndMinute?: number | null
+  hourlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: number | null
+  cooldownSeconds?: number | null
   createdBy: string
   createdAt?: Date | string
   publishedAt?: Date | string | null
@@ -934,6 +1378,18 @@ export type PolicyVersionUncheckedCreateWithoutPolicyInput = {
   merchantMode?: $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionCreateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionCreatedeniedHostsInput | string[]
+  approvalThreshold?: number
+  rejectionThreshold?: number
+  allowedMerchantCategories?: Prisma.PolicyVersionCreateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Date | string | null
+  activeUntil?: Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionCreateallowedWeekdaysInput | number[]
+  allowedStartMinute?: number | null
+  allowedEndMinute?: number | null
+  hourlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: number | null
+  cooldownSeconds?: number | null
   createdBy: string
   createdAt?: Date | string
   publishedAt?: Date | string | null
@@ -977,6 +1433,18 @@ export type PolicyVersionCreateWithoutDecisionsInput = {
   merchantMode?: $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionCreateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionCreatedeniedHostsInput | string[]
+  approvalThreshold?: number
+  rejectionThreshold?: number
+  allowedMerchantCategories?: Prisma.PolicyVersionCreateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Date | string | null
+  activeUntil?: Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionCreateallowedWeekdaysInput | number[]
+  allowedStartMinute?: number | null
+  allowedEndMinute?: number | null
+  hourlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: number | null
+  cooldownSeconds?: number | null
   createdBy: string
   createdAt?: Date | string
   publishedAt?: Date | string | null
@@ -997,6 +1465,18 @@ export type PolicyVersionUncheckedCreateWithoutDecisionsInput = {
   merchantMode?: $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionCreateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionCreatedeniedHostsInput | string[]
+  approvalThreshold?: number
+  rejectionThreshold?: number
+  allowedMerchantCategories?: Prisma.PolicyVersionCreateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Date | string | null
+  activeUntil?: Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionCreateallowedWeekdaysInput | number[]
+  allowedStartMinute?: number | null
+  allowedEndMinute?: number | null
+  hourlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: number | null
+  cooldownSeconds?: number | null
   createdBy: string
   createdAt?: Date | string
   publishedAt?: Date | string | null
@@ -1029,6 +1509,18 @@ export type PolicyVersionUpdateWithoutDecisionsInput = {
   merchantMode?: Prisma.EnumMerchantModeFieldUpdateOperationsInput | $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionUpdateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionUpdatedeniedHostsInput | string[]
+  approvalThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  rejectionThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  allowedMerchantCategories?: Prisma.PolicyVersionUpdateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  activeUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionUpdateallowedWeekdaysInput | number[]
+  allowedStartMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  allowedEndMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  hourlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  cooldownSeconds?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdBy?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1049,6 +1541,18 @@ export type PolicyVersionUncheckedUpdateWithoutDecisionsInput = {
   merchantMode?: Prisma.EnumMerchantModeFieldUpdateOperationsInput | $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionUpdateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionUpdatedeniedHostsInput | string[]
+  approvalThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  rejectionThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  allowedMerchantCategories?: Prisma.PolicyVersionUpdateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  activeUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionUpdateallowedWeekdaysInput | number[]
+  allowedStartMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  allowedEndMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  hourlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  cooldownSeconds?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdBy?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1066,6 +1570,18 @@ export type PolicyVersionCreateManyAssetInput = {
   merchantMode?: $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionCreateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionCreatedeniedHostsInput | string[]
+  approvalThreshold?: number
+  rejectionThreshold?: number
+  allowedMerchantCategories?: Prisma.PolicyVersionCreateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Date | string | null
+  activeUntil?: Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionCreateallowedWeekdaysInput | number[]
+  allowedStartMinute?: number | null
+  allowedEndMinute?: number | null
+  hourlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: number | null
+  cooldownSeconds?: number | null
   createdBy: string
   createdAt?: Date | string
   publishedAt?: Date | string | null
@@ -1081,6 +1597,18 @@ export type PolicyVersionUpdateWithoutAssetInput = {
   merchantMode?: Prisma.EnumMerchantModeFieldUpdateOperationsInput | $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionUpdateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionUpdatedeniedHostsInput | string[]
+  approvalThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  rejectionThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  allowedMerchantCategories?: Prisma.PolicyVersionUpdateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  activeUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionUpdateallowedWeekdaysInput | number[]
+  allowedStartMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  allowedEndMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  hourlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  cooldownSeconds?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdBy?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1100,6 +1628,18 @@ export type PolicyVersionUncheckedUpdateWithoutAssetInput = {
   merchantMode?: Prisma.EnumMerchantModeFieldUpdateOperationsInput | $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionUpdateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionUpdatedeniedHostsInput | string[]
+  approvalThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  rejectionThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  allowedMerchantCategories?: Prisma.PolicyVersionUpdateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  activeUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionUpdateallowedWeekdaysInput | number[]
+  allowedStartMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  allowedEndMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  hourlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  cooldownSeconds?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdBy?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1118,6 +1658,18 @@ export type PolicyVersionUncheckedUpdateManyWithoutAssetInput = {
   merchantMode?: Prisma.EnumMerchantModeFieldUpdateOperationsInput | $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionUpdateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionUpdatedeniedHostsInput | string[]
+  approvalThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  rejectionThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  allowedMerchantCategories?: Prisma.PolicyVersionUpdateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  activeUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionUpdateallowedWeekdaysInput | number[]
+  allowedStartMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  allowedEndMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  hourlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  cooldownSeconds?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdBy?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1134,6 +1686,18 @@ export type PolicyVersionCreateManyPolicyInput = {
   merchantMode?: $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionCreateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionCreatedeniedHostsInput | string[]
+  approvalThreshold?: number
+  rejectionThreshold?: number
+  allowedMerchantCategories?: Prisma.PolicyVersionCreateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Date | string | null
+  activeUntil?: Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionCreateallowedWeekdaysInput | number[]
+  allowedStartMinute?: number | null
+  allowedEndMinute?: number | null
+  hourlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: number | null
+  cooldownSeconds?: number | null
   createdBy: string
   createdAt?: Date | string
   publishedAt?: Date | string | null
@@ -1149,6 +1713,18 @@ export type PolicyVersionUpdateWithoutPolicyInput = {
   merchantMode?: Prisma.EnumMerchantModeFieldUpdateOperationsInput | $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionUpdateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionUpdatedeniedHostsInput | string[]
+  approvalThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  rejectionThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  allowedMerchantCategories?: Prisma.PolicyVersionUpdateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  activeUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionUpdateallowedWeekdaysInput | number[]
+  allowedStartMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  allowedEndMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  hourlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  cooldownSeconds?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdBy?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1168,6 +1744,18 @@ export type PolicyVersionUncheckedUpdateWithoutPolicyInput = {
   merchantMode?: Prisma.EnumMerchantModeFieldUpdateOperationsInput | $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionUpdateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionUpdatedeniedHostsInput | string[]
+  approvalThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  rejectionThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  allowedMerchantCategories?: Prisma.PolicyVersionUpdateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  activeUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionUpdateallowedWeekdaysInput | number[]
+  allowedStartMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  allowedEndMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  hourlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  cooldownSeconds?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdBy?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1186,6 +1774,18 @@ export type PolicyVersionUncheckedUpdateManyWithoutPolicyInput = {
   merchantMode?: Prisma.EnumMerchantModeFieldUpdateOperationsInput | $Enums.MerchantMode
   allowedHosts?: Prisma.PolicyVersionUpdateallowedHostsInput | string[]
   deniedHosts?: Prisma.PolicyVersionUpdatedeniedHostsInput | string[]
+  approvalThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  rejectionThreshold?: Prisma.IntFieldUpdateOperationsInput | number
+  allowedMerchantCategories?: Prisma.PolicyVersionUpdateallowedMerchantCategoriesInput | string[]
+  activeFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  activeUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  allowedWeekdays?: Prisma.PolicyVersionUpdateallowedWeekdaysInput | number[]
+  allowedStartMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  allowedEndMinute?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  hourlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  monthlyLimitAtomic?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxTransactionsPerHour?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  cooldownSeconds?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdBy?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1243,6 +1843,18 @@ export type PolicyVersionSelect<ExtArgs extends runtime.Types.Extensions.Interna
   merchantMode?: boolean
   allowedHosts?: boolean
   deniedHosts?: boolean
+  approvalThreshold?: boolean
+  rejectionThreshold?: boolean
+  allowedMerchantCategories?: boolean
+  activeFrom?: boolean
+  activeUntil?: boolean
+  allowedWeekdays?: boolean
+  allowedStartMinute?: boolean
+  allowedEndMinute?: boolean
+  hourlyLimitAtomic?: boolean
+  monthlyLimitAtomic?: boolean
+  maxTransactionsPerHour?: boolean
+  cooldownSeconds?: boolean
   createdBy?: boolean
   createdAt?: boolean
   publishedAt?: boolean
@@ -1265,6 +1877,18 @@ export type PolicyVersionSelectCreateManyAndReturn<ExtArgs extends runtime.Types
   merchantMode?: boolean
   allowedHosts?: boolean
   deniedHosts?: boolean
+  approvalThreshold?: boolean
+  rejectionThreshold?: boolean
+  allowedMerchantCategories?: boolean
+  activeFrom?: boolean
+  activeUntil?: boolean
+  allowedWeekdays?: boolean
+  allowedStartMinute?: boolean
+  allowedEndMinute?: boolean
+  hourlyLimitAtomic?: boolean
+  monthlyLimitAtomic?: boolean
+  maxTransactionsPerHour?: boolean
+  cooldownSeconds?: boolean
   createdBy?: boolean
   createdAt?: boolean
   publishedAt?: boolean
@@ -1284,6 +1908,18 @@ export type PolicyVersionSelectUpdateManyAndReturn<ExtArgs extends runtime.Types
   merchantMode?: boolean
   allowedHosts?: boolean
   deniedHosts?: boolean
+  approvalThreshold?: boolean
+  rejectionThreshold?: boolean
+  allowedMerchantCategories?: boolean
+  activeFrom?: boolean
+  activeUntil?: boolean
+  allowedWeekdays?: boolean
+  allowedStartMinute?: boolean
+  allowedEndMinute?: boolean
+  hourlyLimitAtomic?: boolean
+  monthlyLimitAtomic?: boolean
+  maxTransactionsPerHour?: boolean
+  cooldownSeconds?: boolean
   createdBy?: boolean
   createdAt?: boolean
   publishedAt?: boolean
@@ -1303,12 +1939,24 @@ export type PolicyVersionSelectScalar = {
   merchantMode?: boolean
   allowedHosts?: boolean
   deniedHosts?: boolean
+  approvalThreshold?: boolean
+  rejectionThreshold?: boolean
+  allowedMerchantCategories?: boolean
+  activeFrom?: boolean
+  activeUntil?: boolean
+  allowedWeekdays?: boolean
+  allowedStartMinute?: boolean
+  allowedEndMinute?: boolean
+  hourlyLimitAtomic?: boolean
+  monthlyLimitAtomic?: boolean
+  maxTransactionsPerHour?: boolean
+  cooldownSeconds?: boolean
   createdBy?: boolean
   createdAt?: boolean
   publishedAt?: boolean
 }
 
-export type PolicyVersionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "policyId" | "version" | "status" | "assetId" | "perTransactionLimitAtomic" | "dailyLimitAtomic" | "overLimitAction" | "merchantMode" | "allowedHosts" | "deniedHosts" | "createdBy" | "createdAt" | "publishedAt", ExtArgs["result"]["policyVersion"]>
+export type PolicyVersionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "policyId" | "version" | "status" | "assetId" | "perTransactionLimitAtomic" | "dailyLimitAtomic" | "overLimitAction" | "merchantMode" | "allowedHosts" | "deniedHosts" | "approvalThreshold" | "rejectionThreshold" | "allowedMerchantCategories" | "activeFrom" | "activeUntil" | "allowedWeekdays" | "allowedStartMinute" | "allowedEndMinute" | "hourlyLimitAtomic" | "monthlyLimitAtomic" | "maxTransactionsPerHour" | "cooldownSeconds" | "createdBy" | "createdAt" | "publishedAt", ExtArgs["result"]["policyVersion"]>
 export type PolicyVersionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   policy?: boolean | Prisma.PolicyDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -1345,6 +1993,18 @@ export type $PolicyVersionPayload<ExtArgs extends runtime.Types.Extensions.Inter
     merchantMode: $Enums.MerchantMode
     allowedHosts: string[]
     deniedHosts: string[]
+    approvalThreshold: number
+    rejectionThreshold: number
+    allowedMerchantCategories: string[]
+    activeFrom: Date | null
+    activeUntil: Date | null
+    allowedWeekdays: number[]
+    allowedStartMinute: number | null
+    allowedEndMinute: number | null
+    hourlyLimitAtomic: runtime.Decimal | null
+    monthlyLimitAtomic: runtime.Decimal | null
+    maxTransactionsPerHour: number | null
+    cooldownSeconds: number | null
     createdBy: string
     createdAt: Date
     publishedAt: Date | null
@@ -1786,6 +2446,18 @@ export interface PolicyVersionFieldRefs {
   readonly merchantMode: Prisma.FieldRef<"PolicyVersion", 'MerchantMode'>
   readonly allowedHosts: Prisma.FieldRef<"PolicyVersion", 'String[]'>
   readonly deniedHosts: Prisma.FieldRef<"PolicyVersion", 'String[]'>
+  readonly approvalThreshold: Prisma.FieldRef<"PolicyVersion", 'Int'>
+  readonly rejectionThreshold: Prisma.FieldRef<"PolicyVersion", 'Int'>
+  readonly allowedMerchantCategories: Prisma.FieldRef<"PolicyVersion", 'String[]'>
+  readonly activeFrom: Prisma.FieldRef<"PolicyVersion", 'DateTime'>
+  readonly activeUntil: Prisma.FieldRef<"PolicyVersion", 'DateTime'>
+  readonly allowedWeekdays: Prisma.FieldRef<"PolicyVersion", 'Int[]'>
+  readonly allowedStartMinute: Prisma.FieldRef<"PolicyVersion", 'Int'>
+  readonly allowedEndMinute: Prisma.FieldRef<"PolicyVersion", 'Int'>
+  readonly hourlyLimitAtomic: Prisma.FieldRef<"PolicyVersion", 'Decimal'>
+  readonly monthlyLimitAtomic: Prisma.FieldRef<"PolicyVersion", 'Decimal'>
+  readonly maxTransactionsPerHour: Prisma.FieldRef<"PolicyVersion", 'Int'>
+  readonly cooldownSeconds: Prisma.FieldRef<"PolicyVersion", 'Int'>
   readonly createdBy: Prisma.FieldRef<"PolicyVersion", 'String'>
   readonly createdAt: Prisma.FieldRef<"PolicyVersion", 'DateTime'>
   readonly publishedAt: Prisma.FieldRef<"PolicyVersion", 'DateTime'>

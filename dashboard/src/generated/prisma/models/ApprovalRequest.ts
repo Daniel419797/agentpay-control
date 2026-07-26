@@ -20,8 +20,20 @@ export type ApprovalRequestModel = runtime.Types.Result.DefaultSelection<Prisma.
 
 export type AggregateApprovalRequest = {
   _count: ApprovalRequestCountAggregateOutputType | null
+  _avg: ApprovalRequestAvgAggregateOutputType | null
+  _sum: ApprovalRequestSumAggregateOutputType | null
   _min: ApprovalRequestMinAggregateOutputType | null
   _max: ApprovalRequestMaxAggregateOutputType | null
+}
+
+export type ApprovalRequestAvgAggregateOutputType = {
+  requiredApprovals: number | null
+  requiredRejections: number | null
+}
+
+export type ApprovalRequestSumAggregateOutputType = {
+  requiredApprovals: number | null
+  requiredRejections: number | null
 }
 
 export type ApprovalRequestMinAggregateOutputType = {
@@ -34,6 +46,8 @@ export type ApprovalRequestMinAggregateOutputType = {
   decidedAt: Date | null
   decidedBy: string | null
   decisionNote: string | null
+  requiredApprovals: number | null
+  requiredRejections: number | null
 }
 
 export type ApprovalRequestMaxAggregateOutputType = {
@@ -46,6 +60,8 @@ export type ApprovalRequestMaxAggregateOutputType = {
   decidedAt: Date | null
   decidedBy: string | null
   decisionNote: string | null
+  requiredApprovals: number | null
+  requiredRejections: number | null
 }
 
 export type ApprovalRequestCountAggregateOutputType = {
@@ -58,9 +74,21 @@ export type ApprovalRequestCountAggregateOutputType = {
   decidedAt: number
   decidedBy: number
   decisionNote: number
+  requiredApprovals: number
+  requiredRejections: number
   _all: number
 }
 
+
+export type ApprovalRequestAvgAggregateInputType = {
+  requiredApprovals?: true
+  requiredRejections?: true
+}
+
+export type ApprovalRequestSumAggregateInputType = {
+  requiredApprovals?: true
+  requiredRejections?: true
+}
 
 export type ApprovalRequestMinAggregateInputType = {
   id?: true
@@ -72,6 +100,8 @@ export type ApprovalRequestMinAggregateInputType = {
   decidedAt?: true
   decidedBy?: true
   decisionNote?: true
+  requiredApprovals?: true
+  requiredRejections?: true
 }
 
 export type ApprovalRequestMaxAggregateInputType = {
@@ -84,6 +114,8 @@ export type ApprovalRequestMaxAggregateInputType = {
   decidedAt?: true
   decidedBy?: true
   decisionNote?: true
+  requiredApprovals?: true
+  requiredRejections?: true
 }
 
 export type ApprovalRequestCountAggregateInputType = {
@@ -96,6 +128,8 @@ export type ApprovalRequestCountAggregateInputType = {
   decidedAt?: true
   decidedBy?: true
   decisionNote?: true
+  requiredApprovals?: true
+  requiredRejections?: true
   _all?: true
 }
 
@@ -137,6 +171,18 @@ export type ApprovalRequestAggregateArgs<ExtArgs extends runtime.Types.Extension
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    * 
+   * Select which fields to average
+  **/
+  _avg?: ApprovalRequestAvgAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
+   * Select which fields to sum
+  **/
+  _sum?: ApprovalRequestSumAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
    * Select which fields to find the minimum value
   **/
   _min?: ApprovalRequestMinAggregateInputType
@@ -167,6 +213,8 @@ export type ApprovalRequestGroupByArgs<ExtArgs extends runtime.Types.Extensions.
   take?: number
   skip?: number
   _count?: ApprovalRequestCountAggregateInputType | true
+  _avg?: ApprovalRequestAvgAggregateInputType
+  _sum?: ApprovalRequestSumAggregateInputType
   _min?: ApprovalRequestMinAggregateInputType
   _max?: ApprovalRequestMaxAggregateInputType
 }
@@ -181,7 +229,11 @@ export type ApprovalRequestGroupByOutputType = {
   decidedAt: Date | null
   decidedBy: string | null
   decisionNote: string | null
+  requiredApprovals: number
+  requiredRejections: number
   _count: ApprovalRequestCountAggregateOutputType | null
+  _avg: ApprovalRequestAvgAggregateOutputType | null
+  _sum: ApprovalRequestSumAggregateOutputType | null
   _min: ApprovalRequestMinAggregateOutputType | null
   _max: ApprovalRequestMaxAggregateOutputType | null
 }
@@ -214,7 +266,10 @@ export type ApprovalRequestWhereInput = {
   decidedAt?: Prisma.DateTimeNullableFilter<"ApprovalRequest"> | Date | string | null
   decidedBy?: Prisma.UuidNullableFilter<"ApprovalRequest"> | string | null
   decisionNote?: Prisma.StringNullableFilter<"ApprovalRequest"> | string | null
+  requiredApprovals?: Prisma.IntFilter<"ApprovalRequest"> | number
+  requiredRejections?: Prisma.IntFilter<"ApprovalRequest"> | number
   paymentIntent?: Prisma.XOR<Prisma.PaymentIntentScalarRelationFilter, Prisma.PaymentIntentWhereInput>
+  decisions?: Prisma.ApprovalDecisionListRelationFilter
 }
 
 export type ApprovalRequestOrderByWithRelationInput = {
@@ -227,7 +282,10 @@ export type ApprovalRequestOrderByWithRelationInput = {
   decidedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   decidedBy?: Prisma.SortOrderInput | Prisma.SortOrder
   decisionNote?: Prisma.SortOrderInput | Prisma.SortOrder
+  requiredApprovals?: Prisma.SortOrder
+  requiredRejections?: Prisma.SortOrder
   paymentIntent?: Prisma.PaymentIntentOrderByWithRelationInput
+  decisions?: Prisma.ApprovalDecisionOrderByRelationAggregateInput
 }
 
 export type ApprovalRequestWhereUniqueInput = Prisma.AtLeast<{
@@ -243,7 +301,10 @@ export type ApprovalRequestWhereUniqueInput = Prisma.AtLeast<{
   decidedAt?: Prisma.DateTimeNullableFilter<"ApprovalRequest"> | Date | string | null
   decidedBy?: Prisma.UuidNullableFilter<"ApprovalRequest"> | string | null
   decisionNote?: Prisma.StringNullableFilter<"ApprovalRequest"> | string | null
+  requiredApprovals?: Prisma.IntFilter<"ApprovalRequest"> | number
+  requiredRejections?: Prisma.IntFilter<"ApprovalRequest"> | number
   paymentIntent?: Prisma.XOR<Prisma.PaymentIntentScalarRelationFilter, Prisma.PaymentIntentWhereInput>
+  decisions?: Prisma.ApprovalDecisionListRelationFilter
 }, "id" | "paymentIntentId">
 
 export type ApprovalRequestOrderByWithAggregationInput = {
@@ -256,9 +317,13 @@ export type ApprovalRequestOrderByWithAggregationInput = {
   decidedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   decidedBy?: Prisma.SortOrderInput | Prisma.SortOrder
   decisionNote?: Prisma.SortOrderInput | Prisma.SortOrder
+  requiredApprovals?: Prisma.SortOrder
+  requiredRejections?: Prisma.SortOrder
   _count?: Prisma.ApprovalRequestCountOrderByAggregateInput
+  _avg?: Prisma.ApprovalRequestAvgOrderByAggregateInput
   _max?: Prisma.ApprovalRequestMaxOrderByAggregateInput
   _min?: Prisma.ApprovalRequestMinOrderByAggregateInput
+  _sum?: Prisma.ApprovalRequestSumOrderByAggregateInput
 }
 
 export type ApprovalRequestScalarWhereWithAggregatesInput = {
@@ -274,6 +339,8 @@ export type ApprovalRequestScalarWhereWithAggregatesInput = {
   decidedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ApprovalRequest"> | Date | string | null
   decidedBy?: Prisma.UuidNullableWithAggregatesFilter<"ApprovalRequest"> | string | null
   decisionNote?: Prisma.StringNullableWithAggregatesFilter<"ApprovalRequest"> | string | null
+  requiredApprovals?: Prisma.IntWithAggregatesFilter<"ApprovalRequest"> | number
+  requiredRejections?: Prisma.IntWithAggregatesFilter<"ApprovalRequest"> | number
 }
 
 export type ApprovalRequestCreateInput = {
@@ -285,7 +352,10 @@ export type ApprovalRequestCreateInput = {
   decidedAt?: Date | string | null
   decidedBy?: string | null
   decisionNote?: string | null
+  requiredApprovals?: number
+  requiredRejections?: number
   paymentIntent: Prisma.PaymentIntentCreateNestedOneWithoutApprovalInput
+  decisions?: Prisma.ApprovalDecisionCreateNestedManyWithoutApprovalRequestInput
 }
 
 export type ApprovalRequestUncheckedCreateInput = {
@@ -298,6 +368,9 @@ export type ApprovalRequestUncheckedCreateInput = {
   decidedAt?: Date | string | null
   decidedBy?: string | null
   decisionNote?: string | null
+  requiredApprovals?: number
+  requiredRejections?: number
+  decisions?: Prisma.ApprovalDecisionUncheckedCreateNestedManyWithoutApprovalRequestInput
 }
 
 export type ApprovalRequestUpdateInput = {
@@ -309,7 +382,10 @@ export type ApprovalRequestUpdateInput = {
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   decidedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decisionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredApprovals?: Prisma.IntFieldUpdateOperationsInput | number
+  requiredRejections?: Prisma.IntFieldUpdateOperationsInput | number
   paymentIntent?: Prisma.PaymentIntentUpdateOneRequiredWithoutApprovalNestedInput
+  decisions?: Prisma.ApprovalDecisionUpdateManyWithoutApprovalRequestNestedInput
 }
 
 export type ApprovalRequestUncheckedUpdateInput = {
@@ -322,6 +398,9 @@ export type ApprovalRequestUncheckedUpdateInput = {
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   decidedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decisionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredApprovals?: Prisma.IntFieldUpdateOperationsInput | number
+  requiredRejections?: Prisma.IntFieldUpdateOperationsInput | number
+  decisions?: Prisma.ApprovalDecisionUncheckedUpdateManyWithoutApprovalRequestNestedInput
 }
 
 export type ApprovalRequestCreateManyInput = {
@@ -334,6 +413,8 @@ export type ApprovalRequestCreateManyInput = {
   decidedAt?: Date | string | null
   decidedBy?: string | null
   decisionNote?: string | null
+  requiredApprovals?: number
+  requiredRejections?: number
 }
 
 export type ApprovalRequestUpdateManyMutationInput = {
@@ -345,6 +426,8 @@ export type ApprovalRequestUpdateManyMutationInput = {
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   decidedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decisionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredApprovals?: Prisma.IntFieldUpdateOperationsInput | number
+  requiredRejections?: Prisma.IntFieldUpdateOperationsInput | number
 }
 
 export type ApprovalRequestUncheckedUpdateManyInput = {
@@ -357,6 +440,8 @@ export type ApprovalRequestUncheckedUpdateManyInput = {
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   decidedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decisionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredApprovals?: Prisma.IntFieldUpdateOperationsInput | number
+  requiredRejections?: Prisma.IntFieldUpdateOperationsInput | number
 }
 
 export type ApprovalRequestNullableScalarRelationFilter = {
@@ -374,6 +459,13 @@ export type ApprovalRequestCountOrderByAggregateInput = {
   decidedAt?: Prisma.SortOrder
   decidedBy?: Prisma.SortOrder
   decisionNote?: Prisma.SortOrder
+  requiredApprovals?: Prisma.SortOrder
+  requiredRejections?: Prisma.SortOrder
+}
+
+export type ApprovalRequestAvgOrderByAggregateInput = {
+  requiredApprovals?: Prisma.SortOrder
+  requiredRejections?: Prisma.SortOrder
 }
 
 export type ApprovalRequestMaxOrderByAggregateInput = {
@@ -386,6 +478,8 @@ export type ApprovalRequestMaxOrderByAggregateInput = {
   decidedAt?: Prisma.SortOrder
   decidedBy?: Prisma.SortOrder
   decisionNote?: Prisma.SortOrder
+  requiredApprovals?: Prisma.SortOrder
+  requiredRejections?: Prisma.SortOrder
 }
 
 export type ApprovalRequestMinOrderByAggregateInput = {
@@ -398,6 +492,18 @@ export type ApprovalRequestMinOrderByAggregateInput = {
   decidedAt?: Prisma.SortOrder
   decidedBy?: Prisma.SortOrder
   decisionNote?: Prisma.SortOrder
+  requiredApprovals?: Prisma.SortOrder
+  requiredRejections?: Prisma.SortOrder
+}
+
+export type ApprovalRequestSumOrderByAggregateInput = {
+  requiredApprovals?: Prisma.SortOrder
+  requiredRejections?: Prisma.SortOrder
+}
+
+export type ApprovalRequestScalarRelationFilter = {
+  is?: Prisma.ApprovalRequestWhereInput
+  isNot?: Prisma.ApprovalRequestWhereInput
 }
 
 export type ApprovalRequestCreateNestedOneWithoutPaymentIntentInput = {
@@ -436,6 +542,20 @@ export type EnumApprovalStatusFieldUpdateOperationsInput = {
   set?: $Enums.ApprovalStatus
 }
 
+export type ApprovalRequestCreateNestedOneWithoutDecisionsInput = {
+  create?: Prisma.XOR<Prisma.ApprovalRequestCreateWithoutDecisionsInput, Prisma.ApprovalRequestUncheckedCreateWithoutDecisionsInput>
+  connectOrCreate?: Prisma.ApprovalRequestCreateOrConnectWithoutDecisionsInput
+  connect?: Prisma.ApprovalRequestWhereUniqueInput
+}
+
+export type ApprovalRequestUpdateOneRequiredWithoutDecisionsNestedInput = {
+  create?: Prisma.XOR<Prisma.ApprovalRequestCreateWithoutDecisionsInput, Prisma.ApprovalRequestUncheckedCreateWithoutDecisionsInput>
+  connectOrCreate?: Prisma.ApprovalRequestCreateOrConnectWithoutDecisionsInput
+  upsert?: Prisma.ApprovalRequestUpsertWithoutDecisionsInput
+  connect?: Prisma.ApprovalRequestWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ApprovalRequestUpdateToOneWithWhereWithoutDecisionsInput, Prisma.ApprovalRequestUpdateWithoutDecisionsInput>, Prisma.ApprovalRequestUncheckedUpdateWithoutDecisionsInput>
+}
+
 export type ApprovalRequestCreateWithoutPaymentIntentInput = {
   id?: string
   status?: $Enums.ApprovalStatus
@@ -445,6 +565,9 @@ export type ApprovalRequestCreateWithoutPaymentIntentInput = {
   decidedAt?: Date | string | null
   decidedBy?: string | null
   decisionNote?: string | null
+  requiredApprovals?: number
+  requiredRejections?: number
+  decisions?: Prisma.ApprovalDecisionCreateNestedManyWithoutApprovalRequestInput
 }
 
 export type ApprovalRequestUncheckedCreateWithoutPaymentIntentInput = {
@@ -456,6 +579,9 @@ export type ApprovalRequestUncheckedCreateWithoutPaymentIntentInput = {
   decidedAt?: Date | string | null
   decidedBy?: string | null
   decisionNote?: string | null
+  requiredApprovals?: number
+  requiredRejections?: number
+  decisions?: Prisma.ApprovalDecisionUncheckedCreateNestedManyWithoutApprovalRequestInput
 }
 
 export type ApprovalRequestCreateOrConnectWithoutPaymentIntentInput = {
@@ -483,6 +609,9 @@ export type ApprovalRequestUpdateWithoutPaymentIntentInput = {
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   decidedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decisionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredApprovals?: Prisma.IntFieldUpdateOperationsInput | number
+  requiredRejections?: Prisma.IntFieldUpdateOperationsInput | number
+  decisions?: Prisma.ApprovalDecisionUpdateManyWithoutApprovalRequestNestedInput
 }
 
 export type ApprovalRequestUncheckedUpdateWithoutPaymentIntentInput = {
@@ -494,8 +623,112 @@ export type ApprovalRequestUncheckedUpdateWithoutPaymentIntentInput = {
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   decidedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decisionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredApprovals?: Prisma.IntFieldUpdateOperationsInput | number
+  requiredRejections?: Prisma.IntFieldUpdateOperationsInput | number
+  decisions?: Prisma.ApprovalDecisionUncheckedUpdateManyWithoutApprovalRequestNestedInput
 }
 
+export type ApprovalRequestCreateWithoutDecisionsInput = {
+  id?: string
+  status?: $Enums.ApprovalStatus
+  requestPurpose?: string | null
+  requestedAt?: Date | string
+  expiresAt: Date | string
+  decidedAt?: Date | string | null
+  decidedBy?: string | null
+  decisionNote?: string | null
+  requiredApprovals?: number
+  requiredRejections?: number
+  paymentIntent: Prisma.PaymentIntentCreateNestedOneWithoutApprovalInput
+}
+
+export type ApprovalRequestUncheckedCreateWithoutDecisionsInput = {
+  id?: string
+  paymentIntentId: string
+  status?: $Enums.ApprovalStatus
+  requestPurpose?: string | null
+  requestedAt?: Date | string
+  expiresAt: Date | string
+  decidedAt?: Date | string | null
+  decidedBy?: string | null
+  decisionNote?: string | null
+  requiredApprovals?: number
+  requiredRejections?: number
+}
+
+export type ApprovalRequestCreateOrConnectWithoutDecisionsInput = {
+  where: Prisma.ApprovalRequestWhereUniqueInput
+  create: Prisma.XOR<Prisma.ApprovalRequestCreateWithoutDecisionsInput, Prisma.ApprovalRequestUncheckedCreateWithoutDecisionsInput>
+}
+
+export type ApprovalRequestUpsertWithoutDecisionsInput = {
+  update: Prisma.XOR<Prisma.ApprovalRequestUpdateWithoutDecisionsInput, Prisma.ApprovalRequestUncheckedUpdateWithoutDecisionsInput>
+  create: Prisma.XOR<Prisma.ApprovalRequestCreateWithoutDecisionsInput, Prisma.ApprovalRequestUncheckedCreateWithoutDecisionsInput>
+  where?: Prisma.ApprovalRequestWhereInput
+}
+
+export type ApprovalRequestUpdateToOneWithWhereWithoutDecisionsInput = {
+  where?: Prisma.ApprovalRequestWhereInput
+  data: Prisma.XOR<Prisma.ApprovalRequestUpdateWithoutDecisionsInput, Prisma.ApprovalRequestUncheckedUpdateWithoutDecisionsInput>
+}
+
+export type ApprovalRequestUpdateWithoutDecisionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumApprovalStatusFieldUpdateOperationsInput | $Enums.ApprovalStatus
+  requestPurpose?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  decidedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  decisionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredApprovals?: Prisma.IntFieldUpdateOperationsInput | number
+  requiredRejections?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentIntent?: Prisma.PaymentIntentUpdateOneRequiredWithoutApprovalNestedInput
+}
+
+export type ApprovalRequestUncheckedUpdateWithoutDecisionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  paymentIntentId?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumApprovalStatusFieldUpdateOperationsInput | $Enums.ApprovalStatus
+  requestPurpose?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  decidedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  decisionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredApprovals?: Prisma.IntFieldUpdateOperationsInput | number
+  requiredRejections?: Prisma.IntFieldUpdateOperationsInput | number
+}
+
+
+/**
+ * Count Type ApprovalRequestCountOutputType
+ */
+
+export type ApprovalRequestCountOutputType = {
+  decisions: number
+}
+
+export type ApprovalRequestCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  decisions?: boolean | ApprovalRequestCountOutputTypeCountDecisionsArgs
+}
+
+/**
+ * ApprovalRequestCountOutputType without action
+ */
+export type ApprovalRequestCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ApprovalRequestCountOutputType
+   */
+  select?: Prisma.ApprovalRequestCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * ApprovalRequestCountOutputType without action
+ */
+export type ApprovalRequestCountOutputTypeCountDecisionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ApprovalDecisionWhereInput
+}
 
 
 export type ApprovalRequestSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -508,7 +741,11 @@ export type ApprovalRequestSelect<ExtArgs extends runtime.Types.Extensions.Inter
   decidedAt?: boolean
   decidedBy?: boolean
   decisionNote?: boolean
+  requiredApprovals?: boolean
+  requiredRejections?: boolean
   paymentIntent?: boolean | Prisma.PaymentIntentDefaultArgs<ExtArgs>
+  decisions?: boolean | Prisma.ApprovalRequest$decisionsArgs<ExtArgs>
+  _count?: boolean | Prisma.ApprovalRequestCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["approvalRequest"]>
 
 export type ApprovalRequestSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -521,6 +758,8 @@ export type ApprovalRequestSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
   decidedAt?: boolean
   decidedBy?: boolean
   decisionNote?: boolean
+  requiredApprovals?: boolean
+  requiredRejections?: boolean
   paymentIntent?: boolean | Prisma.PaymentIntentDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["approvalRequest"]>
 
@@ -534,6 +773,8 @@ export type ApprovalRequestSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
   decidedAt?: boolean
   decidedBy?: boolean
   decisionNote?: boolean
+  requiredApprovals?: boolean
+  requiredRejections?: boolean
   paymentIntent?: boolean | Prisma.PaymentIntentDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["approvalRequest"]>
 
@@ -547,11 +788,15 @@ export type ApprovalRequestSelectScalar = {
   decidedAt?: boolean
   decidedBy?: boolean
   decisionNote?: boolean
+  requiredApprovals?: boolean
+  requiredRejections?: boolean
 }
 
-export type ApprovalRequestOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "paymentIntentId" | "status" | "requestPurpose" | "requestedAt" | "expiresAt" | "decidedAt" | "decidedBy" | "decisionNote", ExtArgs["result"]["approvalRequest"]>
+export type ApprovalRequestOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "paymentIntentId" | "status" | "requestPurpose" | "requestedAt" | "expiresAt" | "decidedAt" | "decidedBy" | "decisionNote" | "requiredApprovals" | "requiredRejections", ExtArgs["result"]["approvalRequest"]>
 export type ApprovalRequestInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   paymentIntent?: boolean | Prisma.PaymentIntentDefaultArgs<ExtArgs>
+  decisions?: boolean | Prisma.ApprovalRequest$decisionsArgs<ExtArgs>
+  _count?: boolean | Prisma.ApprovalRequestCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type ApprovalRequestIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   paymentIntent?: boolean | Prisma.PaymentIntentDefaultArgs<ExtArgs>
@@ -564,6 +809,7 @@ export type $ApprovalRequestPayload<ExtArgs extends runtime.Types.Extensions.Int
   name: "ApprovalRequest"
   objects: {
     paymentIntent: Prisma.$PaymentIntentPayload<ExtArgs>
+    decisions: Prisma.$ApprovalDecisionPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -575,6 +821,8 @@ export type $ApprovalRequestPayload<ExtArgs extends runtime.Types.Extensions.Int
     decidedAt: Date | null
     decidedBy: string | null
     decisionNote: string | null
+    requiredApprovals: number
+    requiredRejections: number
   }, ExtArgs["result"]["approvalRequest"]>
   composites: {}
 }
@@ -970,6 +1218,7 @@ readonly fields: ApprovalRequestFieldRefs;
 export interface Prisma__ApprovalRequestClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   paymentIntent<T extends Prisma.PaymentIntentDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.PaymentIntentDefaultArgs<ExtArgs>>): Prisma.Prisma__PaymentIntentClient<runtime.Types.Result.GetResult<Prisma.$PaymentIntentPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  decisions<T extends Prisma.ApprovalRequest$decisionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ApprovalRequest$decisionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ApprovalDecisionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1008,6 +1257,8 @@ export interface ApprovalRequestFieldRefs {
   readonly decidedAt: Prisma.FieldRef<"ApprovalRequest", 'DateTime'>
   readonly decidedBy: Prisma.FieldRef<"ApprovalRequest", 'String'>
   readonly decisionNote: Prisma.FieldRef<"ApprovalRequest", 'String'>
+  readonly requiredApprovals: Prisma.FieldRef<"ApprovalRequest", 'Int'>
+  readonly requiredRejections: Prisma.FieldRef<"ApprovalRequest", 'Int'>
 }
     
 
@@ -1406,6 +1657,30 @@ export type ApprovalRequestDeleteManyArgs<ExtArgs extends runtime.Types.Extensio
    * Limit how many ApprovalRequests to delete.
    */
   limit?: number
+}
+
+/**
+ * ApprovalRequest.decisions
+ */
+export type ApprovalRequest$decisionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ApprovalDecision
+   */
+  select?: Prisma.ApprovalDecisionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ApprovalDecision
+   */
+  omit?: Prisma.ApprovalDecisionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ApprovalDecisionInclude<ExtArgs> | null
+  where?: Prisma.ApprovalDecisionWhereInput
+  orderBy?: Prisma.ApprovalDecisionOrderByWithRelationInput | Prisma.ApprovalDecisionOrderByWithRelationInput[]
+  cursor?: Prisma.ApprovalDecisionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ApprovalDecisionScalarFieldEnum | Prisma.ApprovalDecisionScalarFieldEnum[]
 }
 
 /**

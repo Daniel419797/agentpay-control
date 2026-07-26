@@ -6,6 +6,9 @@ vi.mock("@/lib/supabase-auth", () => ({
   ),
   supabaseAuthConfig: () => ({ url: "https://example.supabase.co", key: "test-anon-key" }),
 }));
+vi.mock("@/lib/rate-limit", () => ({
+  enforceRateLimit: vi.fn(async () => ({ allowed: true, remaining: 9, retryAfterSeconds: 900 })),
+}));
 
 import { createSessionResponse } from "@/lib/supabase-auth";
 import { POST } from "./route";

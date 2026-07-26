@@ -62,6 +62,11 @@ export type Membership = Prisma.MembershipModel
  */
 export type WalletIdentity = Prisma.WalletIdentityModel
 /**
+ * Model WalletAuthChallenge
+ * 
+ */
+export type WalletAuthChallenge = Prisma.WalletAuthChallengeModel
+/**
  * Model Agent
  * 
  */
@@ -102,6 +107,11 @@ export type PolicyVersion = Prisma.PolicyVersionModel
  */
 export type PaymentIntent = Prisma.PaymentIntentModel
 /**
+ * Model ResourceFulfillment
+ * 
+ */
+export type ResourceFulfillment = Prisma.ResourceFulfillmentModel
+/**
  * Model PaymentQuote
  * 
  */
@@ -121,6 +131,11 @@ export type SpendReservation = Prisma.SpendReservationModel
  * 
  */
 export type ApprovalRequest = Prisma.ApprovalRequestModel
+/**
+ * Model ApprovalDecision
+ * 
+ */
+export type ApprovalDecision = Prisma.ApprovalDecisionModel
 /**
  * Model PaymentAttempt
  * 
@@ -147,6 +162,41 @@ export type ResourceListing = Prisma.ResourceListingModel
  */
 export type ResourcePrice = Prisma.ResourcePriceModel
 /**
+ * Model ResourceReview
+ * 
+ */
+export type ResourceReview = Prisma.ResourceReviewModel
+/**
+ * Model ResourceHealthCheck
+ * 
+ */
+export type ResourceHealthCheck = Prisma.ResourceHealthCheckModel
+/**
+ * Model AgentInvoice
+ * 
+ */
+export type AgentInvoice = Prisma.AgentInvoiceModel
+/**
+ * Model InvoiceSequence
+ * 
+ */
+export type InvoiceSequence = Prisma.InvoiceSequenceModel
+/**
+ * Model InvoiceItem
+ * 
+ */
+export type InvoiceItem = Prisma.InvoiceItemModel
+/**
+ * Model InvoiceEvent
+ * 
+ */
+export type InvoiceEvent = Prisma.InvoiceEventModel
+/**
+ * Model InvoiceSettlement
+ * 
+ */
+export type InvoiceSettlement = Prisma.InvoiceSettlementModel
+/**
  * Model AuditEvent
  * 
  */
@@ -156,3 +206,133 @@ export type AuditEvent = Prisma.AuditEventModel
  * 
  */
 export type OutboxEvent = Prisma.OutboxEventModel
+/**
+ * Model NotificationEndpoint
+ * 
+ */
+export type NotificationEndpoint = Prisma.NotificationEndpointModel
+/**
+ * Model NotificationDelivery
+ * 
+ */
+export type NotificationDelivery = Prisma.NotificationDeliveryModel
+/**
+ * Model DataRetentionPolicy
+ * 
+ */
+export type DataRetentionPolicy = Prisma.DataRetentionPolicyModel
+/**
+ * Model DeletionRequest
+ * 
+ */
+export type DeletionRequest = Prisma.DeletionRequestModel
+/**
+ * Model OrganizationEntitlement
+ * 
+ */
+export type OrganizationEntitlement = Prisma.OrganizationEntitlementModel
+/**
+ * Model SupportCase
+ * 
+ */
+export type SupportCase = Prisma.SupportCaseModel
+/**
+ * Model SupportMessage
+ * 
+ */
+export type SupportMessage = Prisma.SupportMessageModel
+/**
+ * Model RateLimitBucket
+ * 
+ */
+export type RateLimitBucket = Prisma.RateLimitBucketModel
+/**
+ * Model ChainNetwork
+ * 
+ */
+export type ChainNetwork = Prisma.ChainNetworkModel
+/**
+ * Model CrossChainRouteQuote
+ * 
+ */
+export type CrossChainRouteQuote = Prisma.CrossChainRouteQuoteModel
+/**
+ * Model CrossChainTransfer
+ * 
+ */
+export type CrossChainTransfer = Prisma.CrossChainTransferModel
+/**
+ * Model ContractAllowlistEntry
+ * 
+ */
+export type ContractAllowlistEntry = Prisma.ContractAllowlistEntryModel
+/**
+ * Model AutomationRule
+ * 
+ */
+export type AutomationRule = Prisma.AutomationRuleModel
+/**
+ * Model AutomationExecution
+ * 
+ */
+export type AutomationExecution = Prisma.AutomationExecutionModel
+/**
+ * Model AutomationExecutionDecision
+ * 
+ */
+export type AutomationExecutionDecision = Prisma.AutomationExecutionDecisionModel
+/**
+ * Model FinancialObservationDaily
+ * 
+ */
+export type FinancialObservationDaily = Prisma.FinancialObservationDailyModel
+/**
+ * Model SpendForecast
+ * 
+ */
+export type SpendForecast = Prisma.SpendForecastModel
+/**
+ * Model FinancialAnomaly
+ * 
+ */
+export type FinancialAnomaly = Prisma.FinancialAnomalyModel
+/**
+ * Model BudgetRecommendation
+ * 
+ */
+export type BudgetRecommendation = Prisma.BudgetRecommendationModel
+/**
+ * Model IntelligenceRun
+ * 
+ */
+export type IntelligenceRun = Prisma.IntelligenceRunModel
+/**
+ * Model CardholderProfile
+ * 
+ */
+export type CardholderProfile = Prisma.CardholderProfileModel
+/**
+ * Model VirtualCard
+ * 
+ */
+export type VirtualCard = Prisma.VirtualCardModel
+/**
+ * Model CardAuthorization
+ * 
+ */
+export type CardAuthorization = Prisma.CardAuthorizationModel
+/**
+ * Model FiatAccount
+ * 
+ */
+export type FiatAccount = Prisma.FiatAccountModel
+/**
+ * Model FiatTransfer
+ * 
+ */
+export type FiatTransfer = Prisma.FiatTransferModel
+/**
+ * Model ProviderWebhookEvent
+ * 
+ */
+export type ProviderWebhookEvent = Prisma.ProviderWebhookEventModel

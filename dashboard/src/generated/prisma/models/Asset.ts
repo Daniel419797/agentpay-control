@@ -247,6 +247,8 @@ export type AssetWhereInput = {
   reservations?: Prisma.SpendReservationListRelationFilter
   prices?: Prisma.ResourcePriceListRelationFilter
   settlements?: Prisma.SettlementListRelationFilter
+  invoices?: Prisma.AgentInvoiceListRelationFilter
+  budgetRecommendations?: Prisma.BudgetRecommendationListRelationFilter
 }
 
 export type AssetOrderByWithRelationInput = {
@@ -265,6 +267,8 @@ export type AssetOrderByWithRelationInput = {
   reservations?: Prisma.SpendReservationOrderByRelationAggregateInput
   prices?: Prisma.ResourcePriceOrderByRelationAggregateInput
   settlements?: Prisma.SettlementOrderByRelationAggregateInput
+  invoices?: Prisma.AgentInvoiceOrderByRelationAggregateInput
+  budgetRecommendations?: Prisma.BudgetRecommendationOrderByRelationAggregateInput
 }
 
 export type AssetWhereUniqueInput = Prisma.AtLeast<{
@@ -288,6 +292,8 @@ export type AssetWhereUniqueInput = Prisma.AtLeast<{
   reservations?: Prisma.SpendReservationListRelationFilter
   prices?: Prisma.ResourcePriceListRelationFilter
   settlements?: Prisma.SettlementListRelationFilter
+  invoices?: Prisma.AgentInvoiceListRelationFilter
+  budgetRecommendations?: Prisma.BudgetRecommendationListRelationFilter
 }, "id" | "network_symbol" | "network_hederaTokenId">
 
 export type AssetOrderByWithAggregationInput = {
@@ -336,6 +342,8 @@ export type AssetCreateInput = {
   reservations?: Prisma.SpendReservationCreateNestedManyWithoutAssetInput
   prices?: Prisma.ResourcePriceCreateNestedManyWithoutAssetInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutAssetInput
+  invoices?: Prisma.AgentInvoiceCreateNestedManyWithoutAssetInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateInput = {
@@ -354,6 +362,8 @@ export type AssetUncheckedCreateInput = {
   reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAssetInput
   prices?: Prisma.ResourcePriceUncheckedCreateNestedManyWithoutAssetInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutAssetInput
+  invoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutAssetInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUpdateInput = {
@@ -372,6 +382,8 @@ export type AssetUpdateInput = {
   reservations?: Prisma.SpendReservationUpdateManyWithoutAssetNestedInput
   prices?: Prisma.ResourcePriceUpdateManyWithoutAssetNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutAssetNestedInput
+  invoices?: Prisma.AgentInvoiceUpdateManyWithoutAssetNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateInput = {
@@ -390,6 +402,8 @@ export type AssetUncheckedUpdateInput = {
   reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAssetNestedInput
   prices?: Prisma.ResourcePriceUncheckedUpdateManyWithoutAssetNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutAssetNestedInput
+  invoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutAssetNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateManyInput = {
@@ -598,6 +612,34 @@ export type AssetUpdateOneRequiredWithoutPricesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.AssetUpdateToOneWithWhereWithoutPricesInput, Prisma.AssetUpdateWithoutPricesInput>, Prisma.AssetUncheckedUpdateWithoutPricesInput>
 }
 
+export type AssetCreateNestedOneWithoutInvoicesInput = {
+  create?: Prisma.XOR<Prisma.AssetCreateWithoutInvoicesInput, Prisma.AssetUncheckedCreateWithoutInvoicesInput>
+  connectOrCreate?: Prisma.AssetCreateOrConnectWithoutInvoicesInput
+  connect?: Prisma.AssetWhereUniqueInput
+}
+
+export type AssetUpdateOneRequiredWithoutInvoicesNestedInput = {
+  create?: Prisma.XOR<Prisma.AssetCreateWithoutInvoicesInput, Prisma.AssetUncheckedCreateWithoutInvoicesInput>
+  connectOrCreate?: Prisma.AssetCreateOrConnectWithoutInvoicesInput
+  upsert?: Prisma.AssetUpsertWithoutInvoicesInput
+  connect?: Prisma.AssetWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AssetUpdateToOneWithWhereWithoutInvoicesInput, Prisma.AssetUpdateWithoutInvoicesInput>, Prisma.AssetUncheckedUpdateWithoutInvoicesInput>
+}
+
+export type AssetCreateNestedOneWithoutBudgetRecommendationsInput = {
+  create?: Prisma.XOR<Prisma.AssetCreateWithoutBudgetRecommendationsInput, Prisma.AssetUncheckedCreateWithoutBudgetRecommendationsInput>
+  connectOrCreate?: Prisma.AssetCreateOrConnectWithoutBudgetRecommendationsInput
+  connect?: Prisma.AssetWhereUniqueInput
+}
+
+export type AssetUpdateOneRequiredWithoutBudgetRecommendationsNestedInput = {
+  create?: Prisma.XOR<Prisma.AssetCreateWithoutBudgetRecommendationsInput, Prisma.AssetUncheckedCreateWithoutBudgetRecommendationsInput>
+  connectOrCreate?: Prisma.AssetCreateOrConnectWithoutBudgetRecommendationsInput
+  upsert?: Prisma.AssetUpsertWithoutBudgetRecommendationsInput
+  connect?: Prisma.AssetWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AssetUpdateToOneWithWhereWithoutBudgetRecommendationsInput, Prisma.AssetUpdateWithoutBudgetRecommendationsInput>, Prisma.AssetUncheckedUpdateWithoutBudgetRecommendationsInput>
+}
+
 export type AssetCreateWithoutAgentsInput = {
   id?: string
   network: string
@@ -613,6 +655,8 @@ export type AssetCreateWithoutAgentsInput = {
   reservations?: Prisma.SpendReservationCreateNestedManyWithoutAssetInput
   prices?: Prisma.ResourcePriceCreateNestedManyWithoutAssetInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutAssetInput
+  invoices?: Prisma.AgentInvoiceCreateNestedManyWithoutAssetInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutAgentsInput = {
@@ -630,6 +674,8 @@ export type AssetUncheckedCreateWithoutAgentsInput = {
   reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAssetInput
   prices?: Prisma.ResourcePriceUncheckedCreateNestedManyWithoutAssetInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutAssetInput
+  invoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutAssetInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutAgentsInput = {
@@ -663,6 +709,8 @@ export type AssetUpdateWithoutAgentsInput = {
   reservations?: Prisma.SpendReservationUpdateManyWithoutAssetNestedInput
   prices?: Prisma.ResourcePriceUpdateManyWithoutAssetNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutAssetNestedInput
+  invoices?: Prisma.AgentInvoiceUpdateManyWithoutAssetNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutAgentsInput = {
@@ -680,6 +728,8 @@ export type AssetUncheckedUpdateWithoutAgentsInput = {
   reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAssetNestedInput
   prices?: Prisma.ResourcePriceUncheckedUpdateManyWithoutAssetNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutAssetNestedInput
+  invoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutAssetNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutBalancesInput = {
@@ -697,6 +747,8 @@ export type AssetCreateWithoutBalancesInput = {
   reservations?: Prisma.SpendReservationCreateNestedManyWithoutAssetInput
   prices?: Prisma.ResourcePriceCreateNestedManyWithoutAssetInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutAssetInput
+  invoices?: Prisma.AgentInvoiceCreateNestedManyWithoutAssetInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutBalancesInput = {
@@ -714,6 +766,8 @@ export type AssetUncheckedCreateWithoutBalancesInput = {
   reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAssetInput
   prices?: Prisma.ResourcePriceUncheckedCreateNestedManyWithoutAssetInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutAssetInput
+  invoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutAssetInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutBalancesInput = {
@@ -747,6 +801,8 @@ export type AssetUpdateWithoutBalancesInput = {
   reservations?: Prisma.SpendReservationUpdateManyWithoutAssetNestedInput
   prices?: Prisma.ResourcePriceUpdateManyWithoutAssetNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutAssetNestedInput
+  invoices?: Prisma.AgentInvoiceUpdateManyWithoutAssetNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutBalancesInput = {
@@ -764,6 +820,8 @@ export type AssetUncheckedUpdateWithoutBalancesInput = {
   reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAssetNestedInput
   prices?: Prisma.ResourcePriceUncheckedUpdateManyWithoutAssetNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutAssetNestedInput
+  invoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutAssetNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutPoliciesInput = {
@@ -781,6 +839,8 @@ export type AssetCreateWithoutPoliciesInput = {
   reservations?: Prisma.SpendReservationCreateNestedManyWithoutAssetInput
   prices?: Prisma.ResourcePriceCreateNestedManyWithoutAssetInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutAssetInput
+  invoices?: Prisma.AgentInvoiceCreateNestedManyWithoutAssetInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutPoliciesInput = {
@@ -798,6 +858,8 @@ export type AssetUncheckedCreateWithoutPoliciesInput = {
   reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAssetInput
   prices?: Prisma.ResourcePriceUncheckedCreateNestedManyWithoutAssetInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutAssetInput
+  invoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutAssetInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutPoliciesInput = {
@@ -831,6 +893,8 @@ export type AssetUpdateWithoutPoliciesInput = {
   reservations?: Prisma.SpendReservationUpdateManyWithoutAssetNestedInput
   prices?: Prisma.ResourcePriceUpdateManyWithoutAssetNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutAssetNestedInput
+  invoices?: Prisma.AgentInvoiceUpdateManyWithoutAssetNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutPoliciesInput = {
@@ -848,6 +912,8 @@ export type AssetUncheckedUpdateWithoutPoliciesInput = {
   reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAssetNestedInput
   prices?: Prisma.ResourcePriceUncheckedUpdateManyWithoutAssetNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutAssetNestedInput
+  invoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutAssetNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutQuotesInput = {
@@ -865,6 +931,8 @@ export type AssetCreateWithoutQuotesInput = {
   reservations?: Prisma.SpendReservationCreateNestedManyWithoutAssetInput
   prices?: Prisma.ResourcePriceCreateNestedManyWithoutAssetInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutAssetInput
+  invoices?: Prisma.AgentInvoiceCreateNestedManyWithoutAssetInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutQuotesInput = {
@@ -882,6 +950,8 @@ export type AssetUncheckedCreateWithoutQuotesInput = {
   reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAssetInput
   prices?: Prisma.ResourcePriceUncheckedCreateNestedManyWithoutAssetInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutAssetInput
+  invoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutAssetInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutQuotesInput = {
@@ -915,6 +985,8 @@ export type AssetUpdateWithoutQuotesInput = {
   reservations?: Prisma.SpendReservationUpdateManyWithoutAssetNestedInput
   prices?: Prisma.ResourcePriceUpdateManyWithoutAssetNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutAssetNestedInput
+  invoices?: Prisma.AgentInvoiceUpdateManyWithoutAssetNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutQuotesInput = {
@@ -932,6 +1004,8 @@ export type AssetUncheckedUpdateWithoutQuotesInput = {
   reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAssetNestedInput
   prices?: Prisma.ResourcePriceUncheckedUpdateManyWithoutAssetNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutAssetNestedInput
+  invoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutAssetNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutReservationsInput = {
@@ -949,6 +1023,8 @@ export type AssetCreateWithoutReservationsInput = {
   quotes?: Prisma.PaymentQuoteCreateNestedManyWithoutAssetInput
   prices?: Prisma.ResourcePriceCreateNestedManyWithoutAssetInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutAssetInput
+  invoices?: Prisma.AgentInvoiceCreateNestedManyWithoutAssetInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutReservationsInput = {
@@ -966,6 +1042,8 @@ export type AssetUncheckedCreateWithoutReservationsInput = {
   quotes?: Prisma.PaymentQuoteUncheckedCreateNestedManyWithoutAssetInput
   prices?: Prisma.ResourcePriceUncheckedCreateNestedManyWithoutAssetInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutAssetInput
+  invoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutAssetInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutReservationsInput = {
@@ -999,6 +1077,8 @@ export type AssetUpdateWithoutReservationsInput = {
   quotes?: Prisma.PaymentQuoteUpdateManyWithoutAssetNestedInput
   prices?: Prisma.ResourcePriceUpdateManyWithoutAssetNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutAssetNestedInput
+  invoices?: Prisma.AgentInvoiceUpdateManyWithoutAssetNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutReservationsInput = {
@@ -1016,6 +1096,8 @@ export type AssetUncheckedUpdateWithoutReservationsInput = {
   quotes?: Prisma.PaymentQuoteUncheckedUpdateManyWithoutAssetNestedInput
   prices?: Prisma.ResourcePriceUncheckedUpdateManyWithoutAssetNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutAssetNestedInput
+  invoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutAssetNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutSettlementsInput = {
@@ -1033,6 +1115,8 @@ export type AssetCreateWithoutSettlementsInput = {
   quotes?: Prisma.PaymentQuoteCreateNestedManyWithoutAssetInput
   reservations?: Prisma.SpendReservationCreateNestedManyWithoutAssetInput
   prices?: Prisma.ResourcePriceCreateNestedManyWithoutAssetInput
+  invoices?: Prisma.AgentInvoiceCreateNestedManyWithoutAssetInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutSettlementsInput = {
@@ -1050,6 +1134,8 @@ export type AssetUncheckedCreateWithoutSettlementsInput = {
   quotes?: Prisma.PaymentQuoteUncheckedCreateNestedManyWithoutAssetInput
   reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAssetInput
   prices?: Prisma.ResourcePriceUncheckedCreateNestedManyWithoutAssetInput
+  invoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutAssetInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutSettlementsInput = {
@@ -1083,6 +1169,8 @@ export type AssetUpdateWithoutSettlementsInput = {
   quotes?: Prisma.PaymentQuoteUpdateManyWithoutAssetNestedInput
   reservations?: Prisma.SpendReservationUpdateManyWithoutAssetNestedInput
   prices?: Prisma.ResourcePriceUpdateManyWithoutAssetNestedInput
+  invoices?: Prisma.AgentInvoiceUpdateManyWithoutAssetNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutSettlementsInput = {
@@ -1100,6 +1188,8 @@ export type AssetUncheckedUpdateWithoutSettlementsInput = {
   quotes?: Prisma.PaymentQuoteUncheckedUpdateManyWithoutAssetNestedInput
   reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAssetNestedInput
   prices?: Prisma.ResourcePriceUncheckedUpdateManyWithoutAssetNestedInput
+  invoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutAssetNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutPricesInput = {
@@ -1117,6 +1207,8 @@ export type AssetCreateWithoutPricesInput = {
   quotes?: Prisma.PaymentQuoteCreateNestedManyWithoutAssetInput
   reservations?: Prisma.SpendReservationCreateNestedManyWithoutAssetInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutAssetInput
+  invoices?: Prisma.AgentInvoiceCreateNestedManyWithoutAssetInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutPricesInput = {
@@ -1134,6 +1226,8 @@ export type AssetUncheckedCreateWithoutPricesInput = {
   quotes?: Prisma.PaymentQuoteUncheckedCreateNestedManyWithoutAssetInput
   reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAssetInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutAssetInput
+  invoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutAssetInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutPricesInput = {
@@ -1167,6 +1261,8 @@ export type AssetUpdateWithoutPricesInput = {
   quotes?: Prisma.PaymentQuoteUpdateManyWithoutAssetNestedInput
   reservations?: Prisma.SpendReservationUpdateManyWithoutAssetNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutAssetNestedInput
+  invoices?: Prisma.AgentInvoiceUpdateManyWithoutAssetNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutPricesInput = {
@@ -1184,6 +1280,192 @@ export type AssetUncheckedUpdateWithoutPricesInput = {
   quotes?: Prisma.PaymentQuoteUncheckedUpdateManyWithoutAssetNestedInput
   reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAssetNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutAssetNestedInput
+  invoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutAssetNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAssetNestedInput
+}
+
+export type AssetCreateWithoutInvoicesInput = {
+  id?: string
+  network: string
+  type: $Enums.AssetType
+  hederaTokenId?: string | null
+  symbol: string
+  name: string
+  decimals: number
+  verified?: boolean
+  agents?: Prisma.AgentCreateNestedManyWithoutDefaultAssetInput
+  balances?: Prisma.BalanceSnapshotCreateNestedManyWithoutAssetInput
+  policies?: Prisma.PolicyVersionCreateNestedManyWithoutAssetInput
+  quotes?: Prisma.PaymentQuoteCreateNestedManyWithoutAssetInput
+  reservations?: Prisma.SpendReservationCreateNestedManyWithoutAssetInput
+  prices?: Prisma.ResourcePriceCreateNestedManyWithoutAssetInput
+  settlements?: Prisma.SettlementCreateNestedManyWithoutAssetInput
+  budgetRecommendations?: Prisma.BudgetRecommendationCreateNestedManyWithoutAssetInput
+}
+
+export type AssetUncheckedCreateWithoutInvoicesInput = {
+  id?: string
+  network: string
+  type: $Enums.AssetType
+  hederaTokenId?: string | null
+  symbol: string
+  name: string
+  decimals: number
+  verified?: boolean
+  agents?: Prisma.AgentUncheckedCreateNestedManyWithoutDefaultAssetInput
+  balances?: Prisma.BalanceSnapshotUncheckedCreateNestedManyWithoutAssetInput
+  policies?: Prisma.PolicyVersionUncheckedCreateNestedManyWithoutAssetInput
+  quotes?: Prisma.PaymentQuoteUncheckedCreateNestedManyWithoutAssetInput
+  reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAssetInput
+  prices?: Prisma.ResourcePriceUncheckedCreateNestedManyWithoutAssetInput
+  settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutAssetInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedCreateNestedManyWithoutAssetInput
+}
+
+export type AssetCreateOrConnectWithoutInvoicesInput = {
+  where: Prisma.AssetWhereUniqueInput
+  create: Prisma.XOR<Prisma.AssetCreateWithoutInvoicesInput, Prisma.AssetUncheckedCreateWithoutInvoicesInput>
+}
+
+export type AssetUpsertWithoutInvoicesInput = {
+  update: Prisma.XOR<Prisma.AssetUpdateWithoutInvoicesInput, Prisma.AssetUncheckedUpdateWithoutInvoicesInput>
+  create: Prisma.XOR<Prisma.AssetCreateWithoutInvoicesInput, Prisma.AssetUncheckedCreateWithoutInvoicesInput>
+  where?: Prisma.AssetWhereInput
+}
+
+export type AssetUpdateToOneWithWhereWithoutInvoicesInput = {
+  where?: Prisma.AssetWhereInput
+  data: Prisma.XOR<Prisma.AssetUpdateWithoutInvoicesInput, Prisma.AssetUncheckedUpdateWithoutInvoicesInput>
+}
+
+export type AssetUpdateWithoutInvoicesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
+  hederaTokenId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  decimals?: Prisma.IntFieldUpdateOperationsInput | number
+  verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  agents?: Prisma.AgentUpdateManyWithoutDefaultAssetNestedInput
+  balances?: Prisma.BalanceSnapshotUpdateManyWithoutAssetNestedInput
+  policies?: Prisma.PolicyVersionUpdateManyWithoutAssetNestedInput
+  quotes?: Prisma.PaymentQuoteUpdateManyWithoutAssetNestedInput
+  reservations?: Prisma.SpendReservationUpdateManyWithoutAssetNestedInput
+  prices?: Prisma.ResourcePriceUpdateManyWithoutAssetNestedInput
+  settlements?: Prisma.SettlementUpdateManyWithoutAssetNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUpdateManyWithoutAssetNestedInput
+}
+
+export type AssetUncheckedUpdateWithoutInvoicesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
+  hederaTokenId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  decimals?: Prisma.IntFieldUpdateOperationsInput | number
+  verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  agents?: Prisma.AgentUncheckedUpdateManyWithoutDefaultAssetNestedInput
+  balances?: Prisma.BalanceSnapshotUncheckedUpdateManyWithoutAssetNestedInput
+  policies?: Prisma.PolicyVersionUncheckedUpdateManyWithoutAssetNestedInput
+  quotes?: Prisma.PaymentQuoteUncheckedUpdateManyWithoutAssetNestedInput
+  reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAssetNestedInput
+  prices?: Prisma.ResourcePriceUncheckedUpdateManyWithoutAssetNestedInput
+  settlements?: Prisma.SettlementUncheckedUpdateManyWithoutAssetNestedInput
+  budgetRecommendations?: Prisma.BudgetRecommendationUncheckedUpdateManyWithoutAssetNestedInput
+}
+
+export type AssetCreateWithoutBudgetRecommendationsInput = {
+  id?: string
+  network: string
+  type: $Enums.AssetType
+  hederaTokenId?: string | null
+  symbol: string
+  name: string
+  decimals: number
+  verified?: boolean
+  agents?: Prisma.AgentCreateNestedManyWithoutDefaultAssetInput
+  balances?: Prisma.BalanceSnapshotCreateNestedManyWithoutAssetInput
+  policies?: Prisma.PolicyVersionCreateNestedManyWithoutAssetInput
+  quotes?: Prisma.PaymentQuoteCreateNestedManyWithoutAssetInput
+  reservations?: Prisma.SpendReservationCreateNestedManyWithoutAssetInput
+  prices?: Prisma.ResourcePriceCreateNestedManyWithoutAssetInput
+  settlements?: Prisma.SettlementCreateNestedManyWithoutAssetInput
+  invoices?: Prisma.AgentInvoiceCreateNestedManyWithoutAssetInput
+}
+
+export type AssetUncheckedCreateWithoutBudgetRecommendationsInput = {
+  id?: string
+  network: string
+  type: $Enums.AssetType
+  hederaTokenId?: string | null
+  symbol: string
+  name: string
+  decimals: number
+  verified?: boolean
+  agents?: Prisma.AgentUncheckedCreateNestedManyWithoutDefaultAssetInput
+  balances?: Prisma.BalanceSnapshotUncheckedCreateNestedManyWithoutAssetInput
+  policies?: Prisma.PolicyVersionUncheckedCreateNestedManyWithoutAssetInput
+  quotes?: Prisma.PaymentQuoteUncheckedCreateNestedManyWithoutAssetInput
+  reservations?: Prisma.SpendReservationUncheckedCreateNestedManyWithoutAssetInput
+  prices?: Prisma.ResourcePriceUncheckedCreateNestedManyWithoutAssetInput
+  settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutAssetInput
+  invoices?: Prisma.AgentInvoiceUncheckedCreateNestedManyWithoutAssetInput
+}
+
+export type AssetCreateOrConnectWithoutBudgetRecommendationsInput = {
+  where: Prisma.AssetWhereUniqueInput
+  create: Prisma.XOR<Prisma.AssetCreateWithoutBudgetRecommendationsInput, Prisma.AssetUncheckedCreateWithoutBudgetRecommendationsInput>
+}
+
+export type AssetUpsertWithoutBudgetRecommendationsInput = {
+  update: Prisma.XOR<Prisma.AssetUpdateWithoutBudgetRecommendationsInput, Prisma.AssetUncheckedUpdateWithoutBudgetRecommendationsInput>
+  create: Prisma.XOR<Prisma.AssetCreateWithoutBudgetRecommendationsInput, Prisma.AssetUncheckedCreateWithoutBudgetRecommendationsInput>
+  where?: Prisma.AssetWhereInput
+}
+
+export type AssetUpdateToOneWithWhereWithoutBudgetRecommendationsInput = {
+  where?: Prisma.AssetWhereInput
+  data: Prisma.XOR<Prisma.AssetUpdateWithoutBudgetRecommendationsInput, Prisma.AssetUncheckedUpdateWithoutBudgetRecommendationsInput>
+}
+
+export type AssetUpdateWithoutBudgetRecommendationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
+  hederaTokenId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  decimals?: Prisma.IntFieldUpdateOperationsInput | number
+  verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  agents?: Prisma.AgentUpdateManyWithoutDefaultAssetNestedInput
+  balances?: Prisma.BalanceSnapshotUpdateManyWithoutAssetNestedInput
+  policies?: Prisma.PolicyVersionUpdateManyWithoutAssetNestedInput
+  quotes?: Prisma.PaymentQuoteUpdateManyWithoutAssetNestedInput
+  reservations?: Prisma.SpendReservationUpdateManyWithoutAssetNestedInput
+  prices?: Prisma.ResourcePriceUpdateManyWithoutAssetNestedInput
+  settlements?: Prisma.SettlementUpdateManyWithoutAssetNestedInput
+  invoices?: Prisma.AgentInvoiceUpdateManyWithoutAssetNestedInput
+}
+
+export type AssetUncheckedUpdateWithoutBudgetRecommendationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  network?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
+  hederaTokenId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  decimals?: Prisma.IntFieldUpdateOperationsInput | number
+  verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  agents?: Prisma.AgentUncheckedUpdateManyWithoutDefaultAssetNestedInput
+  balances?: Prisma.BalanceSnapshotUncheckedUpdateManyWithoutAssetNestedInput
+  policies?: Prisma.PolicyVersionUncheckedUpdateManyWithoutAssetNestedInput
+  quotes?: Prisma.PaymentQuoteUncheckedUpdateManyWithoutAssetNestedInput
+  reservations?: Prisma.SpendReservationUncheckedUpdateManyWithoutAssetNestedInput
+  prices?: Prisma.ResourcePriceUncheckedUpdateManyWithoutAssetNestedInput
+  settlements?: Prisma.SettlementUncheckedUpdateManyWithoutAssetNestedInput
+  invoices?: Prisma.AgentInvoiceUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 
@@ -1199,6 +1481,8 @@ export type AssetCountOutputType = {
   reservations: number
   prices: number
   settlements: number
+  invoices: number
+  budgetRecommendations: number
 }
 
 export type AssetCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1209,6 +1493,8 @@ export type AssetCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.
   reservations?: boolean | AssetCountOutputTypeCountReservationsArgs
   prices?: boolean | AssetCountOutputTypeCountPricesArgs
   settlements?: boolean | AssetCountOutputTypeCountSettlementsArgs
+  invoices?: boolean | AssetCountOutputTypeCountInvoicesArgs
+  budgetRecommendations?: boolean | AssetCountOutputTypeCountBudgetRecommendationsArgs
 }
 
 /**
@@ -1270,6 +1556,20 @@ export type AssetCountOutputTypeCountSettlementsArgs<ExtArgs extends runtime.Typ
   where?: Prisma.SettlementWhereInput
 }
 
+/**
+ * AssetCountOutputType without action
+ */
+export type AssetCountOutputTypeCountInvoicesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.AgentInvoiceWhereInput
+}
+
+/**
+ * AssetCountOutputType without action
+ */
+export type AssetCountOutputTypeCountBudgetRecommendationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.BudgetRecommendationWhereInput
+}
+
 
 export type AssetSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1287,6 +1587,8 @@ export type AssetSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   reservations?: boolean | Prisma.Asset$reservationsArgs<ExtArgs>
   prices?: boolean | Prisma.Asset$pricesArgs<ExtArgs>
   settlements?: boolean | Prisma.Asset$settlementsArgs<ExtArgs>
+  invoices?: boolean | Prisma.Asset$invoicesArgs<ExtArgs>
+  budgetRecommendations?: boolean | Prisma.Asset$budgetRecommendationsArgs<ExtArgs>
   _count?: boolean | Prisma.AssetCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["asset"]>
 
@@ -1332,6 +1634,8 @@ export type AssetInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   reservations?: boolean | Prisma.Asset$reservationsArgs<ExtArgs>
   prices?: boolean | Prisma.Asset$pricesArgs<ExtArgs>
   settlements?: boolean | Prisma.Asset$settlementsArgs<ExtArgs>
+  invoices?: boolean | Prisma.Asset$invoicesArgs<ExtArgs>
+  budgetRecommendations?: boolean | Prisma.Asset$budgetRecommendationsArgs<ExtArgs>
   _count?: boolean | Prisma.AssetCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type AssetIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -1347,6 +1651,8 @@ export type $AssetPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     reservations: Prisma.$SpendReservationPayload<ExtArgs>[]
     prices: Prisma.$ResourcePricePayload<ExtArgs>[]
     settlements: Prisma.$SettlementPayload<ExtArgs>[]
+    invoices: Prisma.$AgentInvoicePayload<ExtArgs>[]
+    budgetRecommendations: Prisma.$BudgetRecommendationPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1758,6 +2064,8 @@ export interface Prisma__AssetClient<T, Null = never, ExtArgs extends runtime.Ty
   reservations<T extends Prisma.Asset$reservationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$reservationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SpendReservationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   prices<T extends Prisma.Asset$pricesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$pricesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ResourcePricePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   settlements<T extends Prisma.Asset$settlementsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$settlementsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SettlementPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  invoices<T extends Prisma.Asset$invoicesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$invoicesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AgentInvoicePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  budgetRecommendations<T extends Prisma.Asset$budgetRecommendationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$budgetRecommendationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BudgetRecommendationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2353,6 +2661,54 @@ export type Asset$settlementsArgs<ExtArgs extends runtime.Types.Extensions.Inter
   take?: number
   skip?: number
   distinct?: Prisma.SettlementScalarFieldEnum | Prisma.SettlementScalarFieldEnum[]
+}
+
+/**
+ * Asset.invoices
+ */
+export type Asset$invoicesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the AgentInvoice
+   */
+  select?: Prisma.AgentInvoiceSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the AgentInvoice
+   */
+  omit?: Prisma.AgentInvoiceOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AgentInvoiceInclude<ExtArgs> | null
+  where?: Prisma.AgentInvoiceWhereInput
+  orderBy?: Prisma.AgentInvoiceOrderByWithRelationInput | Prisma.AgentInvoiceOrderByWithRelationInput[]
+  cursor?: Prisma.AgentInvoiceWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.AgentInvoiceScalarFieldEnum | Prisma.AgentInvoiceScalarFieldEnum[]
+}
+
+/**
+ * Asset.budgetRecommendations
+ */
+export type Asset$budgetRecommendationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the BudgetRecommendation
+   */
+  select?: Prisma.BudgetRecommendationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the BudgetRecommendation
+   */
+  omit?: Prisma.BudgetRecommendationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.BudgetRecommendationInclude<ExtArgs> | null
+  where?: Prisma.BudgetRecommendationWhereInput
+  orderBy?: Prisma.BudgetRecommendationOrderByWithRelationInput | Prisma.BudgetRecommendationOrderByWithRelationInput[]
+  cursor?: Prisma.BudgetRecommendationWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.BudgetRecommendationScalarFieldEnum | Prisma.BudgetRecommendationScalarFieldEnum[]
 }
 
 /**

@@ -1,0 +1,21 @@
+import { db } from "@/lib/db";
+import { currentWorkspace } from "@/lib/workspace";
+import { IntelligenceActions } from "@/components/intelligence-actions";
+
+function Empty({ text }: { text: string }) { return <div className="empty-state"><strong>No data yet</strong><p>{text}</p></div>; }
+
+export default async function IntelligencePage() {
+  const workspace = await currentWorkspace(); const id = workspace?.organization.id;
+  const [run, forecasts, anomalies, recommendations] = id ? await Promise.all([
+    db.intelligenceRun.findFirst({ where: { organizationId: id }, orderBy: { startedAt: "desc" } }),
+    db.spendForecast.findMany({ where: { organizationId: id, horizonDays: 30 }, orderBy: { generatedAt: "desc" }, take: 12 }),
+    db.financialAnomaly.findMany({ where: { organizationId: id, status: { in: ["OPEN", "ACKNOWLEDGED"] } }, orderBy: { detectedAt: "desc" }, take: 12 }),
+    db.budgetRecommendation.findMany({ where: { organizationId: id, status: "OPEN" }, include: { agent: { select: { name: true } }, asset: true }, orderBy: { createdAt: "desc" }, take: 12 }),
+  ]) : [null, [], [], []];
+  return <div className="page"><div className="page-heading"><div><h1>Financial intelligence</h1><p>Explainable forecasts, unusual activity, and owner-reviewed budget recommendations.</p></div><span className="quiet-stamp">{run ? `Updated ${run.completedAt?.toLocaleString() ?? "in progress"}` : "Awaiting first run"}</span></div>
+    <div className="compact-metrics"><div><span>30-day forecasts</span><strong>{forecasts.length}</strong></div><div><span>Open anomalies</span><strong>{anomalies.length}</strong></div><div><span>Budget proposals</span><strong>{recommendations.length}</strong></div></div>
+    <div className="page-grid"><section className="panel"><div className="panel-header"><h2 className="panel-title">Expected outflow · 30 days</h2></div>{forecasts.length ? <div className="record-list">{forecasts.map((forecast) => <div className="record-row" key={forecast.id}><div><div className="record-title">{forecast.assetCode} · {forecast.ledgerType.replaceAll("_", " ")}</div><div className="record-subtitle">{Math.round(forecast.confidence * 100)}% confidence · {forecast.modelName}</div></div><div className="record-aside"><span className="record-meta">{forecast.predictedOutflowAtomic.toString()}</span><span className="record-subtitle">{forecast.lowerBoundAtomic.toString()}–{forecast.upperBoundAtomic.toString()}</span></div></div>)}</div> : <Empty text="Forecasts require settled transaction history." />}</section>
+      <section className="panel"><div className="panel-header"><h2 className="panel-title">Needs review</h2></div>{anomalies.length ? <div className="record-list">{anomalies.map((anomaly) => <div className="record-row record-row-action" key={anomaly.id}><div><div className="record-title">{anomaly.reasonCode.replaceAll("_", " ")}</div><div className="record-subtitle">{anomaly.ledgerType.replaceAll("_", " ")} · {anomaly.assetCode}</div><IntelligenceActions kind="anomaly" id={anomaly.id}/></div><div className="record-aside"><span className="record-meta">Score {anomaly.deviationScore.toFixed(1)}</span><span className="status-badge status-approval">{anomaly.severity}</span></div></div>)}</div> : <Empty text="No unusual activity is open." />}</section></div>
+    <section className="panel section-gap"><div className="panel-header"><h2 className="panel-title">Budget recommendations</h2><span className="panel-note">Acceptance creates a draft policy</span></div>{recommendations.length ? <div className="record-list">{recommendations.map((row) => <div className="record-row record-row-action" key={row.id}><div><div className="record-title">{row.agent.name} · {row.asset.symbol}</div><div className="record-subtitle">Per transaction {row.recommendedPerTransactionAtomic.toString()} · daily {row.recommendedDailyAtomic.toString()} · monthly {row.recommendedMonthlyAtomic.toString()}</div><IntelligenceActions kind="recommendation" id={row.id}/></div><div className="record-aside"><span className="record-meta">{Math.round(row.confidence * 100)}% confidence</span></div></div>)}</div> : <Empty text="Recommendations appear after at least seven active spend days." />}</section>
+  </div>;
+}

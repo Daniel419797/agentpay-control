@@ -6,6 +6,7 @@ export function AuthComplete() {
   const [message, setMessage] = useState("Completing secure sign-in…");
   useEffect(() => {
     const accessToken = new URLSearchParams(window.location.hash.slice(1)).get("access_token");
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
     if (!accessToken) {
       void Promise.resolve().then(() => setMessage("This sign-in link is invalid or expired."));
       return;

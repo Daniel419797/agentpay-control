@@ -26,7 +26,8 @@ export async function supabaseUserFromAccessToken(accessToken: string) {
   const config = supabaseAuthConfig();
   const response = await fetch(`${config.url}/auth/v1/user`, {
     headers: { apikey: config.key, authorization: `Bearer ${accessToken}` },
-    cache: "no-store"
+    cache: "no-store",
+    signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok) throw new Error("SUPABASE_ACCESS_TOKEN_INVALID");
   return response.json() as Promise<SupabaseUser>;

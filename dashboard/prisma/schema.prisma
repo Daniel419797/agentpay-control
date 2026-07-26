@@ -20,6 +20,12 @@ enum Role {
   PROVIDER_ADMIN
 }
 
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+}
+
 enum AgentStatus {
   PROVISIONING
   ACTIVE
@@ -102,6 +108,11 @@ enum ApprovalStatus {
   CONSUMED
 }
 
+enum ApprovalDecisionType {
+  APPROVE
+  REJECT
+}
+
 enum ReservationStatus {
   ACTIVE
   CONSUMED
@@ -151,49 +162,308 @@ enum ProviderStatus {
   UNAVAILABLE
 }
 
+enum ProviderVerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum ResourceHealthStatus {
+  UNKNOWN
+  HEALTHY
+  DEGRADED
+  DOWN
+}
+
+enum ReviewStatus {
+  PUBLISHED
+  HIDDEN
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  VIEWED
+  APPROVAL_PENDING
+  PAYMENT_PENDING
+  PAID
+  OVERDUE
+  VOID
+}
+
 enum AuditResult {
   SUCCESS
   FAILURE
   DENIED
 }
 
+enum FulfillmentStatus {
+  PENDING
+  FULFILLED
+  FAILED
+}
+
+enum NotificationChannelType {
+  WEBHOOK
+  EMAIL
+  SLACK
+}
+
+enum NotificationEndpointStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum DeliveryStatus {
+  PENDING
+  DELIVERED
+  RETRY_SCHEDULED
+  DEAD_LETTER
+}
+
+enum DeletionRequestStatus {
+  REQUESTED
+  CANCELED
+  PROCESSING
+  COMPLETED
+}
+
+enum PlanTier {
+  FREE
+  STARTER
+  GROWTH
+  ENTERPRISE
+}
+
+enum SupportCaseStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_CUSTOMER
+  RESOLVED
+  CLOSED
+}
+
+enum SupportSeverity {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum CardProvider {
+  SANDBOX
+  STRIPE
+}
+
+enum CardholderStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+  REJECTED
+}
+
+enum VirtualCardStatus {
+  INACTIVE
+  ACTIVE
+  FROZEN
+  CANCELED
+}
+
+enum CardAuthorizationStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  REVERSED
+  CLOSED
+}
+
+enum FiatAccountStatus {
+  PENDING
+  ACTIVE
+  RESTRICTED
+  CLOSED
+}
+
+enum FiatTransferDirection {
+  DEPOSIT
+  WITHDRAWAL
+}
+
+enum FiatTransferStatus {
+  PENDING
+  PROCESSING
+  SUBMISSION_UNKNOWN
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+enum ProviderWebhookStatus {
+  RECEIVED
+  PROCESSED
+  IGNORED
+  FAILED
+}
+
+enum ChainFamily {
+  HEDERA
+  EVM
+}
+
+enum CrossChainQuoteStatus {
+  ACTIVE
+  CONSUMED
+  EXPIRED
+  CANCELED
+}
+
+enum CrossChainTransferStatus {
+  QUOTED
+  AWAITING_SIGNATURE
+  SUBMITTED
+  BRIDGING
+  DESTINATION_CONFIRMED
+  FAILED
+  REFUNDED
+  CANCELED
+}
+
+enum AutomationRuleStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum AutomationTriggerType {
+  MANUAL
+  SCHEDULE
+  BALANCE_THRESHOLD
+  INVOICE_EVENT
+  WEBHOOK
+}
+
+enum AutomationActionType {
+  CONTRACT_CALL
+  X402_PAYMENT
+  CREATE_INVOICE
+}
+
+enum AutomationExecutionStatus {
+  PENDING
+  AWAITING_APPROVAL
+  EXECUTING
+  SUBMISSION_UNKNOWN
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+enum AutomationDecisionType {
+  APPROVE
+  REJECT
+}
+
+enum FinancialLedgerType {
+  CRYPTO_PAYMENT
+  VIRTUAL_CARD
+  FIAT_TRANSFER
+  INVOICE
+}
+
+enum IntelligenceRunStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum FinancialAnomalyStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  DISMISSED
+}
+
+enum RecommendationStatus {
+  OPEN
+  ACCEPTED
+  DISMISSED
+  SUPERSEDED
+}
+
 model User {
-  id          String       @id @default(uuid()) @db.Uuid
-  email       String?      @unique
-  displayName String
-  createdAt   DateTime     @default(now()) @db.Timestamptz
-  memberships Membership[]
-  identities  WalletIdentity[]
+  id                            String                        @id @default(uuid()) @db.Uuid
+  email                         String?                       @unique
+  displayName                   String
+  createdAt                     DateTime                      @default(now()) @db.Timestamptz
+  memberships                   Membership[]
+  identities                    WalletIdentity[]
+  approvalDecisions             ApprovalDecision[]
+  cardholderProfiles            CardholderProfile[]
+  resourceReviews               ResourceReview[]
+  automationDecisions           AutomationExecutionDecision[]
+  triggeredAutomationExecutions AutomationExecution[]         @relation("AutomationTriggeredBy")
 }
 
 model Organization {
-  id                String             @id @default(uuid()) @db.Uuid
-  name              String
-  slug              String             @unique
-  status            OrganizationStatus @default(ACTIVE)
-  environmentMode   String             @default("TESTNET_ONLY")
-  killSwitchEnabled Boolean            @default(false)
-  timezone          String             @default("UTC")
-  createdAt         DateTime           @default(now()) @db.Timestamptz
-  updatedAt         DateTime           @updatedAt @db.Timestamptz
-  memberships       Membership[]
-  agents            Agent[]
-  policies          Policy[]
-  paymentIntents    PaymentIntent[]
-  providers         ResourceProvider[]
-  auditEvents       AuditEvent[]
-  outboxEvents      OutboxEvent[]
+  id                    String                      @id @default(uuid()) @db.Uuid
+  name                  String
+  slug                  String                      @unique
+  status                OrganizationStatus          @default(ACTIVE)
+  environmentMode       String                      @default("TESTNET_ONLY")
+  killSwitchEnabled     Boolean                     @default(false)
+  timezone              String                      @default("UTC")
+  createdAt             DateTime                    @default(now()) @db.Timestamptz
+  updatedAt             DateTime                    @updatedAt @db.Timestamptz
+  memberships           Membership[]
+  agents                Agent[]
+  policies              Policy[]
+  paymentIntents        PaymentIntent[]
+  providers             ResourceProvider[]
+  auditEvents           AuditEvent[]
+  outboxEvents          OutboxEvent[]
+  notificationEndpoints NotificationEndpoint[]
+  retentionPolicy       DataRetentionPolicy?
+  deletionRequests      DeletionRequest[]
+  entitlement           OrganizationEntitlement?
+  supportCases          SupportCase[]
+  cardholders           CardholderProfile[]
+  virtualCards          VirtualCard[]
+  cardAuthorizations    CardAuthorization[]
+  fiatAccounts          FiatAccount[]
+  fiatTransfers         FiatTransfer[]
+  resourceReviews       ResourceReview[]
+  issuedInvoices        AgentInvoice[]              @relation("InvoiceIssuerOrganization")
+  receivedInvoices      AgentInvoice[]              @relation("InvoiceRecipientOrganization")
+  invoiceSequence       InvoiceSequence?
+  crossChainQuotes      CrossChainRouteQuote[]
+  crossChainTransfers   CrossChainTransfer[]
+  contractAllowlist     ContractAllowlistEntry[]
+  automationRules       AutomationRule[]
+  automationExecutions  AutomationExecution[]
+  financialObservations FinancialObservationDaily[]
+  forecasts             SpendForecast[]
+  financialAnomalies    FinancialAnomaly[]
+  budgetRecommendations BudgetRecommendation[]
+  intelligenceRuns      IntelligenceRun[]
 }
 
 model Membership {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @db.Uuid
-  userId         String       @db.Uuid
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  userId         String           @db.Uuid
   roles          Role[]
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  status         MembershipStatus @default(ACTIVE)
+  invitedAt      DateTime         @default(now()) @db.Timestamptz
+  activatedAt    DateTime?        @db.Timestamptz
+  suspendedAt    DateTime?        @db.Timestamptz
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+
   @@unique([organizationId, userId])
   @@index([userId])
+  @@index([organizationId, status])
 }
 
 model WalletIdentity {
@@ -204,68 +474,95 @@ model WalletIdentity {
   walletProvider String
   verifiedAt     DateTime @default(now()) @db.Timestamptz
   user           User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
   @@unique([network, accountId])
 }
 
+model WalletAuthChallenge {
+  id         String    @id @db.Uuid
+  accountId  String
+  nonceHash  String
+  expiresAt  DateTime  @db.Timestamptz
+  consumedAt DateTime? @db.Timestamptz
+  createdAt  DateTime  @default(now()) @db.Timestamptz
+
+  @@index([expiresAt, consumedAt])
+}
+
 model Agent {
-  id                    String              @id @default(uuid()) @db.Uuid
-  organizationId        String              @db.Uuid
+  id                    String                      @id @default(uuid()) @db.Uuid
+  organizationId        String                      @db.Uuid
   name                  String
   description           String?
-  status                AgentStatus         @default(PROVISIONING)
-  network               String              @default("hedera:testnet")
-  defaultAssetId        String?             @db.Uuid
-  effectivePolicyId     String?             @db.Uuid
-  createdAt             DateTime            @default(now()) @db.Timestamptz
-  updatedAt             DateTime            @updatedAt @db.Timestamptz
-  organization          Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  defaultAsset          Asset?              @relation(fields: [defaultAssetId], references: [id], onDelete: Restrict)
-  effectivePolicy       PolicyVersion?      @relation("EffectivePolicy", fields: [effectivePolicyId], references: [id], onDelete: SetNull)
+  status                AgentStatus                 @default(PROVISIONING)
+  network               String                      @default("hedera:testnet")
+  defaultAssetId        String?                     @db.Uuid
+  effectivePolicyId     String?                     @db.Uuid
+  createdAt             DateTime                    @default(now()) @db.Timestamptz
+  updatedAt             DateTime                    @updatedAt @db.Timestamptz
+  organization          Organization                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  defaultAsset          Asset?                      @relation(fields: [defaultAssetId], references: [id], onDelete: Restrict)
+  effectivePolicy       PolicyVersion?              @relation("EffectivePolicy", fields: [effectivePolicyId], references: [id], onDelete: SetNull)
   accounts              PaymentAccount[]
   credentials           AgentCredential[]
   policies              Policy[]
   paymentIntents        PaymentIntent[]
   reservations          SpendReservation[]
+  virtualCards          VirtualCard[]
+  issuedInvoices        AgentInvoice[]              @relation("InvoiceIssuerAgent")
+  receivedInvoices      AgentInvoice[]              @relation("InvoiceRecipientAgent")
+  crossChainQuotes      CrossChainRouteQuote[]
+  crossChainTransfers   CrossChainTransfer[]
+  automationRules       AutomationRule[]
+  financialObservations FinancialObservationDaily[]
+  forecasts             SpendForecast[]
+  financialAnomalies    FinancialAnomaly[]
+  budgetRecommendations BudgetRecommendation[]
+
   @@index([organizationId, status])
 }
 
 model PaymentAccount {
-  id                  String        @id @default(uuid()) @db.Uuid
-  agentId             String        @db.Uuid
+  id                  String            @id @default(uuid()) @db.Uuid
+  agentId             String            @db.Uuid
   network             String
   accountId           String
   evmAddress          String?
   publicKey           String?
-  encryptedKeyBundle String?
+  encryptedKeyBundle  String?
   custodyType         CustodyType
   signingMode         SigningMode
-  status              AccountStatus @default(PROVISIONING)
-  delegationExpiresAt DateTime?      @db.Timestamptz
-  syncedAt            DateTime?      @db.Timestamptz
-  createdAt           DateTime       @default(now()) @db.Timestamptz
-  updatedAt           DateTime       @updatedAt @db.Timestamptz
-  agent               Agent          @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  status              AccountStatus     @default(PROVISIONING)
+  delegationExpiresAt DateTime?         @db.Timestamptz
+  syncedAt            DateTime?         @db.Timestamptz
+  createdAt           DateTime          @default(now()) @db.Timestamptz
+  updatedAt           DateTime          @updatedAt @db.Timestamptz
+  agent               Agent             @relation(fields: [agentId], references: [id], onDelete: Restrict)
   balances            BalanceSnapshot[]
-  @@unique([network, accountId])
+
+  @@index([network, accountId])
   @@index([agentId, status])
 }
 
 model Asset {
-  id            String       @id @default(uuid()) @db.Uuid
-  network       String
-  type          AssetType
-  hederaTokenId String?
-  symbol        String
-  name          String
-  decimals      Int
-  verified      Boolean      @default(false)
-  agents        Agent[]
-  balances      BalanceSnapshot[]
-  policies      PolicyVersion[]
-  quotes        PaymentQuote[]
-  reservations  SpendReservation[]
-  prices        ResourcePrice[]
-  settlements   Settlement[]
+  id                    String                 @id @default(uuid()) @db.Uuid
+  network               String
+  type                  AssetType
+  hederaTokenId         String?
+  symbol                String
+  name                  String
+  decimals              Int
+  verified              Boolean                @default(false)
+  agents                Agent[]
+  balances              BalanceSnapshot[]
+  policies              PolicyVersion[]
+  quotes                PaymentQuote[]
+  reservations          SpendReservation[]
+  prices                ResourcePrice[]
+  settlements           Settlement[]
+  invoices              AgentInvoice[]
+  budgetRecommendations BudgetRecommendation[]
+
   @@unique([network, symbol])
   @@unique([network, hederaTokenId])
 }
@@ -280,6 +577,7 @@ model BalanceSnapshot {
   asOf             DateTime       @db.Timestamptz
   paymentAccount   PaymentAccount @relation(fields: [paymentAccountId], references: [id], onDelete: Restrict)
   asset            Asset          @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
   @@index([paymentAccountId, assetId, asOf(sort: Desc)])
 }
 
@@ -296,6 +594,7 @@ model AgentCredential {
   revokedAt  DateTime?        @db.Timestamptz
   createdAt  DateTime         @default(now()) @db.Timestamptz
   agent      Agent            @relation(fields: [agentId], references: [id], onDelete: Restrict)
+
   @@index([agentId, status])
 }
 
@@ -307,54 +606,89 @@ model Policy {
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   agent          Agent           @relation(fields: [agentId], references: [id], onDelete: Restrict)
   versions       PolicyVersion[]
+
   @@index([organizationId, agentId])
 }
 
 model PolicyVersion {
-  id                        String          @id @default(uuid()) @db.Uuid
-  policyId                  String          @db.Uuid
+  id                        String           @id @default(uuid()) @db.Uuid
+  policyId                  String           @db.Uuid
   version                   Int
   status                    PolicyStatus
-  assetId                   String          @db.Uuid
-  perTransactionLimitAtomic Decimal         @db.Decimal(78, 0)
-  dailyLimitAtomic          Decimal         @db.Decimal(78, 0)
+  assetId                   String           @db.Uuid
+  perTransactionLimitAtomic Decimal          @db.Decimal(78, 0)
+  dailyLimitAtomic          Decimal          @db.Decimal(78, 0)
   overLimitAction           OverLimitAction
-  merchantMode              MerchantMode    @default(ANY)
+  merchantMode              MerchantMode     @default(ANY)
   allowedHosts              String[]
   deniedHosts               String[]
-  createdBy                 String          @db.Uuid
-  createdAt                 DateTime        @default(now()) @db.Timestamptz
-  publishedAt               DateTime?       @db.Timestamptz
-  policy                    Policy          @relation(fields: [policyId], references: [id], onDelete: Restrict)
-  asset                     Asset           @relation(fields: [assetId], references: [id], onDelete: Restrict)
-  activeForAgents           Agent[]         @relation("EffectivePolicy")
+  approvalThreshold         Int              @default(1)
+  rejectionThreshold        Int              @default(1)
+  allowedMerchantCategories String[]
+  activeFrom                DateTime?        @db.Timestamptz
+  activeUntil               DateTime?        @db.Timestamptz
+  allowedWeekdays           Int[]
+  allowedStartMinute        Int?
+  allowedEndMinute          Int?
+  hourlyLimitAtomic         Decimal?         @db.Decimal(78, 0)
+  monthlyLimitAtomic        Decimal?         @db.Decimal(78, 0)
+  maxTransactionsPerHour    Int?
+  cooldownSeconds           Int?
+  createdBy                 String           @db.Uuid
+  createdAt                 DateTime         @default(now()) @db.Timestamptz
+  publishedAt               DateTime?        @db.Timestamptz
+  policy                    Policy           @relation(fields: [policyId], references: [id], onDelete: Restrict)
+  asset                     Asset            @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  activeForAgents           Agent[]          @relation("EffectivePolicy")
   decisions                 PolicyDecision[]
+
   @@unique([policyId, version])
   @@index([policyId, status])
 }
 
 model PaymentIntent {
-  id             String         @id @default(uuid()) @db.Uuid
-  organizationId String         @db.Uuid
-  agentId        String         @db.Uuid
-  idempotencyKey String
-  requestHash    String
-  resourceUrl    String
-  merchantHost   String
-  purpose        String?
-  status         PaymentStatus  @default(CREATED)
-  createdAt      DateTime       @default(now()) @db.Timestamptz
-  updatedAt      DateTime       @updatedAt @db.Timestamptz
-  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  agent          Agent          @relation(fields: [agentId], references: [id], onDelete: Restrict)
-  quote          PaymentQuote?
-  decisions      PolicyDecision[]
-  reservation    SpendReservation?
-  approval       ApprovalRequest?
-  attempts       PaymentAttempt[]
+  id                String               @id @default(uuid()) @db.Uuid
+  organizationId    String               @db.Uuid
+  agentId           String               @db.Uuid
+  idempotencyKey    String
+  requestHash       String
+  resourceUrl       String
+  merchantHost      String
+  purpose           String?
+  status            PaymentStatus        @default(CREATED)
+  createdAt         DateTime             @default(now()) @db.Timestamptz
+  updatedAt         DateTime             @updatedAt @db.Timestamptz
+  organization      Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent             Agent                @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  quote             PaymentQuote?
+  decisions         PolicyDecision[]
+  reservation       SpendReservation?
+  approval          ApprovalRequest?
+  attempts          PaymentAttempt[]
+  fulfillment       ResourceFulfillment?
+  invoiceSettlement InvoiceSettlement?
+  resourceReview    ResourceReview?
+
   @@unique([organizationId, agentId, idempotencyKey])
   @@index([organizationId, status, createdAt(sort: Desc)])
   @@index([agentId, createdAt(sort: Desc)])
+}
+
+model ResourceFulfillment {
+  id              String            @id @default(uuid()) @db.Uuid
+  paymentIntentId String            @unique @db.Uuid
+  status          FulfillmentStatus @default(PENDING)
+  contentType     String?
+  contentHash     String?
+  contentBytes    Int?
+  responseBody    Json?
+  errorCode       String?
+  fulfilledAt     DateTime?         @db.Timestamptz
+  createdAt       DateTime          @default(now()) @db.Timestamptz
+  updatedAt       DateTime          @updatedAt @db.Timestamptz
+  paymentIntent   PaymentIntent     @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
 }
 
 model PaymentQuote {
@@ -375,18 +709,19 @@ model PaymentQuote {
 }
 
 model PolicyDecision {
-  id                  String         @id @default(uuid()) @db.Uuid
-  paymentIntentId     String         @db.Uuid
-  policyVersionId     String         @db.Uuid
-  outcome             PolicyOutcome
-  reasonCodes         String[]
-  factsHash           String
-  spendBeforeAtomic   Decimal        @db.Decimal(78, 0)
+  id                   String        @id @default(uuid()) @db.Uuid
+  paymentIntentId      String        @db.Uuid
+  policyVersionId      String        @db.Uuid
+  outcome              PolicyOutcome
+  reasonCodes          String[]
+  factsHash            String
+  spendBeforeAtomic    Decimal       @db.Decimal(78, 0)
   reservedBeforeAtomic Decimal       @db.Decimal(78, 0)
-  projectedAtomic     Decimal        @db.Decimal(78, 0)
-  evaluatedAt         DateTime       @default(now()) @db.Timestamptz
-  paymentIntent       PaymentIntent  @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
-  policyVersion       PolicyVersion  @relation(fields: [policyVersionId], references: [id], onDelete: Restrict)
+  projectedAtomic      Decimal       @db.Decimal(78, 0)
+  evaluatedAt          DateTime      @default(now()) @db.Timestamptz
+  paymentIntent        PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+  policyVersion        PolicyVersion @relation(fields: [policyVersionId], references: [id], onDelete: Restrict)
+
   @@index([paymentIntentId, evaluatedAt(sort: Desc)])
 }
 
@@ -405,36 +740,58 @@ model SpendReservation {
   paymentIntent   PaymentIntent     @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
   agent           Agent             @relation(fields: [agentId], references: [id], onDelete: Restrict)
   asset           Asset             @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
   @@index([agentId, assetId, windowStart, status])
 }
 
 model ApprovalRequest {
-  id              String          @id @default(uuid()) @db.Uuid
-  paymentIntentId String          @unique @db.Uuid
-  status          ApprovalStatus  @default(PENDING)
-  requestPurpose  String?
-  requestedAt     DateTime        @default(now()) @db.Timestamptz
-  expiresAt       DateTime        @db.Timestamptz
-  decidedAt       DateTime?       @db.Timestamptz
-  decidedBy       String?         @db.Uuid
-  decisionNote    String?
-  paymentIntent   PaymentIntent   @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+  id                 String             @id @default(uuid()) @db.Uuid
+  paymentIntentId    String             @unique @db.Uuid
+  status             ApprovalStatus     @default(PENDING)
+  requestPurpose     String?
+  requestedAt        DateTime           @default(now()) @db.Timestamptz
+  expiresAt          DateTime           @db.Timestamptz
+  decidedAt          DateTime?          @db.Timestamptz
+  decidedBy          String?            @db.Uuid
+  decisionNote       String?
+  requiredApprovals  Int                @default(1)
+  requiredRejections Int                @default(1)
+  paymentIntent      PaymentIntent      @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+  decisions          ApprovalDecision[]
+
   @@index([status, expiresAt])
 }
 
+model ApprovalDecision {
+  id                String               @id @default(uuid()) @db.Uuid
+  approvalRequestId String               @db.Uuid
+  userId            String               @db.Uuid
+  decision          ApprovalDecisionType
+  note              String?
+  createdAt         DateTime             @default(now()) @db.Timestamptz
+  approvalRequest   ApprovalRequest      @relation(fields: [approvalRequestId], references: [id], onDelete: Restrict)
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([approvalRequestId, userId])
+  @@index([approvalRequestId, decision])
+}
+
 model PaymentAttempt {
-  id                   String        @id @default(uuid()) @db.Uuid
-  paymentIntentId      String        @db.Uuid
-  attemptNumber        Int
-  status               AttemptStatus
-  facilitatorRequestId String?
-  signatureFingerprint String?
-  errorCode            String?
-  createdAt            DateTime      @default(now()) @db.Timestamptz
-  updatedAt            DateTime      @updatedAt @db.Timestamptz
-  paymentIntent        PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
-  settlement           Settlement?
+  id                     String        @id @default(uuid()) @db.Uuid
+  paymentIntentId        String        @db.Uuid
+  attemptNumber          Int
+  status                 AttemptStatus
+  facilitatorRequestId   String?
+  candidateTransactionId String?
+  signatureFingerprint   String?
+  errorCode              String?
+  createdAt              DateTime      @default(now()) @db.Timestamptz
+  updatedAt              DateTime      @updatedAt @db.Timestamptz
+  paymentIntent          PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+  settlement             Settlement?
+
   @@unique([paymentIntentId, attemptNumber])
+  @@index([candidateTransactionId])
 }
 
 model Settlement {
@@ -453,38 +810,56 @@ model Settlement {
   confirmedAt        DateTime?        @db.Timestamptz
   paymentAttempt     PaymentAttempt   @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict)
   asset              Asset            @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
   @@unique([network, transactionId])
   @@index([status, submittedAt])
 }
 
 model ResourceProvider {
-  id                        String         @id @default(uuid()) @db.Uuid
-  organizationId            String?        @db.Uuid
+  id                        String                     @id @default(uuid()) @db.Uuid
+  organizationId            String?                    @db.Uuid
   name                      String
-  status                    ProviderStatus @default(ACTIVE)
+  publicSlug                String?                    @unique
+  description               String?
+  websiteUrl                String?
+  supportEmail              String?
+  termsUrl                  String?
+  privacyUrl                String?
+  status                    ProviderStatus             @default(ACTIVE)
+  verificationStatus        ProviderVerificationStatus @default(UNVERIFIED)
+  verifiedAt                DateTime?                  @db.Timestamptz
   settlementAccountId       String
-  settlementAccountVerified Boolean        @default(false)
-  createdAt                 DateTime       @default(now()) @db.Timestamptz
-  organization              Organization?  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  settlementAccountVerified Boolean                    @default(false)
+  createdAt                 DateTime                   @default(now()) @db.Timestamptz
+  organization              Organization?              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   resources                 ResourceListing[]
 }
 
 model ResourceListing {
-  id                 String           @id @default(uuid()) @db.Uuid
-  providerId         String           @db.Uuid
+  id                 String                @id @default(uuid()) @db.Uuid
+  providerId         String                @db.Uuid
   category           ResourceCategory
   name               String
-  slug               String           @unique
+  slug               String                @unique
   description        String
-  endpoint            String
-  status              ResourceStatus  @default(DRAFT)
-  inputSchema         Json
-  outputContentTypes  String[]
-  version             Int              @default(1)
-  createdAt           DateTime         @default(now()) @db.Timestamptz
-  updatedAt           DateTime         @updatedAt @db.Timestamptz
-  provider            ResourceProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
-  prices              ResourcePrice[]
+  endpoint           String
+  status             ResourceStatus        @default(DRAFT)
+  inputSchema        Json
+  outputContentTypes String[]
+  version            Int                   @default(1)
+  public             Boolean               @default(false)
+  tags               String[]              @default([])
+  termsUrl           String?
+  serviceLevel       Json?
+  healthStatus       ResourceHealthStatus  @default(UNKNOWN)
+  lastHealthCheckAt  DateTime?             @db.Timestamptz
+  createdAt          DateTime              @default(now()) @db.Timestamptz
+  updatedAt          DateTime              @updatedAt @db.Timestamptz
+  provider           ResourceProvider      @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  prices             ResourcePrice[]
+  reviews            ResourceReview[]
+  healthChecks       ResourceHealthCheck[]
+
   @@index([category, status])
 }
 
@@ -496,7 +871,121 @@ model ResourcePrice {
   scheme            String          @default("exact")
   resourceListing   ResourceListing @relation(fields: [resourceListingId], references: [id], onDelete: Restrict)
   asset             Asset           @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
   @@unique([resourceListingId, assetId])
+}
+
+model ResourceReview {
+  id              String          @id @default(uuid()) @db.Uuid
+  organizationId  String          @db.Uuid
+  userId          String          @db.Uuid
+  resourceId      String          @db.Uuid
+  paymentIntentId String          @unique @db.Uuid
+  rating          Int
+  comment         String?
+  status          ReviewStatus    @default(PUBLISHED)
+  createdAt       DateTime        @default(now()) @db.Timestamptz
+  updatedAt       DateTime        @updatedAt @db.Timestamptz
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  resource        ResourceListing @relation(fields: [resourceId], references: [id], onDelete: Restrict)
+  paymentIntent   PaymentIntent   @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, resourceId])
+  @@index([resourceId, status, createdAt(sort: Desc)])
+}
+
+model ResourceHealthCheck {
+  id         String               @id @default(uuid()) @db.Uuid
+  resourceId String               @db.Uuid
+  status     ResourceHealthStatus
+  httpStatus Int?
+  latencyMs  Int?
+  errorCode  String?
+  checkedAt  DateTime             @default(now()) @db.Timestamptz
+  resource   ResourceListing      @relation(fields: [resourceId], references: [id], onDelete: Restrict)
+
+  @@index([resourceId, checkedAt(sort: Desc)])
+}
+
+model AgentInvoice {
+  id                      String             @id @default(uuid()) @db.Uuid
+  issuerOrganizationId    String             @db.Uuid
+  recipientOrganizationId String             @db.Uuid
+  issuerAgentId           String             @db.Uuid
+  recipientAgentId        String             @db.Uuid
+  assetId                 String             @db.Uuid
+  number                  String
+  status                  InvoiceStatus      @default(DRAFT)
+  title                   String
+  memo                    String?
+  subtotalAtomic          Decimal            @db.Decimal(78, 0)
+  totalAtomic             Decimal            @db.Decimal(78, 0)
+  dueAt                   DateTime           @db.Timestamptz
+  createdBy               String             @db.Uuid
+  sentAt                  DateTime?          @db.Timestamptz
+  viewedAt                DateTime?          @db.Timestamptz
+  paidAt                  DateTime?          @db.Timestamptz
+  voidedAt                DateTime?          @db.Timestamptz
+  createdAt               DateTime           @default(now()) @db.Timestamptz
+  updatedAt               DateTime           @updatedAt @db.Timestamptz
+  issuerOrganization      Organization       @relation("InvoiceIssuerOrganization", fields: [issuerOrganizationId], references: [id], onDelete: Restrict)
+  recipientOrganization   Organization       @relation("InvoiceRecipientOrganization", fields: [recipientOrganizationId], references: [id], onDelete: Restrict)
+  issuerAgent             Agent              @relation("InvoiceIssuerAgent", fields: [issuerAgentId], references: [id], onDelete: Restrict)
+  recipientAgent          Agent              @relation("InvoiceRecipientAgent", fields: [recipientAgentId], references: [id], onDelete: Restrict)
+  asset                   Asset              @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  items                   InvoiceItem[]
+  events                  InvoiceEvent[]
+  settlement              InvoiceSettlement?
+
+  @@unique([issuerOrganizationId, number])
+  @@index([issuerOrganizationId, status, createdAt(sort: Desc)])
+  @@index([recipientOrganizationId, status, dueAt])
+}
+
+model InvoiceSequence {
+  organizationId String       @id @db.Uuid
+  nextNumber     BigInt       @default(1)
+  updatedAt      DateTime     @updatedAt @db.Timestamptz
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+}
+
+model InvoiceItem {
+  id               String       @id @default(uuid()) @db.Uuid
+  invoiceId        String       @db.Uuid
+  description      String
+  quantity         Int
+  unitAmountAtomic Decimal      @db.Decimal(78, 0)
+  totalAtomic      Decimal      @db.Decimal(78, 0)
+  position         Int
+  invoice          AgentInvoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@unique([invoiceId, position])
+}
+
+model InvoiceEvent {
+  id         String       @id @default(uuid()) @db.Uuid
+  invoiceId  String       @db.Uuid
+  actorType  String
+  actorId    String?
+  action     String
+  metadata   Json
+  occurredAt DateTime     @default(now()) @db.Timestamptz
+  invoice    AgentInvoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@index([invoiceId, occurredAt])
+}
+
+model InvoiceSettlement {
+  id              String        @id @default(uuid()) @db.Uuid
+  invoiceId       String        @unique @db.Uuid
+  paymentIntentId String        @unique @db.Uuid
+  transactionId   String        @unique
+  network         String
+  settledAt       DateTime      @db.Timestamptz
+  createdAt       DateTime      @default(now()) @db.Timestamptz
+  invoice         AgentInvoice  @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  paymentIntent   PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
 }
 
 model AuditEvent {
@@ -511,22 +1000,572 @@ model AuditEvent {
   requestId      String?
   metadata       Json
   occurredAt     DateTime     @default(now()) @db.Timestamptz
+  chainSequence  BigInt       @default(dbgenerated())
+  previousHash   String?
+  eventHash      String       @unique @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
   @@index([organizationId, occurredAt(sort: Desc)])
   @@index([organizationId, action])
+  @@index([organizationId, eventHash])
+  @@unique([organizationId, chainSequence])
 }
 
 model OutboxEvent {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @db.Uuid
-  eventType      String
-  aggregateType  String
-  aggregateId    String
-  payload        Json
-  attempts       Int          @default(0)
-  availableAt    DateTime     @default(now()) @db.Timestamptz
-  processedAt    DateTime?    @db.Timestamptz
-  createdAt      DateTime     @default(now()) @db.Timestamptz
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id                String                   @id @default(uuid()) @db.Uuid
+  organizationId    String                   @db.Uuid
+  eventType         String
+  aggregateType     String
+  aggregateId       String
+  payload           Json
+  attempts          Int                      @default(0)
+  availableAt       DateTime                 @default(now()) @db.Timestamptz
+  processedAt       DateTime?                @db.Timestamptz
+  claimedAt         DateTime?                @db.Timestamptz
+  claimToken        String?                  @db.Uuid
+  lastError         String?
+  deadLetteredAt    DateTime?                @db.Timestamptz
+  directChannel     NotificationChannelType?
+  directDestination String?
+  createdAt         DateTime                 @default(now()) @db.Timestamptz
+  organization      Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  deliveries        NotificationDelivery[]
+
   @@index([processedAt, availableAt])
+}
+
+model NotificationEndpoint {
+  id                     String                     @id @default(uuid()) @db.Uuid
+  organizationId         String                     @db.Uuid
+  type                   NotificationChannelType
+  name                   String
+  destination            String
+  eventTypes             String[]
+  status                 NotificationEndpointStatus @default(ACTIVE)
+  signingSecretEncrypted String?
+  createdAt              DateTime                   @default(now()) @db.Timestamptz
+  updatedAt              DateTime                   @updatedAt @db.Timestamptz
+  organization           Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  deliveries             NotificationDelivery[]
+
+  @@index([organizationId, status])
+}
+
+model NotificationDelivery {
+  id             String               @id @default(uuid()) @db.Uuid
+  outboxEventId  String               @db.Uuid
+  endpointId     String               @db.Uuid
+  status         DeliveryStatus       @default(PENDING)
+  attemptCount   Int                  @default(0)
+  lastHttpStatus Int?
+  lastError      String?
+  nextAttemptAt  DateTime             @default(now()) @db.Timestamptz
+  deliveredAt    DateTime?            @db.Timestamptz
+  createdAt      DateTime             @default(now()) @db.Timestamptz
+  updatedAt      DateTime             @updatedAt @db.Timestamptz
+  outboxEvent    OutboxEvent          @relation(fields: [outboxEventId], references: [id], onDelete: Restrict)
+  endpoint       NotificationEndpoint @relation(fields: [endpointId], references: [id], onDelete: Restrict)
+
+  @@unique([outboxEventId, endpointId])
+  @@index([status, nextAttemptAt])
+}
+
+model DataRetentionPolicy {
+  id                  String       @id @default(uuid()) @db.Uuid
+  organizationId      String       @unique @db.Uuid
+  auditDays           Int          @default(2555)
+  financialRecordDays Int          @default(2555)
+  fulfillmentBodyDays Int          @default(30)
+  notificationDays    Int          @default(90)
+  updatedAt           DateTime     @updatedAt @db.Timestamptz
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+}
+
+model DeletionRequest {
+  id                 String                @id @default(uuid()) @db.Uuid
+  organizationId     String                @db.Uuid
+  requestedBy        String                @db.Uuid
+  status             DeletionRequestStatus @default(REQUESTED)
+  requestedAt        DateTime              @default(now()) @db.Timestamptz
+  scheduledFor       DateTime              @db.Timestamptz
+  previousKillSwitch Boolean
+  snapshot           Json
+  canceledAt         DateTime?             @db.Timestamptz
+  completedAt        DateTime?             @db.Timestamptz
+  organization       Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([status, scheduledFor])
+  @@index([organizationId, requestedAt(sort: Desc)])
+}
+
+model OrganizationEntitlement {
+  id                       String       @id @default(uuid()) @db.Uuid
+  organizationId           String       @unique @db.Uuid
+  tier                     PlanTier     @default(FREE)
+  maxActiveAgents          Int          @default(2)
+  maxMembers               Int          @default(3)
+  maxMonthlyPaymentIntents Int          @default(100)
+  maxNotificationEndpoints Int          @default(1)
+  active                   Boolean      @default(true)
+  currentPeriodStart       DateTime     @default(now()) @db.Timestamptz
+  currentPeriodEnd         DateTime     @db.Timestamptz
+  updatedAt                DateTime     @updatedAt @db.Timestamptz
+  organization             Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+}
+
+model SupportCase {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @db.Uuid
+  createdBy      String?           @db.Uuid
+  sourceType     String?
+  sourceId       String?           @db.Uuid
+  title          String
+  description    String
+  category       String
+  severity       SupportSeverity   @default(NORMAL)
+  status         SupportCaseStatus @default(OPEN)
+  createdAt      DateTime          @default(now()) @db.Timestamptz
+  updatedAt      DateTime          @updatedAt @db.Timestamptz
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  messages       SupportMessage[]
+
+  @@index([organizationId, status, updatedAt(sort: Desc)])
+  @@unique([organizationId, sourceType, sourceId])
+}
+
+model SupportMessage {
+  id            String      @id @default(uuid()) @db.Uuid
+  supportCaseId String      @db.Uuid
+  authorId      String?     @db.Uuid
+  authorType    String
+  body          String
+  createdAt     DateTime    @default(now()) @db.Timestamptz
+  supportCase   SupportCase @relation(fields: [supportCaseId], references: [id], onDelete: Restrict)
+
+  @@index([supportCaseId, createdAt])
+}
+
+model RateLimitBucket {
+  key         String   @id
+  count       Int      @default(0)
+  windowStart DateTime @db.Timestamptz
+  expiresAt   DateTime @db.Timestamptz
+  updatedAt   DateTime @updatedAt @db.Timestamptz
+
+  @@index([expiresAt])
+}
+
+model ChainNetwork {
+  id                    String                   @id
+  family                ChainFamily
+  chainReference        String
+  displayName           String
+  nativeSymbol          String
+  explorerTxUrlTemplate String
+  finalitySeconds       Int
+  requiredConfirmations Int                      @default(1)
+  testnet               Boolean                  @default(false)
+  enabled               Boolean                  @default(false)
+  supportsContracts     Boolean                  @default(false)
+  createdAt             DateTime                 @default(now()) @db.Timestamptz
+  updatedAt             DateTime                 @updatedAt @db.Timestamptz
+  sourceQuotes          CrossChainRouteQuote[]   @relation("CrossChainSourceNetwork")
+  destinationQuotes     CrossChainRouteQuote[]   @relation("CrossChainDestinationNetwork")
+  allowlistEntries      ContractAllowlistEntry[]
+}
+
+model CrossChainRouteQuote {
+  id                          String                @id @default(uuid()) @db.Uuid
+  organizationId              String                @db.Uuid
+  agentId                     String                @db.Uuid
+  sourceNetworkId             String
+  destinationNetworkId        String
+  sourceToken                 String
+  destinationToken            String
+  sourceAddress               String
+  destinationAddress          String
+  inputAmountAtomic           Decimal               @db.Decimal(78, 0)
+  estimatedOutputAtomic       Decimal               @db.Decimal(78, 0)
+  minimumOutputAtomic         Decimal               @db.Decimal(78, 0)
+  provider                    String
+  externalQuoteId             String
+  tool                        String?
+  feeSummary                  Json
+  transactionRequestEncrypted String
+  requestHash                 String
+  status                      CrossChainQuoteStatus @default(ACTIVE)
+  expiresAt                   DateTime              @db.Timestamptz
+  createdAt                   DateTime              @default(now()) @db.Timestamptz
+  organization                Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent                       Agent                 @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  sourceNetwork               ChainNetwork          @relation("CrossChainSourceNetwork", fields: [sourceNetworkId], references: [id], onDelete: Restrict)
+  destinationNetwork          ChainNetwork          @relation("CrossChainDestinationNetwork", fields: [destinationNetworkId], references: [id], onDelete: Restrict)
+  transfer                    CrossChainTransfer?
+
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([expiresAt, status])
+}
+
+model CrossChainTransfer {
+  id                         String                   @id @default(uuid()) @db.Uuid
+  organizationId             String                   @db.Uuid
+  agentId                    String                   @db.Uuid
+  quoteId                    String                   @unique @db.Uuid
+  idempotencyKey             String
+  status                     CrossChainTransferStatus @default(QUOTED)
+  sourceTransactionHash      String?
+  sourceVerifiedAt           DateTime?                @db.Timestamptz
+  sourceBlockNumber          String?
+  destinationTransactionHash String?
+  providerStatus             String?
+  errorCode                  String?
+  submittedAt                DateTime?                @db.Timestamptz
+  completedAt                DateTime?                @db.Timestamptz
+  createdAt                  DateTime                 @default(now()) @db.Timestamptz
+  updatedAt                  DateTime                 @updatedAt @db.Timestamptz
+  organization               Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent                      Agent                    @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  quote                      CrossChainRouteQuote     @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([sourceTransactionHash])
+  @@index([sourceVerifiedAt])
+}
+
+model ContractAllowlistEntry {
+  id                       String       @id @default(uuid()) @db.Uuid
+  organizationId           String       @db.Uuid
+  networkId                String
+  contractAddress          String
+  name                     String
+  allowedFunctionSelectors String[]
+  maxGas                   Int
+  maxPayableAtomic         Decimal      @default(0) @db.Decimal(78, 0)
+  expectedCodeHash         String?
+  active                   Boolean      @default(true)
+  createdAt                DateTime     @default(now()) @db.Timestamptz
+  updatedAt                DateTime     @updatedAt @db.Timestamptz
+  organization             Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  network                  ChainNetwork @relation(fields: [networkId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, networkId, contractAddress])
+  @@index([organizationId, active])
+}
+
+model AutomationRule {
+  id                    String                @id @default(uuid()) @db.Uuid
+  organizationId        String                @db.Uuid
+  agentId               String                @db.Uuid
+  name                  String
+  description           String?
+  status                AutomationRuleStatus  @default(DRAFT)
+  triggerType           AutomationTriggerType
+  triggerConfig         Json
+  actionType            AutomationActionType
+  actionConfigEncrypted String
+  approvalThreshold     Int                   @default(0)
+  maxExecutionsPerDay   Int                   @default(24)
+  nextRunAt             DateTime?             @db.Timestamptz
+  version               Int                   @default(1)
+  createdBy             String                @db.Uuid
+  createdAt             DateTime              @default(now()) @db.Timestamptz
+  updatedAt             DateTime              @updatedAt @db.Timestamptz
+  organization          Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent                 Agent                 @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  executions            AutomationExecution[]
+
+  @@index([organizationId, status, nextRunAt])
+  @@index([agentId, status])
+}
+
+model AutomationExecution {
+  id                String                        @id @default(uuid()) @db.Uuid
+  organizationId    String                        @db.Uuid
+  ruleId            String                        @db.Uuid
+  idempotencyKey    String
+  status            AutomationExecutionStatus     @default(PENDING)
+  triggerFactsHash  String
+  requiredApprovals Int                           @default(0)
+  triggeredByUserId String?                       @db.Uuid
+  transactionId     String?
+  result            Json?
+  errorCode         String?
+  startedAt         DateTime?                     @db.Timestamptz
+  completedAt       DateTime?                     @db.Timestamptz
+  createdAt         DateTime                      @default(now()) @db.Timestamptz
+  updatedAt         DateTime                      @updatedAt @db.Timestamptz
+  organization      Organization                  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  rule              AutomationRule                @relation(fields: [ruleId], references: [id], onDelete: Restrict)
+  triggeredBy       User?                         @relation("AutomationTriggeredBy", fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+  decisions         AutomationExecutionDecision[]
+
+  @@unique([ruleId, idempotencyKey])
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([triggeredByUserId])
+}
+
+model AutomationExecutionDecision {
+  id          String                 @id @default(uuid()) @db.Uuid
+  executionId String                 @db.Uuid
+  userId      String                 @db.Uuid
+  decision    AutomationDecisionType
+  note        String?
+  createdAt   DateTime               @default(now()) @db.Timestamptz
+  execution   AutomationExecution    @relation(fields: [executionId], references: [id], onDelete: Restrict)
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([executionId, userId])
+  @@index([executionId, decision])
+}
+
+model FinancialObservationDaily {
+  id               String              @id @default(uuid()) @db.Uuid
+  organizationId   String              @db.Uuid
+  agentId          String?             @db.Uuid
+  scopeKey         String
+  ledgerType       FinancialLedgerType
+  assetCode        String
+  observationDate  DateTime            @db.Date
+  outflowAtomic    Decimal             @default(0) @db.Decimal(78, 0)
+  inflowAtomic     Decimal             @default(0) @db.Decimal(78, 0)
+  transactionCount Int                 @default(0)
+  declinedCount    Int                 @default(0)
+  averageAtomic    Decimal             @default(0) @db.Decimal(78, 0)
+  maximumAtomic    Decimal             @default(0) @db.Decimal(78, 0)
+  createdAt        DateTime            @default(now()) @db.Timestamptz
+  updatedAt        DateTime            @updatedAt @db.Timestamptz
+  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent            Agent?              @relation(fields: [agentId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, scopeKey, ledgerType, assetCode, observationDate])
+  @@index([organizationId, ledgerType, assetCode, observationDate])
+}
+
+model SpendForecast {
+  id                     String              @id @default(uuid()) @db.Uuid
+  organizationId         String              @db.Uuid
+  agentId                String?             @db.Uuid
+  ledgerType             FinancialLedgerType
+  assetCode              String
+  horizonDays            Int
+  predictedOutflowAtomic Decimal             @db.Decimal(78, 0)
+  lowerBoundAtomic       Decimal             @db.Decimal(78, 0)
+  upperBoundAtomic       Decimal             @db.Decimal(78, 0)
+  confidence             Float
+  modelName              String
+  modelVersion           String
+  trainingDays           Int
+  trainedThrough         DateTime            @db.Date
+  generatedAt            DateTime            @default(now()) @db.Timestamptz
+  organization           Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent                  Agent?              @relation(fields: [agentId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, generatedAt(sort: Desc)])
+  @@index([agentId, ledgerType, assetCode, horizonDays, generatedAt(sort: Desc)])
+}
+
+model FinancialAnomaly {
+  id             String                 @id @default(uuid()) @db.Uuid
+  organizationId String                 @db.Uuid
+  agentId        String?                @db.Uuid
+  ledgerType     FinancialLedgerType
+  assetCode      String
+  anomalyKey     String                 @unique
+  severity       String
+  reasonCode     String
+  observedAtomic Decimal                @db.Decimal(78, 0)
+  expectedAtomic Decimal                @db.Decimal(78, 0)
+  deviationScore Float
+  sourceType     String?
+  sourceId       String?
+  explanation    Json
+  status         FinancialAnomalyStatus @default(OPEN)
+  detectedAt     DateTime               @default(now()) @db.Timestamptz
+  acknowledgedAt DateTime?              @db.Timestamptz
+  resolvedAt     DateTime?              @db.Timestamptz
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent          Agent?                 @relation(fields: [agentId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, status, detectedAt(sort: Desc)])
+  @@index([agentId, status, detectedAt(sort: Desc)])
+}
+
+model BudgetRecommendation {
+  id                              String               @id @default(uuid()) @db.Uuid
+  organizationId                  String               @db.Uuid
+  agentId                         String               @db.Uuid
+  assetId                         String               @db.Uuid
+  recommendedPerTransactionAtomic Decimal              @db.Decimal(78, 0)
+  recommendedDailyAtomic          Decimal              @db.Decimal(78, 0)
+  recommendedMonthlyAtomic        Decimal              @db.Decimal(78, 0)
+  confidence                      Float
+  rationale                       Json
+  status                          RecommendationStatus @default(OPEN)
+  basedOnThrough                  DateTime             @db.Date
+  createdAt                       DateTime             @default(now()) @db.Timestamptz
+  updatedAt                       DateTime             @updatedAt @db.Timestamptz
+  organization                    Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent                           Agent                @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  asset                           Asset                @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([agentId, status])
+}
+
+model IntelligenceRun {
+  id              String                @id @default(uuid()) @db.Uuid
+  organizationId  String                @db.Uuid
+  status          IntelligenceRunStatus @default(RUNNING)
+  windowStart     DateTime              @db.Date
+  windowEnd       DateTime              @db.Date
+  observations    Int                   @default(0)
+  forecasts       Int                   @default(0)
+  anomalies       Int                   @default(0)
+  recommendations Int                   @default(0)
+  errorCode       String?
+  startedAt       DateTime              @default(now()) @db.Timestamptz
+  completedAt     DateTime?             @db.Timestamptz
+  organization    Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, startedAt(sort: Desc)])
+  @@index([status, startedAt])
+}
+
+model CardholderProfile {
+  id                   String           @id @default(uuid()) @db.Uuid
+  organizationId       String           @db.Uuid
+  userId               String?          @db.Uuid
+  provider             CardProvider
+  externalCardholderId String
+  status               CardholderStatus @default(PENDING)
+  name                 String
+  email                String
+  phone                String?
+  billingAddress       Json
+  createdAt            DateTime         @default(now()) @db.Timestamptz
+  updatedAt            DateTime         @updatedAt @db.Timestamptz
+  organization         Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user                 User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  cards                VirtualCard[]
+
+  @@unique([provider, externalCardholderId])
+  @@index([organizationId, status])
+}
+
+model VirtualCard {
+  id                  String              @id @default(uuid()) @db.Uuid
+  organizationId      String              @db.Uuid
+  agentId             String              @db.Uuid
+  cardholderProfileId String              @db.Uuid
+  provider            CardProvider
+  externalCardId      String
+  status              VirtualCardStatus   @default(INACTIVE)
+  currency            String              @db.VarChar(3)
+  last4               String              @db.VarChar(4)
+  brand               String?
+  expMonth            Int?
+  expYear             Int?
+  nickname            String?
+  spendingLimitMinor  Decimal?            @db.Decimal(78, 0)
+  spendingInterval    String?
+  allowedCategories   String[]
+  blockedCategories   String[]
+  allowedCountries    String[]
+  version             Int                 @default(1)
+  createdAt           DateTime            @default(now()) @db.Timestamptz
+  updatedAt           DateTime            @updatedAt @db.Timestamptz
+  organization        Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent               Agent               @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  cardholder          CardholderProfile   @relation(fields: [cardholderProfileId], references: [id], onDelete: Restrict)
+  authorizations      CardAuthorization[]
+
+  @@unique([provider, externalCardId])
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([agentId, status])
+}
+
+model CardAuthorization {
+  id                      String                  @id @default(uuid()) @db.Uuid
+  organizationId          String                  @db.Uuid
+  virtualCardId           String                  @db.Uuid
+  provider                CardProvider
+  externalAuthorizationId String
+  status                  CardAuthorizationStatus @default(PENDING)
+  amountMinor             Decimal                 @db.Decimal(78, 0)
+  currency                String                  @db.VarChar(3)
+  merchantName            String?
+  merchantCategory        String?
+  merchantCountry         String?
+  approved                Boolean?
+  decisionReasons         String[]
+  requestedAt             DateTime                @db.Timestamptz
+  resolvedAt              DateTime?               @db.Timestamptz
+  createdAt               DateTime                @default(now()) @db.Timestamptz
+  updatedAt               DateTime                @updatedAt @db.Timestamptz
+  organization            Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  virtualCard             VirtualCard             @relation(fields: [virtualCardId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, externalAuthorizationId])
+  @@index([organizationId, requestedAt(sort: Desc)])
+  @@index([virtualCardId, status, requestedAt])
+}
+
+model FiatAccount {
+  id                String            @id @default(uuid()) @db.Uuid
+  organizationId    String            @db.Uuid
+  provider          CardProvider
+  externalAccountId String
+  status            FiatAccountStatus @default(PENDING)
+  currency          String            @db.VarChar(3)
+  availableMinor    Decimal           @default(0) @db.Decimal(78, 0)
+  pendingMinor      Decimal           @default(0) @db.Decimal(78, 0)
+  createdAt         DateTime          @default(now()) @db.Timestamptz
+  updatedAt         DateTime          @updatedAt @db.Timestamptz
+  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  transfers         FiatTransfer[]
+
+  @@unique([provider, externalAccountId])
+  @@index([organizationId, status])
+}
+
+model FiatTransfer {
+  id                    String                @id @default(uuid()) @db.Uuid
+  organizationId        String                @db.Uuid
+  fiatAccountId         String                @db.Uuid
+  provider              CardProvider
+  externalTransferId    String
+  idempotencyKey        String
+  requestHash           String
+  direction             FiatTransferDirection
+  status                FiatTransferStatus    @default(PENDING)
+  amountMinor           Decimal               @db.Decimal(78, 0)
+  currency              String                @db.VarChar(3)
+  failureCode           String?
+  instrumentIdEncrypted String?
+  description           String?
+  createdAt             DateTime              @default(now()) @db.Timestamptz
+  updatedAt             DateTime              @updatedAt @db.Timestamptz
+  organization          Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  fiatAccount           FiatAccount           @relation(fields: [fiatAccountId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, externalTransferId])
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([status, updatedAt])
+}
+
+model ProviderWebhookEvent {
+  id              String                @id @default(uuid()) @db.Uuid
+  provider        CardProvider
+  externalEventId String
+  eventType       String
+  payloadHash     String
+  status          ProviderWebhookStatus @default(RECEIVED)
+  errorCode       String?
+  receivedAt      DateTime              @default(now()) @db.Timestamptz
+  processedAt     DateTime?             @db.Timestamptz
+
+  @@unique([provider, externalEventId])
+  @@index([provider, status, receivedAt])
 }

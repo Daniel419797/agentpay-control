@@ -28,7 +28,15 @@ export type ResourceProviderMinAggregateOutputType = {
   id: string | null
   organizationId: string | null
   name: string | null
+  publicSlug: string | null
+  description: string | null
+  websiteUrl: string | null
+  supportEmail: string | null
+  termsUrl: string | null
+  privacyUrl: string | null
   status: $Enums.ProviderStatus | null
+  verificationStatus: $Enums.ProviderVerificationStatus | null
+  verifiedAt: Date | null
   settlementAccountId: string | null
   settlementAccountVerified: boolean | null
   createdAt: Date | null
@@ -38,7 +46,15 @@ export type ResourceProviderMaxAggregateOutputType = {
   id: string | null
   organizationId: string | null
   name: string | null
+  publicSlug: string | null
+  description: string | null
+  websiteUrl: string | null
+  supportEmail: string | null
+  termsUrl: string | null
+  privacyUrl: string | null
   status: $Enums.ProviderStatus | null
+  verificationStatus: $Enums.ProviderVerificationStatus | null
+  verifiedAt: Date | null
   settlementAccountId: string | null
   settlementAccountVerified: boolean | null
   createdAt: Date | null
@@ -48,7 +64,15 @@ export type ResourceProviderCountAggregateOutputType = {
   id: number
   organizationId: number
   name: number
+  publicSlug: number
+  description: number
+  websiteUrl: number
+  supportEmail: number
+  termsUrl: number
+  privacyUrl: number
   status: number
+  verificationStatus: number
+  verifiedAt: number
   settlementAccountId: number
   settlementAccountVerified: number
   createdAt: number
@@ -60,7 +84,15 @@ export type ResourceProviderMinAggregateInputType = {
   id?: true
   organizationId?: true
   name?: true
+  publicSlug?: true
+  description?: true
+  websiteUrl?: true
+  supportEmail?: true
+  termsUrl?: true
+  privacyUrl?: true
   status?: true
+  verificationStatus?: true
+  verifiedAt?: true
   settlementAccountId?: true
   settlementAccountVerified?: true
   createdAt?: true
@@ -70,7 +102,15 @@ export type ResourceProviderMaxAggregateInputType = {
   id?: true
   organizationId?: true
   name?: true
+  publicSlug?: true
+  description?: true
+  websiteUrl?: true
+  supportEmail?: true
+  termsUrl?: true
+  privacyUrl?: true
   status?: true
+  verificationStatus?: true
+  verifiedAt?: true
   settlementAccountId?: true
   settlementAccountVerified?: true
   createdAt?: true
@@ -80,7 +120,15 @@ export type ResourceProviderCountAggregateInputType = {
   id?: true
   organizationId?: true
   name?: true
+  publicSlug?: true
+  description?: true
+  websiteUrl?: true
+  supportEmail?: true
+  termsUrl?: true
+  privacyUrl?: true
   status?: true
+  verificationStatus?: true
+  verifiedAt?: true
   settlementAccountId?: true
   settlementAccountVerified?: true
   createdAt?: true
@@ -163,7 +211,15 @@ export type ResourceProviderGroupByOutputType = {
   id: string
   organizationId: string | null
   name: string
+  publicSlug: string | null
+  description: string | null
+  websiteUrl: string | null
+  supportEmail: string | null
+  termsUrl: string | null
+  privacyUrl: string | null
   status: $Enums.ProviderStatus
+  verificationStatus: $Enums.ProviderVerificationStatus
+  verifiedAt: Date | null
   settlementAccountId: string
   settlementAccountVerified: boolean
   createdAt: Date
@@ -194,7 +250,15 @@ export type ResourceProviderWhereInput = {
   id?: Prisma.UuidFilter<"ResourceProvider"> | string
   organizationId?: Prisma.UuidNullableFilter<"ResourceProvider"> | string | null
   name?: Prisma.StringFilter<"ResourceProvider"> | string
+  publicSlug?: Prisma.StringNullableFilter<"ResourceProvider"> | string | null
+  description?: Prisma.StringNullableFilter<"ResourceProvider"> | string | null
+  websiteUrl?: Prisma.StringNullableFilter<"ResourceProvider"> | string | null
+  supportEmail?: Prisma.StringNullableFilter<"ResourceProvider"> | string | null
+  termsUrl?: Prisma.StringNullableFilter<"ResourceProvider"> | string | null
+  privacyUrl?: Prisma.StringNullableFilter<"ResourceProvider"> | string | null
   status?: Prisma.EnumProviderStatusFilter<"ResourceProvider"> | $Enums.ProviderStatus
+  verificationStatus?: Prisma.EnumProviderVerificationStatusFilter<"ResourceProvider"> | $Enums.ProviderVerificationStatus
+  verifiedAt?: Prisma.DateTimeNullableFilter<"ResourceProvider"> | Date | string | null
   settlementAccountId?: Prisma.StringFilter<"ResourceProvider"> | string
   settlementAccountVerified?: Prisma.BoolFilter<"ResourceProvider"> | boolean
   createdAt?: Prisma.DateTimeFilter<"ResourceProvider"> | Date | string
@@ -206,7 +270,15 @@ export type ResourceProviderOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   organizationId?: Prisma.SortOrderInput | Prisma.SortOrder
   name?: Prisma.SortOrder
+  publicSlug?: Prisma.SortOrderInput | Prisma.SortOrder
+  description?: Prisma.SortOrderInput | Prisma.SortOrder
+  websiteUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  supportEmail?: Prisma.SortOrderInput | Prisma.SortOrder
+  termsUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  privacyUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
+  verificationStatus?: Prisma.SortOrder
+  verifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   settlementAccountId?: Prisma.SortOrder
   settlementAccountVerified?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -216,24 +288,40 @@ export type ResourceProviderOrderByWithRelationInput = {
 
 export type ResourceProviderWhereUniqueInput = Prisma.AtLeast<{
   id?: string
+  publicSlug?: string
   AND?: Prisma.ResourceProviderWhereInput | Prisma.ResourceProviderWhereInput[]
   OR?: Prisma.ResourceProviderWhereInput[]
   NOT?: Prisma.ResourceProviderWhereInput | Prisma.ResourceProviderWhereInput[]
   organizationId?: Prisma.UuidNullableFilter<"ResourceProvider"> | string | null
   name?: Prisma.StringFilter<"ResourceProvider"> | string
+  description?: Prisma.StringNullableFilter<"ResourceProvider"> | string | null
+  websiteUrl?: Prisma.StringNullableFilter<"ResourceProvider"> | string | null
+  supportEmail?: Prisma.StringNullableFilter<"ResourceProvider"> | string | null
+  termsUrl?: Prisma.StringNullableFilter<"ResourceProvider"> | string | null
+  privacyUrl?: Prisma.StringNullableFilter<"ResourceProvider"> | string | null
   status?: Prisma.EnumProviderStatusFilter<"ResourceProvider"> | $Enums.ProviderStatus
+  verificationStatus?: Prisma.EnumProviderVerificationStatusFilter<"ResourceProvider"> | $Enums.ProviderVerificationStatus
+  verifiedAt?: Prisma.DateTimeNullableFilter<"ResourceProvider"> | Date | string | null
   settlementAccountId?: Prisma.StringFilter<"ResourceProvider"> | string
   settlementAccountVerified?: Prisma.BoolFilter<"ResourceProvider"> | boolean
   createdAt?: Prisma.DateTimeFilter<"ResourceProvider"> | Date | string
   organization?: Prisma.XOR<Prisma.OrganizationNullableScalarRelationFilter, Prisma.OrganizationWhereInput> | null
   resources?: Prisma.ResourceListingListRelationFilter
-}, "id">
+}, "id" | "publicSlug">
 
 export type ResourceProviderOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   organizationId?: Prisma.SortOrderInput | Prisma.SortOrder
   name?: Prisma.SortOrder
+  publicSlug?: Prisma.SortOrderInput | Prisma.SortOrder
+  description?: Prisma.SortOrderInput | Prisma.SortOrder
+  websiteUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  supportEmail?: Prisma.SortOrderInput | Prisma.SortOrder
+  termsUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  privacyUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
+  verificationStatus?: Prisma.SortOrder
+  verifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   settlementAccountId?: Prisma.SortOrder
   settlementAccountVerified?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -249,7 +337,15 @@ export type ResourceProviderScalarWhereWithAggregatesInput = {
   id?: Prisma.UuidWithAggregatesFilter<"ResourceProvider"> | string
   organizationId?: Prisma.UuidNullableWithAggregatesFilter<"ResourceProvider"> | string | null
   name?: Prisma.StringWithAggregatesFilter<"ResourceProvider"> | string
+  publicSlug?: Prisma.StringNullableWithAggregatesFilter<"ResourceProvider"> | string | null
+  description?: Prisma.StringNullableWithAggregatesFilter<"ResourceProvider"> | string | null
+  websiteUrl?: Prisma.StringNullableWithAggregatesFilter<"ResourceProvider"> | string | null
+  supportEmail?: Prisma.StringNullableWithAggregatesFilter<"ResourceProvider"> | string | null
+  termsUrl?: Prisma.StringNullableWithAggregatesFilter<"ResourceProvider"> | string | null
+  privacyUrl?: Prisma.StringNullableWithAggregatesFilter<"ResourceProvider"> | string | null
   status?: Prisma.EnumProviderStatusWithAggregatesFilter<"ResourceProvider"> | $Enums.ProviderStatus
+  verificationStatus?: Prisma.EnumProviderVerificationStatusWithAggregatesFilter<"ResourceProvider"> | $Enums.ProviderVerificationStatus
+  verifiedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ResourceProvider"> | Date | string | null
   settlementAccountId?: Prisma.StringWithAggregatesFilter<"ResourceProvider"> | string
   settlementAccountVerified?: Prisma.BoolWithAggregatesFilter<"ResourceProvider"> | boolean
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"ResourceProvider"> | Date | string
@@ -258,7 +354,15 @@ export type ResourceProviderScalarWhereWithAggregatesInput = {
 export type ResourceProviderCreateInput = {
   id?: string
   name: string
+  publicSlug?: string | null
+  description?: string | null
+  websiteUrl?: string | null
+  supportEmail?: string | null
+  termsUrl?: string | null
+  privacyUrl?: string | null
   status?: $Enums.ProviderStatus
+  verificationStatus?: $Enums.ProviderVerificationStatus
+  verifiedAt?: Date | string | null
   settlementAccountId: string
   settlementAccountVerified?: boolean
   createdAt?: Date | string
@@ -270,7 +374,15 @@ export type ResourceProviderUncheckedCreateInput = {
   id?: string
   organizationId?: string | null
   name: string
+  publicSlug?: string | null
+  description?: string | null
+  websiteUrl?: string | null
+  supportEmail?: string | null
+  termsUrl?: string | null
+  privacyUrl?: string | null
   status?: $Enums.ProviderStatus
+  verificationStatus?: $Enums.ProviderVerificationStatus
+  verifiedAt?: Date | string | null
   settlementAccountId: string
   settlementAccountVerified?: boolean
   createdAt?: Date | string
@@ -280,7 +392,15 @@ export type ResourceProviderUncheckedCreateInput = {
 export type ResourceProviderUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
+  publicSlug?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  supportEmail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProviderStatusFieldUpdateOperationsInput | $Enums.ProviderStatus
+  verificationStatus?: Prisma.EnumProviderVerificationStatusFieldUpdateOperationsInput | $Enums.ProviderVerificationStatus
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   settlementAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   settlementAccountVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -292,7 +412,15 @@ export type ResourceProviderUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
+  publicSlug?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  supportEmail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProviderStatusFieldUpdateOperationsInput | $Enums.ProviderStatus
+  verificationStatus?: Prisma.EnumProviderVerificationStatusFieldUpdateOperationsInput | $Enums.ProviderVerificationStatus
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   settlementAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   settlementAccountVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -303,7 +431,15 @@ export type ResourceProviderCreateManyInput = {
   id?: string
   organizationId?: string | null
   name: string
+  publicSlug?: string | null
+  description?: string | null
+  websiteUrl?: string | null
+  supportEmail?: string | null
+  termsUrl?: string | null
+  privacyUrl?: string | null
   status?: $Enums.ProviderStatus
+  verificationStatus?: $Enums.ProviderVerificationStatus
+  verifiedAt?: Date | string | null
   settlementAccountId: string
   settlementAccountVerified?: boolean
   createdAt?: Date | string
@@ -312,7 +448,15 @@ export type ResourceProviderCreateManyInput = {
 export type ResourceProviderUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
+  publicSlug?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  supportEmail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProviderStatusFieldUpdateOperationsInput | $Enums.ProviderStatus
+  verificationStatus?: Prisma.EnumProviderVerificationStatusFieldUpdateOperationsInput | $Enums.ProviderVerificationStatus
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   settlementAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   settlementAccountVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -322,7 +466,15 @@ export type ResourceProviderUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
+  publicSlug?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  supportEmail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProviderStatusFieldUpdateOperationsInput | $Enums.ProviderStatus
+  verificationStatus?: Prisma.EnumProviderVerificationStatusFieldUpdateOperationsInput | $Enums.ProviderVerificationStatus
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   settlementAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   settlementAccountVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -342,7 +494,15 @@ export type ResourceProviderCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   organizationId?: Prisma.SortOrder
   name?: Prisma.SortOrder
+  publicSlug?: Prisma.SortOrder
+  description?: Prisma.SortOrder
+  websiteUrl?: Prisma.SortOrder
+  supportEmail?: Prisma.SortOrder
+  termsUrl?: Prisma.SortOrder
+  privacyUrl?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  verificationStatus?: Prisma.SortOrder
+  verifiedAt?: Prisma.SortOrder
   settlementAccountId?: Prisma.SortOrder
   settlementAccountVerified?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -352,7 +512,15 @@ export type ResourceProviderMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   organizationId?: Prisma.SortOrder
   name?: Prisma.SortOrder
+  publicSlug?: Prisma.SortOrder
+  description?: Prisma.SortOrder
+  websiteUrl?: Prisma.SortOrder
+  supportEmail?: Prisma.SortOrder
+  termsUrl?: Prisma.SortOrder
+  privacyUrl?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  verificationStatus?: Prisma.SortOrder
+  verifiedAt?: Prisma.SortOrder
   settlementAccountId?: Prisma.SortOrder
   settlementAccountVerified?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -362,7 +530,15 @@ export type ResourceProviderMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   organizationId?: Prisma.SortOrder
   name?: Prisma.SortOrder
+  publicSlug?: Prisma.SortOrder
+  description?: Prisma.SortOrder
+  websiteUrl?: Prisma.SortOrder
+  supportEmail?: Prisma.SortOrder
+  termsUrl?: Prisma.SortOrder
+  privacyUrl?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  verificationStatus?: Prisma.SortOrder
+  verifiedAt?: Prisma.SortOrder
   settlementAccountId?: Prisma.SortOrder
   settlementAccountVerified?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -419,6 +595,10 @@ export type EnumProviderStatusFieldUpdateOperationsInput = {
   set?: $Enums.ProviderStatus
 }
 
+export type EnumProviderVerificationStatusFieldUpdateOperationsInput = {
+  set?: $Enums.ProviderVerificationStatus
+}
+
 export type ResourceProviderCreateNestedOneWithoutResourcesInput = {
   create?: Prisma.XOR<Prisma.ResourceProviderCreateWithoutResourcesInput, Prisma.ResourceProviderUncheckedCreateWithoutResourcesInput>
   connectOrCreate?: Prisma.ResourceProviderCreateOrConnectWithoutResourcesInput
@@ -436,7 +616,15 @@ export type ResourceProviderUpdateOneRequiredWithoutResourcesNestedInput = {
 export type ResourceProviderCreateWithoutOrganizationInput = {
   id?: string
   name: string
+  publicSlug?: string | null
+  description?: string | null
+  websiteUrl?: string | null
+  supportEmail?: string | null
+  termsUrl?: string | null
+  privacyUrl?: string | null
   status?: $Enums.ProviderStatus
+  verificationStatus?: $Enums.ProviderVerificationStatus
+  verifiedAt?: Date | string | null
   settlementAccountId: string
   settlementAccountVerified?: boolean
   createdAt?: Date | string
@@ -446,7 +634,15 @@ export type ResourceProviderCreateWithoutOrganizationInput = {
 export type ResourceProviderUncheckedCreateWithoutOrganizationInput = {
   id?: string
   name: string
+  publicSlug?: string | null
+  description?: string | null
+  websiteUrl?: string | null
+  supportEmail?: string | null
+  termsUrl?: string | null
+  privacyUrl?: string | null
   status?: $Enums.ProviderStatus
+  verificationStatus?: $Enums.ProviderVerificationStatus
+  verifiedAt?: Date | string | null
   settlementAccountId: string
   settlementAccountVerified?: boolean
   createdAt?: Date | string
@@ -486,7 +682,15 @@ export type ResourceProviderScalarWhereInput = {
   id?: Prisma.UuidFilter<"ResourceProvider"> | string
   organizationId?: Prisma.UuidNullableFilter<"ResourceProvider"> | string | null
   name?: Prisma.StringFilter<"ResourceProvider"> | string
+  publicSlug?: Prisma.StringNullableFilter<"ResourceProvider"> | string | null
+  description?: Prisma.StringNullableFilter<"ResourceProvider"> | string | null
+  websiteUrl?: Prisma.StringNullableFilter<"ResourceProvider"> | string | null
+  supportEmail?: Prisma.StringNullableFilter<"ResourceProvider"> | string | null
+  termsUrl?: Prisma.StringNullableFilter<"ResourceProvider"> | string | null
+  privacyUrl?: Prisma.StringNullableFilter<"ResourceProvider"> | string | null
   status?: Prisma.EnumProviderStatusFilter<"ResourceProvider"> | $Enums.ProviderStatus
+  verificationStatus?: Prisma.EnumProviderVerificationStatusFilter<"ResourceProvider"> | $Enums.ProviderVerificationStatus
+  verifiedAt?: Prisma.DateTimeNullableFilter<"ResourceProvider"> | Date | string | null
   settlementAccountId?: Prisma.StringFilter<"ResourceProvider"> | string
   settlementAccountVerified?: Prisma.BoolFilter<"ResourceProvider"> | boolean
   createdAt?: Prisma.DateTimeFilter<"ResourceProvider"> | Date | string
@@ -495,7 +699,15 @@ export type ResourceProviderScalarWhereInput = {
 export type ResourceProviderCreateWithoutResourcesInput = {
   id?: string
   name: string
+  publicSlug?: string | null
+  description?: string | null
+  websiteUrl?: string | null
+  supportEmail?: string | null
+  termsUrl?: string | null
+  privacyUrl?: string | null
   status?: $Enums.ProviderStatus
+  verificationStatus?: $Enums.ProviderVerificationStatus
+  verifiedAt?: Date | string | null
   settlementAccountId: string
   settlementAccountVerified?: boolean
   createdAt?: Date | string
@@ -506,7 +718,15 @@ export type ResourceProviderUncheckedCreateWithoutResourcesInput = {
   id?: string
   organizationId?: string | null
   name: string
+  publicSlug?: string | null
+  description?: string | null
+  websiteUrl?: string | null
+  supportEmail?: string | null
+  termsUrl?: string | null
+  privacyUrl?: string | null
   status?: $Enums.ProviderStatus
+  verificationStatus?: $Enums.ProviderVerificationStatus
+  verifiedAt?: Date | string | null
   settlementAccountId: string
   settlementAccountVerified?: boolean
   createdAt?: Date | string
@@ -531,7 +751,15 @@ export type ResourceProviderUpdateToOneWithWhereWithoutResourcesInput = {
 export type ResourceProviderUpdateWithoutResourcesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
+  publicSlug?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  supportEmail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProviderStatusFieldUpdateOperationsInput | $Enums.ProviderStatus
+  verificationStatus?: Prisma.EnumProviderVerificationStatusFieldUpdateOperationsInput | $Enums.ProviderVerificationStatus
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   settlementAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   settlementAccountVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -542,7 +770,15 @@ export type ResourceProviderUncheckedUpdateWithoutResourcesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
+  publicSlug?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  supportEmail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProviderStatusFieldUpdateOperationsInput | $Enums.ProviderStatus
+  verificationStatus?: Prisma.EnumProviderVerificationStatusFieldUpdateOperationsInput | $Enums.ProviderVerificationStatus
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   settlementAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   settlementAccountVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -551,7 +787,15 @@ export type ResourceProviderUncheckedUpdateWithoutResourcesInput = {
 export type ResourceProviderCreateManyOrganizationInput = {
   id?: string
   name: string
+  publicSlug?: string | null
+  description?: string | null
+  websiteUrl?: string | null
+  supportEmail?: string | null
+  termsUrl?: string | null
+  privacyUrl?: string | null
   status?: $Enums.ProviderStatus
+  verificationStatus?: $Enums.ProviderVerificationStatus
+  verifiedAt?: Date | string | null
   settlementAccountId: string
   settlementAccountVerified?: boolean
   createdAt?: Date | string
@@ -560,7 +804,15 @@ export type ResourceProviderCreateManyOrganizationInput = {
 export type ResourceProviderUpdateWithoutOrganizationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
+  publicSlug?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  supportEmail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProviderStatusFieldUpdateOperationsInput | $Enums.ProviderStatus
+  verificationStatus?: Prisma.EnumProviderVerificationStatusFieldUpdateOperationsInput | $Enums.ProviderVerificationStatus
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   settlementAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   settlementAccountVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -570,7 +822,15 @@ export type ResourceProviderUpdateWithoutOrganizationInput = {
 export type ResourceProviderUncheckedUpdateWithoutOrganizationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
+  publicSlug?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  supportEmail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProviderStatusFieldUpdateOperationsInput | $Enums.ProviderStatus
+  verificationStatus?: Prisma.EnumProviderVerificationStatusFieldUpdateOperationsInput | $Enums.ProviderVerificationStatus
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   settlementAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   settlementAccountVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -580,7 +840,15 @@ export type ResourceProviderUncheckedUpdateWithoutOrganizationInput = {
 export type ResourceProviderUncheckedUpdateManyWithoutOrganizationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
+  publicSlug?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  supportEmail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumProviderStatusFieldUpdateOperationsInput | $Enums.ProviderStatus
+  verificationStatus?: Prisma.EnumProviderVerificationStatusFieldUpdateOperationsInput | $Enums.ProviderVerificationStatus
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   settlementAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   settlementAccountVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -621,7 +889,15 @@ export type ResourceProviderSelect<ExtArgs extends runtime.Types.Extensions.Inte
   id?: boolean
   organizationId?: boolean
   name?: boolean
+  publicSlug?: boolean
+  description?: boolean
+  websiteUrl?: boolean
+  supportEmail?: boolean
+  termsUrl?: boolean
+  privacyUrl?: boolean
   status?: boolean
+  verificationStatus?: boolean
+  verifiedAt?: boolean
   settlementAccountId?: boolean
   settlementAccountVerified?: boolean
   createdAt?: boolean
@@ -634,7 +910,15 @@ export type ResourceProviderSelectCreateManyAndReturn<ExtArgs extends runtime.Ty
   id?: boolean
   organizationId?: boolean
   name?: boolean
+  publicSlug?: boolean
+  description?: boolean
+  websiteUrl?: boolean
+  supportEmail?: boolean
+  termsUrl?: boolean
+  privacyUrl?: boolean
   status?: boolean
+  verificationStatus?: boolean
+  verifiedAt?: boolean
   settlementAccountId?: boolean
   settlementAccountVerified?: boolean
   createdAt?: boolean
@@ -645,7 +929,15 @@ export type ResourceProviderSelectUpdateManyAndReturn<ExtArgs extends runtime.Ty
   id?: boolean
   organizationId?: boolean
   name?: boolean
+  publicSlug?: boolean
+  description?: boolean
+  websiteUrl?: boolean
+  supportEmail?: boolean
+  termsUrl?: boolean
+  privacyUrl?: boolean
   status?: boolean
+  verificationStatus?: boolean
+  verifiedAt?: boolean
   settlementAccountId?: boolean
   settlementAccountVerified?: boolean
   createdAt?: boolean
@@ -656,13 +948,21 @@ export type ResourceProviderSelectScalar = {
   id?: boolean
   organizationId?: boolean
   name?: boolean
+  publicSlug?: boolean
+  description?: boolean
+  websiteUrl?: boolean
+  supportEmail?: boolean
+  termsUrl?: boolean
+  privacyUrl?: boolean
   status?: boolean
+  verificationStatus?: boolean
+  verifiedAt?: boolean
   settlementAccountId?: boolean
   settlementAccountVerified?: boolean
   createdAt?: boolean
 }
 
-export type ResourceProviderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "organizationId" | "name" | "status" | "settlementAccountId" | "settlementAccountVerified" | "createdAt", ExtArgs["result"]["resourceProvider"]>
+export type ResourceProviderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "organizationId" | "name" | "publicSlug" | "description" | "websiteUrl" | "supportEmail" | "termsUrl" | "privacyUrl" | "status" | "verificationStatus" | "verifiedAt" | "settlementAccountId" | "settlementAccountVerified" | "createdAt", ExtArgs["result"]["resourceProvider"]>
 export type ResourceProviderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organization?: boolean | Prisma.ResourceProvider$organizationArgs<ExtArgs>
   resources?: boolean | Prisma.ResourceProvider$resourcesArgs<ExtArgs>
@@ -685,7 +985,15 @@ export type $ResourceProviderPayload<ExtArgs extends runtime.Types.Extensions.In
     id: string
     organizationId: string | null
     name: string
+    publicSlug: string | null
+    description: string | null
+    websiteUrl: string | null
+    supportEmail: string | null
+    termsUrl: string | null
+    privacyUrl: string | null
     status: $Enums.ProviderStatus
+    verificationStatus: $Enums.ProviderVerificationStatus
+    verifiedAt: Date | null
     settlementAccountId: string
     settlementAccountVerified: boolean
     createdAt: Date
@@ -1117,7 +1425,15 @@ export interface ResourceProviderFieldRefs {
   readonly id: Prisma.FieldRef<"ResourceProvider", 'String'>
   readonly organizationId: Prisma.FieldRef<"ResourceProvider", 'String'>
   readonly name: Prisma.FieldRef<"ResourceProvider", 'String'>
+  readonly publicSlug: Prisma.FieldRef<"ResourceProvider", 'String'>
+  readonly description: Prisma.FieldRef<"ResourceProvider", 'String'>
+  readonly websiteUrl: Prisma.FieldRef<"ResourceProvider", 'String'>
+  readonly supportEmail: Prisma.FieldRef<"ResourceProvider", 'String'>
+  readonly termsUrl: Prisma.FieldRef<"ResourceProvider", 'String'>
+  readonly privacyUrl: Prisma.FieldRef<"ResourceProvider", 'String'>
   readonly status: Prisma.FieldRef<"ResourceProvider", 'ProviderStatus'>
+  readonly verificationStatus: Prisma.FieldRef<"ResourceProvider", 'ProviderVerificationStatus'>
+  readonly verifiedAt: Prisma.FieldRef<"ResourceProvider", 'DateTime'>
   readonly settlementAccountId: Prisma.FieldRef<"ResourceProvider", 'String'>
   readonly settlementAccountVerified: Prisma.FieldRef<"ResourceProvider", 'Boolean'>
   readonly createdAt: Prisma.FieldRef<"ResourceProvider", 'DateTime'>

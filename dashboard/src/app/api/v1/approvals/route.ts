@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { handleApiError, ok, problem } from "@/lib/api";
-import { workspaceFromRequest } from "@/lib/workspace";
+import { workspaceFromRequest, workspaceHasRole } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -8,9 +8,10 @@ export async function GET(request: Request) {
   try {
     const workspace = await workspaceFromRequest(request);
     if (!workspace) return problem(401, "AUTH_REQUIRED", "Sign in before viewing approvals.");
+    if (!workspaceHasRole(workspace, ["OWNER", "OPERATOR", "APPROVER", "VIEWER"])) return problem(403, "ROLE_REQUIRED", "Approval access is required.");
     const rows = await db.approvalRequest.findMany({
       where: { paymentIntent: { organizationId: workspace.organization.id } },
-      include: { paymentIntent: { include: { agent: true, quote: { include: { asset: true } }, decisions: true } } },
+      include: { decisions: true, paymentIntent: { include: { agent: true, quote: { include: { asset: true } }, decisions: true } } },
       orderBy: { requestedAt: "desc" },
     });
     return ok(rows.map((approval) => ({
