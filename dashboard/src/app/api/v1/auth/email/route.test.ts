@@ -44,7 +44,7 @@ describe("passwordless email delivery", () => {
       body: JSON.stringify({ email: "operator@example.com", mode: "otp" }),
     }));
 
-    expect(response.status).toBe(502);
-    expect((await response.json()).code).toBe("EMAIL_AUTH_FAILED");
+    expect(response.status).toBe(429);
+    expect((await response.json()).code).toBe("EMAIL_RATE_LIMITED");
   });
 });

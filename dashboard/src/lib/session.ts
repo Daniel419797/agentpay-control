@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { getConfig } from "@/lib/config";
 
 export const SESSION_COOKIE = "agentpay_session";
-export type OperatorSession = { sub: string; email: string; name: string; mode: "supabase" };
+export type OperatorSession = { sub: string; email: string | null; name: string; mode: "supabase" | "wallet" };
 
 function key() { return new TextEncoder().encode(getConfig().AUTH_SECRET); }
 
@@ -13,8 +13,8 @@ export async function createOperatorSession(session: OperatorSession) {
 
 export async function verifyOperatorSession(token: string): Promise<OperatorSession> {
   const { payload } = await jwtVerify(token, key(), { algorithms: ["HS256"] });
-  if (!payload.sub || typeof payload.email !== "string" || typeof payload.name !== "string" || payload.mode !== "supabase") throw new Error("INVALID_SESSION");
-  return { sub: payload.sub, email: payload.email, name: payload.name, mode: payload.mode };
+  if (!payload.sub || typeof payload.name !== "string" || !["supabase", "wallet"].includes(payload.mode as string)) throw new Error("INVALID_SESSION");
+  return { sub: payload.sub, email: (payload.email as string) ?? null, name: payload.name, mode: payload.mode as "supabase" | "wallet" };
 }
 
 export async function sessionFromRequest(request: Request) {
@@ -61,4 +61,32 @@ export async function provisionSupabaseOperator(user: { id: string; email?: stri
 
 export function sessionCookie(token: string) {
   return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=28800${getConfig().APP_ENV === "production" ? "; Secure" : ""}`;
+}
+
+export async function provisionWalletOperator(accountId: string, walletProvider: string) {
+  const network = "hedera:testnet";
+  const existingIdentity = await db.walletIdentity.findUnique({ where: { network_accountId: { network, accountId } } });
+  if (existingIdentity) {
+    const user = await db.user.findUniqueOrThrow({ where: { id: existingIdentity.userId } });
+    return { sub: user.id, email: null, name: user.displayName, mode: "wallet" as const };
+  }
+  const displayName = `Wallet ${accountId}`;
+  const user = await db.user.create({ data: { displayName } });
+  const slug = `wallet-${accountId.replace(/\./g, "-")}-${user.id.slice(0, 8)}`;
+  const organization = await db.organization.create({
+    data: {
+      name: `${displayName}'s workspace`,
+      slug,
+      memberships: { create: { userId: user.id, roles: ["OWNER", "OPERATOR", "APPROVER", "PROVIDER_ADMIN"] } },
+    },
+  });
+  await db.walletIdentity.create({ data: { userId: user.id, network, accountId, walletProvider } });
+  await db.auditEvent.create({
+    data: {
+      organizationId: organization.id, actorType: "USER", actorId: user.id,
+      action: "WORKSPACE_CREATED", targetType: "ORGANIZATION", targetId: organization.id,
+      result: "SUCCESS", metadata: { authMethod: "wallet", accountId },
+    },
+  });
+  return { sub: user.id, email: null, name: displayName, mode: "wallet" as const };
 }
