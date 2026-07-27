@@ -1,0 +1,122 @@
+import { ExactEvmScheme } from "@x402/evm/exact/facilitator";
+import { toFacilitatorEvmSigner, verifyTypedDataSignature } from "@x402/evm";
+import { createWalletClient, createPublicClient, http, defineChain, type WalletClient, type PublicClient, type Hex } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { z } from "zod";
+
+const arcTestnet = defineChain({
+  id: 5042002,
+  name: "Arc Testnet",
+  nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
+  rpcUrls: { default: { http: ["https://rpc.testnet.arc.network"] } },
+  blockExplorers: { default: { name: "ArcScan", url: "https://testnet.arcscan.app" } },
+  testnet: true,
+});
+
+export const envSchema = z.object({
+  APP_ENV: z.enum(["development", "test", "production"]).default("development"),
+  ARC_PAYER_PRIVATE_KEY: z.string().regex(/^(0x)?[0-9a-fA-F]{64}$/, "Must be a 64-char hex private key"),
+  ARC_RPC_URL: z.string().url().default("https://rpc.testnet.arc.network"),
+  ARC_USDC_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).default("0x3600000000000000000000000000000000000000"),
+  ARC_PROVIDER_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
+  FACILITATOR_API_KEY: z.string().min(32).optional(),
+  CONTRACT_ALLOWLIST_JSON: z.string().default("[]"),
+  PORT: z.coerce.number().default(8788),
+});
+
+export type ArcConfig = z.infer<typeof envSchema>;
+
+export class EvmFacilitator {
+  private readonly config: ArcConfig;
+  private readonly account: ReturnType<typeof privateKeyToAccount>;
+  readonly walletClient: WalletClient;
+  readonly publicClient: PublicClient;
+  readonly scheme: ExactEvmScheme;
+  readonly network: string;
+  readonly usdcAddress: Hex;
+
+  constructor(config: ArcConfig) {
+    this.config = config;
+    this.account = privateKeyToAccount(config.ARC_PAYER_PRIVATE_KEY.startsWith("0x") ? config.ARC_PAYER_PRIVATE_KEY as Hex : `0x${config.ARC_PAYER_PRIVATE_KEY}` as Hex);
+    this.usdcAddress = config.ARC_USDC_ADDRESS as Hex;
+
+    const chain = defineChain({
+      ...arcTestnet,
+      rpcUrls: { default: { http: [config.ARC_RPC_URL] } },
+    });
+
+    this.walletClient = createWalletClient({
+      account: this.account,
+      chain,
+      transport: http(config.ARC_RPC_URL),
+    });
+
+    this.publicClient = createPublicClient({
+      chain,
+      transport: http(config.ARC_RPC_URL),
+    });
+
+    const evmSigner = {
+      address: this.account.address,
+      readContract: (args: any) => this.publicClient.readContract(args),
+      sendTransaction: (args: any) => this.walletClient.sendTransaction({ ...args, account: this.account, chain: this.walletClient.chain }),
+      writeContract: (args: any) => this.walletClient.writeContract({ ...args, account: this.account, chain: this.walletClient.chain }),
+      waitForTransactionReceipt: (args: any) => this.publicClient.waitForTransactionReceipt(args),
+      getCode: (args: any) => this.publicClient.getCode(args),
+      verifyTypedData: (args: any) => verifyTypedDataSignature(evmSigner as any, args),
+    };
+    const signer = toFacilitatorEvmSigner(evmSigner);
+    this.scheme = new ExactEvmScheme(signer);
+    this.network = `eip155:${chain.id}`;
+  }
+
+  get providerAddress(): string {
+    return this.config.ARC_PROVIDER_ADDRESS;
+  }
+
+  get usdcContract(): { address: Hex; abi: readonly unknown[] } {
+    return {
+      address: this.usdcAddress,
+      abi: [
+        {
+          type: "function",
+          name: "transferWithAuthorization",
+          stateMutability: "nonpayable",
+          inputs: [
+            { name: "from", type: "address" },
+            { name: "to", type: "address" },
+            { name: "value", type: "uint256" },
+            { name: "validAfter", type: "uint256" },
+            { name: "validBefore", type: "uint256" },
+            { name: "nonce", type: "bytes32" },
+            { name: "v", type: "uint8" },
+            { name: "r", type: "bytes32" },
+            { name: "s", type: "bytes32" },
+          ],
+          outputs: [],
+        },
+      ] as const,
+    };
+  }
+
+  async executeContractCall(
+    contractAddress: Hex,
+    calldata: Hex,
+    gas: number,
+    payableAtomic: bigint,
+  ) {
+    const tx = await this.walletClient.sendTransaction({
+      account: this.account,
+      chain: this.walletClient.chain,
+      to: contractAddress,
+      data: calldata,
+      gas: BigInt(Math.min(gas, 15_000_000)),
+      value: payableAtomic,
+    });
+    const receipt = await this.publicClient.waitForTransactionReceipt({
+      hash: tx,
+      timeout: 30_000,
+    });
+    return { transactionHash: tx, status: receipt.status === "success", blockNumber: receipt.blockNumber };
+  }
+}
