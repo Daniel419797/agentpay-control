@@ -100,6 +100,20 @@ a { color: inherit; text-decoration: none; }
 .topbar-title { font-size: 20px; font-weight: 720; letter-spacing: -0.025em; }
 .topbar-actions { display: flex; align-items: center; gap: 12px; }
 .network-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.network-switcher { position: relative; }
+.network-switcher.compact .network-switcher-trigger { font-size: 12px; padding: 2px 0; border: 0; background: transparent; color: var(--sidebar-foreground); min-height: auto; }
+.network-switcher-trigger { min-height: 34px; border: 1px solid #b8c7d2; border-radius: 6px; padding: 0 10px; display: inline-flex; align-items: center; gap: 7px; background: white; color: #263449; font-size: 12px; font-weight: 650; cursor: pointer; white-space: nowrap; }
+.network-switcher-trigger:hover { border-color: #8d9daa; }
+.network-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.network-dot.testnet { background: #13c7b5; box-shadow: 0 0 0 3px rgb(19 199 181 / 12%); }
+.network-dot.mainnet { background: #f59e0b; box-shadow: 0 0 0 3px rgb(245 158 11 / 12%); }
+.network-switcher-scrim { position: fixed; inset: 0; z-index: 69; }
+.network-switcher-dropdown { position: absolute; top: calc(100% + 6px); left: 0; min-width: 180px; border: 1px solid var(--border); border-radius: 7px; padding: 5px; background: white; box-shadow: 0 12px 32px rgba(6, 27, 53, .14); z-index: 70; }
+.compact .network-switcher-dropdown { left: -8px; }
+.network-option { width: 100%; border: 0; border-radius: 5px; padding: 9px 10px; display: flex; align-items: center; gap: 8px; background: transparent; color: #263449; font-size: 12px; font-weight: 600; cursor: pointer; text-align: left; }
+.network-option:hover { background: #f2f6f9; }
+.network-option.active { background: #e9f6f4; color: #006d65; }
+.network-check { margin-left: auto; color: var(--primary); font-weight: 700; }
 .account-chip { border: 1px solid var(--border); border-radius: 6px; padding: 8px 11px; font-family: var(--font-geist-mono), monospace; font-size: 12px; background: #fff; }
 .wallet-control { position: relative; }
 .wallet-trigger { min-height: 34px; border: 1px solid #b8c7d2; border-radius: 6px; padding: 0 10px; display: inline-flex; align-items: center; gap: 7px; background: white; color: #263449; font-size: 12px; font-weight: 650; cursor: pointer; }
@@ -310,7 +324,9 @@ a { color: inherit; text-decoration: none; }
   .topbar { height: 60px; padding: 0 16px; }
   .topbar-title { font-size: 17px; }
   .mobile-nav-button { display: inline-grid; place-items: center; border: 0; background: transparent; }
-  .network-label span:last-child, .account-chip { display: none; }
+  .network-label, .network-switcher:not(.compact) { display: none; }
+  .compact .network-switcher-trigger span { display: none; }
+  .compact .network-switcher-trigger .network-dot { display: inline-block; }
   .page { padding: 18px 14px 32px; }
   .page-heading { margin-bottom: 14px; }
   .page-heading h1 { font-size: 21px; }

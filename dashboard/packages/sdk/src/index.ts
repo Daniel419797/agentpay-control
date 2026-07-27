@@ -1,6 +1,6 @@
 export type AgentPayClientOptions = { baseUrl: string; apiKey: string; fetch?: typeof globalThis.fetch };
 
-export type PaidRequest = { resourceUrl: string; purpose?: string; maxAmountAtomic?: string };
+export type PaidRequest = { resourceUrl: string; purpose?: string; maxAmountAtomic?: string; network?: string };
 
 export type PaymentIntent = {
   id: string;
@@ -39,6 +39,7 @@ export type ResourceListing = {
   prices: Array<{
     asset: { symbol: string; decimals: number };
     atomicAmount: string;
+    network?: string;
   }>;
 };
 

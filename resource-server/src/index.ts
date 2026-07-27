@@ -7,15 +7,52 @@ import { boundedJson, sameRequirement } from "./security.js";
 
 const env = z.object({
   FACILITATOR_URL: z.string().default("http://localhost:8787"),
+  HEDERA_MAINNET_FACILITATOR_URL: z.string().default("http://localhost:8787"),
+  ARC_FACILITATOR_URL: z.string().default("http://localhost:8788"),
   PORT: z.coerce.number().default(3200),
   NETWORK: z.string().default("hedera:testnet"),
   PROVIDER_ACCOUNT_ID: z.string(),
+  HEDERA_MAINNET_PROVIDER_ACCOUNT_ID: z.string().optional(),
   USDC_TOKEN_ID: z.string().optional(),
+  HEDERA_MAINNET_USDC_TOKEN_ID: z.string().optional(),
   FACILITATOR_FEE_PAYER_ID: z.string().optional(),
   FACILITATOR_API_KEY: z.string().min(32).optional(),
+  ARC_PROVIDER_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
+  ARC_USDC_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
 }).parse(process.env);
 
-type AssetPrice = { type: "NATIVE" | "TOKEN"; amount: string; hederaTokenId?: string };
+const ARCTestnet = {
+  caip2: "eip155:5042002",
+  usdcAddress: env.ARC_USDC_ADDRESS ?? "0x3600000000000000000000000000000000000000",
+  providerAddress: env.ARC_PROVIDER_ADDRESS ?? "",
+  explorerUrl: "https://testnet.arcscan.app/tx",
+  facilitatorUrl: env.ARC_FACILITATOR_URL,
+};
+
+const HederaTestnet = {
+  caip2: "hedera:testnet",
+  usdcTokenId: env.USDC_TOKEN_ID,
+  providerAccountId: env.PROVIDER_ACCOUNT_ID,
+  explorerUrl: "https://hashscan.io/testnet/transaction",
+  facilitatorUrl: env.FACILITATOR_URL,
+};
+
+const HederaMainnet = {
+  caip2: "hedera:mainnet",
+  usdcTokenId: env.HEDERA_MAINNET_USDC_TOKEN_ID,
+  providerAccountId: env.HEDERA_MAINNET_PROVIDER_ACCOUNT_ID ?? env.PROVIDER_ACCOUNT_ID,
+  explorerUrl: "https://hashscan.io/mainnet/transaction",
+  facilitatorUrl: env.HEDERA_MAINNET_FACILITATOR_URL,
+};
+
+type NetworkConfig = { caip2: string; facilitatorUrl: string; explorerUrl: string };
+const networks: Record<string, NetworkConfig> = {
+  [HederaTestnet.caip2]: HederaTestnet,
+  [HederaMainnet.caip2]: HederaMainnet,
+  [ARCTestnet.caip2]: ARCTestnet,
+};
+
+type AssetPrice = { type: "NATIVE" | "TOKEN"; amount: string; assetId: string; decimals: number; symbol: string };
 const requirementSchema = z.object({
   scheme: z.literal("exact"),
   network: z.string().min(1),
@@ -31,24 +68,39 @@ const paymentPayloadSchema = z.object({
   payload: z.record(z.string(), z.unknown()),
 }).passthrough();
 
-const prices: Record<string, AssetPrice> = {
-  hbar: { type: "NATIVE", amount: "5000000" },
-  usdc: { type: "TOKEN", amount: "1000000", hederaTokenId: env.USDC_TOKEN_ID },
+const arcPrices: Record<string, AssetPrice> = {
+  usdc: { type: "TOKEN", amount: "1000000", assetId: ARCTestnet.usdcAddress, decimals: 6, symbol: "USDC" },
+};
+const hederaPrices: Record<string, AssetPrice> = {
+  hbar: { type: "NATIVE", amount: "5000000", assetId: "0.0.0", decimals: 8, symbol: "HBAR" },
+  usdc: { type: "TOKEN", amount: "1000000", assetId: HederaTestnet.usdcTokenId ?? "", decimals: 6, symbol: "USDC" },
 };
 
-function paymentRequirements(asset: "hbar" | "usdc", resourceUrl: string) {
-  const p = prices[asset];
+function getNetworkConfig(network: string): NetworkConfig | undefined {
+  return networks[network];
+}
+
+function paymentRequirements(network: string, resourceUrl: string) {
+  const isArc = network === ARCTestnet.caip2;
+  const isHederaMainnet = network === HederaMainnet.caip2;
+  const prices = isArc ? arcPrices : isHederaMainnet ? hederaPrices : hederaPrices;
+  const payTo = isArc
+    ? ARCTestnet.providerAddress
+    : isHederaMainnet
+      ? HederaMainnet.providerAccountId
+      : HederaTestnet.providerAccountId;
+  const accepts = Object.entries(prices).map(([key, p]) => ({
+    scheme: "exact" as const,
+    network,
+    amount: p.amount,
+    payTo,
+    asset: p.assetId,
+    maxTimeoutSeconds: 900,
+    extra: isArc ? { name: "USD Coin", version: "2", assetTransferMethod: "eip3009" } : { feePayer: env.FACILITATOR_FEE_PAYER_ID },
+  }));
   return {
     x402Version: 2,
-    accepts: [{
-      scheme: "exact",
-      network: env.NETWORK,
-      amount: p.amount,
-      payTo: env.PROVIDER_ACCOUNT_ID,
-      asset: p.type === "TOKEN" ? p.hederaTokenId : "0.0.0",
-      maxTimeoutSeconds: 900,
-      extra: env.FACILITATOR_FEE_PAYER_ID ? { feePayer: env.FACILITATOR_FEE_PAYER_ID } : {},
-    }],
+    accepts,
     resource: {
       url: resourceUrl,
       description: "AgentPay protected resource",
@@ -58,60 +110,40 @@ function paymentRequirements(asset: "hbar" | "usdc", resourceUrl: string) {
   };
 }
 
+const sharedPrices = [
+  { asset: "HBAR", atomicAmount: hederaPrices.hbar.amount, network: HederaTestnet.caip2 },
+  { asset: "USDC", atomicAmount: hederaPrices.usdc.amount, network: HederaTestnet.caip2 },
+  { asset: "HBAR", atomicAmount: hederaPrices.hbar.amount, network: HederaMainnet.caip2 },
+  { asset: "USDC", atomicAmount: hederaPrices.usdc.amount, network: HederaMainnet.caip2 },
+  { asset: "USDC", atomicAmount: arcPrices.usdc.amount, network: ARCTestnet.caip2 },
+];
+
 const catalog = {
   resources: [
     {
-      id: "market-data-eth",
-      category: "MARKET_DATA",
-      name: "ETH/USD Price",
-      description: "Latest Ethereum price with 24h change",
-      endpoint: "/v1/market-data/ETH",
-      prices: [
-        { asset: "HBAR", atomicAmount: prices.hbar.amount, type: prices.hbar.type },
-        { asset: "USDC", atomicAmount: prices.usdc.amount, type: prices.usdc.type, hederaTokenId: prices.usdc.hederaTokenId },
-      ],
+      id: "market-data-eth", category: "MARKET_DATA", name: "ETH/USD Price",
+      description: "Latest Ethereum price with 24h change", endpoint: "/v1/market-data/ETH",
+      prices: sharedPrices,
     },
     {
-      id: "market-data-btc",
-      category: "MARKET_DATA",
-      name: "BTC/USD Price",
-      description: "Latest Bitcoin price with 24h change",
-      endpoint: "/v1/market-data/BTC",
-      prices: [
-        { asset: "HBAR", atomicAmount: prices.hbar.amount, type: prices.hbar.type },
-        { asset: "USDC", atomicAmount: prices.usdc.amount, type: prices.usdc.type, hederaTokenId: prices.usdc.hederaTokenId },
-      ],
+      id: "market-data-btc", category: "MARKET_DATA", name: "BTC/USD Price",
+      description: "Latest Bitcoin price with 24h change", endpoint: "/v1/market-data/BTC",
+      prices: sharedPrices,
     },
     {
-      id: "files-report",
-      category: "FILE",
-      name: "Q2 Market Report",
-      description: "Confidential Q2 market analysis report (PDF)",
-      endpoint: "/v1/files/report-q2",
-      prices: [
-        { asset: "HBAR", atomicAmount: prices.hbar.amount, type: prices.hbar.type },
-      ],
+      id: "files-report", category: "FILE", name: "Q2 Market Report",
+      description: "Confidential Q2 market analysis report (PDF)", endpoint: "/v1/files/report-q2",
+      prices: [sharedPrices[0], sharedPrices[2]],
     },
     {
-      id: "inference-llama",
-      category: "AI_INFERENCE",
-      name: "LLaMA 3.2 Inference",
-      description: "Run inference on LLaMA 3.2 with custom prompt (max 1000 tokens)",
-      endpoint: "/v1/inference/llama-3.2",
-      prices: [
-        { asset: "HBAR", atomicAmount: prices.hbar.amount, type: prices.hbar.type },
-        { asset: "USDC", atomicAmount: prices.usdc.amount, type: prices.usdc.type, hederaTokenId: prices.usdc.hederaTokenId },
-      ],
+      id: "inference-llama", category: "AI_INFERENCE", name: "LLaMA 3.2 Inference",
+      description: "Run inference on LLaMA 3.2 with custom prompt (max 1000 tokens)", endpoint: "/v1/inference/llama-3.2",
+      prices: sharedPrices,
     },
     {
-      id: "research-web",
-      category: "WEB_RESEARCH",
-      name: "Web Research Query",
-      description: "Bounded web research with source metadata",
-      endpoint: "/v1/research",
-      prices: [
-        { asset: "HBAR", atomicAmount: prices.hbar.amount, type: prices.hbar.type },
-      ],
+      id: "research-web", category: "WEB_RESEARCH", name: "Web Research Query",
+      description: "Bounded web research with source metadata", endpoint: "/v1/research",
+      prices: [sharedPrices[0], sharedPrices[2]],
     },
   ],
 };
@@ -127,23 +159,33 @@ function generateResourceId(): string {
   return createHash("sha256").update(randomUUID()).digest("hex").slice(0, 16);
 }
 
+function getFacilitatorForNetwork(network: string): string | undefined {
+  if (network === ARCTestnet.caip2) return ARCTestnet.facilitatorUrl;
+  if (network === HederaTestnet.caip2) return HederaTestnet.facilitatorUrl;
+  if (network === HederaMainnet.caip2) return HederaMainnet.facilitatorUrl;
+  return undefined;
+}
+
 const app = new Hono();
 
-app.get("/health", (c: Context) => c.json({ status: "ok", network: env.NETWORK, provider: env.PROVIDER_ACCOUNT_ID }));
+app.get("/health", (c: Context) => c.json({ status: "ok", networks: Object.keys(networks), provider: { testnet: env.PROVIDER_ACCOUNT_ID, mainnet: env.HEDERA_MAINNET_PROVIDER_ACCOUNT_ID ?? env.PROVIDER_ACCOUNT_ID } }));
 
 app.get("/catalog", (c: Context) => c.json(catalog));
 
 async function handlePaidRequest(c: Context, category: string, resourceId: string, data: unknown) {
   const paymentSignature = c.req.header("PAYMENT-SIGNATURE");
   const paymentRequirementsHeader = c.req.header("PAYMENT-REQUIREMENTS");
-  const canonical = paymentRequirements("hbar", c.req.url);
+  const acceptNetwork = c.req.header("ACCEPT-NETWORK") ?? HederaTestnet.caip2;
+
+  const canonical = paymentRequirements(acceptNetwork, c.req.url);
   const canonicalRequirement = requirementSchema.parse(canonical.accepts[0]);
 
   if (!paymentSignature) {
     c.header("PAYMENT-REQUIRED", JSON.stringify(canonical));
+    const firstPrice = acceptNetwork === ARCTestnet.caip2 ? arcPrices.usdc : hederaPrices.hbar;
     return c.json({
       code: "PAYMENT_REQUIRED",
-      message: `Pay ${prices.hbar.amount} tinybars to access this ${category} resource`,
+      message: `Pay ${firstPrice.amount} ${firstPrice.symbol} on ${acceptNetwork} to access this ${category} resource`,
       paymentRequirements: canonical,
     }, 402);
   }
@@ -154,15 +196,17 @@ async function handlePaidRequest(c: Context, category: string, resourceId: strin
   try {
     const parsed = requirementSchema.parse(JSON.parse(paymentRequirementsHeader));
     const payload = paymentPayloadSchema.parse(JSON.parse(paymentSignature));
-    if (!sameRequirement(parsed, canonicalRequirement) || !sameRequirement(payload.accepted, canonicalRequirement)) {
+    const matchingCanonical = canonical.accepts.find((req) => sameRequirement(parsed, req));
+    if (!matchingCanonical || !sameRequirement(payload.accepted, matchingCanonical)) {
       return c.json({ code: "PAYMENT_REQUIREMENT_MISMATCH", message: "The signed payment does not match this resource price and payee." }, 402);
     }
-    const verifyBody = {
-      paymentPayload: payload,
-      paymentRequirements: canonicalRequirement,
-    };
+
+    const verifyBody = { paymentPayload: payload, paymentRequirements: matchingCanonical };
     const idempotencyKey = `resource:${resourceId}:${createHash("sha256").update(paymentSignature).digest("hex")}`;
-    const verifyRes = await fetch(`${env.FACILITATOR_URL}/verify`, {
+    const facilitatorUrl = getFacilitatorForNetwork(parsed.network);
+    if (!facilitatorUrl) return c.json({ code: "NETWORK_UNSUPPORTED", message: `Network ${parsed.network} is not supported` }, 422);
+
+    const verifyRes = await fetch(`${facilitatorUrl}/verify`, {
       method: "POST",
       headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(env.FACILITATOR_API_KEY ? { authorization: `Bearer ${env.FACILITATOR_API_KEY}` } : {}) },
       body: JSON.stringify(verifyBody),
@@ -173,7 +217,7 @@ async function handlePaidRequest(c: Context, category: string, resourceId: strin
       return c.json({ code: "PAYMENT_INVALID", message: verifyResult.invalidReason || "Payment verification failed" }, 402);
     }
 
-    const settleRes = await fetch(`${env.FACILITATOR_URL}/settle`, {
+    const settleRes = await fetch(`${facilitatorUrl}/settle`, {
       method: "POST",
       headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(env.FACILITATOR_API_KEY ? { authorization: `Bearer ${env.FACILITATOR_API_KEY}` } : {}) },
       body: JSON.stringify(verifyBody),
@@ -189,19 +233,19 @@ async function handlePaidRequest(c: Context, category: string, resourceId: strin
     const paymentResponse = {
       x402Version: 2,
       transactionId,
-      network: env.NETWORK,
+      network: parsed.network,
       settledAt: new Date().toISOString(),
     };
     c.header("PAYMENT-RESPONSE", JSON.stringify(paymentResponse));
+
+    const networkConfig = getNetworkConfig(parsed.network);
+    const explorerUrl = networkConfig ? `${networkConfig.explorerUrl}/${transactionId}` : `https://hashscan.io/testnet/transaction/${transactionId}`;
 
     const response = {
       resourceId: generateResourceId(),
       category,
       content: data,
-      settled: {
-        transactionId,
-        hashscanUrl: `https://hashscan.io/testnet/transaction/${transactionId}`,
-      },
+      settled: { transactionId, explorerUrl },
     };
     return c.json(response);
   } catch (error) {
@@ -213,11 +257,7 @@ app.get("/v1/market-data/:symbol", async (c: Context) => {
   const symbol = (c.req.param("symbol") ?? "").toUpperCase();
   const data = marketData[symbol];
   if (!data) return c.json({ code: "NOT_FOUND", message: `Unknown symbol: ${symbol}` }, 404);
-  return handlePaidRequest(c, "MARKET_DATA", `market-data-${symbol}`, {
-    symbol,
-    ...data,
-    timestamp: new Date().toISOString(),
-  });
+  return handlePaidRequest(c, "MARKET_DATA", `market-data-${symbol}`, { symbol, ...data, timestamp: new Date().toISOString() });
 });
 
 app.get("/v1/files/:fileId", async (c: Context) => {
@@ -236,13 +276,11 @@ app.post("/v1/inference/:model", async (c: Context) => {
   let body: Record<string, unknown>;
   try { body = await boundedJson(c.req.raw) as Record<string, unknown>; }
   catch (error) { return c.json({ code: error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE" ? "REQUEST_BODY_TOO_LARGE" : "INVALID_JSON" }, error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE" ? 413 : 400); }
-  const prompt = String(body.prompt || "Explain the benefits of Hedera hashgraph for microtransactions.");
+  const prompt = String(body.prompt || "Explain the benefits of micropayments for autonomous agents.");
   return handlePaidRequest(c, "AI_INFERENCE", `inference-${model}`, {
-    model,
-    prompt,
-    response: `[Simulated ${model} response] Based on the provided context: ${prompt.slice(0, 100)}...\n\nKey points:\n1. Hedera offers fixed $0.001 fees per transfer\n2. Finality in 3-5 seconds enables real-time micropayments\n3. The x402 standard formalizes HTTP 402 for autonomous commerce\n4. Native HBAR and USDC support provide stable payment options`,
-    tokensUsed: prompt.length * 2,
-    modelVersion: "3.2-4k",
+    model, prompt,
+    response: `[Simulated ${model} response] Based on the provided context: ${prompt.slice(0, 100)}...\n\nKey points:\n1. Arc offers sub-second deterministic finality\n2. USDC is the native gas token, no separate ETH needed\n3. The x402 standard with EIP-3009 enables gasless payments\n4. Cross-chain USDC via CCTP maintains native fungibility`,
+    tokensUsed: prompt.length * 2, modelVersion: "3.2-4k",
   });
 });
 
@@ -252,14 +290,10 @@ app.post("/v1/research", async (c: Context) => {
   catch (error) { return c.json({ code: error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE" ? "REQUEST_BODY_TOO_LARGE" : "INVALID_JSON" }, error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE" ? 413 : 400); }
   const query = String(body.query || "latest developments in decentralized AI");
   return handlePaidRequest(c, "WEB_RESEARCH", "research-default", {
-    query,
-    results: [
-      { title: "Decentralized AI Computing Market 2026", url: "https://example.com/ai-computing-2026", snippet: "The decentralized AI computing market reached $4.2B in Q2 2026..." },
-      { title: "Hedera x402 Standard Gains Traction", url: "https://example.com/x402-adoption", snippet: "The x402 payment standard on Hedera is seeing adoption across AI agent platforms..." },
-      { title: "Agent-to-Agent Commerce Protocol", url: "https://example.com/a2a-commerce", snippet: "A new protocol for autonomous agent commerce was announced, built on Hedera..." },
-    ],
-    fetchedAt: new Date().toISOString(),
-    sourceCount: 12,
+    query, results: [
+      { title: "AgentPay Multi-Chain Expansion", url: "https://agentpay.dev/blog/multi-chain", snippet: "AgentPay now supports Arc blockchain for sub-second USDC settlements..." },
+      { title: "Arc Blockchain by Circle", url: "https://docs.arc.io", snippet: "A purpose-built L1 for stablecoin-native financial applications with USDC as gas..." },
+    ], fetchedAt: new Date().toISOString(), sourceCount: 8,
   });
 });
 

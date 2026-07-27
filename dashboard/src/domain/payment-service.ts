@@ -3,10 +3,15 @@ import { db } from "@/lib/db";
 import { getConfig } from "@/lib/config";
 import { evaluatePolicy, policyScheduleViolation } from "@/domain/policy";
 import { paymentFingerprint } from "@/domain/fingerprint";
-import { createManagedPaymentPayload, discoverX402, fulfillX402Resource, parsePaymentRequired, selectRequirement, X402SubmissionUnknownError } from "@/domain/x402-client";
+import { createManagedPaymentPayload, discoverX402, fulfillX402Resource, parsePaymentRequired, selectRequirement, X402SubmissionUnknownError, type FacilitatorRoutes } from "@/domain/x402-client";
 import { assertSafeResourceUrl } from "@/lib/safe-url";
 import { retrySerializable } from "@/lib/retry";
 import { assertPlanLimit } from "@/domain/entitlement-service";
+
+function assetRequirementIdentifier(asset: { type: string; hederaTokenId?: string | null }, network: string): string {
+  if (network.startsWith("eip155:")) return asset.hederaTokenId ?? "";
+  return asset.type === "NATIVE" ? "0.0.0" : asset.hederaTokenId ?? "";
+}
 
 export type PaidRequestInput = { resourceUrl: string; purpose?: string; maxAmountAtomic?: string };
 
@@ -66,12 +71,17 @@ export async function executeAuthorizedIntent(intentId: string) {
   if (!account) throw new Error("PAYMENT_ACCOUNT_UNAVAILABLE");
   if (account.custodyType !== "PLATFORM_MANAGED_TESTNET" || account.signingMode !== "AUTONOMOUS_MANAGED") throw new Error("MANAGED_SIGNER_REQUIRED");
   const config = getConfig();
-  if (!config.FACILITATOR_URL) throw new Error("LIVE_FACILITATOR_REQUIRED");
-  if (config.HEDERA_PAYER_ACCOUNT_ID && config.HEDERA_PAYER_ACCOUNT_ID !== account.accountId) throw new Error("MANAGED_PAYER_MISMATCH");
+  const isArc = account.network.startsWith("eip155:");
+  if (isArc) {
+    if (!config.ARC_FACILITATOR_URL) throw new Error("LIVE_FACILITATOR_REQUIRED");
+  } else {
+    if (!config.FACILITATOR_URL) throw new Error("LIVE_FACILITATOR_REQUIRED");
+    if (config.HEDERA_PAYER_ACCOUNT_ID && config.HEDERA_PAYER_ACCOUNT_ID !== account.accountId) throw new Error("MANAGED_PAYER_MISMATCH");
+  }
   const required = parsePaymentRequired(intent.quote!.rawChallenge);
   const requirement = selectRequirement(required, {
     network: intent.quote!.network,
-    asset: intent.quote!.asset.type === "NATIVE" ? "0.0.0" : intent.quote!.asset.hederaTokenId ?? "",
+    asset: assetRequirementIdentifier(intent.quote!.asset, intent.quote!.network),
     amount: intent.quote!.amountAtomic.toString(),
     payTo: intent.quote!.payToAccountId,
     resourceUrl: intent.resourceUrl,
@@ -81,7 +91,7 @@ export async function executeAuthorizedIntent(intentId: string) {
   const attemptNumber = (await db.paymentAttempt.count({ where: { paymentIntentId: intent.id } })) + 1;
   const attempt = await db.paymentAttempt.create({ data: { paymentIntentId: intent.id, attemptNumber, status: "STARTED", facilitatorRequestId: randomUUID() } });
   try {
-    const signed = await createManagedPaymentPayload(config.FACILITATOR_URL, requirement, config.FACILITATOR_API_KEY);
+    const signed = await createManagedPaymentPayload(requirement);
     await db.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "SIGNED", signatureFingerprint: hash(signed.paymentPayload), candidateTransactionId: signed.transactionId } });
     const fulfillment = await fulfillX402Resource(intent.resourceUrl, requirement, signed.paymentPayload);
     return db.$transaction(async (tx) => {
@@ -132,7 +142,7 @@ export async function createPaidRequest(agentId: string, idempotencyKey: string,
     if (!policy) throw new Error("POLICY_NOT_PUBLISHED");
     const listing = await tx.resourceListing.findFirst({ where: { OR: [{ endpoint: canonical.resourceUrl }, { slug: resourceUrl.pathname.split("/").filter(Boolean).at(-1) }], status: "ACTIVE" }, include: { provider: true, prices: { where: { assetId: policy.assetId }, take: 1 } } });
     if (!listing?.prices[0]) throw new Error("RESOURCE_PRICE_NOT_FOUND");
-    const requirement = selectRequirement(required, { network: agent.network, asset: policy.asset.type === "NATIVE" ? "0.0.0" : policy.asset.hederaTokenId ?? "", amount: listing.prices[0].atomicAmount.toString(), payTo: listing.provider.settlementAccountId, resourceUrl: canonical.resourceUrl });
+    const requirement = selectRequirement(required, { network: agent.network, asset: assetRequirementIdentifier(policy.asset, agent.network), amount: listing.prices[0].atomicAmount.toString(), payTo: listing.provider.settlementAccountId, resourceUrl: canonical.resourceUrl });
     const amountAtomic = requirement.amount;
     if (input.maxAmountAtomic && BigInt(amountAtomic) > BigInt(input.maxAmountAtomic)) throw new Error("MAX_AMOUNT_EXCEEDED");
     const account = agent.accounts[0];

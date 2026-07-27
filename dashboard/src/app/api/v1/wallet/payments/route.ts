@@ -13,11 +13,13 @@ import { sessionFromRequest } from "@/lib/session";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { workspaceForSession } from "@/lib/workspace";
 
+const networkSchema = z.enum(["hedera:testnet", "hedera:mainnet"]).default("hedera:testnet");
 const paymentSchema = z.object({
   transactionId: z.string().min(8).max(120),
   payeeAccountId: z.string().regex(/^0\.0\.\d+$/),
   amountTinybar: z.number().int().positive().max(10_000_000_000),
   purpose: z.string().min(2).max(120),
+  network: networkSchema,
 });
 const action = "WALLET_PAYMENT_SETTLED";
 
@@ -29,13 +31,15 @@ function paymentView(event: { targetId: string | null; metadata: unknown; occurr
     consensusTimestamp: string;
     purpose?: string;
     resource?: string;
+    network?: string;
   };
+  const network = metadata.network === "hedera:mainnet" ? "mainnet" : "testnet";
   return {
     transactionId: event.targetId,
     ...metadata,
     purpose: metadata.purpose ?? metadata.resource ?? "Hedera payment",
     occurredAt: event.occurredAt.toISOString(),
-    hashscanUrl: `https://hashscan.io/testnet/transaction/${event.targetId}`,
+    hashscanUrl: `https://hashscan.io/${network}/transaction/${event.targetId}`,
   };
 }
 
@@ -65,18 +69,21 @@ export async function POST(request: Request) {
     const input = paymentSchema.parse(await requestBody(request));
     const transactionId = normalizeTransactionId(input.transactionId);
     const identity = await db.walletIdentity.findFirst({
-      where: { userId: session.sub, network: "hedera:testnet" },
+      where: { userId: session.sub, network: input.network },
       orderBy: { verifiedAt: "desc" },
     });
-    if (!identity) return problem(409, "WALLET_NOT_LINKED", "Connect and verify a Hedera testnet wallet first.");
+    if (!identity) return problem(409, "WALLET_NOT_LINKED", `Connect and verify a ${input.network} wallet first.`);
 
     const existing = await db.auditEvent.findFirst({
       where: { organizationId: workspace.organization.id, actorId: session.sub, action, targetId: transactionId },
     });
     if (existing) return ok(paymentView(existing));
 
+    const mirrorUrl = input.network === "hedera:mainnet"
+      ? getConfig().HEDERA_MAINNET_MIRROR_NODE_URL
+      : getConfig().HEDERA_MIRROR_NODE_URL;
     const mirrorResponse = await fetch(
-      `${getConfig().HEDERA_MIRROR_NODE_URL}/api/v1/transactions/${encodeURIComponent(transactionId)}`,
+      `${mirrorUrl}/api/v1/transactions/${encodeURIComponent(transactionId)}`,
       { cache: "no-store", signal: AbortSignal.timeout(10_000) },
     );
     if (mirrorResponse.status === 404) {
@@ -110,6 +117,7 @@ export async function POST(request: Request) {
             amountHbar: formatTinybarsAsHbar(input.amountTinybar),
             consensusTimestamp: transaction.consensus_timestamp,
             purpose: input.purpose,
+            network: input.network,
           },
         },
       });

@@ -6,12 +6,26 @@ import { useEffect, useRef, useState } from "react";
 
 import { extractTransactionId, parseHbarToTinybars } from "@/lib/hedera-payment";
 import { extractSignatureMap } from "@/lib/wallet-signature-response";
+import { useNetwork } from "@/domain/network-context";
 
 type WalletIdentity = { id: string; accountId: string; network: string; walletProvider: string };
 type Challenge = { accountId: string; message: string; challengeToken: string };
 type PaymentReceipt = { transactionId: string; hashscanUrl: string };
 
+function networkToLedgerId(network: string) {
+  return network === "hedera:mainnet" ? "mainnet" as const : "testnet" as const;
+}
+
+function networkToLedgerIdEnum(network: string) {
+  return network === "hedera:mainnet" ? 1 : 2;
+}
+
+function networkToSignerPrefix(network: string) {
+  return network === "hedera:mainnet" ? "hedera:mainnet" : "hedera:testnet";
+}
+
 export function HederaWalletConnect() {
+  const { network } = useNetwork();
   const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
   const connector = useRef<DAppConnector | null>(null);
   const [open, setOpen] = useState(false);
@@ -32,12 +46,13 @@ export function HederaWalletConnect() {
     const [{ DAppConnector, HederaJsonRpcMethod }, { LedgerId }] = await Promise.all([
       import("@hashgraph/hedera-wallet-connect"), import("@hiero-ledger/sdk")
     ]);
+    const ledgerId = LedgerId.fromString(networkToLedgerIdEnum(network).toString());
     const instance = new DAppConnector({
       name: "AgentPay Control",
       description: "Connect a Hedera payment identity to AgentPay Control.",
       url: window.location.origin,
       icons: [`${window.location.origin}/icon.svg`]
-    }, LedgerId.TESTNET, projectId!, Object.values(HederaJsonRpcMethod));
+    }, ledgerId, projectId!, Object.values(HederaJsonRpcMethod));
     await instance.init({ logger: "error" });
     await instance.openModal(undefined, true);
     connector.current = instance;
@@ -51,10 +66,10 @@ export function HederaWalletConnect() {
     setBusy(true); setError(null);
     try {
       const { instance, accountId } = await openWalletSession();
-      const challengeResponse = await fetch(`/api/v1/wallet/challenge?accountId=${encodeURIComponent(accountId)}`);
+      const challengeResponse = await fetch(`/api/v1/wallet/challenge?accountId=${encodeURIComponent(accountId)}&network=${encodeURIComponent(network)}`);
       if (!challengeResponse.ok) throw new Error("Could not create the wallet verification challenge.");
       const challengeBody = await challengeResponse.json() as { data: Challenge };
-      const signed = await instance.signMessage({ signerAccountId: `hedera:testnet:${accountId}`, message: challengeBody.data.message });
+      const signed = await instance.signMessage({ signerAccountId: `${networkToSignerPrefix(network)}:${accountId}`, message: challengeBody.data.message });
       const signatureMap = extractSignatureMap(signed);
       if (!signatureMap) throw new Error("HashPack did not return a valid signature.");
       const linkResponse = await fetch("/api/v1/wallet", {
@@ -92,7 +107,7 @@ export function HederaWalletConnect() {
         .addHbarTransfer(payeeAccountId, Hbar.fromTinybars(amountTinybar))
         .setTransactionMemo(`AgentPay: ${purpose.trim().slice(0, 90)}`);
       const result = await session.instance.signAndExecuteTransaction({
-        signerAccountId: `hedera:testnet:${session.accountId}`,
+        signerAccountId: `${networkToSignerPrefix(network)}:${session.accountId}`,
         transactionList: transactionToBase64String(transaction),
       });
       const transactionId = extractTransactionId(result);
@@ -121,7 +136,7 @@ export function HederaWalletConnect() {
     setBusy(true); setError(null);
     try {
       await connector.current?.disconnectAll().catch(() => undefined);
-      const response = await fetch("/api/v1/wallet", { method: "DELETE" });
+      const response = await fetch(`/api/v1/wallet?network=${encodeURIComponent(network)}`, { method: "DELETE" });
       if (!response.ok) throw new Error("Could not unlink the wallet.");
       setIdentity(null); connector.current = null;
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not unlink the wallet."); }
@@ -134,7 +149,7 @@ export function HederaWalletConnect() {
         <WalletCards size={16} />{identity ? identity.accountId : "Connect wallet"}
       </button>
       {open && <section className="wallet-popover" aria-label="Hedera wallet connection">
-        <div className="wallet-popover-heading"><div><strong>Hedera payment identity</strong><span>Self custody · Testnet</span></div>{identity ? <CheckCircle2 size={18} className="wallet-ok" /> : <XCircle size={18} className="wallet-muted" />}</div>
+        <div className="wallet-popover-heading"><div><strong>Hedera payment identity</strong><span>{networkToSignerPrefix(network) === "hedera:mainnet" ? "Self custody · Mainnet" : "Self custody · Testnet"}</span></div>{identity ? <CheckCircle2 size={18} className="wallet-ok" /> : <XCircle size={18} className="wallet-muted" />}</div>
         {identity ? <div className="wallet-identity"><span>HashPack / WalletConnect</span><strong>{identity.accountId}</strong><small>Ownership signature verified</small></div> : <p>Connect HashPack through WalletConnect, then approve a message signature. This does not sign in to AgentPay or authorize a payment.</p>}
         {error && <div className="wallet-error" role="alert">{error}</div>}
         {receipt && <div className="wallet-receipt"><strong>Payment confirmed</strong><a href={receipt.hashscanUrl} target="_blank" rel="noreferrer">View on HashScan</a></div>}

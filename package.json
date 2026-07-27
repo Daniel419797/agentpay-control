@@ -1,11 +1,11 @@
 {
   "name": "agentpay-control",
   "private": true,
-  "description": "Policy-controlled payment OS for autonomous software agents using x402 on Hedera",
+  "description": "Policy-controlled payment OS for autonomous software agents using x402 on Hedera and Arc",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Daniel419797/agentpay-control.git"
   },
-  "workspaces": ["dashboard", "facilitator", "resource-server"]
+  "workspaces": ["dashboard", "facilitator", "facilitator-arc", "resource-server"]
 }

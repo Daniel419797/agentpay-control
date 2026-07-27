@@ -11,6 +11,8 @@ import {
   Settings, ShieldCheck, Store
 } from "lucide-react";
 import { HederaWalletConnect } from "@/components/hedera-wallet-connect";
+import { NetworkProvider } from "@/domain/network-context";
+import { NetworkSwitcher } from "@/components/network-switcher";
 
 const navigation: Array<{ label: string; href: Route; icon: typeof LayoutDashboard; group?: string }> = [
   { label: "Overview", href: "/app/overview", icon: LayoutDashboard, group: "Operate" },
@@ -41,47 +43,49 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       });
   }, []);
   return (
-    <div className="app-shell">
-      {navOpen && <button className="nav-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}
-      <aside className={`sidebar${navOpen ? " sidebar-open" : ""}`} aria-label="Primary navigation">
-        <div className="sidebar-brand">
-          <Image
-            src="/brand/agentpay-lockup-white.png"
-            alt="AgentPay"
-            width={177}
-            height={35}
-            priority
-          />
-          {/* <span>Control</span> */}
-        </div>
-        <nav className="nav-list">
-          {navigation.map((item) => <div className="nav-entry" key={item.href}>{item.group && <span className="nav-group">{item.group}</span>}<Link className={`nav-link${pathname === item.href || (item.href !== "/app/overview" && pathname.startsWith(`${item.href}/`)) ? " active" : ""}`} href={item.href} onClick={() => setNavOpen(false)}><item.icon aria-hidden="true" size={17} />{item.label}</Link></div>)}
-        </nav>
-        <div className="sidebar-spacer" />
-        <div className="sidebar-context">
-          <span className="context-label">Environment</span>
-          <span className="context-value"><span className="status-dot" />Hedera Testnet · Live</span>
-        </div>
-        <div className="sidebar-context">
-          <span className="context-label">Operator</span>
-          <span className="context-value">{operatorEmail}</span>
-        </div>
-      </aside>
-      <main className="main-area">
-        <header className="topbar">
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button className="mobile-nav-button" aria-label="Open navigation" aria-expanded={navOpen} onClick={() => setNavOpen(true)}><Menu size={20} /></button>
-            <span className="topbar-title">Payment operations</span>
+    <NetworkProvider>
+      <div className="app-shell">
+        {navOpen && <button className="nav-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}
+        <aside className={`sidebar${navOpen ? " sidebar-open" : ""}`} aria-label="Primary navigation">
+          <div className="sidebar-brand">
+            <Image
+              src="/brand/agentpay-lockup-white.png"
+              alt="AgentPay"
+              width={177}
+              height={35}
+              priority
+            />
+            {/* <span>Control</span> */}
           </div>
-          <div className="topbar-actions">
-            <span className="network-label"><span className="status-dot" /><span>Hedera testnet</span></span>
-            <HederaWalletConnect />
-            <Link className="primary-button" href="/app/agents/new"><Plus size={16} /><span>Create agent</span></Link>
+          <nav className="nav-list">
+            {navigation.map((item) => <div className="nav-entry" key={item.href}>{item.group && <span className="nav-group">{item.group}</span>}<Link className={`nav-link${pathname === item.href || (item.href !== "/app/overview" && pathname.startsWith(`${item.href}/`)) ? " active" : ""}`} href={item.href} onClick={() => setNavOpen(false)}><item.icon aria-hidden="true" size={17} />{item.label}</Link></div>)}
+          </nav>
+          <div className="sidebar-spacer" />
+          <div className="sidebar-context">
+            <span className="context-label">Environment</span>
+            <NetworkSwitcher compact />
           </div>
-        </header>
-        {children}
-      </main>
-    </div>
+          <div className="sidebar-context">
+            <span className="context-label">Operator</span>
+            <span className="context-value">{operatorEmail}</span>
+          </div>
+        </aside>
+        <main className="main-area">
+          <header className="topbar">
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button className="mobile-nav-button" aria-label="Open navigation" aria-expanded={navOpen} onClick={() => setNavOpen(true)}><Menu size={20} /></button>
+              <span className="topbar-title">Payment operations</span>
+            </div>
+            <div className="topbar-actions">
+              <NetworkSwitcher />
+              <HederaWalletConnect />
+              <Link className="primary-button" href="/app/agents/new"><Plus size={16} /><span>Create agent</span></Link>
+            </div>
+          </header>
+          {children}
+        </main>
+      </div>
+    </NetworkProvider>
   );
 }
 

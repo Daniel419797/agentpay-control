@@ -14,10 +14,12 @@ export default async function AgentPage({ params }: { params: Promise<{ agentId:
   });
   if (!agent) notFound();
   const account = agent.accounts[0];
-  return <FormPage title={agent.name} description={agent.description ?? "Policy-controlled Hedera testnet agent."}>
+  const networkLabel = account?.network === "hedera:mainnet" ? "Hedera Mainnet" : account?.network === "hedera:testnet" ? "Hedera Testnet" : account?.network ?? "Unknown network";
+  return <FormPage title={agent.name} description={agent.description ?? `Policy-controlled ${networkLabel} agent.`}>
     <div className="detail-grid">
       <div><span>Status</span><strong>{agent.status}</strong></div>
       <div><span>Account</span><strong>{account?.accountId ?? "Not connected"}</strong></div>
+      <div><span>Network</span><strong>{networkLabel}</strong></div>
       <div><span>Custody</span><strong>{account?.custodyType.replaceAll("_", " ") ?? "Unavailable"}</strong></div>
       <div><span>Signing</span><strong>{account?.signingMode.replaceAll("_", " ") ?? "Unavailable"}</strong></div>
       <div><span>Policy</span><strong>{agent.effectivePolicy ? `Published v${agent.effectivePolicy.version}` : "Not published"}</strong></div>

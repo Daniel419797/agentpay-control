@@ -26,6 +26,14 @@ services:
       postgres:
         condition: service_healthy
 
+  facilitator-arc:
+    build:
+      context: ./facilitator-arc
+      dockerfile: Dockerfile
+    ports:
+      - "8788:8788"
+    env_file: ./facilitator-arc/.env
+
   resource-server:
     build:
       context: ./resource-server

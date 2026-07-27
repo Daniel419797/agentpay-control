@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { getNetworkRouter } from "@/domain/network-router";
 
 const MAX_CHALLENGE_BYTES = 64 * 1024;
 const MAX_FULFILLMENT_BYTES = 1024 * 1024;
@@ -109,13 +110,42 @@ export function selectRequirement(
   return selected;
 }
 
-export async function createManagedPaymentPayload(facilitatorUrl: string, requirement: PaymentRequirement, apiKey?: string) {
-  const response = await fetch(`${facilitatorUrl}/managed-sign`, {
+export function createManagedPaymentPayload(
+  facilitatorUrl: string,
+  requirement: PaymentRequirement,
+  apiKey?: string,
+): Promise<{ paymentPayload: z.infer<typeof paymentPayloadSchema>; transactionId: string }>;
+
+export function createManagedPaymentPayload(
+  requirement: PaymentRequirement,
+): Promise<{ paymentPayload: z.infer<typeof paymentPayloadSchema>; transactionId: string }>;
+
+export async function createManagedPaymentPayload(
+  facilitatorUrlOrRequirement: string | PaymentRequirement,
+  requirement?: PaymentRequirement,
+  apiKey?: string,
+) {
+  let url: string;
+  let req: PaymentRequirement;
+  let key: string | undefined;
+
+  if (typeof facilitatorUrlOrRequirement === "string" && requirement) {
+    url = facilitatorUrlOrRequirement;
+    req = requirement;
+    key = apiKey;
+  } else {
+    req = facilitatorUrlOrRequirement as PaymentRequirement;
+    const route = getNetworkRouter().getRoute(req.network);
+    url = route.facilitatorUrl;
+    key = route.facilitatorApiKey;
+  }
+
+  const response = await fetch(`${url}/managed-sign`, {
     method: "POST",
     redirect: "manual",
     signal: AbortSignal.timeout(15_000),
-    headers: { "content-type": "application/json", accept: "application/json", ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}) },
-    body: JSON.stringify({ paymentRequirements: requirement }),
+    headers: { "content-type": "application/json", accept: "application/json", ...(key ? { authorization: `Bearer ${key}` } : {}) },
+    body: JSON.stringify({ paymentRequirements: req }),
   });
   if (!response.ok) throw new Error(`FACILITATOR_SIGNING_${response.status}`);
   const body = await response.json() as { paymentPayload?: unknown; transactionId?: unknown };
