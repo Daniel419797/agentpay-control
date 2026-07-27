@@ -1,6 +1,6 @@
 # AgentPay Control
 
-A policy-controlled payment operating system for autonomous software agents using the **x402 payment standard** on **Hedera testnet** rails.
+A policy-controlled payment operating system for autonomous software agents using the **x402 payment standard** on **Hedera testnet** and **Arc Blockchain** rails.
 
 Built for the [Hedera x402 Bounty](https://hedera.com/x402-bounty).
 
