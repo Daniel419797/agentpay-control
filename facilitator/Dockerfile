@@ -1,4 +1,4 @@
-FROM node:22-alpine AS workspace
+FROM node:25-alpine AS workspace
 WORKDIR /app
 RUN npm install --global npm@11.11.1
 COPY package.json package-lock.json ./
@@ -15,7 +15,7 @@ COPY facilitator ./facilitator
 RUN npm run build --workspace=@agentpay/hedera-facilitator
 RUN npm prune --omit=dev --workspace=@agentpay/hedera-facilitator --include-workspace-root=false
 
-FROM node:22-alpine AS runtime
+FROM node:25-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
