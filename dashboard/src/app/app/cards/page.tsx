@@ -6,10 +6,6 @@ import { currentWorkspace } from "@/lib/workspace";
 
 function Empty({ text }: { text: string }) { return <div className="empty-state"><strong>Nothing to show</strong><p>{text}</p></div>; }
 
-function getVirtualCardsEnabled(): boolean {
-  try { return getConfig().VIRTUAL_CARDS_ENABLED; } catch { return false; }
-}
-
 export default async function CardsPage() {
   const workspace = await currentWorkspace(); const organizationId = workspace?.organization.id;
   const [cards, accounts, authorizations, agents, cardholders, transfers] = organizationId ? await Promise.all([
@@ -23,7 +19,7 @@ export default async function CardsPage() {
   return <div className="page"><div className="page-heading"><div><h1>Cards & fiat</h1><p>Issue controlled virtual cards and monitor fiat movement from one ledger.</p></div></div>
     <div className="compact-metrics"><div><CreditCard size={17}/><span>Active cards</span><strong>{cards.filter((card) => card.status === "ACTIVE").length}</strong></div><div><Landmark size={17}/><span>Fiat accounts</span><strong>{accounts.length}</strong></div><div><span>Recent authorizations</span><strong>{authorizations.length}</strong></div></div>
     <CardOperations
-      enabled={getVirtualCardsEnabled()}
+      enabled={getConfig().VIRTUAL_CARDS_ENABLED}
       agents={agents.map((agent) => ({ id: agent.id, label: agent.name }))}
       cardholders={cardholders.map((cardholder) => ({ id: cardholder.id, label: cardholder.name }))}
       cards={cards.map((card) => ({ id: card.id, label: card.nickname ?? `•••• ${card.last4}`, status: card.status, version: card.version }))}

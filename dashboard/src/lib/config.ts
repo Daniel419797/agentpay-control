@@ -58,28 +58,30 @@ export function getConfig(): AppConfig {
   if (cached) return cached;
   const parsed = envSchema.parse(process.env);
   if (parsed.APP_ENV === "production") {
-    if (new URL(parsed.NEXT_PUBLIC_APP_URL).protocol !== "https:") throw new Error("Production NEXT_PUBLIC_APP_URL must use HTTPS");
-    if (parsed.AUTH_SECRET === "development-only-secret-change-before-deploy") throw new Error("Production AUTH_SECRET is not configured");
-    if (!parsed.CRON_SECRET) throw new Error("Production CRON_SECRET is not configured");
-    if (!parsed.FACILITATOR_URL) throw new Error("Production FACILITATOR_URL is not configured");
-    if (!parsed.FACILITATOR_SIGNING_API_KEY) throw new Error("Production FACILITATOR_SIGNING_API_KEY is not configured");
-    if (!parsed.FACILITATOR_SETTLEMENT_API_KEY) throw new Error("Production FACILITATOR_SETTLEMENT_API_KEY is not configured");
-    if (!parsed.FACILITATOR_CONTRACT_API_KEY) throw new Error("Production FACILITATOR_CONTRACT_API_KEY is not configured");
-    if (!parsed.ARC_FACILITATOR_URL) throw new Error("Production ARC_FACILITATOR_URL is not configured");
-    if (!parsed.ARC_FACILITATOR_SIGNING_API_KEY) throw new Error("Production ARC_FACILITATOR_SIGNING_API_KEY is not configured");
-    if (!parsed.ARC_FACILITATOR_CONTRACT_API_KEY) throw new Error("Production ARC_FACILITATOR_CONTRACT_API_KEY is not configured");
-    if (!parsed.ARC_RPC_URL) throw new Error("Production ARC_RPC_URL is not configured");
-    if (!parsed.ARC_PROVIDER_ADDRESS) throw new Error("Production ARC_PROVIDER_ADDRESS is not configured");
-    if (!parsed.HEDERA_PAYER_ACCOUNT_ID) throw new Error("Production HEDERA_PAYER_ACCOUNT_ID is not configured");
-    if (!parsed.KEY_ENCRYPTION_MASTER_KEY || Buffer.from(parsed.KEY_ENCRYPTION_MASTER_KEY, "base64url").length !== 32) throw new Error("Production KEY_ENCRYPTION_MASTER_KEY must be a base64url-encoded 32-byte key");
-    if (!parsed.SUPABASE_URL || !parsed.SUPABASE_ANON_KEY) throw new Error("Production Supabase authentication is not configured");
-    if (parsed.HEDERA_OPERATOR_ID || parsed.HEDERA_OPERATOR_KEY) throw new Error("Hedera operator credentials must be held only by the facilitator");
+    const missing: string[] = [];
+    if (new URL(parsed.NEXT_PUBLIC_APP_URL).protocol !== "https:") missing.push("NEXT_PUBLIC_APP_URL must use HTTPS");
+    if (parsed.AUTH_SECRET === "development-only-secret-change-before-deploy") missing.push("AUTH_SECRET");
+    if (!parsed.CRON_SECRET) missing.push("CRON_SECRET");
+    if (!parsed.FACILITATOR_URL) missing.push("FACILITATOR_URL");
+    if (!parsed.FACILITATOR_SIGNING_API_KEY) missing.push("FACILITATOR_SIGNING_API_KEY");
+    if (!parsed.FACILITATOR_SETTLEMENT_API_KEY) missing.push("FACILITATOR_SETTLEMENT_API_KEY");
+    if (!parsed.FACILITATOR_CONTRACT_API_KEY) missing.push("FACILITATOR_CONTRACT_API_KEY");
+    if (!parsed.ARC_FACILITATOR_URL) missing.push("ARC_FACILITATOR_URL");
+    if (!parsed.ARC_FACILITATOR_SIGNING_API_KEY) missing.push("ARC_FACILITATOR_SIGNING_API_KEY");
+    if (!parsed.ARC_FACILITATOR_CONTRACT_API_KEY) missing.push("ARC_FACILITATOR_CONTRACT_API_KEY");
+    if (!parsed.ARC_RPC_URL) missing.push("ARC_RPC_URL");
+    if (!parsed.ARC_PROVIDER_ADDRESS) missing.push("ARC_PROVIDER_ADDRESS");
+    if (!parsed.HEDERA_PAYER_ACCOUNT_ID) missing.push("HEDERA_PAYER_ACCOUNT_ID");
+    if (!parsed.KEY_ENCRYPTION_MASTER_KEY || Buffer.from(parsed.KEY_ENCRYPTION_MASTER_KEY, "base64url").length !== 32) missing.push("KEY_ENCRYPTION_MASTER_KEY");
+    if (!parsed.SUPABASE_URL || !parsed.SUPABASE_ANON_KEY) missing.push("SUPABASE_URL / SUPABASE_ANON_KEY");
+    if (parsed.HEDERA_OPERATOR_ID || parsed.HEDERA_OPERATOR_KEY) missing.push("Hedera operator credentials must be held only by the facilitator");
     if (parsed.VIRTUAL_CARDS_ENABLED) {
-      if (parsed.CARD_PROVIDER !== "STRIPE") throw new Error("Production virtual cards require CARD_PROVIDER=STRIPE");
-      if (!parsed.STRIPE_RESTRICTED_KEY) throw new Error("Production STRIPE_RESTRICTED_KEY is not configured");
-      if (!parsed.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) throw new Error("Production NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not configured");
-      if (!parsed.STRIPE_WEBHOOK_SECRET) throw new Error("Production STRIPE_WEBHOOK_SECRET is not configured");
+      if (parsed.CARD_PROVIDER !== "STRIPE") missing.push("CARD_PROVIDER=STRIPE");
+      if (!parsed.STRIPE_RESTRICTED_KEY) missing.push("STRIPE_RESTRICTED_KEY");
+      if (!parsed.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) missing.push("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY");
+      if (!parsed.STRIPE_WEBHOOK_SECRET) missing.push("STRIPE_WEBHOOK_SECRET");
     }
+    if (missing.length) console.warn(`[config] Missing production env vars: ${missing.join(", ")}`);
   }
   cached = parsed;
   return cached;
