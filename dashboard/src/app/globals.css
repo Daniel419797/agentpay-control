@@ -55,7 +55,7 @@
 }
 
 * { border-color: var(--border); }
-html { background: var(--background); }
+html { background: var(--background); overflow-x: hidden; }
 body {
   margin: 0;
   background: var(--background);
@@ -158,7 +158,7 @@ a { color: inherit; text-decoration: none; }
 .metric-detail { color: var(--muted-foreground); font-size: 11px; margin-top: 8px; }
 .metric-alert { color: #aa6400; }
 
-.operations-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(330px, 0.9fr); gap: 18px; align-items: start; }
+.operations-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 0.9fr); gap: 18px; align-items: start; }
 .panel { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
 .panel-header { min-height: 54px; margin: 0 -16px; padding: 0 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .panel-footer { margin: 0 -16px; }
