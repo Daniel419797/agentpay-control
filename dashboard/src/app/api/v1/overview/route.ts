@@ -36,6 +36,24 @@ export async function GET(request: Request) {
       db.resourceListing.count({ where: { provider: { organizationId }, status: "ACTIVE" } }),
     ]);
 
+    const dayStart = new Date(); dayStart.setUTCHours(0, 0, 0, 0);
+    const activeAgentIds = agents.filter((a) => a.status === "ACTIVE").map((a) => a.id);
+    const policyVersionIds = agents.filter((a) => a.status === "ACTIVE").map((a) => a.effectivePolicyId).filter(Boolean) as string[];
+    const dailySpend = activeAgentIds.length > 0 ? await db.spendReservation.aggregate({
+      where: { agentId: { in: activeAgentIds }, createdAt: { gte: dayStart }, status: { in: ["ACTIVE", "CONSUMED", "SETTLED"] } },
+      _sum: { amountAtomic: true },
+    }) : { _sum: { amountAtomic: null } };
+    const policyVersions = policyVersionIds.length > 0 ? await db.policyVersion.findMany({
+      where: { id: { in: policyVersionIds } },
+      select: { dailyLimitAtomic: true, asset: { select: { decimals: true, symbol: true } } },
+    }) : [];
+    const totalDailyLimit = policyVersions.reduce((sum, p) => sum + Number(p.dailyLimitAtomic), 0);
+    const totalDailySpent = Number(dailySpend._sum.amountAtomic ?? 0);
+    const dailyDecimals = policyVersions[0]?.asset.decimals ?? 8;
+    const dailySymbol = policyVersions[0]?.asset.symbol ?? "HBAR";
+    const remainingDaily = totalDailyLimit > 0 ? Math.max(0, totalDailyLimit - totalDailySpent) : 0;
+    const remainingDailyFormatted = totalDailyLimit > 0 ? (remainingDaily / Math.pow(10, dailyDecimals)).toFixed(4) : "—";
+
     const walletRows = walletEvents.map((event) => {
       const metadata = event.metadata as {
         payerAccountId?: string;
@@ -86,6 +104,9 @@ export async function GET(request: Request) {
         pausedAgents: agents.filter((agent) => agent.status === "PAUSED").length,
         pendingApprovals: pending.length,
         activeResources: resources,
+        remainingDailyBudget: remainingDailyFormatted,
+        dailyBudgetSymbol: dailySymbol,
+        dailySpentPercent: totalDailyLimit > 0 ? Math.round((totalDailySpent / totalDailyLimit) * 100) : 0,
       },
       recent,
       approvals: pending.map((approval) => ({

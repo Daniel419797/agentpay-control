@@ -11,6 +11,9 @@ type OverviewData = {
     pausedAgents: number;
     pendingApprovals: number;
     activeResources: number;
+    remainingDailyBudget: string;
+    dailyBudgetSymbol: string;
+    dailySpentPercent: number;
   };
   recent: Array<{
     id: string;
@@ -67,6 +70,7 @@ export function OverviewDashboard() {
       <div className="page-heading"><div><h1>Overview</h1><p>Live policy-controlled activity and Hedera testnet settlement records.</p></div></div>
       <section className="metrics" aria-label="Payment metrics">
         <div className="metric"><div className="metric-label">Settled spend</div><div className="metric-value">{data.metrics.settledHbar.toFixed(4)} HBAR</div><div className="metric-detail">Verified wallet payments</div></div>
+        <div className="metric"><div className="metric-label">Remaining daily budget</div><div className="metric-value">{data.metrics.remainingDailyBudget} {data.metrics.dailyBudgetSymbol}</div><div className="metric-detail">{data.metrics.dailySpentPercent}% used today</div></div>
         <div className="metric"><div className="metric-label">Active agents</div><div className="metric-value">{data.metrics.activeAgents}</div><div className="metric-detail">{data.metrics.pausedAgents} paused</div></div>
         <div className="metric"><div className="metric-label">Pending approvals</div><div className="metric-value metric-alert">{data.metrics.pendingApprovals}</div><div className="metric-detail">{data.metrics.pendingApprovals ? "Awaiting operator review" : "Queue is clear"}</div></div>
         <div className="metric"><div className="metric-label">Active resources</div><div className="metric-value">{data.metrics.activeResources}</div><div className="metric-detail">Registered x402 endpoints</div></div>
