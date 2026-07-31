@@ -96,12 +96,13 @@ export function CredentialManager({ agentId, existing }: { agentId: string; exis
               ))}
             </div>
           </div>
-          {error && <div className="form-error">{error}</div>}
+          {error && <div className="form-error" role="alert">{error}</div>}
+          {!label && <div className="form-error">Enter a label to continue.</div>}
           <div className="button-row">
-            <button className="primary-button" disabled={loading || !label || scopes.length === 0} onClick={() => void create()}>
+            <button className="primary-button" disabled={loading || scopes.length === 0} onClick={() => { if (!label) { setError("Enter a label for this credential."); return; } void create(); }}>
               {loading ? "Creating…" : "Create credential"}
             </button>
-            <button className="secondary-button" onClick={() => { setShowForm(false); setError(""); }}>Cancel</button>
+            <button className="secondary-button" onClick={() => { setShowForm(false); setError(""); setLabel(""); }}>Cancel</button>
           </div>
         </div>
       ) : (

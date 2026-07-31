@@ -49,7 +49,12 @@ export function HederaWalletConnect() {
       url: window.location.origin,
       icons: [`${window.location.origin}/icon.svg`]
     }, ledgerId, projectId!, Object.values(HederaJsonRpcMethod));
-    await instance.init({ logger: "error" });
+
+    const initTimeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("WalletConnect timed out. Make sure HashPack is installed and unlocked.")), 15_000)
+    );
+    await Promise.race([instance.init({ logger: "error" }), initTimeout]);
+
     await instance.openModal(undefined, true);
     connector.current = instance;
     const signer = instance.signers[0];
