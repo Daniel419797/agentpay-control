@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { FormPage } from "@/components/workspace-page";
+import { PolicyPublishForm } from "@/components/policy-publish-form";
 import { db } from "@/lib/db";
 import { formatAtomic } from "@/lib/format";
 import { currentWorkspace } from "@/lib/workspace";
@@ -24,6 +25,6 @@ export default async function PolicyPage({ params }: { params: Promise<{ agentId
       <div><span>Denied hosts</span><strong>{policy.deniedHosts.join(", ") || "None"}</strong></div>
       <div><span>Approval threshold</span><strong>{policy.approvalThreshold} approver{policy.approvalThreshold === 1 ? "" : "s"}</strong></div>
       <div><span>Rejection threshold</span><strong>{policy.rejectionThreshold} rejection{policy.rejectionThreshold === 1 ? "" : "s"}</strong></div>
-    </div> : <div className="empty-state"><strong>No policy published</strong><p>Publish a policy before this agent can create x402 payment intents.</p></div>}
+    </div> : <PolicyPublishForm agentId={agentId} />}
   </FormPage>;
 }
