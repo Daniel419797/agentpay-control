@@ -2,7 +2,7 @@
 
 import type { DAppConnector } from "@hashgraph/hedera-wallet-connect";
 import { CheckCircle2, Link2, LoaderCircle, Unplug, WalletCards, XCircle } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { extractTransactionId, parseHbarToTinybars } from "@/lib/hedera-payment";
 import { extractSignatureMap } from "@/lib/wallet-signature-response";
@@ -18,6 +18,10 @@ function networkToLedgerIdEnum(network: string) {
 
 function networkToSignerPrefix(network: string) {
   return network === "hedera:mainnet" ? "hedera:mainnet" : "hedera:testnet";
+}
+
+function timeout(ms: number, message: string): Promise<never> {
+  return new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms));
 }
 
 export function HederaWalletConnect() {
@@ -38,29 +42,53 @@ export function HederaWalletConnect() {
       .then((body: { data?: { identities?: WalletIdentity[] } } | null) => setIdentity(body?.data?.identities?.[0] ?? null));
   }, []);
 
-  async function openWalletSession() {
-    const [{ DAppConnector, HederaJsonRpcMethod }, { LedgerId }] = await Promise.all([
-      import("@hashgraph/hedera-wallet-connect"), import("@hiero-ledger/sdk")
-    ]);
-    const ledgerId = LedgerId.fromString(networkToLedgerIdEnum(network).toString());
-    const instance = new DAppConnector({
+  const openWalletSession = useCallback(async () => {
+    let DAppConnectorClass: typeof DAppConnector;
+    let HederaJsonRpcMethod: Record<string, string>;
+    let ledgerId: unknown;
+
+    try {
+      const [wcMod, sdkMod] = await Promise.all([
+        import("@hashgraph/hedera-wallet-connect"),
+        import("@hiero-ledger/sdk"),
+      ]);
+      DAppConnectorClass = wcMod.DAppConnector;
+      HederaJsonRpcMethod = wcMod.HederaJsonRpcMethod;
+      ledgerId = sdkMod.LedgerId.fromString(networkToLedgerIdEnum(network).toString());
+    } catch (importErr) {
+      throw new Error("Failed to load WalletConnect libraries. Check your network connection.");
+    }
+    const instance = new DAppConnectorClass({
       name: "AgentPay Control",
       description: "Connect a Hedera payment identity to AgentPay Control.",
       url: window.location.origin,
-      icons: [`${window.location.origin}/icon.svg`]
-    }, ledgerId, projectId!, Object.values(HederaJsonRpcMethod));
+      icons: [`${window.location.origin}/icon.svg`],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }, ledgerId as any, projectId!, Object.values(HederaJsonRpcMethod));
 
-    const initTimeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("WalletConnect timed out. Make sure HashPack is installed and unlocked.")), 15_000)
-    );
-    await Promise.race([instance.init({ logger: "error" }), initTimeout]);
+    try {
+      await Promise.race([
+        instance.init({ logger: "error" }),
+        timeout(10_000, "WalletConnect relay timed out. Check your internet connection."),
+      ]);
+    } catch (initErr) {
+      throw new Error(`WalletConnect initialization failed: ${initErr instanceof Error ? initErr.message : "unknown error"}`);
+    }
 
-    await instance.openModal(undefined, true);
+    try {
+      await Promise.race([
+        instance.openModal(undefined, true),
+        timeout(30_000, "WalletConnect modal timed out. Make sure HashPack is installed and try again."),
+      ]);
+    } catch (modalErr) {
+      throw new Error(`Could not open wallet modal: ${modalErr instanceof Error ? modalErr.message : "unknown error"}`);
+    }
+
     connector.current = instance;
     const signer = instance.signers[0];
-    if (!signer) throw new Error("The wallet did not share a Hedera account.");
+    if (!signer) throw new Error("The wallet did not share a Hedera account. Open HashPack and approve the connection.");
     return { instance, accountId: signer.getAccountId().toString() };
-  }
+  }, [network, projectId]);
 
   async function connectWallet() {
     if (!projectId) { setError("WalletConnect project ID is not configured yet."); return; }
