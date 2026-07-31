@@ -160,6 +160,7 @@ a { color: inherit; text-decoration: none; }
 
 .operations-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(330px, 0.9fr); gap: 18px; align-items: start; }
 .panel { background: #fff; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.panel > .page-grid, .panel > .app-form { padding: 16px; }
 .page-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
 .section-gap { margin-top: 18px; }
 .compact-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #fff; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 18px; }
