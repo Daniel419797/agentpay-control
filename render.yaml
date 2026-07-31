@@ -83,6 +83,14 @@ services:
         sync: false
       - key: VIRTUAL_CARDS_ENABLED
         value: "false"
+      - key: CARD_PROVIDER
+        value: SANDBOX
+      - key: STRIPE_RESTRICTED_KEY
+        sync: false
+      - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
 
   - type: web
     name: agentpay-facilitator
