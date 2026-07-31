@@ -56,7 +56,7 @@ let cached: AppConfig | undefined;
 
 export function getConfig(): AppConfig {
   if (cached) return cached;
-  const parsed = envSchema.parse(process.env);
+  const parsed = parseEnv();
   if (parsed.APP_ENV === "production") {
     const missing: string[] = [];
     if (new URL(parsed.NEXT_PUBLIC_APP_URL).protocol !== "https:") missing.push("NEXT_PUBLIC_APP_URL must use HTTPS");
@@ -85,4 +85,17 @@ export function getConfig(): AppConfig {
   }
   cached = parsed;
   return cached;
+}
+
+function parseEnv(): AppConfig {
+  const result = envSchema.safeParse(process.env);
+  if (result.success) return result.data;
+  console.error("[config] Environment validation failed:", result.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join(" | "));
+  const filtered: Record<string, string | undefined> = {};
+  for (const key of Object.keys(process.env)) filtered[key] = process.env[key];
+  for (const issue of result.error.issues) delete filtered[String(issue.path[0] ?? "")];
+  const retry = envSchema.safeParse(filtered);
+  if (retry.success) return retry.data;
+  console.error("[config] Environment validation failed after dropping invalid keys, using defaults");
+  return envSchema.parse({});
 }

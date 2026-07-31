@@ -29,7 +29,8 @@ export async function GET(request: Request) {
     const result = await createSessionResponse(data.user, new URL("/app/overview", request.url));
     result.headers.append("set-cookie", clearCookie);
     return result;
-  } catch {
+  } catch (err) {
+    console.error("[oauth/callback] Auth flow failed:", err);
     return signInError("auth_config");
   }
 }
