@@ -1,0 +1,126 @@
+{
+  "completeness": "complete",
+  "deferred": [],
+  "documentType": "codex-security.coverage",
+  "excludePaths": [
+    ".git/",
+    "node_modules/",
+    "dashboard/.next/",
+    "dashboard/test-results/",
+    "dashboard/playwright-report/",
+    "**/dist/"
+  ],
+  "explicitExclusions": [
+    {
+      "pattern": ".git/",
+      "reason": "Git object database and metadata are not application source."
+    },
+    {
+      "pattern": "node_modules/, dashboard/.next/, **/dist/",
+      "reason": "Generated dependencies and build products were evaluated through manifests, lockfile audit, clean builds, and runtime tests rather than line-by-line source review."
+    },
+    {
+      "pattern": "dashboard/test-results/, dashboard/playwright-report/",
+      "reason": "Ephemeral browser-test output is not shipped application source."
+    }
+  ],
+  "includePaths": [
+    "."
+  ],
+  "inventoryStrategy": "repository",
+  "mode": "repository",
+  "openQuestions": [
+    {
+      "followUpPrompt": "Verify live provider configuration and run authenticated canaries after final credentials are supplied.",
+      "question": "Are production OAuth redirects, TLS domains, egress controls, and secret rotation configured in the deployment provider?"
+    },
+    {
+      "followUpPrompt": "Document and test a Supabase-compatible full-project recovery procedure in addition to the proven portable public-schema restore.",
+      "question": "Is provider-managed Supabase metadata covered by the platform backup and recovery policy?"
+    }
+  ],
+  "scanId": "466d356ce303_20260728T154154Z",
+  "schemaVersion": "1.0",
+  "surfaces": [
+    {
+      "disposition": "no_issue_found",
+      "id": "surface_api_authz_tenancy",
+      "label": "API authentication, authorization, and organization isolation",
+      "notes": "Reviewed authenticated route guards, workspace resolution, membership roles, internal-route secrets, object-scoped queries, and CSRF origin enforcement.",
+      "receiptRefs": [
+        "artifacts/02_discovery/in_scope_files.txt"
+      ],
+      "riskArea": "Broken access control and tenant data exposure"
+    },
+    {
+      "disposition": "no_issue_found",
+      "id": "surface_payment_policy_governance",
+      "label": "Payment policy, approvals, reservations, and audit integrity",
+      "notes": "Reviewed policy evaluation, approval flows, transactional spend reservations, immutable fingerprints, submission recovery incidents, and database-enforced hash chaining.",
+      "receiptRefs": [
+        "artifacts/02_discovery/in_scope_files.txt"
+      ],
+      "riskArea": "Unauthorized or duplicate spend and audit tampering"
+    },
+    {
+      "disposition": "rejected",
+      "id": "surface_outbound_http",
+      "label": "Outbound resource, fulfillment, health, and notification HTTP",
+      "notes": "Candidate candidate-b878526e40d2b165 was suppressed after source tracing and regression tests proved public-IP validation plus connection-time DNS pinning at every identified sink.",
+      "receiptRefs": [
+        "artifacts/02_discovery/candidate_ledger.jsonl"
+      ],
+      "riskArea": "SSRF and DNS rebinding"
+    },
+    {
+      "disposition": "rejected",
+      "id": "surface_browser_auth",
+      "label": "Session, OAuth, wallet, and browser security controls",
+      "notes": "Candidate candidate-56afbf8a791bb046 was suppressed because production cookies are host-bound and JWT verification fixes algorithm, issuer, and audience.",
+      "receiptRefs": [
+        "artifacts/02_discovery/candidate_ledger.jsonl"
+      ],
+      "riskArea": "Session confusion, cookie shadowing, and token substitution"
+    },
+    {
+      "disposition": "rejected",
+      "id": "surface_credential_protection",
+      "label": "Credential encryption and key material",
+      "notes": "Candidate candidate-8d8153bf200ebd90 was suppressed after exact 32-byte production-key validation, authenticated v2 encryption, tamper tests, and isolated v1 read compatibility.",
+      "receiptRefs": [
+        "artifacts/02_discovery/candidate_ledger.jsonl"
+      ],
+      "riskArea": "Credential disclosure and weak cryptographic keys"
+    },
+    {
+      "disposition": "rejected",
+      "id": "surface_facilitators",
+      "label": "Hedera and Arc signing, settlement, contract execution, and error handling",
+      "notes": "Candidates candidate-986d2dafe67d7e5d and candidate-b6710f43bdb97de4 were suppressed by production fail-closed key separation, cross-capability rejection tests, bounded bodies, contract allowlists, and stable public error codes.",
+      "receiptRefs": [
+        "artifacts/02_discovery/candidate_ledger.jsonl"
+      ],
+      "riskArea": "Privileged capability escalation and sensitive error disclosure"
+    },
+    {
+      "disposition": "no_issue_found",
+      "id": "surface_supply_chain_delivery",
+      "label": "Dependencies, CI, containers, Compose, and Render blueprint",
+      "notes": "Production audit reports zero vulnerabilities; npm is pinned; clean installs and all production images build; runtime containers use UID 1000 and pass health/restart tests.",
+      "receiptRefs": [
+        "artifacts/02_discovery/in_scope_files.txt"
+      ],
+      "riskArea": "Known vulnerable dependencies, non-reproducible builds, and privileged runtimes"
+    },
+    {
+      "disposition": "no_issue_found",
+      "id": "surface_database_recovery",
+      "label": "Prisma migrations, seed behavior, governance checks, and recovery",
+      "notes": "All 22 migrations are current; fresh and configured states were exercised; governance verification passed; the configured remote public schema restored locally with 60 tables and 22 migrations.",
+      "receiptRefs": [
+        "artifacts/02_discovery/in_scope_files.txt"
+      ],
+      "riskArea": "Schema drift, unrecoverable data, and broken integrity controls"
+    }
+  ]
+}

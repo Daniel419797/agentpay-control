@@ -25,7 +25,11 @@ export type PaymentIntent = {
     errorCode?: string | null;
   } | null;
   attempts?: Array<{
-    settlement?: { transactionId: string; hashscanUrl: string } | null;
+    settlement?: {
+      transactionId: string;
+      hashscanUrl: string;
+      network?: string;
+    } | null;
   }> | null;
 };
 

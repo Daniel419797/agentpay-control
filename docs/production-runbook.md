@@ -6,7 +6,14 @@ Every release must pass the repository CI workflow: all forward migrations again
 
 ## Required production configuration
 
-Use a managed PostgreSQL database with point-in-time recovery. Set `APP_ENV=production`, a unique 32+ character `AUTH_SECRET`, `CRON_SECRET`, and `KEY_ENCRYPTION_MASTER_KEY`, the HTTPS dashboard and facilitator URLs, a restricted facilitator API key, Hedera operator credentials held only by the facilitator, and notification credentials. Enable virtual cards only with an approved Stripe Issuing account, a restricted `rk_` key, publishable key, and signed webhook secret. Keep LI.FI and Stripe server credentials out of browser-exposed variables.
+Use a managed PostgreSQL database with point-in-time recovery. Set `APP_ENV=production`, unique 32+ character `AUTH_SECRET` and `CRON_SECRET` values, and a cryptographically random 32-byte base64url `KEY_ENCRYPTION_MASTER_KEY`. Configure separate signing, settlement, and contract-execution facilitator credentials; keep Hedera and Arc private keys only in their facilitator services. Enable virtual cards only with an approved Stripe Issuing account, a restricted `rk_` key, publishable key, and signed webhook secret. Keep LI.FI and Stripe server credentials out of browser-exposed variables.
+
+The root `render.yaml` is the production Blueprint. Render can generate general
+application and capability secrets, but `KEY_ENCRYPTION_MASTER_KEY` is intentionally
+operator-supplied because it must decode to exactly 32 bytes. Generate it locally with
+`node -p "require('crypto').randomBytes(32).toString('base64url')"` and store it only
+in Render's secret environment UI. Losing or replacing this key without a controlled
+rotation makes encrypted organization credentials unreadable.
 
 Set `HEDERA_PAYER_ACCOUNT_ID` in the dashboard to the same payer account configured in the facilitator. The dashboard uses this public account identifier to persist a Hedera transaction ID before contract submission; it never receives the payer private key. Maintenance reconciliation must remain enabled so `SUBMISSION_UNKNOWN` contract executions are resolved from mirror-node evidence without blind retries.
 

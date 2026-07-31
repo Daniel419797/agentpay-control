@@ -20,19 +20,19 @@ class DefaultNetworkRouter implements NetworkRouter {
     const config = getConfig();
     this.routes["hedera:testnet"] = {
       facilitatorUrl: config.FACILITATOR_URL ?? "http://localhost:8787",
-      facilitatorApiKey: config.FACILITATOR_API_KEY,
+      facilitatorApiKey: config.FACILITATOR_SIGNING_API_KEY ?? config.FACILITATOR_API_KEY,
       explorerUrl: "https://hashscan.io/testnet/transaction",
       nativeAsset: "0.0.0",
     };
     this.routes["hedera:mainnet"] = {
       facilitatorUrl: config.HEDERA_MAINNET_FACILITATOR_URL ?? "http://localhost:8787",
-      facilitatorApiKey: config.HEDERA_MAINNET_FACILITATOR_API_KEY,
+      facilitatorApiKey: config.HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY ?? config.HEDERA_MAINNET_FACILITATOR_API_KEY,
       explorerUrl: "https://hashscan.io/mainnet/transaction",
       nativeAsset: "0.0.0",
     };
     this.routes["eip155:5042002"] = {
       facilitatorUrl: config.ARC_FACILITATOR_URL ?? "http://localhost:8788",
-      facilitatorApiKey: config.ARC_FACILITATOR_API_KEY,
+      facilitatorApiKey: config.ARC_FACILITATOR_SIGNING_API_KEY ?? config.ARC_FACILITATOR_API_KEY,
       explorerUrl: "https://testnet.arcscan.app/tx",
       nativeAsset: "0x3600000000000000000000000000000000000000",
     };

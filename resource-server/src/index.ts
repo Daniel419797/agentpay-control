@@ -3,9 +3,12 @@ import { serve } from "@hono/node-server";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { z } from "zod";
+import { parseEnabledNetworks, requiresNetwork } from "./network-selection.js";
 import { boundedJson, sameRequirement } from "./security.js";
 
 const env = z.object({
+  APP_ENV: z.enum(["development", "test", "production"]).default("development"),
+  ENABLED_NETWORKS: z.string().default("hedera:testnet,eip155:5042002"),
   FACILITATOR_URL: z.string().default("http://localhost:8787"),
   HEDERA_MAINNET_FACILITATOR_URL: z.string().default("http://localhost:8787"),
   ARC_FACILITATOR_URL: z.string().default("http://localhost:8788"),
@@ -17,9 +20,25 @@ const env = z.object({
   HEDERA_MAINNET_USDC_TOKEN_ID: z.string().optional(),
   FACILITATOR_FEE_PAYER_ID: z.string().optional(),
   FACILITATOR_API_KEY: z.string().min(32).optional(),
+  FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
+  HEDERA_MAINNET_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
+  ARC_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
   ARC_PROVIDER_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   ARC_USDC_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
 }).parse(process.env);
+
+const enabledNetworks = parseEnabledNetworks(env.ENABLED_NETWORKS);
+if (env.APP_ENV === "production") {
+  if (requiresNetwork(enabledNetworks, "hedera:testnet") && !env.FACILITATOR_SETTLEMENT_API_KEY) {
+    throw new Error("Production Hedera testnet settlement API key is required");
+  }
+  if (requiresNetwork(enabledNetworks, "hedera:mainnet") && !env.HEDERA_MAINNET_FACILITATOR_SETTLEMENT_API_KEY) {
+    throw new Error("Production Hedera mainnet settlement API key is required");
+  }
+  if (requiresNetwork(enabledNetworks, "eip155:5042002") && !env.ARC_FACILITATOR_SETTLEMENT_API_KEY) {
+    throw new Error("Production Arc settlement API key is required");
+  }
+}
 
 const ARCTestnet = {
   caip2: "eip155:5042002",
@@ -46,11 +65,14 @@ const HederaMainnet = {
 };
 
 type NetworkConfig = { caip2: string; facilitatorUrl: string; explorerUrl: string };
-const networks: Record<string, NetworkConfig> = {
+const configuredNetworks: Record<string, NetworkConfig> = {
   [HederaTestnet.caip2]: HederaTestnet,
   [HederaMainnet.caip2]: HederaMainnet,
   [ARCTestnet.caip2]: ARCTestnet,
 };
+const networks = Object.fromEntries(
+  Object.entries(configuredNetworks).filter(([network]) => enabledNetworks.has(network as never)),
+) as Record<string, NetworkConfig>;
 
 type AssetPrice = { type: "NATIVE" | "TOKEN"; amount: string; assetId: string; decimals: number; symbol: string };
 const requirementSchema = z.object({
@@ -116,7 +138,7 @@ const sharedPrices = [
   { asset: "HBAR", atomicAmount: hederaPrices.hbar.amount, network: HederaMainnet.caip2 },
   { asset: "USDC", atomicAmount: hederaPrices.usdc.amount, network: HederaMainnet.caip2 },
   { asset: "USDC", atomicAmount: arcPrices.usdc.amount, network: ARCTestnet.caip2 },
-];
+].filter((price) => enabledNetworks.has(price.network as never));
 
 const catalog = {
   resources: [
@@ -166,6 +188,12 @@ function getFacilitatorForNetwork(network: string): string | undefined {
   return undefined;
 }
 
+function getSettlementApiKey(network: string): string | undefined {
+  if (network === ARCTestnet.caip2) return env.ARC_FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_API_KEY;
+  if (network === HederaMainnet.caip2) return env.HEDERA_MAINNET_FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_API_KEY;
+  return env.FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_API_KEY;
+}
+
 const app = new Hono();
 
 app.get("/health", (c: Context) => c.json({ status: "ok", networks: Object.keys(networks), provider: { testnet: env.PROVIDER_ACCOUNT_ID, mainnet: env.HEDERA_MAINNET_PROVIDER_ACCOUNT_ID ?? env.PROVIDER_ACCOUNT_ID } }));
@@ -176,6 +204,9 @@ async function handlePaidRequest(c: Context, category: string, resourceId: strin
   const paymentSignature = c.req.header("PAYMENT-SIGNATURE");
   const paymentRequirementsHeader = c.req.header("PAYMENT-REQUIREMENTS");
   const acceptNetwork = c.req.header("ACCEPT-NETWORK") ?? HederaTestnet.caip2;
+  if (!getNetworkConfig(acceptNetwork)) {
+    return c.json({ code: "NETWORK_UNSUPPORTED", message: `Network ${acceptNetwork} is not enabled` }, 422);
+  }
 
   const canonical = paymentRequirements(acceptNetwork, c.req.url);
   const canonicalRequirement = requirementSchema.parse(canonical.accepts[0]);
@@ -205,10 +236,11 @@ async function handlePaidRequest(c: Context, category: string, resourceId: strin
     const idempotencyKey = `resource:${resourceId}:${createHash("sha256").update(paymentSignature).digest("hex")}`;
     const facilitatorUrl = getFacilitatorForNetwork(parsed.network);
     if (!facilitatorUrl) return c.json({ code: "NETWORK_UNSUPPORTED", message: `Network ${parsed.network} is not supported` }, 422);
+    const settlementApiKey = getSettlementApiKey(parsed.network);
 
     const verifyRes = await fetch(`${facilitatorUrl}/verify`, {
       method: "POST",
-      headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(env.FACILITATOR_API_KEY ? { authorization: `Bearer ${env.FACILITATOR_API_KEY}` } : {}) },
+      headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(settlementApiKey ? { authorization: `Bearer ${settlementApiKey}` } : {}) },
       body: JSON.stringify(verifyBody),
       signal: AbortSignal.timeout(15_000),
     });
@@ -219,7 +251,7 @@ async function handlePaidRequest(c: Context, category: string, resourceId: strin
 
     const settleRes = await fetch(`${facilitatorUrl}/settle`, {
       method: "POST",
-      headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(env.FACILITATOR_API_KEY ? { authorization: `Bearer ${env.FACILITATOR_API_KEY}` } : {}) },
+      headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(settlementApiKey ? { authorization: `Bearer ${settlementApiKey}` } : {}) },
       body: JSON.stringify(verifyBody),
       signal: AbortSignal.timeout(30_000),
     });
@@ -249,7 +281,11 @@ async function handlePaidRequest(c: Context, category: string, resourceId: strin
     };
     return c.json(response);
   } catch (error) {
-    return c.json({ code: "FACILITATOR_ERROR", message: error instanceof Error ? error.message : "Facilitator communication failed" }, 502);
+    console.error(JSON.stringify({
+      event: "facilitator_request_failed",
+      errorType: error instanceof Error ? error.name : "UnknownError",
+    }));
+    return c.json({ code: "FACILITATOR_ERROR", message: "Facilitator communication failed" }, 502);
   }
 }
 

@@ -1,11 +1,40 @@
 {
   "name": "agentpay-control",
   "private": true,
+  "packageManager": "npm@11.11.1",
+  "engines": {
+    "node": "22.x",
+    "npm": "11.11.1"
+  },
   "description": "Policy-controlled payment OS for autonomous software agents using x402 on Hedera and Arc",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Daniel419797/agentpay-control.git"
   },
-  "workspaces": ["dashboard", "facilitator", "facilitator-arc", "resource-server"]
+  "workspaces": ["dashboard", "facilitator", "facilitator-arc", "facilitator-combined", "resource-server"],
+  "overrides": {
+    "@hiero-ledger/sdk": {
+      ".": "2.86.2",
+      "@grpc/grpc-js": "1.12.7",
+      "bn.js": "5.2.3",
+      "ethers": "6.17.0",
+      "protobufjs": "8.6.6",
+      "ws": "8.21.1"
+    },
+    "@hiero-ledger/proto": {
+      "protobufjs": "7.6.5"
+    },
+    "@grpc/grpc-js": "1.12.7",
+    "@coinbase/cdp-sdk": {
+      "axios": "1.18.1"
+    },
+    "axios": "1.18.1",
+    "bn.js": "5.2.3",
+    "ethers": "6.17.0",
+    "postcss": "8.5.18",
+    "protobufjs": "7.6.5",
+    "sharp": "0.35.0",
+    "ws": "8.21.1"
+  }
 }

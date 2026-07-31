@@ -2,7 +2,7 @@ import { createHmac, randomInt, randomUUID } from "node:crypto";
 
 import { getConfig } from "@/lib/config";
 import { db } from "@/lib/db";
-import { assertSafeResourceUrl } from "@/lib/safe-url";
+import { safeFetch } from "@/lib/safe-url";
 import { decryptSecret } from "@/lib/secret-box";
 
 const MAX_ATTEMPTS = 8;
@@ -26,7 +26,6 @@ async function deliver(target: DeliveryTarget, envelope: EventEnvelope) {
       body: JSON.stringify({ from: config.NOTIFICATION_FROM_EMAIL, to: [target.destination], subject: `AgentPay: ${envelope.type.replaceAll("_", " ")}`, text: JSON.stringify(envelope, null, 2) }),
     });
   }
-  const url = await assertSafeResourceUrl(target.destination, config.APP_ENV === "production");
   const timestamp = String(Math.floor(Date.now() / 1000));
   const body = target.type === "SLACK"
     ? JSON.stringify({ text: `AgentPay ${envelope.type}`, attachments: [{ color: "#0f766e", text: `Event ${envelope.id}\n${JSON.stringify(envelope.data)}` }] })
@@ -34,7 +33,7 @@ async function deliver(target: DeliveryTarget, envelope: EventEnvelope) {
   const headers = target.type === "WEBHOOK"
     ? signedWebhookHeaders(envelope.id, timestamp, body, decryptSecret(target.signingSecretEncrypted ?? ""))
     : { "content-type": "application/json", "user-agent": "AgentPay-Notifications/1.0" };
-  return fetch(url, { method: "POST", redirect: "manual", signal: AbortSignal.timeout(10_000), headers, body });
+  return safeFetch(target.destination, { method: "POST", redirect: "manual", signal: AbortSignal.timeout(10_000), headers, body }, config.APP_ENV === "production");
 }
 
 function retryAt(attempt: number) {

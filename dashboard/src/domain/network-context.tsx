@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useCallback, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useCallback, useEffect, useSyncExternalStore, type ReactNode } from "react";
 
 export type NetworkId = "hedera:testnet" | "hedera:mainnet";
 
@@ -54,8 +54,6 @@ function getServerSnapshot(): NetworkId {
   return "hedera:testnet";
 }
 
-let initialised = false;
-
 const NetworkContext = createContext<{
   network: NetworkId;
   setNetwork: (value: NetworkId) => void;
@@ -72,10 +70,13 @@ const NetworkContext = createContext<{
 export function NetworkProvider({ children }: { children: ReactNode }) {
   const network = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  if (!initialised) {
-    initialised = true;
-    snapshot = resolveNetwork();
-  }
+  useEffect(() => {
+    const resolved = resolveNetwork();
+    if (resolved !== snapshot) {
+      snapshot = resolved;
+      notifyListeners();
+    }
+  }, []);
 
   const handleSetNetwork = useCallback((value: NetworkId) => {
     setNetwork(value);

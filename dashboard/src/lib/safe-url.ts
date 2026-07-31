@@ -1,5 +1,6 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
+import { Agent, fetch as pinnedFetch, type Dispatcher, type RequestInit as UndiciRequestInit } from "undici";
 
 function isPrivateIpv4(address: string) {
   const parts = address.split(".").map(Number);
@@ -41,4 +42,48 @@ export async function assertSafeResourceUrl(value: string, production: boolean) 
   const addresses = await lookup(url.hostname, { all: true, verbatim: true });
   if (!addresses.length || addresses.some(({ address }) => isPrivateAddress(address))) throw new Error("RESOURCE_URL_PRIVATE_NETWORK");
   return url;
+}
+
+type ResolvedAddress = { address: string; family: 4 | 6 };
+const MAX_PINNED_DISPATCHERS = 64;
+const pinnedDispatchers = new Map<string, Dispatcher>();
+
+export function createPinnedLookup(resolved: ResolvedAddress) {
+  return (_hostname: string, options: { all?: boolean }, callback: (error: Error | null, address: string | Array<ResolvedAddress>, family?: number) => void) => {
+    if (options.all) callback(null, [resolved]);
+    else callback(null, resolved.address, resolved.family);
+  };
+}
+
+function dispatcherFor(hostname: string, resolved: ResolvedAddress): Dispatcher {
+  const key = `${hostname}:${resolved.family}:${resolved.address}`;
+  const existing = pinnedDispatchers.get(key);
+  if (existing) {
+    pinnedDispatchers.delete(key);
+    pinnedDispatchers.set(key, existing);
+    return existing;
+  }
+  const dispatcher = new Agent({ connect: { lookup: createPinnedLookup(resolved) as never } });
+  pinnedDispatchers.set(key, dispatcher);
+  if (pinnedDispatchers.size > MAX_PINNED_DISPATCHERS) {
+    const oldestKey = pinnedDispatchers.keys().next().value as string | undefined;
+    const oldest = oldestKey ? pinnedDispatchers.get(oldestKey) : undefined;
+    if (oldestKey) pinnedDispatchers.delete(oldestKey);
+    if (oldest) void oldest.destroy();
+  }
+  return dispatcher;
+}
+
+/**
+ * Validates and pins DNS for the actual socket connection, preventing a hostname
+ * from resolving publicly during validation and privately during fetch.
+ */
+export async function safeFetch(value: string | URL, init: RequestInit, production: boolean): Promise<Response> {
+  const url = validateResourceUrl(value.toString(), production);
+  if (!production) return fetch(url, init);
+  const addresses = await lookup(url.hostname, { all: true, verbatim: true });
+  if (!addresses.length || addresses.some(({ address }) => isPrivateAddress(address))) throw new Error("RESOURCE_URL_PRIVATE_NETWORK");
+  const selected = addresses[0] as ResolvedAddress;
+  const dispatcher = dispatcherFor(url.hostname, selected);
+  return await pinnedFetch(url, { ...init, dispatcher } as unknown as UndiciRequestInit) as unknown as Response;
 }

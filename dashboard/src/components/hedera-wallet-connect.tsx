@@ -12,10 +12,6 @@ type WalletIdentity = { id: string; accountId: string; network: string; walletPr
 type Challenge = { accountId: string; message: string; challengeToken: string };
 type PaymentReceipt = { transactionId: string; hashscanUrl: string };
 
-function networkToLedgerId(network: string) {
-  return network === "hedera:mainnet" ? "mainnet" as const : "testnet" as const;
-}
-
 function networkToLedgerIdEnum(network: string) {
   return network === "hedera:mainnet" ? 1 : 2;
 }

@@ -1,0 +1,164 @@
+services:
+  - type: web
+    name: agentpay-control-dashboard
+    runtime: node
+    plan: starter
+    region: frankfurt
+    buildCommand: npm install --global npm@11.11.1 && npm ci && npm run build --workspace=agentpay-control
+    preDeployCommand: npm run db:deploy --workspace=agentpay-control
+    startCommand: npm run start --workspace=agentpay-control
+    healthCheckPath: /api/v1/ready
+    autoDeployTrigger: checksPass
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: NEXT_PUBLIC_APP_URL
+        fromService:
+          type: web
+          name: agentpay-control-dashboard
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: DATABASE_URL
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      - key: KEY_ENCRYPTION_MASTER_KEY
+        sync: false
+      - key: HEDERA_NETWORK
+        value: testnet
+      - key: HEDERA_PAYER_ACCOUNT_ID
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: HEDERA_PAYER_ID
+      - key: HEDERA_PROVIDER_ACCOUNT_ID
+        sync: false
+      - key: HEDERA_USDC_TOKEN_ID
+        sync: false
+      - key: FACILITATOR_URL
+        sync: false
+      - key: FACILITATOR_SIGNING_API_KEY
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: MANAGED_SIGNING_API_KEY
+      - key: FACILITATOR_SETTLEMENT_API_KEY
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: SETTLEMENT_API_KEY
+      - key: FACILITATOR_CONTRACT_API_KEY
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: CONTRACT_EXECUTION_API_KEY
+      - key: ARC_FACILITATOR_URL
+        sync: false
+      - key: ARC_FACILITATOR_SIGNING_API_KEY
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: MANAGED_SIGNING_API_KEY
+      - key: ARC_FACILITATOR_CONTRACT_API_KEY
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: CONTRACT_EXECUTION_API_KEY
+      - key: ARC_RPC_URL
+        value: https://rpc.testnet.arc.network
+      - key: ARC_PROVIDER_ADDRESS
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: ARC_PROVIDER_ADDRESS
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: WALLETCONNECT_PROJECT_ID
+        sync: false
+      - key: NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
+        sync: false
+      - key: VIRTUAL_CARDS_ENABLED
+        value: "false"
+
+  - type: web
+    name: agentpay-facilitator
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    dockerContext: .
+    dockerfilePath: facilitator-combined/Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: HEDERA_NETWORK
+        value: testnet
+      - key: HEDERA_OPERATOR_ID
+        sync: false
+      - key: HEDERA_OPERATOR_KEY
+        sync: false
+      - key: HEDERA_PAYER_ID
+        sync: false
+      - key: HEDERA_PAYER_KEY
+        sync: false
+      - key: ARC_PAYER_PRIVATE_KEY
+        sync: false
+      - key: ARC_RPC_URL
+        value: https://rpc.testnet.arc.network
+      - key: ARC_USDC_ADDRESS
+        value: "0x3600000000000000000000000000000000000000"
+      - key: ARC_PROVIDER_ADDRESS
+        sync: false
+      - key: MANAGED_SIGNING_API_KEY
+        generateValue: true
+      - key: SETTLEMENT_API_KEY
+        generateValue: true
+      - key: CONTRACT_EXECUTION_API_KEY
+        generateValue: true
+      - key: CONTRACT_ALLOWLIST_JSON
+        value: "[]"
+
+  - type: web
+    name: agentpay-resource-server
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    dockerContext: .
+    dockerfilePath: resource-server/Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: ENABLED_NETWORKS
+        value: hedera:testnet,eip155:5042002
+      - key: FACILITATOR_URL
+        sync: false
+      - key: ARC_FACILITATOR_URL
+        sync: false
+      - key: FACILITATOR_SETTLEMENT_API_KEY
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: SETTLEMENT_API_KEY
+      - key: ARC_FACILITATOR_SETTLEMENT_API_KEY
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: SETTLEMENT_API_KEY
+      - key: PROVIDER_ACCOUNT_ID
+        sync: false
+      - key: ARC_PROVIDER_ADDRESS
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: ARC_PROVIDER_ADDRESS
+      - key: ARC_USDC_ADDRESS
+        value: "0x3600000000000000000000000000000000000000"

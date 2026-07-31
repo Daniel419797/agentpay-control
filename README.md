@@ -18,10 +18,12 @@ agentpay-control/
 │   └── src/index.ts     Hedera x402 facilitator: verify, settle, sign
 ├── facilitator-arc/     → Render (Hono server)
 │   └── src/index.ts     Arc EVM x402 facilitator: verify, settle, sign
+├── facilitator-combined/ → Render (Hono server)
+│   └── src/index.ts     One server mounting both facilitators (/hedera, /arc)
 ├── resource-server/     → Render (Hono server)
 │   └── src/index.ts     Demo resources: market-data, files, AI, research
 ├── docs/                Design docs, demo script, assets
-├── vercel.json          Vercel deployment config
+├── render.yaml          Render deployment blueprint
 └── README.md
 ```
 
@@ -35,39 +37,55 @@ agentpay-control/
 
 The dashboard includes a **network switcher** (topbar and sidebar) to toggle between Hedera testnet and mainnet. Selection persists via URL (`?network=hedera:mainnet`) and localStorage. The agent list, creation form, wallet connection, and resource-server routing all follow the selected network.
 
+`facilitator-combined/` runs both facilitators on **one Render server**: the Hedera app is mounted at `/hedera/*` and the Arc app at `/arc/*` (paths configurable via `HEDERA_BASE_PATH` / `ARC_BASE_PATH`). Each facilitator also remains runnable standalone for local development.
+
 ## Deploy
 
-### Dashboard → Vercel
+### Production stack → Render
 
-```bash
-cd dashboard
-npx vercel --prod
-```
+Create a Render Blueprint from the root `render.yaml`. It provisions the dashboard,
+the combined facilitator, and the resource server in one region, deploys only
+after GitHub checks pass, wires capability credentials between services, and runs
+Prisma migrations before the dashboard starts.
 
-Set environment variables from `.env.example`. For multi-network support, additionally configure `HEDERA_MAINNET_FACILITATOR_URL`, `HEDERA_MAINNET_FACILITATOR_API_KEY`, `HEDERA_MAINNET_MIRROR_NODE_URL`.
+Render prompts for every external credential. Generate `KEY_ENCRYPTION_MASTER_KEY`
+as exactly 32 random bytes encoded with base64url; a general random string is not a
+valid encryption key. Production uses separate signing, settlement, and
+contract-execution credentials—never reuse one key across capabilities.
 
-### Facilitator (Hedera) → Render
+### Combined Facilitator (Hedera + Arc) → Render
 
-1. Connect your `facilitator/` directory as a Web Service
-2. Build command: `npm install`
-3. Start command: `npm run start`
-4. Set env vars: `HEDERA_NETWORK`, `HEDERA_OPERATOR_ID`, `HEDERA_OPERATOR_KEY`, `HEDERA_PAYER_ID`, `HEDERA_PAYER_KEY`
+Use the root `render.yaml` Blueprint. It builds `facilitator-combined/Dockerfile`
+into one service that serves both networks: Hedera under `https://<svc>.onrender.com/hedera`
+and Arc under `https://<svc>.onrender.com/arc`, with an overall `/health` endpoint.
 
-Deploy separate instances for testnet and mainnet with different `HEDERA_NETWORK` values.
+Because Render can only copy raw values from other services, the two URL variables
+that include the path suffix are prompted once during Blueprint creation:
 
-### Facilitator (Arc) → Render
+- Dashboard `FACILITATOR_URL` = `https://agentpay-facilitator.onrender.com/hedera`
+- Dashboard `ARC_FACILITATOR_URL` = `https://agentpay-facilitator.onrender.com/arc`
+- Resource server `FACILITATOR_URL` = the same `/hedera` URL
+- Resource server `ARC_FACILITATOR_URL` = the same `/arc` URL
 
-1. Connect your `facilitator-arc/` directory as a Web Service
-2. Build command: `npm install`
-3. Start command: `npm run start`
-4. Set env vars: `ARC_PAYER_PRIVATE_KEY`, `ARC_RPC_URL`, `ARC_USDC_ADDRESS`, `ARC_PROVIDER_ADDRESS`
+Replace the hostname with the service's actual URL shown by Render after creation
+if it differs. All other credentials are wired automatically: signing, settlement,
+and contract-execution keys plus `HEDERA_PAYER_ID` and `ARC_PROVIDER_ADDRESS`.
+
+Provide the prompted Hedera operator/payer credentials (`HEDERA_OPERATOR_ID`,
+`HEDERA_OPERATOR_KEY`, `HEDERA_PAYER_ID`, `HEDERA_PAYER_KEY`) and Arc payer
+(`ARC_PAYER_PRIVATE_KEY`, `ARC_PROVIDER_ADDRESS`) through Render's secret
+environment UI.
+
+Deploy a separate instance for mainnet with a different `HEDERA_NETWORK` value
+and point the dashboard's `HEDERA_MAINNET_FACILITATOR_URL` at its `/hedera` URL.
 
 ### Resource Server → Render
 
-1. Connect your `resource-server/` directory as a Web Service
-2. Build command: `npm install`
-3. Start command: `npm run start`
-4. Set env vars: `FACILITATOR_URL`, `HEDERA_MAINNET_FACILITATOR_URL`, `ARC_FACILITATOR_URL`, `PROVIDER_ACCOUNT_ID`, `PORT`
+The Blueprint enables Hedera testnet and Arc testnet by default. Change
+`ENABLED_NETWORKS` only to a comma-separated subset of `hedera:testnet`,
+`hedera:mainnet`, and `eip155:5042002`; startup fails on unsupported values.
+Facilitator URLs and capability-scoped settlement keys are wired from their owning
+services. Render prompts only for the external provider settlement accounts.
 
 ## Local Development
 
@@ -90,11 +108,23 @@ cd facilitator-arc
 npm install
 npm run dev
 
+# Combined facilitators on one port (terminal 2 alternative)
+cd facilitator-combined
+npm install
+npm run build --workspace=@agentpay/hedera-facilitator --workspace=@agentpay/arc-facilitator
+npm run dev
+
 # Resource Server (terminal 4)
 cd resource-server
 npm install
 npm run dev
 ```
+
+To run the combined facilitator locally, create `facilitator-combined/.env` from
+`.env.example` and fill in the Hedera and Arc credentials; it serves both networks
+on one port (`/hedera`, `/arc`). The dashboard's `FACILITATOR_URL` then becomes
+`http://localhost:8787/hedera` and `ARC_FACILITATOR_URL` becomes
+`http://localhost:8787/arc`.
 
 Set the network via URL param: `http://localhost:3100/app/agents?network=hedera:mainnet`
 Or use the network switcher dropdown in the topbar.

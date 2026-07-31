@@ -3,6 +3,7 @@ import { jwtVerify } from "jose";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function proxy(request: NextRequest) {
+  const sessionCookieName = process.env.APP_ENV === "production" ? "__Host-agentpay_session" : "agentpay_session";
   const suppliedRequestId = request.headers.get("x-request-id");
   const requestId = suppliedRequestId && /^[a-zA-Z0-9._:-]{1,128}$/.test(suppliedRequestId)
     ? suppliedRequestId
@@ -16,10 +17,11 @@ export async function proxy(request: NextRequest) {
   };
   if (request.nextUrl.pathname.startsWith("/api/")) {
     const unsafe = !["GET", "HEAD", "OPTIONS"].includes(request.method);
-    const cookieAuthenticated = Boolean(request.cookies.get("agentpay_session")?.value);
+    const cookieAuthenticated = Boolean(request.cookies.get(sessionCookieName)?.value);
     if (unsafe && cookieAuthenticated) {
       const origin = request.headers.get("origin");
-      if (!origin || origin !== request.nextUrl.origin) {
+      const expectedOrigin = new URL(process.env.NEXT_PUBLIC_APP_URL ?? request.nextUrl.origin).origin;
+      if (!origin || origin !== expectedOrigin) {
         return NextResponse.json({
           type: "https://agentpay.dev/problems/csrf-rejected",
           title: "CSRF REJECTED",
@@ -31,10 +33,10 @@ export async function proxy(request: NextRequest) {
     }
     return proceed();
   }
-  const token = request.cookies.get("agentpay_session")?.value;
+  const token = request.cookies.get(sessionCookieName)?.value;
   if (!token) return NextResponse.redirect(new URL("/sign-in", request.url));
   try {
-    await jwtVerify(token, new TextEncoder().encode(process.env.AUTH_SECRET), { algorithms: ["HS256"] });
+    await jwtVerify(token, new TextEncoder().encode(process.env.AUTH_SECRET), { algorithms: ["HS256"], issuer: "agentpay-control", audience: "agentpay-operator" });
     return proceed();
   } catch {
     return NextResponse.redirect(new URL("/sign-in?error=session_expired", request.url));

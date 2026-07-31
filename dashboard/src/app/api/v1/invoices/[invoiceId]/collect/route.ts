@@ -40,8 +40,9 @@ export async function GET(request: Request, context: { params: Promise<{ invoice
   if (!sameRequirement(clientRequirement, requirement) || !sameRequirement(paymentPayload.accepted, requirement)) return NextResponse.json({ code: "PAYMENT_REQUIREMENT_MISMATCH" }, { status: 402 });
   const intent = await db.paymentIntent.findFirst({ where: { agentId: invoice.recipientAgentId, resourceUrl: canonicalUrl, status: "SIGNING", quote: { amountAtomic: invoice.totalAtomic, payToAccountId: payTo, assetId: invoice.assetId } }, orderBy: { updatedAt: "desc" } });
   if (!intent) return NextResponse.json({ code: "INVOICE_PAYMENT_INTENT_NOT_FOUND" }, { status: 409 });
-  if (!config.FACILITATOR_URL || !config.FACILITATOR_API_KEY) return NextResponse.json({ code: "FACILITATOR_UNAVAILABLE" }, { status: 503 });
-  const facilitatorHeaders = { "content-type": "application/json", authorization: `Bearer ${config.FACILITATOR_API_KEY}` };
+  const settlementApiKey = config.FACILITATOR_SETTLEMENT_API_KEY ?? config.FACILITATOR_API_KEY;
+  if (!config.FACILITATOR_URL || !settlementApiKey) return NextResponse.json({ code: "FACILITATOR_UNAVAILABLE" }, { status: 503 });
+  const facilitatorHeaders = { "content-type": "application/json", authorization: `Bearer ${settlementApiKey}` };
   const result = await db.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`invoice-collect:${invoice.id}`}, 0))`;
     const existing = await tx.invoiceSettlement.findUnique({ where: { invoiceId: invoice.id } });

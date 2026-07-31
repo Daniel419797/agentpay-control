@@ -1,6 +1,6 @@
 import { getConfig } from "@/lib/config";
 import { db } from "@/lib/db";
-import { assertSafeResourceUrl } from "@/lib/safe-url";
+import { safeFetch } from "@/lib/safe-url";
 
 export function classifyResourceHealth(httpStatus: number | undefined, latencyMs: number | undefined, maxLatencyMs?: number) {
   if (httpStatus === undefined) return "DOWN" as const;
@@ -18,8 +18,8 @@ export async function runResourceHealthChecks(limit = 50) {
     let errorCode: string | undefined;
     const started = performance.now();
     try {
-      const url = await assertSafeResourceUrl(resource.endpoint, getConfig().APP_ENV === "production");
-      const response = await fetch(url, { method: "GET", redirect: "manual", headers: { accept: "application/json", "user-agent": "AgentPay-Health/1.0" }, signal: AbortSignal.timeout(5_000) });
+      const production = getConfig().APP_ENV === "production";
+      const response = await safeFetch(resource.endpoint, { method: "GET", redirect: "manual", headers: { accept: "application/json", "user-agent": "AgentPay-Health/1.0" }, signal: AbortSignal.timeout(5_000) }, production);
       latencyMs = Math.round(performance.now() - started);
       httpStatus = response.status;
       await response.body?.cancel();

@@ -16,11 +16,17 @@ const envSchema = z.object({
   HEDERA_MIRROR_NODE_URL: optionalUrl.default("https://testnet.mirrornode.hedera.com"),
   FACILITATOR_URL: optionalUrl,
   FACILITATOR_API_KEY: z.string().min(32).optional(),
+  FACILITATOR_SIGNING_API_KEY: z.string().min(32).optional(),
+  FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
+  FACILITATOR_CONTRACT_API_KEY: z.string().min(32).optional(),
   HEDERA_MAINNET_FACILITATOR_URL: optionalUrl,
   HEDERA_MAINNET_FACILITATOR_API_KEY: z.string().min(32).optional(),
+  HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY: z.string().min(32).optional(),
   HEDERA_MAINNET_MIRROR_NODE_URL: optionalUrl.default("https://mainnet-public.mirrornode.hedera.com"),
   ARC_FACILITATOR_URL: optionalUrl,
   ARC_FACILITATOR_API_KEY: z.string().min(32).optional(),
+  ARC_FACILITATOR_SIGNING_API_KEY: z.string().min(32).optional(),
+  ARC_FACILITATOR_CONTRACT_API_KEY: z.string().min(32).optional(),
   ARC_RPC_URL: z.string().url().optional(),
   ARC_PROVIDER_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   X402_NETWORK: z.string().default("hedera:testnet"),
@@ -56,13 +62,17 @@ export function getConfig(): AppConfig {
     if (parsed.AUTH_SECRET === "development-only-secret-change-before-deploy") throw new Error("Production AUTH_SECRET is not configured");
     if (!parsed.CRON_SECRET) throw new Error("Production CRON_SECRET is not configured");
     if (!parsed.FACILITATOR_URL) throw new Error("Production FACILITATOR_URL is not configured");
-    if (!parsed.FACILITATOR_API_KEY) throw new Error("Production FACILITATOR_API_KEY is not configured");
+    if (!parsed.FACILITATOR_SIGNING_API_KEY) throw new Error("Production FACILITATOR_SIGNING_API_KEY is not configured");
+    if (!parsed.FACILITATOR_SETTLEMENT_API_KEY) throw new Error("Production FACILITATOR_SETTLEMENT_API_KEY is not configured");
+    if (!parsed.FACILITATOR_CONTRACT_API_KEY) throw new Error("Production FACILITATOR_CONTRACT_API_KEY is not configured");
     if (!parsed.ARC_FACILITATOR_URL) throw new Error("Production ARC_FACILITATOR_URL is not configured");
-    if (!parsed.ARC_FACILITATOR_API_KEY) throw new Error("Production ARC_FACILITATOR_API_KEY is not configured");
+    if (!parsed.ARC_FACILITATOR_SIGNING_API_KEY) throw new Error("Production ARC_FACILITATOR_SIGNING_API_KEY is not configured");
+    if (!parsed.ARC_FACILITATOR_CONTRACT_API_KEY) throw new Error("Production ARC_FACILITATOR_CONTRACT_API_KEY is not configured");
     if (!parsed.ARC_RPC_URL) throw new Error("Production ARC_RPC_URL is not configured");
     if (!parsed.ARC_PROVIDER_ADDRESS) throw new Error("Production ARC_PROVIDER_ADDRESS is not configured");
     if (!parsed.HEDERA_PAYER_ACCOUNT_ID) throw new Error("Production HEDERA_PAYER_ACCOUNT_ID is not configured");
-    if (!parsed.KEY_ENCRYPTION_MASTER_KEY) throw new Error("Production KEY_ENCRYPTION_MASTER_KEY is not configured");
+    if (!parsed.KEY_ENCRYPTION_MASTER_KEY || Buffer.from(parsed.KEY_ENCRYPTION_MASTER_KEY, "base64url").length !== 32) throw new Error("Production KEY_ENCRYPTION_MASTER_KEY must be a base64url-encoded 32-byte key");
+    if (!parsed.SUPABASE_URL || !parsed.SUPABASE_ANON_KEY) throw new Error("Production Supabase authentication is not configured");
     if (parsed.HEDERA_OPERATOR_ID || parsed.HEDERA_OPERATOR_KEY) throw new Error("Hedera operator credentials must be held only by the facilitator");
     if (parsed.VIRTUAL_CARDS_ENABLED) {
       if (parsed.CARD_PROVIDER !== "STRIPE") throw new Error("Production virtual cards require CARD_PROVIDER=STRIPE");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { authorizationMatches, boundedJson, validateContractCall } from "./security.js";
+import { authorizationMatches, boundedJson, capabilityAuthorizationMatches, publicFailure, validateContractCall } from "./security.js";
 
 const allowlist = [
   {
@@ -16,6 +16,13 @@ describe("arc facilitator authorization", () => {
     expect(authorizationMatches("a".repeat(32), `Bearer ${"b".repeat(32)}`)).toBe(false);
     expect(authorizationMatches("a".repeat(32), undefined)).toBe(false);
   });
+
+  it("does not accept a credential assigned to another capability", () => {
+    const signingKey = "s".repeat(32);
+    const settlementKey = "v".repeat(32);
+    expect(capabilityAuthorizationMatches(signingKey, undefined, `Bearer ${settlementKey}`)).toBe(false);
+    expect(capabilityAuthorizationMatches(signingKey, undefined, `Bearer ${signingKey}`)).toBe(true);
+  });
 });
 
 describe("arc facilitator request limits", () => {
@@ -29,6 +36,17 @@ describe("arc facilitator request limits", () => {
         32,
       ),
     ).rejects.toThrow("REQUEST_BODY_TOO_LARGE");
+  });
+
+  it("never exposes internal error messages in public failures", () => {
+    expect(publicFailure(new Error("rpc secret: abc"), "SIGNING_FAILED", 500)).toEqual({
+      code: "SIGNING_FAILED",
+      status: 500,
+    });
+    expect(publicFailure(new Error("REQUEST_BODY_TOO_LARGE"), "SIGNING_FAILED", 500)).toEqual({
+      code: "REQUEST_BODY_TOO_LARGE",
+      status: 413,
+    });
   });
 });
 

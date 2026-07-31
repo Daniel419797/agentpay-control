@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { getNetworkRouter } from "@/domain/network-router";
+import { safeFetch } from "@/lib/safe-url";
 
 const MAX_CHALLENGE_BYTES = 64 * 1024;
 const MAX_FULFILLMENT_BYTES = 1024 * 1024;
@@ -71,14 +72,14 @@ async function boundedText(response: Response, maximum: number) {
   return new TextDecoder().decode(bytes);
 }
 
-export async function discoverX402(resourceUrl: URL) {
-  const response = await fetch(resourceUrl, {
+export async function discoverX402(resourceUrl: URL, production = false) {
+  const response = await safeFetch(resourceUrl, {
     method: "GET",
     redirect: "manual",
     cache: "no-store",
     signal: AbortSignal.timeout(10_000),
     headers: { accept: "application/json" },
-  });
+  }, production);
   if (response.status !== 402) throw new Error("X402_PAYMENT_REQUIRED_EXPECTED");
   const header = response.headers.get("payment-required");
   if (header && Buffer.byteLength(header) > MAX_CHALLENGE_BYTES) throw new Error("RESOURCE_RESPONSE_TOO_LARGE");
@@ -163,10 +164,11 @@ export async function fulfillX402Resource(
   resourceUrl: string,
   requirement: PaymentRequirement,
   paymentPayload: z.infer<typeof paymentPayloadSchema>,
+  production = false,
 ) {
   let response: Response;
   try {
-    response = await fetch(resourceUrl, {
+    response = await safeFetch(resourceUrl, {
       method: "GET",
       redirect: "manual",
       cache: "no-store",
@@ -176,7 +178,7 @@ export async function fulfillX402Resource(
         "payment-signature": JSON.stringify(paymentPayload),
         "payment-requirements": JSON.stringify(requirement),
       },
-    });
+    }, production);
   } catch {
     throw new X402SubmissionUnknownError();
   }

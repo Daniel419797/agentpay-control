@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isPrivateAddress, validateResourceUrl } from "@/lib/safe-url";
+import { createPinnedLookup, isPrivateAddress, validateResourceUrl } from "@/lib/safe-url";
 
 describe("resource URL safety", () => {
   it.each(["127.0.0.1", "10.2.3.4", "172.20.1.2", "192.168.1.1", "::1", "fd00::1"])("blocks private address %s", (address) => {
@@ -23,5 +23,15 @@ describe("resource URL safety", () => {
   it("rejects embedded credentials and fragments", () => {
     expect(() => validateResourceUrl("https://user:pass@example.com/resource", true)).toThrow("RESOURCE_URL_UNSAFE");
     expect(() => validateResourceUrl("https://example.com/resource#token", true)).toThrow("RESOURCE_URL_UNSAFE");
+  });
+
+  it("pins the validated address instead of resolving the hostname again", async () => {
+    const lookup = createPinnedLookup({ address: "203.0.113.10", family: 4 });
+    await new Promise<void>((resolve, reject) => lookup("attacker.example", { all: false }, (error, address, family) => {
+      if (error) return reject(error);
+      expect(address).toBe("203.0.113.10");
+      expect(family).toBe(4);
+      resolve();
+    }));
   });
 });

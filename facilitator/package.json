@@ -3,20 +3,27 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./app": { "types": "./dist/app.d.ts", "default": "./dist/app.js" }
+  },
   "engines": { "node": ">=22" },
   "scripts": {
     "dev": "node --env-file=.env --import tsx --watch src/index.ts",
-    "start": "node --env-file=.env --import tsx src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
     "verify:live": "node --env-file=.env --import tsx scripts/live-x402.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "@hiero-ledger/sdk": "2.85.0",
-    "@hono/node-server": "1.19.11",
-    "@x402/core": "2.19.0",
-    "@x402/hedera": "2.19.0",
-    "hono": "4.12.8",
+    "@hiero-ledger/sdk": "2.86.2",
+    "@hono/node-server": "2.0.12",
+    "@x402/core": "2.20.0",
+    "@x402/hedera": "2.20.0",
+    "hono": "4.12.32",
     "zod": "4.3.6"
   },
   "devDependencies": {

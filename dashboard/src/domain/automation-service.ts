@@ -77,14 +77,15 @@ export async function executeAutomation(executionId: string) {
       const call = contractActionSchema.parse(action);
       const entry = await db.contractAllowlistEntry.findUniqueOrThrow({ where: { id: call.allowlistEntryId } });
       const config = getConfig();
-      if (!config.FACILITATOR_URL || !config.FACILITATOR_API_KEY || !config.HEDERA_PAYER_ACCOUNT_ID) throw new Error("FACILITATOR_UNAVAILABLE");
+      const contractApiKey = config.FACILITATOR_CONTRACT_API_KEY ?? config.FACILITATOR_API_KEY;
+      if (!config.FACILITATOR_URL || !contractApiKey || !config.HEDERA_PAYER_ACCOUNT_ID) throw new Error("FACILITATOR_UNAVAILABLE");
       const candidateTransactionId = execution.transactionId ?? TransactionId.generate(AccountId.fromString(config.HEDERA_PAYER_ACCOUNT_ID)).toString();
       if (!execution.transactionId) {
         await db.automationExecution.update({ where: { id: execution.id }, data: { transactionId: candidateTransactionId } });
       }
       let response: Response;
       try {
-        response = await fetch(`${config.FACILITATOR_URL}/contract-execute`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${config.FACILITATOR_API_KEY}`, "idempotency-key": execution.id }, body: JSON.stringify({ contractId: entry.contractAddress, functionSelector: call.functionSelector, calldata: call.calldata, gas: call.gas, payableAtomic: call.payableAtomic, transactionId: candidateTransactionId }), signal: AbortSignal.timeout(30_000) });
+        response = await fetch(`${config.FACILITATOR_URL}/contract-execute`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${contractApiKey}`, "idempotency-key": execution.id }, body: JSON.stringify({ contractId: entry.contractAddress, functionSelector: call.functionSelector, calldata: call.calldata, gas: call.gas, payableAtomic: call.payableAtomic, transactionId: candidateTransactionId }), signal: AbortSignal.timeout(30_000) });
       } catch {
         throw new ContractSubmissionUnknownError();
       }

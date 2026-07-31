@@ -51,9 +51,9 @@ Show: GitHub repo page briefly
 
 - [ ] Fund HashPack wallet on testnet (use faucet)
 - [ ] Deploy/reset seed data: `npm run db:seed`
-- [ ] Start facilitator: `cd apps/facilitator && npm run dev`
-- [ ] Start resource server: `cd apps/resource-server && npm run dev`
-- [ ] Start dashboard: `npm run dev -- -p 3100`
+- [ ] Start facilitator: `cd facilitator && npm run dev`
+- [ ] Start resource server: `cd resource-server && npm run dev`
+- [ ] Start dashboard: `cd dashboard && npm run dev -- -p 3100`
 - [ ] Create organization and agent
 - [ ] Fund agent account with testnet HBAR
 - [ ] Publish policy (per-tx: 100 HBAR, daily: 500 HBAR)

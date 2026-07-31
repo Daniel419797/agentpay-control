@@ -16,7 +16,6 @@ async function main() {
   for (const network of networks) await db.chainNetwork.upsert({ where: { id: network.id }, update: network, create: network });
 
   for (const suffix of ["testnet", "mainnet"] as const) {
-    const hbarTokenId = suffix === "testnet" ? undefined : "0.0.1357199";
     const usdcTokenId = suffix === "testnet" ? "0.0.429274" : "0.0.1456980";
     await db.asset.upsert({
       where: { network_symbol: { network: `hedera:${suffix}`, symbol: "HBAR" } },

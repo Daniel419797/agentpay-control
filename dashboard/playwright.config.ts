@@ -1,4 +1,7 @@
 import { defineConfig } from "@playwright/test";
+
+const browserChannel = process.env.PLAYWRIGHT_CHANNEL;
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -9,9 +12,10 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3100",
     trace: "on-first-retry",
+    ...(browserChannel ? { channel: browserChannel } : {}),
   },
   webServer: {
-    command: "npm run dev -- -p 3100",
+    command: process.env.CI ? "npm run start -- -p 3100" : "npm run dev -- -p 3100",
     port: 3100,
     reuseExistingServer: !process.env.CI,
   },

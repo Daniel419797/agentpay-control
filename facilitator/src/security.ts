@@ -1,5 +1,24 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
+export type PublicFailure = {
+  code: "REQUEST_BODY_TOO_LARGE" | string;
+  status: 400 | 413 | 500;
+};
+
+export function publicFailure(error: unknown, fallbackCode: string, fallbackStatus: 400 | 500): PublicFailure {
+  if (error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE") {
+    return { code: "REQUEST_BODY_TOO_LARGE", status: 413 };
+  }
+  return { code: fallbackCode, status: fallbackStatus };
+}
+
+export function logFailure(event: string, error: unknown) {
+  console.error(JSON.stringify({
+    event,
+    errorType: error instanceof Error ? error.name : "UnknownError",
+  }));
+}
+
 export async function boundedJson(request: Request, maxBytes = 64 * 1024): Promise<unknown> {
   const declared = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(declared) && declared > maxBytes) throw new Error("REQUEST_BODY_TOO_LARGE");
@@ -47,6 +66,14 @@ export function authorizationMatches(apiKey: string | undefined, authorization: 
   const expected = createHash("sha256").update(`Bearer ${apiKey}`).digest();
   const actual = createHash("sha256").update(authorization ?? "").digest();
   return timingSafeEqual(expected, actual);
+}
+
+export function capabilityAuthorizationMatches(
+  capabilityKey: string | undefined,
+  legacyKey: string | undefined,
+  authorization: string | undefined,
+) {
+  return authorizationMatches(capabilityKey ?? legacyKey, authorization);
 }
 
 export function validateContractCall(

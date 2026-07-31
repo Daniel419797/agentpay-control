@@ -1,4 +1,5 @@
 import { ExactEvmScheme } from "@x402/evm/exact/facilitator";
+import { ExactEvmScheme as ExactEvmClientScheme } from "@x402/evm/exact/client";
 import { toFacilitatorEvmSigner, verifyTypedDataSignature } from "@x402/evm";
 import { createWalletClient, createPublicClient, http, defineChain, type WalletClient, type PublicClient, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -20,6 +21,9 @@ export const envSchema = z.object({
   ARC_USDC_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).default("0x3600000000000000000000000000000000000000"),
   ARC_PROVIDER_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
   FACILITATOR_API_KEY: z.string().min(32).optional(),
+  MANAGED_SIGNING_API_KEY: z.string().min(32).optional(),
+  SETTLEMENT_API_KEY: z.string().min(32).optional(),
+  CONTRACT_EXECUTION_API_KEY: z.string().min(32).optional(),
   CONTRACT_ALLOWLIST_JSON: z.string().default("[]"),
   PORT: z.coerce.number().default(8788),
 });
@@ -32,6 +36,7 @@ export class EvmFacilitator {
   readonly walletClient: WalletClient;
   readonly publicClient: PublicClient;
   readonly scheme: ExactEvmScheme;
+  readonly clientScheme: ExactEvmClientScheme;
   readonly network: string;
   readonly usdcAddress: Hex;
 
@@ -67,6 +72,7 @@ export class EvmFacilitator {
     };
     const signer = toFacilitatorEvmSigner(evmSigner);
     this.scheme = new ExactEvmScheme(signer);
+    this.clientScheme = new ExactEvmClientScheme(this.account, { rpcUrl: config.ARC_RPC_URL });
     this.network = `eip155:${chain.id}`;
   }
 

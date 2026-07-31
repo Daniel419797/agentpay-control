@@ -4,12 +4,14 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
-  const stored = request.headers.get("cookie")?.match(/(?:^|;\s*)agentpay_oauth=([^;]+)/)?.[1];
+  const isSecure = url.protocol === "https:";
+  const cookieName = isSecure ? "__Host-agentpay_oauth" : "agentpay_oauth";
+  const stored = request.headers.get("cookie")?.match(new RegExp(`(?:^|;\\s*)${cookieName}=([^;]+)`))?.[1];
   const separator = stored?.lastIndexOf(".") ?? -1;
   const verifier = separator > 0 ? stored?.slice(0, separator) : stored;
   const expectedState = separator > 0 ? stored?.slice(separator + 1) : undefined;
-  const secure = url.protocol === "https:" ? "; Secure" : "";
-  const clearCookie = `agentpay_oauth=; Path=/; HttpOnly; SameSite=Lax${secure}; Max-Age=0`;
+  const secure = isSecure ? "; Secure" : "";
+  const clearCookie = `${cookieName}=; Path=/; HttpOnly; SameSite=Lax${secure}; Max-Age=0`;
   // Supabase owns the hosted OAuth state value. PKCE is bound to this browser
   // through the HttpOnly, SameSite verifier cookie. Older cookies may also
   // contain an AgentPay state suffix, which is still validated when present.

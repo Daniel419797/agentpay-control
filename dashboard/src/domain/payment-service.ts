@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { getConfig } from "@/lib/config";
 import { evaluatePolicy, policyScheduleViolation } from "@/domain/policy";
 import { paymentFingerprint } from "@/domain/fingerprint";
-import { createManagedPaymentPayload, discoverX402, fulfillX402Resource, parsePaymentRequired, selectRequirement, X402SubmissionUnknownError, type FacilitatorRoutes } from "@/domain/x402-client";
+import { createManagedPaymentPayload, discoverX402, fulfillX402Resource, parsePaymentRequired, selectRequirement, X402SubmissionUnknownError } from "@/domain/x402-client";
 import { assertSafeResourceUrl } from "@/lib/safe-url";
 import { retrySerializable } from "@/lib/retry";
 import { assertPlanLimit } from "@/domain/entitlement-service";
@@ -93,7 +93,7 @@ export async function executeAuthorizedIntent(intentId: string) {
   try {
     const signed = await createManagedPaymentPayload(requirement);
     await db.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "SIGNED", signatureFingerprint: hash(signed.paymentPayload), candidateTransactionId: signed.transactionId } });
-    const fulfillment = await fulfillX402Resource(intent.resourceUrl, requirement, signed.paymentPayload);
+    const fulfillment = await fulfillX402Resource(intent.resourceUrl, requirement, signed.paymentPayload, config.APP_ENV === "production");
     return db.$transaction(async (tx) => {
       await tx.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "CONFIRMED" } });
       await tx.settlement.create({ data: { paymentAttemptId: attempt.id, assetId: intent.quote!.assetId, status: "CONFIRMED", network: fulfillment.network, transactionId: fulfillment.transactionId, payerAccountId: account.accountId, payeeAccountId: intent.quote!.payToAccountId, amountAtomic: intent.quote!.amountAtomic, resultCode: "SUCCESS", submittedAt: new Date(), confirmedAt: new Date() } });
@@ -129,7 +129,7 @@ export async function createPaidRequest(agentId: string, idempotencyKey: string,
   const requestHash = hash(canonical);
   const preexisting = await db.paymentIntent.findFirst({ where: { agentId, idempotencyKey }, include: { quote: { include: { asset: true } }, approval: true, fulfillment: true, attempts: { include: { settlement: true } } } });
   if (preexisting) { if (preexisting.requestHash !== requestHash) throw new Error("IDEMPOTENCY_CONFLICT"); return preexisting; }
-  const required = await discoverX402(resourceUrl);
+  const required = await discoverX402(resourceUrl, config.APP_ENV === "production");
   const result = await retrySerializable(() => db.$transaction(async (tx) => {
     const agent = await tx.agent.findUniqueOrThrow({ where: { id: agentId }, include: { organization: true, effectivePolicy: { include: { asset: true } }, accounts: { where: { status: "ACTIVE" }, include: { balances: { orderBy: { asOf: "desc" }, take: 1 } } } } });
     const existing = await tx.paymentIntent.findUnique({ where: { organizationId_agentId_idempotencyKey: { organizationId: agent.organizationId, agentId, idempotencyKey } }, include: { quote: { include: { asset: true } }, approval: true, attempts: { include: { settlement: true } } } });

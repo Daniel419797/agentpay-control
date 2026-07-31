@@ -1,0 +1,107 @@
+{
+  "documentType": "codex-security.scan-manifest",
+  "scan": {
+    "artifacts": [
+      {
+        "mediaType": "application/json",
+        "path": "findings.json",
+        "sha256": "72a115c87ccee597af5de923cab86b648fa8fd849587150a8a3de92fdc86a4a7"
+      },
+      {
+        "mediaType": "application/json",
+        "path": "coverage.json",
+        "sha256": "ef5c9542a5e323eb5e7cff71eca34063270db41f3f3d11f41dd6b82cbeff6f94"
+      },
+      {
+        "mediaType": "application/octet-stream",
+        "path": "artifacts/02_discovery/candidate_ledger.jsonl",
+        "sha256": "ed20e3cdc75d305a8b57d0658c7defe230b6c7b443b2e699d0f5fb88958dc40e"
+      },
+      {
+        "mediaType": "application/octet-stream",
+        "path": "artifacts/02_discovery/in_scope_files.txt",
+        "sha256": "4a3252fef708e9b84730510e71828ab0185263eec5c4ecbea5c6a89990401628"
+      }
+    ],
+    "completedAt": "2026-07-29T12:18:44Z",
+    "coverageRef": "coverage.json",
+    "findingsRef": "findings.json",
+    "id": "466d356ce303_20260728T154154Z",
+    "producer": {
+      "name": "codex-security-plugin",
+      "version": "0.1.14"
+    },
+    "scope": {
+      "artifactsReviewed": [
+        "artifacts/01_context/threat_model.md",
+        "artifacts/02_discovery/in_scope_files.txt",
+        "artifacts/02_discovery/candidate_ledger.jsonl"
+      ],
+      "excludePaths": [
+        ".git/",
+        "node_modules/",
+        "dashboard/.next/",
+        "dashboard/test-results/",
+        "dashboard/playwright-report/",
+        "**/dist/"
+      ],
+      "includePaths": [
+        "."
+      ],
+      "limitations": [
+        "Live OAuth redirect and production secret-manager rotation require final provider credentials.",
+        "A full Supabase platform-metadata restore requires a Supabase-compatible target; the application-owned public schema was restored successfully to stock PostgreSQL."
+      ],
+      "runtimeStatus": "Parent-only standard scan fallback; clean dependency, build, database recovery, container runtime, and browser evidence was gathered.",
+      "summary": "Repository-wide standard security scan of the AgentPay dashboard, API routes, Prisma data model and migrations, Hedera and Arc facilitators, resource server, deployment descriptors, CI, documentation, and imported scan artifacts.",
+      "validationMode": "Compact validation of every discovery candidate; attack-path analysis was not entered because no candidate remained reportable or deferred."
+    },
+    "sealedAt": "2026-07-29T12:18:44Z",
+    "startedAt": "2026-07-28T15:41:54Z",
+    "status": "completed",
+    "target": {
+      "displayName": "Daniel419797/agentpay-control",
+      "kind": "git_worktree",
+      "remote": "https://github.com/Daniel419797/agentpay-control.git",
+      "revision": "466d356ce303b1ddd93443eb447f11c42c800852",
+      "snapshotDigest": "codex-security-snapshot/v1:sha256:5eaf289b43eddc9a618749f0d8818be03213ac765faa5eea475bd8eb1b768227",
+      "targetId": "github.com/Daniel419797/agentpay-control"
+    },
+    "threatModel": {
+      "assets": [
+        "Hedera and Arc payer keys",
+        "Facilitator capability credentials",
+        "Encrypted agent credentials",
+        "Organization payment policies and spend reservations",
+        "Audit-chain and incident records",
+        "Session and OAuth state"
+      ],
+      "attackerCapabilities": [
+        "Unauthenticated internet requests",
+        "Authenticated low-privilege organization membership",
+        "Control of marketplace resource or notification URLs",
+        "Malformed x402 payloads and oversized request streams",
+        "Compromised single-purpose service credential"
+      ],
+      "securityObjectives": [
+        "Never expose or misuse payer keys",
+        "Enforce organization and role boundaries",
+        "Keep signing, settlement, and contract-execution credentials independent",
+        "Apply policy and transactional reservation checks before signing",
+        "Prevent private-network access through outbound HTTP",
+        "Preserve audit and incident integrity",
+        "Fail closed in production when required security configuration is absent"
+      ],
+      "summary": "AgentPay accepts browser, webhook, agent, marketplace, and x402 traffic across trust boundaries while controlling payment signing and settlement credentials. Highest-impact risks are unauthorized signing or settlement, tenant-data access, credential disclosure, SSRF, payment-policy bypass, audit-chain tampering, and supply-chain compromise.",
+      "trustBoundaries": [
+        "Browser to Next.js application",
+        "Next.js application to PostgreSQL and Supabase",
+        "Application and resource server to facilitators",
+        "Facilitators to Hedera and Arc networks",
+        "Application to attacker-influenced outbound resource and notification URLs",
+        "CI and container build to external package registries"
+      ]
+    }
+  },
+  "schemaVersion": "1.0"
+}

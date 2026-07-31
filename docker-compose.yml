@@ -17,33 +17,57 @@ services:
 
   facilitator:
     build:
-      context: ./facilitator
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: facilitator/Dockerfile
     ports:
       - "8787:8787"
-    env_file: ./facilitator/.env
+    env_file:
+      - path: ./facilitator/.env
+        required: false
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8787/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
   facilitator-arc:
     build:
-      context: ./facilitator-arc
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: facilitator-arc/Dockerfile
     ports:
       - "8788:8788"
-    env_file: ./facilitator-arc/.env
+    env_file:
+      - path: ./facilitator-arc/.env
+        required: false
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8788/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
   resource-server:
     build:
-      context: ./resource-server
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: resource-server/Dockerfile
     ports:
       - "3200:3200"
-    env_file: ./resource-server/.env
+    env_file:
+      - path: ./resource-server/.env
+        required: false
     depends_on:
       facilitator:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:3200/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
 volumes:
   agentpay-postgres:

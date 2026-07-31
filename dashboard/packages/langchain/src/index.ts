@@ -27,11 +27,12 @@ export function createAgentPayTool(client: AgentPayClient, agentId: string) {
       const intent = await client.createPaidRequest(agentId, input);
       let content: string;
       switch (intent.status) {
-        case "SETTLED":
+        case "SETTLED": {
           const txId = intent.attempts?.[0]?.settlement?.transactionId;
-          const network = intent.attempts?.[0]?.settlement?.["network" as keyof typeof intent.attempts[0].settlement] as string | undefined;
+          const network = intent.attempts?.[0]?.settlement?.network;
           content = `Payment settled. Transaction: ${txId}\nExplorer: ${explorerUrl(network, txId ?? "")}`;
           break;
+        }
         case "DENIED":
           content = `Payment denied by policy.`;
           break;

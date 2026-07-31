@@ -2,7 +2,9 @@ import { SignJWT, jwtVerify } from "jose";
 import { db } from "@/lib/db";
 import { getConfig } from "@/lib/config";
 
-export const SESSION_COOKIE = "agentpay_session";
+export const SESSION_COOKIE = process.env.APP_ENV === "production" ? "__Host-agentpay_session" : "agentpay_session";
+const SESSION_ISSUER = "agentpay-control";
+const SESSION_AUDIENCE = "agentpay-operator";
 export type OperatorSession = {
   sub: string;
   email: string | null;
@@ -16,11 +18,11 @@ export const STEP_UP_MAX_AGE_SECONDS = 10 * 60;
 function key() { return new TextEncoder().encode(getConfig().AUTH_SECRET); }
 
 export async function createOperatorSession(session: Omit<OperatorSession, "authenticatedAt">) {
-  return new SignJWT({ email: session.email, name: session.name, mode: session.mode }).setProtectedHeader({ alg: "HS256" }).setSubject(session.sub).setIssuedAt().setExpirationTime("8h").sign(key());
+  return new SignJWT({ email: session.email, name: session.name, mode: session.mode }).setProtectedHeader({ alg: "HS256" }).setIssuer(SESSION_ISSUER).setAudience(SESSION_AUDIENCE).setSubject(session.sub).setIssuedAt().setExpirationTime("8h").sign(key());
 }
 
 export async function verifyOperatorSession(token: string): Promise<OperatorSession> {
-  const { payload } = await jwtVerify(token, key(), { algorithms: ["HS256"] });
+  const { payload } = await jwtVerify(token, key(), { algorithms: ["HS256"], issuer: SESSION_ISSUER, audience: SESSION_AUDIENCE });
   if (!payload.sub || typeof payload.name !== "string" || typeof payload.iat !== "number" || !["supabase", "wallet"].includes(payload.mode as string)) throw new Error("INVALID_SESSION");
   return { sub: payload.sub, email: (payload.email as string) ?? null, name: payload.name, mode: payload.mode as "supabase" | "wallet", authenticatedAt: payload.iat };
 }
@@ -34,7 +36,7 @@ export function hasRecentAuthentication(
 }
 
 export async function sessionFromRequest(request: Request) {
-  const token = request.headers.get("cookie")?.match(/(?:^|;\s*)agentpay_session=([^;]+)/)?.[1];
+  const token = request.headers.get("cookie")?.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`))?.[1];
   if (!token) return null;
   try { return await verifyOperatorSession(token); } catch { return null; }
 }
