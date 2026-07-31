@@ -26,6 +26,7 @@ export default async function AgentPage({ params }: { params: Promise<{ agentId:
       <div><span>Policy</span><strong>{agent.effectivePolicy ? `Published v${agent.effectivePolicy.version}` : "Not published"}</strong></div>
     </div>
     <div className="button-row">
+      <Link className="primary-button" href={`/app/agents/${agentId}/pay` as never}>Send payment</Link>
       <Link className="secondary-button" href={`/app/agents/${agentId}/policy`}>Edit policy</Link>
       <Link className="secondary-button" href={`/app/agents/${agentId}/credentials`}>Credentials</Link>
       <AgentStatusToggle agentId={agent.id} currentStatus={agent.status} />
