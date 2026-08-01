@@ -12,8 +12,8 @@ type WalletIdentity = { id: string; accountId: string; network: string; walletPr
 type Challenge = { accountId: string; message: string; challengeToken: string };
 type PaymentReceipt = { transactionId: string; hashscanUrl: string };
 
-function networkToLedgerIdEnum(network: string) {
-  return network === "hedera:mainnet" ? 1 : 2;
+export function networkToLedgerIdName(network: string) {
+  return network === "hedera:mainnet" ? "mainnet" : "testnet";
 }
 
 function networkToSignerPrefix(network: string) {
@@ -54,8 +54,8 @@ export function HederaWalletConnect() {
       ]);
       DAppConnectorClass = wcMod.DAppConnector;
       HederaJsonRpcMethod = wcMod.HederaJsonRpcMethod;
-      ledgerId = sdkMod.LedgerId.fromString(networkToLedgerIdEnum(network).toString());
-    } catch (importErr) {
+      ledgerId = sdkMod.LedgerId.fromString(networkToLedgerIdName(network));
+    } catch {
       throw new Error("Failed to load WalletConnect libraries. Check your network connection.");
     }
     const instance = new DAppConnectorClass({
