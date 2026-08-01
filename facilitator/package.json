@@ -24,7 +24,7 @@
     "@x402/core": "2.20.0",
     "@x402/hedera": "2.20.0",
     "hono": "4.12.32",
-    "zod": "4.3.6"
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/node": "25.0.10",
