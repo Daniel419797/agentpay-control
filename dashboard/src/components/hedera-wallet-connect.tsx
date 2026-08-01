@@ -85,10 +85,7 @@ export function HederaWalletConnect() {
     const activeConnector = instance ?? await connectorPromise.current!;
 
     try {
-      await Promise.race([
-        activeConnector.openModal(undefined, true),
-        timeout(15_000, `WalletConnect could not create a pairing. Confirm ${window.location.origin} is allowed in Reown Project Domains.`),
-      ]);
+      await activeConnector.openModal(undefined, true);
     } catch (modalErr) {
       throw new Error(`Could not open wallet modal: ${modalErr instanceof Error ? modalErr.message : "unknown error"}`);
     }
@@ -116,6 +113,7 @@ export function HederaWalletConnect() {
       const linkBody = await linkResponse.json();
       if (!linkResponse.ok) throw new Error(linkBody.detail ?? "Wallet verification failed.");
       setIdentity(linkBody.data.identity as WalletIdentity);
+      setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Wallet connection was cancelled.");
     } finally { setBusy(false); }
