@@ -11,6 +11,7 @@ import { useNetwork } from "@/domain/network-context";
 type WalletIdentity = { id: string; accountId: string; network: string; walletProvider: string };
 type Challenge = { accountId: string; message: string; challengeToken: string };
 type PaymentReceipt = { transactionId: string; hashscanUrl: string };
+type WalletConnectorState = { instance: DAppConnector; network: string };
 
 export function networkToLedgerIdName(network: string) {
   return network === "hedera:mainnet" ? "mainnet" : "testnet";
@@ -27,7 +28,8 @@ function timeout(ms: number, message: string): Promise<never> {
 export function HederaWalletConnect() {
   const { network } = useNetwork();
   const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
-  const connector = useRef<DAppConnector | null>(null);
+  const connector = useRef<WalletConnectorState | null>(null);
+  const connectorPromise = useRef<Promise<DAppConnector> | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [identity, setIdentity] = useState<WalletIdentity | null>(null);
@@ -43,51 +45,57 @@ export function HederaWalletConnect() {
   }, []);
 
   const openWalletSession = useCallback(async () => {
+    const instance = connector.current?.network === network ? connector.current.instance : null;
     let DAppConnectorClass: typeof DAppConnector;
     let HederaJsonRpcMethod: Record<string, string>;
     let ledgerId: unknown;
 
-    try {
-      const [wcMod, sdkMod] = await Promise.all([
-        import("@hashgraph/hedera-wallet-connect"),
-        import("@hiero-ledger/sdk"),
-      ]);
-      DAppConnectorClass = wcMod.DAppConnector;
-      HederaJsonRpcMethod = wcMod.HederaJsonRpcMethod;
-      ledgerId = sdkMod.LedgerId.fromString(networkToLedgerIdName(network));
-    } catch {
-      throw new Error("Failed to load WalletConnect libraries. Check your network connection.");
-    }
-    const instance = new DAppConnectorClass({
-      name: "AgentPay Control",
-      description: "Connect a Hedera payment identity to AgentPay Control.",
-      url: window.location.origin,
-      icons: [`${window.location.origin}/icon.svg`],
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }, ledgerId as any, projectId!, Object.values(HederaJsonRpcMethod));
+    if (!instance && !connectorPromise.current) connectorPromise.current = (async () => {
+      try {
+        const [wcMod, sdkMod] = await Promise.all([
+          import("@hashgraph/hedera-wallet-connect"),
+          import("@hiero-ledger/sdk"),
+        ]);
+        DAppConnectorClass = wcMod.DAppConnector;
+        HederaJsonRpcMethod = wcMod.HederaJsonRpcMethod;
+        ledgerId = sdkMod.LedgerId.fromString(networkToLedgerIdName(network));
+      } catch {
+        throw new Error("Failed to load WalletConnect libraries. Check your network connection.");
+      }
+      const created = new DAppConnectorClass({
+        name: "AgentPay Control",
+        description: "Connect a Hedera payment identity to AgentPay Control.",
+        url: window.location.origin,
+        icons: [`${window.location.origin}/icon.svg`],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }, ledgerId as any, projectId!, Object.values(HederaJsonRpcMethod));
+
+      try {
+        await Promise.race([
+          created.init({ logger: "error" }),
+          timeout(10_000, "WalletConnect relay timed out. Check your internet connection."),
+        ]);
+      } catch (initErr) {
+        throw new Error(`WalletConnect initialization failed: ${initErr instanceof Error ? initErr.message : "unknown error"}`);
+      }
+      connector.current = { instance: created, network };
+      return created;
+    })().finally(() => { connectorPromise.current = null; });
+
+    const activeConnector = instance ?? await connectorPromise.current!;
 
     try {
       await Promise.race([
-        instance.init({ logger: "error" }),
-        timeout(10_000, "WalletConnect relay timed out. Check your internet connection."),
-      ]);
-    } catch (initErr) {
-      throw new Error(`WalletConnect initialization failed: ${initErr instanceof Error ? initErr.message : "unknown error"}`);
-    }
-
-    try {
-      await Promise.race([
-        instance.openModal(undefined, true),
-        timeout(30_000, "WalletConnect modal timed out. Make sure HashPack is installed and try again."),
+        activeConnector.openModal(undefined, true),
+        timeout(15_000, `WalletConnect could not create a pairing. Confirm ${window.location.origin} is allowed in Reown Project Domains.`),
       ]);
     } catch (modalErr) {
       throw new Error(`Could not open wallet modal: ${modalErr instanceof Error ? modalErr.message : "unknown error"}`);
     }
 
-    connector.current = instance;
-    const signer = instance.signers[0];
+    const signer = activeConnector.signers[0];
     if (!signer) throw new Error("The wallet did not share a Hedera account. Open HashPack and approve the connection.");
-    return { instance, accountId: signer.getAccountId().toString() };
+    return { instance: activeConnector, accountId: signer.getAccountId().toString() };
   }, [network, projectId]);
 
   async function connectWallet() {
@@ -121,8 +129,9 @@ export function HederaWalletConnect() {
     if (purpose.trim().length < 2) { setError("Describe the purpose of this payment."); return; }
     setBusy(true); setError(null); setReceipt(null);
     try {
-      const session = connector.current
-        ? { instance: connector.current, accountId: identity.accountId }
+      const activeConnector = connector.current;
+      const session = activeConnector?.network === network
+        ? { instance: activeConnector.instance, accountId: identity.accountId }
         : await openWalletSession();
       if (session.accountId !== identity.accountId) {
         throw new Error(`Connect the verified wallet ${identity.accountId} to send this payment.`);
@@ -164,7 +173,7 @@ export function HederaWalletConnect() {
   async function disconnectWallet() {
     setBusy(true); setError(null);
     try {
-      await connector.current?.disconnectAll().catch(() => undefined);
+      await connector.current?.instance.disconnectAll().catch(() => undefined);
       const response = await fetch(`/api/v1/wallet?network=${encodeURIComponent(network)}`, { method: "DELETE" });
       if (!response.ok) throw new Error("Could not unlink the wallet.");
       setIdentity(null); connector.current = null;
