@@ -84,5 +84,8 @@
     "@tailwindcss/oxide-linux-x64-gnu": "4.2.1",
     "lightningcss": "^1.31.1",
     "lightningcss-linux-x64-gnu": "^1.31.1"
+  },
+  "overrides": {
+    "typescript": "5.9.3"
   }
 }
