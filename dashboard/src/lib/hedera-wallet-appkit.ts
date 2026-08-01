@@ -124,13 +124,17 @@ export async function openHederaWallet(projectId: string, network: string): Prom
     : HederaChainDefinition.Native.Testnet;
 
   await appKit.switchNetwork(targetNetwork, { throwOnFailure: true });
-  const modalOpened = !appKit.getIsConnectedState();
-  if (modalOpened) await appKit.open({ view: "Connect" });
+  let provider = appKit.getIsConnectedState()
+    ? await appKit.getUniversalProvider()
+    : undefined;
+  const existingAccount = provider ? connectedAccountId(provider, network) : null;
+  if (provider && existingAccount) return { accountId: existingAccount, appKit, provider };
 
-  const provider = await appKit.getUniversalProvider();
+  await appKit.open({ view: "Connect" });
+  provider ??= await appKit.getUniversalProvider();
   if (!provider) throw new Error("WalletConnect could not initialize its provider.");
 
-  const accountId = await waitForAccount(appKit, provider, network, modalOpened);
+  const accountId = await waitForAccount(appKit, provider, network, true);
   return { accountId, appKit, provider };
 }
 
