@@ -16,6 +16,7 @@ export type HederaWalletSession = {
 };
 
 let walletKitPromise: Promise<WalletKit> | null = null;
+let activeKitNetwork: string | null = null;
 
 export function accountIdForNetwork(accounts: string[], network: string) {
   const prefix = `${network}:`;
@@ -28,19 +29,24 @@ function connectedAccountId(provider: WalletProvider, network: string) {
   return accountIdForNetwork(accounts, network);
 }
 
-async function getWalletKit(projectId: string): Promise<WalletKit> {
-  if (!walletKitPromise) {
+async function getWalletKit(projectId: string, network: string): Promise<WalletKit> {
+  if (!walletKitPromise || activeKitNetwork !== network) {
+    activeKitNetwork = network;
     walletKitPromise = Promise.all([
       import("@hashgraph/hedera-wallet-connect"),
       import("@reown/appkit"),
     ]).then(([hedera, reown]) => {
-      const networks = [
-        hedera.HederaChainDefinition.Native.Mainnet,
-        hedera.HederaChainDefinition.Native.Testnet,
-      ] as const;
+      const primaryNetwork = network === "hedera:mainnet"
+        ? hedera.HederaChainDefinition.Native.Mainnet
+        : hedera.HederaChainDefinition.Native.Testnet;
+      const secondaryNetwork = network === "hedera:mainnet"
+        ? hedera.HederaChainDefinition.Native.Testnet
+        : hedera.HederaChainDefinition.Native.Mainnet;
+
+      const networks = [primaryNetwork, secondaryNetwork] as const;
       const adapter = new hedera.HederaAdapter({
         projectId,
-        networks: [...networks],
+        networks: [primaryNetwork],
         namespace: hedera.hederaNamespace,
       });
       const appKit = reown.createAppKit({
@@ -53,10 +59,14 @@ async function getWalletKit(projectId: string): Promise<WalletKit> {
           icons: [`${window.location.origin}/brand/agentpay-mark.png`],
         },
         networks: [...networks],
-        defaultNetwork: hedera.HederaChainDefinition.Native.Testnet,
+        defaultNetwork: primaryNetwork,
         featuredWalletIds: [
           "1ae92b26df02f0abca6304df07debccd18262fdf5fe82daa81593582dac9a369", // HashPack
         ],
+        allWallets: "SHOW",
+        enableInjected: true,
+        enableEIP6963: true,
+        enableMobileFullScreen: true,
         features: {
           analytics: false,
           email: false,
@@ -67,6 +77,7 @@ async function getWalletKit(projectId: string): Promise<WalletKit> {
       return { appKit };
     }).catch((error) => {
       walletKitPromise = null;
+      activeKitNetwork = null;
       throw error;
     });
   }
@@ -120,7 +131,7 @@ function waitForAccount(appKit: AppKit, provider: WalletProvider, network: strin
 }
 
 export async function openHederaWallet(projectId: string, network: string): Promise<HederaWalletSession> {
-  const { appKit } = await getWalletKit(projectId);
+  const { appKit } = await getWalletKit(projectId, network);
   const { HederaChainDefinition } = await import("@hashgraph/hedera-wallet-connect");
   const targetNetwork = network === "hedera:mainnet"
     ? HederaChainDefinition.Native.Mainnet
@@ -141,7 +152,7 @@ export async function openHederaWallet(projectId: string, network: string): Prom
   return { accountId, appKit, provider };
 }
 
-export async function disconnectHederaWallet(projectId: string) {
-  const { appKit } = await getWalletKit(projectId);
+export async function disconnectHederaWallet(projectId: string, network: string = "hedera:testnet") {
+  const { appKit } = await getWalletKit(projectId, network);
   await appKit.disconnect(HEDERA_NAMESPACE as never);
 }
