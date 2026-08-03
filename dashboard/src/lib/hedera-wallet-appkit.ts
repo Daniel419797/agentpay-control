@@ -132,10 +132,19 @@ function waitForAccount(appKit: AppKit, provider: WalletProvider, network: strin
 
 export async function openHederaWallet(projectId: string, network: string): Promise<HederaWalletSession> {
   const { appKit } = await getWalletKit(projectId, network);
-  const { HederaChainDefinition } = await import("@hashgraph/hedera-wallet-connect");
+  const { HederaChainDefinition, findExtensions, extensionConnect } = await import("@hashgraph/hedera-wallet-connect");
   const targetNetwork = network === "hedera:mainnet"
     ? HederaChainDefinition.Native.Mainnet
     : HederaChainDefinition.Native.Testnet;
+
+  const foundExtensions: Array<{ id: string; isIframe: boolean }> = [];
+  if (typeof window !== "undefined") {
+    findExtensions((metadata, isIframe) => {
+      if (metadata.id && !foundExtensions.some((ext) => ext.id === metadata.id)) {
+        foundExtensions.push({ id: metadata.id, isIframe });
+      }
+    });
+  }
 
   await appKit.switchNetwork(targetNetwork, { throwOnFailure: true });
   let provider = appKit.getIsConnectedState()
@@ -148,8 +157,19 @@ export async function openHederaWallet(projectId: string, network: string): Prom
   provider ??= await appKit.getUniversalProvider();
   if (!provider) throw new Error("WalletConnect could not initialize its provider.");
 
-  const accountId = await waitForAccount(appKit, provider, network, true);
-  return { accountId, appKit, provider };
+  const onDisplayUri = (uri: string) => {
+    for (const ext of foundExtensions) {
+      extensionConnect(ext.id, ext.isIframe, uri);
+    }
+  };
+  provider.on("display_uri", onDisplayUri);
+
+  try {
+    const accountId = await waitForAccount(appKit, provider, network, true);
+    return { accountId, appKit, provider };
+  } finally {
+    provider.removeListener("display_uri", onDisplayUri);
+  }
 }
 
 export async function disconnectHederaWallet(projectId: string, network: string = "hedera:testnet") {
