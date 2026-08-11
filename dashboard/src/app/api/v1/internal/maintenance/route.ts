@@ -1,6 +1,7 @@
 import { finalizeDeletionRequests, openUnresolvedSubmissionIncidents, runPaymentMaintenance, runRetentionMaintenance } from "@/domain/maintenance-service";
 import { reconcileUnknownHederaPayments } from "@/domain/payment-reconciliation-service";
 import { reconcileUnknownArcPayments } from "@/domain/arc-payment-reconciliation-service";
+import { reconcileUnknownCardanoPayments } from "@/domain/cardano-payment-reconciliation-service";
 import { runResourceHealthChecks } from "@/domain/resource-health-service";
 import { markOverdueInvoices } from "@/domain/invoice-service";
 import { reconcileCrossChainTransfers } from "@/domain/cross-chain-service";
@@ -13,10 +14,11 @@ import { authorizeInternalRequest } from "@/lib/internal-auth";
 export async function POST(request: Request) {
   try {
     if (!authorizeInternalRequest(request)) return problem(401, "UNAUTHORIZED", "A valid maintenance service credential is required.");
-    const [payments, hederaPaymentReconciliation, arcPaymentReconciliation, retention, deletions, resourceHealth, invoices, crossChain, fiat, scheduledAutomations, eventAutomations, deferredAutomations, contractReconciliation, intelligence] = await Promise.all([
+    const [payments, hederaPaymentReconciliation, arcPaymentReconciliation, cardanoPaymentReconciliation, retention, deletions, resourceHealth, invoices, crossChain, fiat, scheduledAutomations, eventAutomations, deferredAutomations, contractReconciliation, intelligence] = await Promise.all([
       runPaymentMaintenance(),
       reconcileUnknownHederaPayments(),
       reconcileUnknownArcPayments(),
+      reconcileUnknownCardanoPayments(),
       runRetentionMaintenance(),
       finalizeDeletionRequests(),
       runResourceHealthChecks(),
@@ -32,7 +34,7 @@ export async function POST(request: Request) {
     const incidents = await openUnresolvedSubmissionIncidents();
     return ok({
       payments,
-      paymentReconciliation: { hedera: hederaPaymentReconciliation, arc: arcPaymentReconciliation },
+      paymentReconciliation: { hedera: hederaPaymentReconciliation, arc: arcPaymentReconciliation, cardano: cardanoPaymentReconciliation },
       retention,
       deletions,
       resourceHealth,
