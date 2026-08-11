@@ -71,8 +71,8 @@ export async function POST(request: Request) {
 
     const operationState = await db.organization.findUnique({ where: { id: workspace.organization.id }, select: { status: true, killSwitchEnabled: true } });
     if (!operationState || operationState.status !== "ACTIVE" || operationState.killSwitchEnabled) {
-      if (transfer.externalTransferId.startsWith("pending_")) {
-        await db.fiatTransfer.updateMany({ where: { id: transfer.id, externalTransferId: { startsWith: "pending_" }, status: { in: ["PENDING", "SUBMISSION_UNKNOWN"] } }, data: { status: "CANCELED", failureCode: "ORGANIZATION_KILL_SWITCH_ENABLED" } });
+      if (transfer.externalTransferId.startsWith("pending_") && transfer.status === "PENDING") {
+        await db.fiatTransfer.updateMany({ where: { id: transfer.id, externalTransferId: { startsWith: "pending_" }, status: "PENDING" }, data: { status: "CANCELED", failureCode: "ORGANIZATION_KILL_SWITCH_ENABLED" } });
       }
       return problem(409, operationState?.killSwitchEnabled ? "ORGANIZATION_KILL_SWITCH_ENABLED" : "ORGANIZATION_NOT_ACTIVE", "The organization is not permitted to submit a new fiat transfer.");
     }
