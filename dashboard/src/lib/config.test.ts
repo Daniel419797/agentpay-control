@@ -53,4 +53,9 @@ describe("production configuration", () => {
       FACILITATOR_SETTLEMENT_API_KEY: duplicate,
     }))).toThrow(/must use distinct secrets/);
   });
+
+  it("requires canonical unpadded base64url for the 32-byte encryption key", () => {
+    expect(() => parseEnv(productionEnv({ KEY_ENCRYPTION_MASTER_KEY: "A".repeat(42) + "+" }))).toThrow(/unpadded base64url/);
+    expect(() => parseEnv(productionEnv({ KEY_ENCRYPTION_MASTER_KEY: Buffer.alloc(31, 7).toString("base64url") }))).toThrow(/unpadded base64url/);
+  });
 });
