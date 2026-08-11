@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Activity, Bot, Boxes, BrainCircuit, CircleDollarSign, ClipboardCheck, CreditCard,
-  FileClock, FileText, GitBranch, LayoutDashboard, Menu, Plus, ReceiptText, Repeat2,
+  FileClock, FileText, GitBranch, LayoutDashboard, LogOut, Menu, Plus, ReceiptText, Repeat2,
   Settings, ShieldCheck, Store
 } from "lucide-react";
 import { HederaWalletConnect } from "@/components/hedera-wallet-connect";
@@ -43,9 +43,9 @@ function SignerControl({ operatingState }: { operatingState: OperatingState }) {
         : "Signing is disabled until operator state is verified";
     return <span className="account-chip" title={title}>Signing disabled</span>;
   }
-  if (network === "eip155:5042002") {
-    return <span className="account-chip" title="Arc payments are signed by the isolated AgentPay facilitator">Arc managed signer</span>;
-  }
+  if (network === "eip155:5042002") return <span className="account-chip" title="Arc payments are signed by the isolated AgentPay facilitator">Arc managed signer</span>;
+  if (network === "cardano:preprod") return <span className="account-chip" title="Cardano Preprod x402 transactions are built and signed by the isolated managed signer">Cardano managed signer</span>;
+  if (network === "cardano:mainnet") return <span className="account-chip" title="Cardano Mainnet signing is delegated to the configured production signer outside the dashboard">Cardano delegated signer</span>;
   return <HederaWalletConnect />;
 }
 
@@ -55,6 +55,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const [operatorEmail, setOperatorEmail] = useState("Loading operator…");
   const [roles, setRoles] = useState<string[]>([]);
   const [operatingState, setOperatingState] = useState<OperatingState>("LOADING");
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     void fetch("/api/v1/session", { cache: "no-store" })
@@ -78,29 +79,26 @@ function ShellContent({ children }: { children: React.ReactNode }) {
 
   const canCreateAgent = operatingState === "OPEN" && (roles.includes("OWNER") || roles.includes("OPERATOR"));
 
+  async function signOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    try { await fetch("/api/v1/auth/sign-out", { method: "POST" }); }
+    finally { window.location.assign("/sign-in"); }
+  }
+
   return (
     <div className="app-shell">
       {navOpen && <button className="nav-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}
       <aside className={`sidebar${navOpen ? " sidebar-open" : ""}`} aria-label="Primary navigation">
-        <div className="sidebar-brand">
-          <Image src="/brand/agentpay-lockup-white.png" alt="AgentPay" width={177} height={35} priority />
-        </div>
+        <div className="sidebar-brand"><Image src="/brand/agentpay-lockup-white.png" alt="AgentPay" width={177} height={35} priority /></div>
         <nav className="nav-list">
           {navigation.map((item) => <div className="nav-entry" key={item.href}>{item.group && <span className="nav-group">{item.group}</span>}<Link className={`nav-link${pathname === item.href || (item.href !== "/app/overview" && pathname.startsWith(`${item.href}/`)) ? " active" : ""}`} href={item.href} onClick={() => setNavOpen(false)}><item.icon aria-hidden="true" size={17} />{item.label}</Link></div>)}
         </nav>
         <div className="sidebar-spacer" />
-        <div className="sidebar-context">
-          <span className="context-label">Workspace</span>
-          <WorkspaceSwitcher compact />
-        </div>
-        <div className="sidebar-context">
-          <span className="context-label">Environment</span>
-          <NetworkSwitcher compact />
-        </div>
-        <div className="sidebar-context">
-          <span className="context-label">Operator</span>
-          <span className="context-value">{operatorEmail}</span>
-        </div>
+        <div className="sidebar-context"><span className="context-label">Workspace</span><WorkspaceSwitcher compact /></div>
+        <div className="sidebar-context"><span className="context-label">Environment</span><NetworkSwitcher compact /></div>
+        <div className="sidebar-context"><span className="context-label">Operator</span><span className="context-value">{operatorEmail}</span></div>
+        <button className="nav-link" type="button" onClick={() => void signOut()} disabled={signingOut} aria-label="Sign out"><LogOut aria-hidden="true" size={17} />{signingOut ? "Signing out…" : "Sign out"}</button>
       </aside>
       <main className="main-area">
         <header className="topbar">
@@ -122,9 +120,26 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function AppShell({ children, mainnetEnabled = true, arcEnabled = false }: { children: React.ReactNode; mainnetEnabled?: boolean; arcEnabled?: boolean }) {
+export function AppShell({
+  children,
+  mainnetEnabled = true,
+  arcEnabled = false,
+  cardanoPreprodEnabled = false,
+  cardanoMainnetEnabled = false,
+}: {
+  children: React.ReactNode;
+  mainnetEnabled?: boolean;
+  arcEnabled?: boolean;
+  cardanoPreprodEnabled?: boolean;
+  cardanoMainnetEnabled?: boolean;
+}) {
   return (
-    <NetworkProvider mainnetEnabled={mainnetEnabled} arcEnabled={arcEnabled}>
+    <NetworkProvider
+      mainnetEnabled={mainnetEnabled}
+      arcEnabled={arcEnabled}
+      cardanoPreprodEnabled={cardanoPreprodEnabled}
+      cardanoMainnetEnabled={cardanoMainnetEnabled}
+    >
       <ShellContent>{children}</ShellContent>
     </NetworkProvider>
   );
