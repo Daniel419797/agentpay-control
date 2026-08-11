@@ -105,9 +105,11 @@ function payeeForNetwork(network: string): string {
 }
 function requirementsForNetwork(network: string) {
   const isArc = network === ARCTestnet.caip2;
+  const networkComplete = isArc || Boolean(env.FACILITATOR_FEE_PAYER_ID);
+  if (!networkComplete) return [];
   return Object.values(pricesForNetwork(network))
     .filter((price) => price.assetId.length > 0 && payeeForNetwork(network).length > 0)
-    .map((price) => ({ scheme: "exact" as const, network, amount: price.amount, payTo: payeeForNetwork(network), asset: price.assetId, maxTimeoutSeconds: 900, extra: isArc ? { name: "USD Coin", version: "2", assetTransferMethod: "eip3009" } : { feePayer: env.FACILITATOR_FEE_PAYER_ID } }));
+    .map((price) => ({ scheme: "exact" as const, network, amount: price.amount, payTo: payeeForNetwork(network), asset: price.assetId, maxTimeoutSeconds: 900, extra: isArc ? { name: "USD Coin", version: "2", assetTransferMethod: "eip3009" } : { feePayer: env.FACILITATOR_FEE_PAYER_ID! } }));
 }
 function paymentRequirements(resourceUrl: string) {
   const accepts = Object.keys(networks).flatMap(requirementsForNetwork);
@@ -121,7 +123,7 @@ const sharedPrices = [
   { asset: "HBAR", atomicAmount: hederaMainnetPrices.hbar.amount, network: HederaMainnet.caip2, assetId: hederaMainnetPrices.hbar.assetId },
   { asset: "USDC", atomicAmount: hederaMainnetPrices.usdc.amount, network: HederaMainnet.caip2, assetId: hederaMainnetPrices.usdc.assetId },
   { asset: "USDC", atomicAmount: arcPrices.usdc.amount, network: ARCTestnet.caip2, assetId: arcPrices.usdc.assetId },
-].filter((price) => enabledNetworks.has(price.network as never) && price.assetId.length > 0).map(({ assetId: _assetId, ...price }) => price);
+].filter((price) => enabledNetworks.has(price.network as never) && price.assetId.length > 0 && (!price.network.startsWith("hedera:") || Boolean(env.FACILITATOR_FEE_PAYER_ID))).map(({ assetId: _assetId, ...price }) => price);
 const hederaCatalogPrices = sharedPrices.filter((price) => price.network.startsWith("hedera:"));
 
 const catalog = {
@@ -157,7 +159,7 @@ function getSettlementApiKey(network: string): string | undefined {
 }
 
 const app = new Hono();
-app.get("/health", (c: Context) => c.json({ status: "ok", networks: Object.keys(networks), resourceMode: "DEMO_SYNTHETIC" }));
+app.get("/health", (c: Context) => c.json({ status: "ok", networks: Object.keys(networks).filter((network) => requirementsForNetwork(network).length > 0), resourceMode: "DEMO_SYNTHETIC" }));
 app.get("/catalog", (c: Context) => c.json(catalog));
 
 async function handlePaidRequest(c: Context, category: string, resourceId: string, data: unknown) {
@@ -199,12 +201,18 @@ async function handlePaidRequest(c: Context, category: string, resourceId: strin
     });
     const rawSettlement = await settleRes.json().catch(() => ({}));
     const parsedSettlement = settlementResponseSchema.safeParse(rawSettlement);
-    if (!settleRes.ok || !parsedSettlement.success || parsedSettlement.data.success !== true) {
-      const errorReason = parsedSettlement.success ? parsedSettlement.data.errorReason : undefined;
-      const transactionCandidate = parsedSettlement.success
-        ? ((parsedSettlement.data.transactionId ?? parsedSettlement.data.transaction) || undefined)
-        : undefined;
-      if (settleRes.status >= 500 || errorReason === "settlement_unknown") {
+
+    if (!parsedSettlement.success) {
+      if (settleRes.ok || settleRes.status >= 500) {
+        return c.json({ code: "SETTLEMENT_UNKNOWN", message: "Settlement may have been submitted but the facilitator response could not be verified.", network }, 503);
+      }
+      return c.json({ code: "SETTLEMENT_FAILED", message: "Settlement failed before verifiable submission evidence was returned." }, 422);
+    }
+
+    const settleResult = parsedSettlement.data;
+    const transactionCandidate = (settleResult.transactionId ?? settleResult.transaction) || undefined;
+    if (!settleRes.ok || settleResult.success !== true) {
+      if (settleRes.status >= 500 || settleResult.errorReason === "settlement_unknown" || transactionCandidate) {
         return c.json({
           code: "SETTLEMENT_UNKNOWN",
           message: "Settlement may have been submitted but could not be confirmed.",
@@ -212,9 +220,8 @@ async function handlePaidRequest(c: Context, category: string, resourceId: strin
           ...(transactionCandidate ? { transactionId: transactionCandidate } : {}),
         }, 503);
       }
-      return c.json({ code: "SETTLEMENT_FAILED", message: errorReason || "Settlement failed" }, 422);
+      return c.json({ code: "SETTLEMENT_FAILED", message: settleResult.errorReason || "Settlement failed" }, 422);
     }
-    const settleResult = parsedSettlement.data;
     if (settleResult.network !== network) return c.json({ code: "SETTLEMENT_NETWORK_MISMATCH", message: "Facilitator settlement evidence returned a different network." }, 502);
     if (!settleResult.transaction) return c.json({ code: "SETTLEMENT_EVIDENCE_MISSING", message: "Facilitator did not return a transaction ID" }, 502);
 
