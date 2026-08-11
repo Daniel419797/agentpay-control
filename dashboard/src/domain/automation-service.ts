@@ -28,6 +28,16 @@ export function automationPaymentOutcome(status: string): "DEFER" | "SUCCEED" | 
   return "FAIL";
 }
 
+export function automationOrganizationError(status: string | null | undefined, killSwitchEnabled: boolean | null | undefined) {
+  if (status !== "ACTIVE") return "ORGANIZATION_NOT_ACTIVE" as const;
+  if (killSwitchEnabled) return "ORGANIZATION_KILL_SWITCH_ENABLED" as const;
+  return null;
+}
+
+function isAutomationEmergencyStop(error: unknown) {
+  return error instanceof Error && ["ORGANIZATION_NOT_ACTIVE", "ORGANIZATION_KILL_SWITCH_ENABLED"].includes(error.message);
+}
+
 export function contractCodeHashMatches(bytecode: string, expectedCodeHash: string) {
   return keccak256(bytecode).toLowerCase() === expectedCodeHash.toLowerCase();
 }
@@ -72,6 +82,10 @@ export async function executeAutomation(executionId: string) {
   if (claimed.count !== 1) return db.automationExecution.findUniqueOrThrow({ where: { id: executionId } });
   const execution = await db.automationExecution.findUniqueOrThrow({ where: { id: executionId }, include: { rule: true } });
   try {
+    const organization = await db.organization.findUnique({ where: { id: execution.organizationId }, select: { status: true, killSwitchEnabled: true } });
+    const organizationError = automationOrganizationError(organization?.status, organization?.killSwitchEnabled);
+    if (organizationError) throw new Error(organizationError);
+
     const action = await validateAutomationAction(execution.organizationId, execution.rule.actionType, JSON.parse(decryptSecret(execution.rule.actionConfigEncrypted)));
     let result: unknown;
     let transactionId: string | undefined;
@@ -196,6 +210,9 @@ export async function triggerAutomation(ruleId: string, organizationId: string, 
     if (!rule) throw new Error("AUTOMATION_RULE_NOT_ACTIVE");
     const existing = await tx.automationExecution.findUnique({ where: { ruleId_idempotencyKey: { ruleId, idempotencyKey } } });
     if (existing) return existing;
+    const organization = await tx.organization.findUnique({ where: { id: organizationId }, select: { status: true, killSwitchEnabled: true } });
+    const organizationError = automationOrganizationError(organization?.status, organization?.killSwitchEnabled);
+    if (organizationError) throw new Error(organizationError);
     const dayStart = new Date(); dayStart.setUTCHours(0, 0, 0, 0);
     const daily = await tx.automationExecution.count({ where: { ruleId, createdAt: { gte: dayStart }, status: { not: "CANCELED" } } });
     if (daily >= rule.maxExecutionsPerDay) throw new Error("AUTOMATION_DAILY_LIMIT_REACHED");
@@ -210,15 +227,21 @@ export async function triggerAutomation(ruleId: string, organizationId: string, 
 export async function runScheduledAutomations(limit = 25, now = new Date()) {
   const rules = await db.automationRule.findMany({ where: { status: "ACTIVE", triggerType: "SCHEDULE", nextRunAt: { lte: now } }, orderBy: { nextRunAt: "asc" }, take: limit });
   let triggered = 0;
+  let blocked = 0;
   for (const rule of rules) {
     const config = z.object({ intervalMinutes: z.number().int().min(1).max(10_080) }).parse(rule.triggerConfig);
     const scheduledFor = rule.nextRunAt ?? now;
     const claimed = await db.automationRule.updateMany({ where: { id: rule.id, version: rule.version, nextRunAt: scheduledFor }, data: { nextRunAt: new Date(scheduledFor.getTime() + config.intervalMinutes * 60_000), version: { increment: 1 } } });
     if (claimed.count !== 1) continue;
-    await triggerAutomation(rule.id, rule.organizationId, `schedule:${scheduledFor.toISOString()}`, { scheduledFor: scheduledFor.toISOString() });
-    triggered += 1;
+    try {
+      await triggerAutomation(rule.id, rule.organizationId, `schedule:${scheduledFor.toISOString()}`, { scheduledFor: scheduledFor.toISOString() });
+      triggered += 1;
+    } catch (error) {
+      if (isAutomationEmergencyStop(error)) { blocked += 1; continue; }
+      throw error;
+    }
   }
-  return { scanned: rules.length, triggered };
+  return { scanned: rules.length, triggered, blocked };
 }
 
 export async function resumeDeferredAutomationPayments(limit = 25) {
@@ -238,7 +261,7 @@ export async function resumeDeferredAutomationPayments(limit = 25) {
 
 export async function runEventDrivenAutomations(limit = 50) {
   const rules = await db.automationRule.findMany({ where: { status: "ACTIVE", triggerType: { in: ["BALANCE_THRESHOLD", "INVOICE_EVENT"] } }, orderBy: { updatedAt: "asc" }, take: limit });
-  let evaluated = 0, matched = 0, triggered = 0;
+  let evaluated = 0, matched = 0, triggered = 0, blocked = 0;
   for (const rule of rules) {
     evaluated += 1;
     if (rule.triggerType === "BALANCE_THRESHOLD") {
@@ -247,20 +270,30 @@ export async function runEventDrivenAutomations(limit = 50) {
       if (!snapshot) continue;
       const balance = BigInt(snapshot.spendableAtomic.toString()); const threshold = BigInt(config.amountAtomic); const isMatch = config.comparison === "BELOW" ? balance < threshold : balance > threshold;
       if (!isMatch) continue; matched += 1;
-      const result = await triggerAutomation(rule.id, rule.organizationId, `balance:${snapshot.id}:${config.comparison}:${config.amountAtomic}`, { snapshotId: snapshot.id, accountId: snapshot.paymentAccount.accountId, assetId: config.assetId, asset: snapshot.asset.symbol, spendableAtomic: balance.toString(), comparison: config.comparison, thresholdAtomic: config.amountAtomic, asOf: snapshot.asOf.toISOString() });
-      if (result.createdAt.getTime() >= Date.now() - 60_000) triggered += 1;
+      try {
+        const result = await triggerAutomation(rule.id, rule.organizationId, `balance:${snapshot.id}:${config.comparison}:${config.amountAtomic}`, { snapshotId: snapshot.id, accountId: snapshot.paymentAccount.accountId, assetId: config.assetId, asset: snapshot.asset.symbol, spendableAtomic: balance.toString(), comparison: config.comparison, thresholdAtomic: config.amountAtomic, asOf: snapshot.asOf.toISOString() });
+        if (result.createdAt.getTime() >= Date.now() - 60_000) triggered += 1;
+      } catch (error) {
+        if (isAutomationEmergencyStop(error)) { blocked += 1; continue; }
+        throw error;
+      }
     } else {
       const config = z.object({ status: z.enum(["SENT", "PAID", "OVERDUE"]) }).parse(rule.triggerConfig);
       const action = `INVOICE_${config.status}`;
       const events = await db.invoiceEvent.findMany({ where: { action, invoice: { OR: [{ issuerOrganizationId: rule.organizationId }, { recipientOrganizationId: rule.organizationId }] } }, include: { invoice: { select: { number: true, status: true, issuerOrganizationId: true, recipientOrganizationId: true, totalAtomic: true, asset: { select: { symbol: true } } } } }, orderBy: { occurredAt: "desc" }, take: 10 });
       for (const event of events) {
         matched += 1;
-        const result = await triggerAutomation(rule.id, rule.organizationId, `invoice-event:${event.id}`, { invoiceEventId: event.id, invoiceId: event.invoiceId, number: event.invoice.number, status: event.invoice.status, totalAtomic: event.invoice.totalAtomic.toString(), asset: event.invoice.asset.symbol, occurredAt: event.occurredAt.toISOString() });
-        if (result.createdAt.getTime() >= Date.now() - 60_000) triggered += 1;
+        try {
+          const result = await triggerAutomation(rule.id, rule.organizationId, `invoice-event:${event.id}`, { invoiceEventId: event.id, invoiceId: event.invoiceId, number: event.invoice.number, status: event.invoice.status, totalAtomic: event.invoice.totalAtomic.toString(), asset: event.invoice.asset.symbol, occurredAt: event.occurredAt.toISOString() });
+          if (result.createdAt.getTime() >= Date.now() - 60_000) triggered += 1;
+        } catch (error) {
+          if (isAutomationEmergencyStop(error)) { blocked += 1; continue; }
+          throw error;
+        }
       }
     }
   }
-  return { evaluated, matched, triggered };
+  return { evaluated, matched, triggered, blocked };
 }
 
 export function newWebhookSecret() { return randomBytes(32).toString("base64url"); }
