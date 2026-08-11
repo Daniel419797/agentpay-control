@@ -31,6 +31,19 @@ function productionEnv(overrides: Record<string, string> = {}) {
   };
 }
 
+function cardanoPreprodEnv(overrides: Record<string, string> = {}) {
+  return productionEnv({
+    CARDANO_PREPROD_FACILITATOR_URL: "https://facilitator.agentpay.example/cardano",
+    CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY: "cardano-preprod-signing-abcdefghijklmnopqrstuvwxyz",
+    CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY: "cardano-preprod-settlement-abcdefghijklmnopqrstuvwxyz",
+    CARDANO_PREPROD_PAYER_ADDRESS: CARDANO_PREPROD_PAYER,
+    CARDANO_PREPROD_PROVIDER_ADDRESS: CARDANO_PREPROD_PROVIDER,
+    CARDANO_PREPROD_BLOCKFROST_PROJECT_ID: "preprod-project-id-abcdefghijklmnopqrstuvwxyz",
+    CARDANO_SETTLEMENT_STORE_API_KEY: "cardano-store-secret-abcdefghijklmnopqrstuvwxyz",
+    ...overrides,
+  });
+}
+
 describe("production configuration", () => {
   it("accepts a complete production configuration", () => {
     expect(parseEnv(productionEnv()).APP_ENV).toBe("production");
@@ -64,6 +77,7 @@ describe("production configuration", () => {
     const duplicate = "duplicate-capability-secret-abcdefghijklmnopqrstuvwxyz";
     expect(() => parseEnv(productionEnv({ FACILITATOR_SIGNING_API_KEY: duplicate, FACILITATOR_SETTLEMENT_API_KEY: duplicate }))).toThrow(/must use distinct secrets/);
     expect(() => parseEnv(productionEnv({ FACILITATOR_SIGNING_API_KEY: duplicate, ARC_FACILITATOR_SIGNING_API_KEY: duplicate }))).toThrow(/must use distinct secrets/);
+    expect(() => parseEnv(cardanoPreprodEnv({ CARDANO_SETTLEMENT_STORE_API_KEY: duplicate, CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY: duplicate }))).toThrow(/must use distinct secrets/);
   });
 
   it("requires canonical unpadded base64url for the 32-byte encryption key", () => {
@@ -82,27 +96,16 @@ describe("production configuration", () => {
     expect(env.CARDANO_MAINNET_FACILITATOR_URL).toBeUndefined();
   });
 
-  it("requires every Cardano Preprod signer, payee, and evidence dependency once the rail is requested", () => {
+  it("requires every Cardano Preprod signer, payee, evidence, and durable replay dependency once requested", () => {
     expect(() => parseEnv(productionEnv({ CARDANO_PREPROD_FACILITATOR_URL: "https://facilitator.agentpay.example/cardano" }))).toThrow(/Cardano Preprod/);
-    const env = parseEnv(productionEnv({
-      CARDANO_PREPROD_FACILITATOR_URL: "https://facilitator.agentpay.example/cardano",
-      CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY: "cardano-preprod-signing-abcdefghijklmnopqrstuvwxyz",
-      CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY: "cardano-preprod-settlement-abcdefghijklmnopqrstuvwxyz",
-      CARDANO_PREPROD_PAYER_ADDRESS: CARDANO_PREPROD_PAYER,
-      CARDANO_PREPROD_PROVIDER_ADDRESS: CARDANO_PREPROD_PROVIDER,
-      CARDANO_PREPROD_BLOCKFROST_PROJECT_ID: "preprod-project-id-abcdefghijklmnopqrstuvwxyz",
-    }));
-    expect(env.CARDANO_PREPROD_PAYER_ADDRESS).toBe(CARDANO_PREPROD_PAYER);
+    const withoutStore = cardanoPreprodEnv();
+    delete (withoutStore as Record<string, string>).CARDANO_SETTLEMENT_STORE_API_KEY;
+    expect(() => parseEnv(withoutStore)).toThrow(/CARDANO_SETTLEMENT_STORE_API_KEY/);
+    expect(parseEnv(cardanoPreprodEnv()).CARDANO_PREPROD_PAYER_ADDRESS).toBe(CARDANO_PREPROD_PAYER);
   });
 
   it("requires HTTPS for Cardano production facilitator and Blockfrost endpoints", () => {
-    expect(() => parseEnv(productionEnv({
-      CARDANO_PREPROD_FACILITATOR_URL: "http://facilitator.agentpay.example/cardano",
-      CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY: "cardano-preprod-signing-abcdefghijklmnopqrstuvwxyz",
-      CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY: "cardano-preprod-settlement-abcdefghijklmnopqrstuvwxyz",
-      CARDANO_PREPROD_PAYER_ADDRESS: CARDANO_PREPROD_PAYER,
-      CARDANO_PREPROD_PROVIDER_ADDRESS: CARDANO_PREPROD_PROVIDER,
-      CARDANO_PREPROD_BLOCKFROST_PROJECT_ID: "preprod-project-id-abcdefghijklmnopqrstuvwxyz",
-    }))).toThrow(/CARDANO_PREPROD_FACILITATOR_URL must use HTTPS/);
+    expect(() => parseEnv(cardanoPreprodEnv({ CARDANO_PREPROD_FACILITATOR_URL: "http://facilitator.agentpay.example/cardano" }))).toThrow(/CARDANO_PREPROD_FACILITATOR_URL must use HTTPS/);
+    expect(() => parseEnv(cardanoPreprodEnv({ CARDANO_PREPROD_BLOCKFROST_URL: "http://cardano-preprod.blockfrost.io/api/v0" }))).toThrow(/CARDANO_PREPROD_BLOCKFROST_URL must use HTTPS/);
   });
 });
