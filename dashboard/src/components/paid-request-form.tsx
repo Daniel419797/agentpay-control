@@ -41,7 +41,15 @@ function explorerTransactionUrl(network: string | undefined, transactionId: stri
   if (network === "hedera:testnet") return `https://hashscan.io/testnet/transaction/${encodeURIComponent(transactionId)}`;
   if (network === "hedera:mainnet") return `https://hashscan.io/mainnet/transaction/${encodeURIComponent(transactionId)}`;
   if (network === "eip155:5042002") return `https://testnet.arcscan.app/tx/${encodeURIComponent(transactionId)}`;
+  if (network === "cardano:preprod") return `https://preprod.cardanoscan.io/transaction/${encodeURIComponent(transactionId)}`;
+  if (network === "cardano:mainnet") return `https://cardanoscan.io/transaction/${encodeURIComponent(transactionId)}`;
   return null;
+}
+
+function supportsManagedRequest(account: AgentAccount | undefined) {
+  if (!account) return false;
+  return (account.custodyType === "PLATFORM_MANAGED_TESTNET" && account.signingMode === "AUTONOMOUS_MANAGED")
+    || (account.custodyType === "EXTERNAL_DELEGATED" && account.signingMode === "BOUNDED_DELEGATION");
 }
 
 export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; defaultAgentId?: string }) {
@@ -59,7 +67,7 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
   const activeAgent = agents.find((agent) => agent.id === agentId);
   const activeAccount = activeAgent?.accounts.find((account) => account.network === activeAgent.network) ?? activeAgent?.accounts[0];
   const isPaused = activeAgent?.status === "PAUSED";
-  const isAutonomousManaged = activeAccount?.custodyType === "PLATFORM_MANAGED_TESTNET" && activeAccount?.signingMode === "AUTONOMOUS_MANAGED";
+  const managedRequest = supportsManagedRequest(activeAccount);
 
   const compatibleResources = useMemo(() => {
     if (!activeAgent) return [];
@@ -74,29 +82,20 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
         if (!response.ok) throw new Error(body?.detail ?? "Could not load registered resources.");
         return body?.data ?? [];
       })
-      .then((rows) => {
-        if (!active) return;
-        setResources(rows);
-      })
-      .catch((caught) => {
-        if (active) setError(caught instanceof Error ? caught.message : "Could not load registered resources.");
-      })
-      .finally(() => {
-        if (active) setLoadingResources(false);
-      });
+      .then((rows) => { if (active) setResources(rows); })
+      .catch((caught) => { if (active) setError(caught instanceof Error ? caught.message : "Could not load registered resources."); })
+      .finally(() => { if (active) setLoadingResources(false); });
     return () => { active = false; };
   }, []);
 
   useEffect(() => {
     if (useCustom) return;
-    if (!compatibleResources.some((resource) => resource.endpoint === resourceUrl)) {
-      setResourceUrl(compatibleResources[0]?.endpoint ?? "");
-    }
+    if (!compatibleResources.some((resource) => resource.endpoint === resourceUrl)) setResourceUrl(compatibleResources[0]?.endpoint ?? "");
   }, [compatibleResources, resourceUrl, useCustom]);
 
   async function submit() {
     const url = useCustom ? customUrl.trim() : resourceUrl;
-    if (!agentId || !url || !isAutonomousManaged) return;
+    if (!agentId || !url || !managedRequest) return;
     setLoading(true);
     setError("");
     setResult(null);
@@ -104,10 +103,7 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
       const idempotencyKey = crypto.randomUUID();
       const response = await fetch(`/api/v1/agents/${agentId}/paid-requests`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": idempotencyKey,
-        },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
         body: JSON.stringify({ resourceUrl: url, purpose: purpose.trim() || undefined }),
       });
       const body = await response.json().catch(() => null) as { data?: any; detail?: string; error?: { message?: string } } | null;
@@ -122,15 +118,7 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
       const amountAtomic = data.quote?.amountAtomic != null ? String(data.quote.amountAtomic) : undefined;
       const decimals = Number(data.quote?.asset?.decimals ?? 0);
       const symbol = String(data.quote?.asset?.symbol ?? "");
-      setResult({
-        id: data.id,
-        status: data.status,
-        resourceUrl: url,
-        transactionId,
-        explorerUrl: explorerTransactionUrl(network, transactionId),
-        amount: amountAtomic ? formatAtomic(amountAtomic, decimals, symbol) : undefined,
-        network,
-      });
+      setResult({ id: data.id, status: data.status, resourceUrl: url, transactionId, explorerUrl: explorerTransactionUrl(network, transactionId), amount: amountAtomic ? formatAtomic(amountAtomic, decimals, symbol) : undefined, network });
     } catch {
       setError("Network error. The request status is unknown; check Transactions before retrying.");
     } finally {
@@ -150,27 +138,17 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
       <div>
         <label style={{ display: "block", fontSize: 13, marginBottom: 4 }}>Agent</label>
         <select className="form-input" value={agentId} onChange={(event) => setAgentId(event.target.value)}>
-          {agents.map((agent) => (
-            <option key={agent.id} value={agent.id}>{agent.name} ({agent.status})</option>
-          ))}
+          {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name} ({agent.status})</option>)}
         </select>
         {isPaused && <div className="form-error" style={{ marginTop: 4 }}>Agent is paused. Resume it before sending requests.</div>}
-        {activeAgent && !isAutonomousManaged && (
-          <div className="form-help" style={{ marginTop: 6 }}>
-            This agent uses wallet confirmation. Autonomous x402 requests are disabled for self-custody accounts; use the Hedera wallet payment control for manually approved transfers.
-          </div>
-        )}
+        {activeAgent && !managedRequest && <div className="form-help" style={{ marginTop: 6 }}>This account requires wallet confirmation. Autonomous x402 requests are available only for managed or explicitly delegated signer accounts.</div>}
       </div>
 
       <div>
         <label style={{ display: "block", fontSize: 13, marginBottom: 4 }}>Resource</label>
         <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
-            <input type="radio" checked={!useCustom} onChange={() => setUseCustom(false)} /> Registered
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
-            <input type="radio" checked={useCustom} onChange={() => setUseCustom(true)} /> Registered URL
-          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}><input type="radio" checked={!useCustom} onChange={() => setUseCustom(false)} /> Registered</label>
+          <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}><input type="radio" checked={useCustom} onChange={() => setUseCustom(true)} /> Registered URL</label>
         </div>
         {useCustom ? (
           <input className="form-input" value={customUrl} onChange={(event) => setCustomUrl(event.target.value)} placeholder="https://provider.example/api/resource" inputMode="url" />
@@ -178,33 +156,15 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
           <select className="form-input" value={resourceUrl} onChange={(event) => setResourceUrl(event.target.value)} disabled={loadingResources || compatibleResources.length === 0}>
             {loadingResources && <option value="">Loading resources…</option>}
             {!loadingResources && compatibleResources.length === 0 && <option value="">No active resource priced for this network</option>}
-            {compatibleResources.map((resource) => (
-              <option key={resource.id} value={resource.endpoint}>{resource.name}{resource.provider?.name ? ` · ${resource.provider.name}` : ""}</option>
-            ))}
+            {compatibleResources.map((resource) => <option key={resource.id} value={resource.endpoint}>{resource.name}{resource.provider?.name ? ` · ${resource.provider.name}` : ""}</option>)}
           </select>
         )}
-        <div className="form-help" style={{ marginTop: 6 }}>
-          The endpoint must be an active AgentPay resource with a verified price and payee for the selected agent network.
-        </div>
+        <div className="form-help" style={{ marginTop: 6 }}>The endpoint must be an active AgentPay resource with a verified price and payee for the selected agent network.</div>
       </div>
 
-      <div>
-        <label style={{ display: "block", fontSize: 13, marginBottom: 4 }}>Purpose (optional)</label>
-        <input className="form-input" value={purpose} onChange={(event) => setPurpose(event.target.value)} placeholder="e.g. Daily market analysis" />
-      </div>
-
+      <div><label style={{ display: "block", fontSize: 13, marginBottom: 4 }}>Purpose (optional)</label><input className="form-input" value={purpose} onChange={(event) => setPurpose(event.target.value)} placeholder="e.g. Daily market analysis" /></div>
       {error && <div className="form-error" role="alert">{error}</div>}
-
-      <div className="button-row">
-        <button
-          className="primary-button"
-          type="button"
-          disabled={loading || !agentId || isPaused || !isAutonomousManaged || (useCustom ? !customUrl.trim() : !resourceUrl)}
-          onClick={() => void submit()}
-        >
-          {loading ? "Sending…" : "Send paid request"}
-        </button>
-      </div>
+      <div className="button-row"><button className="primary-button" type="button" disabled={loading || !agentId || isPaused || !managedRequest || (useCustom ? !customUrl.trim() : !resourceUrl)} onClick={() => void submit()}>{loading ? "Sending…" : "Send paid request"}</button></div>
 
       {result && (
         <div className="panel" style={{ borderRadius: 8, padding: 16 }}>
