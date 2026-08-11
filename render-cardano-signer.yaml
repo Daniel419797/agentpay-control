@@ -16,6 +16,10 @@ services:
         value: preprod
       - key: CARDANO_PAYER_ADDRESS
         sync: false
+      # Optional. When populated this exact policy-id + asset-name unit is the
+      # only Cardano native token the signer may consume/pay besides lovelace.
+      - key: CARDANO_USDCX_ASSET_ID
+        sync: false
       - key: CARDANO_BLOCKFROST_URL
         value: https://cardano-preprod.blockfrost.io/api/v0
       - key: CARDANO_BLOCKFROST_PROJECT_ID
@@ -34,6 +38,8 @@ services:
         sync: false
       - key: CARDANO_MIN_OUTPUT_LOVELACE
         value: "1000000"
+      - key: CARDANO_TOKEN_OUTPUT_LOVELACE
+        value: "2000000"
       - key: CARDANO_MIN_CHANGE_LOVELACE
         value: "2000000"
       - key: CARDANO_MAX_INPUTS
