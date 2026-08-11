@@ -37,15 +37,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     const workspace = await workspaceFromRequest(request);
     if (!workspace) return problem(401, "AUTH_REQUIRED", "Sign in before creating credentials.");
     if (!workspaceHasRole(workspace, ["OWNER", "OPERATOR"])) return problem(403, "ROLE_REQUIRED", "Owner or Operator access is required.");
+    if (workspace.organization.killSwitchEnabled) return problem(409, "ORGANIZATION_KILL_SWITCH_ENABLED", "The emergency stop is active. New agent credentials are disabled.");
     if (!hasRecentAuthentication(workspace.session)) return problem(428, "STEP_UP_REQUIRED", "Sign in again before creating an agent credential.");
     const agent = await db.agent.findFirst({ where: { id: agentId, organizationId: workspace.organization.id }, select: { id: true } });
     if (!agent) return problem(404, "AGENT_NOT_FOUND", "Agent not found.");
+    const operationState = await db.organization.findUnique({ where: { id: workspace.organization.id }, select: { status: true, killSwitchEnabled: true } });
+    if (!operationState || operationState.status !== "ACTIVE") return problem(409, "ORGANIZATION_NOT_ACTIVE", "The organization is not active.");
+    if (operationState.killSwitchEnabled) return problem(409, "ORGANIZATION_KILL_SWITCH_ENABLED", "The emergency stop is active. New agent credentials are disabled.");
     const input = schema.parse(await boundedJson(request));
     if (input.expiresAt && new Date(input.expiresAt) <= new Date()) return problem(422, "EXPIRY_INVALID", "Credential expiry must be in the future.");
     const environmentPrefix = getConfig().APP_ENV === "production" ? "ap_live_" : "ap_test_";
     const secret = `${environmentPrefix}${randomBytes(24).toString("base64url")}`;
     const prefix = secret.slice(0, 24);
     const credential = await db.$transaction(async (tx) => {
+      const organization = await tx.organization.findUnique({ where: { id: workspace.organization.id }, select: { status: true, killSwitchEnabled: true } });
+      if (!organization || organization.status !== "ACTIVE") throw new Error("ORGANIZATION_NOT_ACTIVE");
+      if (organization.killSwitchEnabled) throw new Error("ORGANIZATION_KILL_SWITCH_ENABLED");
       const created = await tx.agentCredential.create({ data: { agentId, label: input.label, prefix, secretHash: createHash("sha256").update(secret).digest("hex"), scopes: input.scopes, expiresAt: input.expiresAt ? new Date(input.expiresAt) : undefined } });
       await tx.auditEvent.create({ data: { organizationId: workspace.organization.id, actorType: "USER", actorId: workspace.user.id, action: "AGENT_CREDENTIAL_CREATED", targetType: "AGENT_CREDENTIAL", targetId: created.id, result: "SUCCESS", metadata: { agentId, prefix, scopes: created.scopes } } });
       await tx.outboxEvent.create({ data: { organizationId: workspace.organization.id, eventType: "AGENT_CREDENTIAL_CREATED", aggregateType: "AGENT_CREDENTIAL", aggregateId: created.id, payload: { agentId, prefix, label: created.label } } });
