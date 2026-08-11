@@ -58,4 +58,15 @@ describe("production configuration", () => {
     expect(() => parseEnv(productionEnv({ KEY_ENCRYPTION_MASTER_KEY: "A".repeat(42) + "+" }))).toThrow(/unpadded base64url/);
     expect(() => parseEnv(productionEnv({ KEY_ENCRYPTION_MASTER_KEY: Buffer.alloc(31, 7).toString("base64url") }))).toThrow(/unpadded base64url/);
   });
+
+  it("requires a mainnet signing credential when mainnet is configured", () => {
+    expect(() => parseEnv(productionEnv({
+      HEDERA_MAINNET_FACILITATOR_URL: "https://mainnet-facilitator.agentpay.example/hedera",
+    }))).toThrow(/HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY/);
+
+    expect(parseEnv(productionEnv({
+      HEDERA_MAINNET_FACILITATOR_URL: "https://mainnet-facilitator.agentpay.example/hedera",
+      HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY: "mainnet-signing-secret-abcdefghijklmnopqrstuvwxyz",
+    })).HEDERA_MAINNET_FACILITATOR_URL).toContain("mainnet-facilitator");
+  });
 });
