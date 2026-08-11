@@ -10,7 +10,8 @@ const MAX_FULFILLMENT_BYTES = 1024 * 1024;
 const paymentRequirementSchema = z.object({ scheme: z.literal("exact"), network: z.string().min(1), asset: z.string().min(1), amount: z.string().regex(/^\d+$/), payTo: z.string().min(1), maxTimeoutSeconds: z.number().int().positive().max(3600), extra: z.record(z.string(), z.unknown()).default({}) });
 const paymentRequiredSchema = z.object({ x402Version: z.literal(2), error: z.string().optional(), resource: z.object({ url: z.string().url(), description: z.string().optional(), mimeType: z.string().optional(), serviceName: z.string().optional(), tags: z.array(z.string()).optional(), iconUrl: z.string().url().optional() }), accepts: z.array(paymentRequirementSchema).min(1), extensions: z.record(z.string(), z.unknown()).optional() });
 const paymentPayloadSchema = z.object({ x402Version: z.literal(2), accepted: paymentRequirementSchema, payload: z.record(z.string(), z.unknown()), resource: z.record(z.string(), z.unknown()).optional(), extensions: z.record(z.string(), z.unknown()).optional() });
-const paymentResponseSchema = z.object({ transactionId: z.string().optional(), transaction: z.string().optional(), network: z.string().optional() }).passthrough();
+const standardPaymentResponseSchema = z.object({ success: z.boolean(), errorReason: z.string().optional(), payer: z.string().optional(), transaction: z.string().min(1), network: z.string().min(1), amount: z.string().optional(), extensions: z.record(z.string(), z.unknown()).optional() }).passthrough();
+const legacyPaymentResponseSchema = z.object({ transactionId: z.string().optional(), transaction: z.string().optional(), network: z.string().optional() }).passthrough();
 
 export type PaymentRequirement = z.infer<typeof paymentRequirementSchema>;
 export type PaymentRequired = z.infer<typeof paymentRequiredSchema>;
@@ -80,7 +81,7 @@ export async function createManagedPaymentPayload(facilitatorUrlOrRequirement: s
 export class X402SubmissionUnknownError extends Error { constructor() { super("X402_SUBMISSION_UNKNOWN"); } }
 
 function ambiguousPostPaymentFailure(status: number, code: string) {
-  return status >= 500 || ["SETTLEMENT_FAILED", "SETTLEMENT_UNKNOWN", "SETTLEMENT_EVIDENCE_MISSING", "FACILITATOR_ERROR"].includes(code);
+  return status >= 500 || ["SETTLEMENT_FAILED", "SETTLEMENT_UNKNOWN", "SETTLEMENT_EVIDENCE_MISSING", "SETTLEMENT_NETWORK_MISMATCH", "FACILITATOR_ERROR"].includes(code);
 }
 
 export async function fulfillX402Resource(resourceUrl: string, requirement: PaymentRequirement, paymentPayload: z.infer<typeof paymentPayloadSchema>, production = false) {
@@ -104,14 +105,29 @@ export async function fulfillX402Resource(resourceUrl: string, requirement: Paym
   }
 
   const paymentResponseHeader = response.headers.get("payment-response");
-  let paymentResponse: z.infer<typeof paymentResponseSchema> = {};
+  let transactionId: string | undefined;
+  let settlementNetwork: string | undefined;
   if (paymentResponseHeader) {
-    try { paymentResponse = paymentResponseSchema.parse(decodeX402Header(paymentResponseHeader, 64 * 1024)); }
-    catch { throw new X402SubmissionUnknownError(); }
+    try {
+      const decoded = decodeX402Header(paymentResponseHeader, 64 * 1024);
+      const standard = standardPaymentResponseSchema.safeParse(decoded);
+      if (standard.success) {
+        if (!standard.data.success) throw new X402SubmissionUnknownError();
+        transactionId = standard.data.transaction;
+        settlementNetwork = standard.data.network;
+      } else {
+        const legacy = legacyPaymentResponseSchema.parse(decoded);
+        transactionId = legacy.transactionId ?? legacy.transaction;
+        settlementNetwork = legacy.network;
+      }
+    } catch (error) {
+      if (error instanceof X402SubmissionUnknownError) throw error;
+      throw new X402SubmissionUnknownError();
+    }
   }
   const nestedTransaction = typeof body === "object" && body && "settled" in body ? (body as { settled?: { transactionId?: string } }).settled?.transactionId : undefined;
-  const transactionId = paymentResponse.transactionId ?? paymentResponse.transaction ?? nestedTransaction;
+  transactionId ??= nestedTransaction;
   if (!transactionId) throw new X402SubmissionUnknownError();
   const contentType = response.headers.get("content-type") ?? "application/octet-stream";
-  return { body, transactionId, network: paymentResponse.network ?? requirement.network, contentType, contentBytes: Buffer.byteLength(text), contentHash: createHash("sha256").update(text).digest("hex") };
+  return { body, transactionId, network: settlementNetwork ?? requirement.network, contentType, contentBytes: Buffer.byteLength(text), contentHash: createHash("sha256").update(text).digest("hex") };
 }
