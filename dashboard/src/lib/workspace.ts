@@ -8,14 +8,34 @@ import {
   type OperatorSession,
 } from "@/lib/session";
 
+export const WORKSPACE_COOKIE = process.env.APP_ENV === "production" ? "__Host-agentpay_workspace" : "agentpay_workspace";
 export const workspaceRoles = ["OWNER", "OPERATOR", "APPROVER", "VIEWER", "PROVIDER_ADMIN"] as const;
 export type WorkspaceRole = (typeof workspaceRoles)[number];
 
-export async function workspaceForSession(session: OperatorSession) {
-  const membership = await db.membership.findFirst({
-    where: { userId: session.sub, status: "ACTIVE", organization: { status: "ACTIVE" } },
+function workspaceCookieValue(cookieHeader: string | null) {
+  return cookieHeader?.match(new RegExp(`(?:^|;\\s*)${WORKSPACE_COOKIE}=([^;]+)`))?.[1];
+}
+
+export function workspaceCookie(organizationId: string) {
+  return `${WORKSPACE_COOKIE}=${encodeURIComponent(organizationId)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=28800${process.env.APP_ENV === "production" ? "; Secure" : ""}`;
+}
+
+export function clearWorkspaceCookie() {
+  return `${WORKSPACE_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${process.env.APP_ENV === "production" ? "; Secure" : ""}`;
+}
+
+export async function workspaceForSession(session: OperatorSession, preferredOrganizationId?: string) {
+  const baseWhere = { userId: session.sub, status: "ACTIVE" as const, organization: { status: "ACTIVE" as const } };
+  const preferred = preferredOrganizationId
+    ? await db.membership.findFirst({
+        where: { ...baseWhere, organizationId: preferredOrganizationId },
+        include: { organization: true, user: true },
+      })
+    : null;
+  const membership = preferred ?? await db.membership.findFirst({
+    where: baseWhere,
     include: { organization: true, user: true },
-    orderBy: { id: "asc" },
+    orderBy: [{ activatedAt: "asc" }, { invitedAt: "asc" }, { id: "asc" }],
   });
   if (!membership) throw new Error("WORKSPACE_MEMBERSHIP_REQUIRED");
   return { session, membership, organization: membership.organization, user: membership.user };
@@ -23,14 +43,18 @@ export async function workspaceForSession(session: OperatorSession) {
 
 export async function workspaceFromRequest(request: Request) {
   const session = await sessionFromRequest(request);
-  return session ? workspaceForSession(session) : null;
+  if (!session) return null;
+  const preferredOrganizationId = workspaceCookieValue(request.headers.get("cookie"));
+  return workspaceForSession(session, preferredOrganizationId ? decodeURIComponent(preferredOrganizationId) : undefined);
 }
 
 export async function currentWorkspace() {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const jar = await cookies();
+  const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
-    return await workspaceForSession(await verifyOperatorSession(token));
+    const preferredOrganizationId = jar.get(WORKSPACE_COOKIE)?.value;
+    return await workspaceForSession(await verifyOperatorSession(token), preferredOrganizationId);
   } catch {
     return null;
   }
