@@ -1,4 +1,5 @@
 import { getConfig, type AppConfig } from "@/lib/config";
+import { cardanoAssetIdentifier } from "@/lib/cardano-assets";
 
 type PaymentAsset = {
   type: string;
@@ -36,8 +37,7 @@ export function x402AssetIdentifier(asset: PaymentAsset, network: string, config
     return required(asset.hederaTokenId ?? undefined, "HEDERA_TOKEN_ID_REQUIRED");
   }
   if (network === "cardano:preprod" || network === "cardano:mainnet") {
-    if (asset.type !== "NATIVE" || asset.symbol !== "ADA") throw new Error("CARDANO_ASSET_UNSUPPORTED");
-    return "lovelace";
+    return cardanoAssetIdentifier(asset, network);
   }
   throw new Error("PAYMENT_NETWORK_UNSUPPORTED");
 }
@@ -59,8 +59,9 @@ export function managedPayerMatches(account: PaymentAccountLike, config: AppConf
 /**
  * Platform-owned bundled resources have deployment-configured payees per rail.
  * Organization-owned marketplace providers are currently verified only for
- * Hedera testnet settlement, so other networks fail closed rather than sending
- * funds to an account that was never verified for that network.
+ * Hedera testnet settlement. Cardano Masumi-bound resources use the seller
+ * wallet verified by the registry trust layer in payment-service instead of
+ * this generic provider settlement path.
  */
 export function providerPayeeForNetwork(provider: ResourceProviderLike, network: string, config: AppConfig = getConfig()): string {
   if (provider.organizationId === null) {
