@@ -52,6 +52,26 @@ describe("bounded request bodies", () => {
     await expect(requestBody(request, 256)).rejects.toThrow("REQUEST_BODY_TOO_LARGE");
   });
 
+  it("rejects unsupported media types before FormData parsing", async () => {
+    const request = new Request("http://localhost", {
+      method: "POST",
+      headers: { "content-type": "text/plain" },
+      body: "plain text",
+    });
+    await expect(requestBody(request, 1024)).rejects.toThrow("UNSUPPORTED_MEDIA_TYPE");
+    expect(handleApiError(new Error("UNSUPPORTED_MEDIA_TYPE")).status).toBe(415);
+  });
+
+  it("maps malformed multipart input to a safe client error", async () => {
+    const request = new Request("http://localhost", {
+      method: "POST",
+      headers: { "content-type": "multipart/form-data; boundary=abc" },
+      body: "--abc\r\nContent-Disposition: form-data; name=\"field\"\r\n\r\nvalue\r\n--wrong--\r\n",
+    });
+    await expect(requestBody(request, 1024)).rejects.toThrow("INVALID_MULTIPART");
+    expect(handleApiError(new Error("INVALID_MULTIPART")).status).toBe(400);
+  });
+
   it("returns safe client errors for oversized and malformed bodies", async () => {
     expect(handleApiError(new Error("REQUEST_BODY_TOO_LARGE")).status).toBe(413);
     expect(handleApiError(new SyntaxError("Unexpected token")).status).toBe(400);
