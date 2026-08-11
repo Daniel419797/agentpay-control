@@ -49,10 +49,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
     await assertSafeResourceUrl(input.endpoint, getConfig().APP_ENV === "production");
     const asset = await db.asset.findUnique({ where: { id: input.assetId } });
     if (!asset?.verified) return problem(409, "ASSET_NOT_VERIFIED", "The resource price must use a verified asset.");
+    if (asset.network !== "hedera:testnet") return problem(409, "PROVIDER_NETWORK_SETTLEMENT_UNSUPPORTED", "Organization marketplace providers currently support verified Hedera testnet settlement only. Other rails remain disabled until a network-specific settlement account is verified.");
     if (input.public && access.provider.verificationStatus !== "VERIFIED") return problem(409, "PROVIDER_NOT_VERIFIED", "Verify the provider before publishing marketplace resources.");
     const row = await db.$transaction(async (tx) => {
       const resource = await tx.resourceListing.create({ data: { providerId, category: input.category, name: input.name, slug: input.slug, description: input.description, endpoint: input.endpoint, status: input.public ? "ACTIVE" : "DRAFT", public: input.public, inputSchema: JSON.parse(JSON.stringify(input.inputSchema)), outputContentTypes: input.outputContentTypes, tags: [...new Set(input.tags)], termsUrl: input.termsUrl, serviceLevel: input.serviceLevel, prices: { create: { assetId: input.assetId, atomicAmount: input.atomicAmount } } } });
-      await tx.auditEvent.create({ data: { organizationId: access.workspace.organization.id, actorType: "USER", actorId: access.workspace.user.id, action: "MARKETPLACE_RESOURCE_CREATED", targetType: "RESOURCE_LISTING", targetId: resource.id, result: "SUCCESS", metadata: { public: resource.public, category: resource.category } } });
+      await tx.auditEvent.create({ data: { organizationId: access.workspace.organization.id, actorType: "USER", actorId: access.workspace.user.id, action: "MARKETPLACE_RESOURCE_CREATED", targetType: "RESOURCE_LISTING", targetId: resource.id, result: "SUCCESS", metadata: { public: resource.public, category: resource.category, settlementNetwork: asset.network } } });
       return resource;
     });
     return ok(row, { status: 201 });
