@@ -27,6 +27,10 @@ updates:
     schedule:
       interval: weekly
   - package-ecosystem: docker
+    directory: /facilitator-combined
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
     directory: /resource-server
     schedule:
       interval: weekly
