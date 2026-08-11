@@ -31,11 +31,17 @@ services:
         value: "0x3600000000000000000000000000000000000000"
       - key: ARC_PROVIDER_ADDRESS
         sync: false
-      - key: MANAGED_SIGNING_API_KEY
+      - key: HEDERA_MANAGED_SIGNING_API_KEY
         generateValue: true
-      - key: SETTLEMENT_API_KEY
+      - key: HEDERA_SETTLEMENT_API_KEY
         generateValue: true
-      - key: CONTRACT_EXECUTION_API_KEY
+      - key: HEDERA_CONTRACT_EXECUTION_API_KEY
+        generateValue: true
+      - key: ARC_MANAGED_SIGNING_API_KEY
+        generateValue: true
+      - key: ARC_SETTLEMENT_API_KEY
+        generateValue: true
+      - key: ARC_CONTRACT_EXECUTION_API_KEY
         generateValue: true
       - key: CONTRACT_ALLOWLIST_JSON
         value: "[]"
@@ -63,13 +69,15 @@ services:
         fromService:
           type: web
           name: agentpay-facilitator
-          envVarKey: SETTLEMENT_API_KEY
+          envVarKey: HEDERA_SETTLEMENT_API_KEY
       - key: ARC_FACILITATOR_SETTLEMENT_API_KEY
         fromService:
           type: web
           name: agentpay-facilitator
-          envVarKey: SETTLEMENT_API_KEY
+          envVarKey: ARC_SETTLEMENT_API_KEY
       - key: PROVIDER_ACCOUNT_ID
+        sync: false
+      - key: USDC_TOKEN_ID
         sync: false
       - key: ARC_PROVIDER_ADDRESS
         fromService:
