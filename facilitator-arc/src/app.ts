@@ -77,35 +77,36 @@ export function createArcApp(env: ArcFacilitatorEnv): { app: Hono; network: stri
       return c.json({ success: false, errorReason: "invalid_request", errorMessage: failure.code }, failure.status);
     }
 
-    try {
-      const captured = await facilitator.captureSettlementEvidence(() => facilitator.scheme.settle(body.paymentPayload, body.paymentRequirements));
-      const result = captured.result;
-      const evidence = result.transaction || captured.transactionId;
-      if (!result.success && evidence) {
-        logFailure("settlement_confirmation_unknown", new Error(result.errorReason ?? "SETTLEMENT_CONFIRMATION_UNKNOWN"));
-        return c.json({
-          ...result,
-          success: false,
-          transaction: evidence,
-          transactionId: evidence,
-          errorReason: "settlement_unknown",
-          errorMessage: result.errorMessage ?? "SETTLEMENT_CONFIRMATION_UNKNOWN",
-          network: facilitator.network,
-        }, 503);
-      }
-      return result.success
-        ? c.json({ ...result, network: result.network ?? facilitator.network })
-        : c.json({ ...result, network: result.network ?? facilitator.network }, 422);
-    } catch (error) {
-      logFailure("settlement_submission_unknown", error);
+    const captured = await facilitator.captureSettlementEvidence(() => facilitator.scheme.settle(body.paymentPayload, body.paymentRequirements));
+    if (captured.error !== undefined) {
+      logFailure("settlement_submission_unknown", captured.error);
       return c.json({
         success: false,
-        transaction: "",
+        transaction: captured.transactionId ?? "",
+        ...(captured.transactionId ? { transactionId: captured.transactionId } : {}),
         network: facilitator.network,
         errorReason: "settlement_unknown",
         errorMessage: "SETTLEMENT_SUBMISSION_UNKNOWN",
       }, 503);
     }
+
+    const result = captured.result;
+    const evidence = result.transaction || captured.transactionId;
+    if (!result.success && evidence) {
+      logFailure("settlement_confirmation_unknown", new Error(result.errorReason ?? "SETTLEMENT_CONFIRMATION_UNKNOWN"));
+      return c.json({
+        ...result,
+        success: false,
+        transaction: evidence,
+        transactionId: evidence,
+        errorReason: "settlement_unknown",
+        errorMessage: result.errorMessage ?? "SETTLEMENT_CONFIRMATION_UNKNOWN",
+        network: facilitator.network,
+      }, 503);
+    }
+    return result.success
+      ? c.json({ ...result, network: result.network ?? facilitator.network })
+      : c.json({ ...result, network: result.network ?? facilitator.network }, 422);
   });
 
   app.post("/contract-execute", async (c) => {
