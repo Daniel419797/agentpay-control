@@ -294,20 +294,18 @@ export async function createPaidRequest(
       include: { quote: { include: { asset: true } }, approval: true, fulfillment: true, attempts: { include: { settlement: true } } },
     });
 
-    if (context.initiatedByUserId) {
-      await tx.auditEvent.create({
-        data: {
-          organizationId: agent.organizationId,
-          actorType: "USER",
-          actorId: context.initiatedByUserId,
-          action: "PAYMENT_REQUEST_INITIATED",
-          targetType: "PAYMENT_INTENT",
-          targetId: intent.id,
-          result: "SUCCESS",
-          metadata: { agentId, status, network: requirement.network, amountAtomic },
-        },
-      });
-    }
+    await tx.auditEvent.create({
+      data: {
+        organizationId: agent.organizationId,
+        actorType: context.initiatedByUserId ? "USER" : "AGENT",
+        actorId: context.initiatedByUserId ?? agentId,
+        action: "PAYMENT_REQUEST_INITIATED",
+        targetType: "PAYMENT_INTENT",
+        targetId: intent.id,
+        result: "SUCCESS",
+        metadata: { agentId, status, network: requirement.network, amountAtomic, initiatorType: context.initiatedByUserId ? "USER" : "AGENT" },
+      },
+    });
 
     return { intent, shouldExecute: status === "AUTHORIZED" };
   }, { isolationLevel: "Serializable" }));
