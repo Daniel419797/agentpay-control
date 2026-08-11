@@ -32,6 +32,9 @@ export type MasumiResourceBinding = {
   apiBaseUrl: string;
   capabilityName: string | null;
   capabilityVersion: string | null;
+  settlementAddress: string | null;
+  paymentType: string | null;
+  pricingSnapshot: unknown;
   metadataHash: string;
   verifiedAt: Date;
   expiresAt: Date;
@@ -112,6 +115,9 @@ export async function loadMasumiResourceBinding(resourceListingId: string): Prom
     apiBaseUrl: String(row.apiBaseUrl),
     capabilityName: row.capabilityName == null ? null : String(row.capabilityName),
     capabilityVersion: row.capabilityVersion == null ? null : String(row.capabilityVersion),
+    settlementAddress: row.settlementAddress == null ? null : String(row.settlementAddress),
+    paymentType: row.paymentType == null ? null : String(row.paymentType),
+    pricingSnapshot: row.pricingSnapshot ?? null,
     metadataHash: String(row.metadataHash),
     verifiedAt: new Date(String(row.verifiedAt)),
     expiresAt: new Date(String(row.expiresAt)),
@@ -144,13 +150,18 @@ export async function refreshMasumiResourceBinding(input: {
   const metadataHash = masumiMetadataHash(entry);
   const capabilityName = entry.Capability?.name ?? null;
   const capabilityVersion = entry.Capability?.version ?? null;
+  const settlementAddress = entry.sellerWallet.address;
+  const paymentType = entry.paymentType ?? null;
+  const pricingSnapshot = entry.AgentPricing ?? null;
   await db.$executeRaw`
     INSERT INTO "MasumiResourceBinding" (
       "resourceListingId", "network", "agentIdentifier", "registryPolicyId", "apiBaseUrl",
-      "capabilityName", "capabilityVersion", "metadataHash", "verifiedAt", "expiresAt", "createdAt", "updatedAt"
+      "capabilityName", "capabilityVersion", "settlementAddress", "paymentType", "pricingSnapshot",
+      "metadataHash", "verifiedAt", "expiresAt", "createdAt", "updatedAt"
     ) VALUES (
       ${input.resourceListingId}::uuid, ${input.network}, ${entry.agentIdentifier}, ${entry.RegistrySource.policyId}, ${entry.apiBaseUrl},
-      ${capabilityName}, ${capabilityVersion}, ${metadataHash}, ${now}, ${expiresAt}, now(), now()
+      ${capabilityName}, ${capabilityVersion}, ${settlementAddress}, ${paymentType}, ${JSON.stringify(pricingSnapshot)}::jsonb,
+      ${metadataHash}, ${now}, ${expiresAt}, now(), now()
     )
     ON CONFLICT ("resourceListingId") DO UPDATE SET
       "network" = EXCLUDED."network",
@@ -159,6 +170,9 @@ export async function refreshMasumiResourceBinding(input: {
       "apiBaseUrl" = EXCLUDED."apiBaseUrl",
       "capabilityName" = EXCLUDED."capabilityName",
       "capabilityVersion" = EXCLUDED."capabilityVersion",
+      "settlementAddress" = EXCLUDED."settlementAddress",
+      "paymentType" = EXCLUDED."paymentType",
+      "pricingSnapshot" = EXCLUDED."pricingSnapshot",
       "metadataHash" = EXCLUDED."metadataHash",
       "verifiedAt" = EXCLUDED."verifiedAt",
       "expiresAt" = EXCLUDED."expiresAt",
@@ -172,6 +186,9 @@ export async function refreshMasumiResourceBinding(input: {
     apiBaseUrl: entry.apiBaseUrl,
     capabilityName,
     capabilityVersion,
+    settlementAddress,
+    paymentType,
+    pricingSnapshot,
     metadataHash,
     verifiedAt: now,
     expiresAt,
@@ -199,7 +216,7 @@ export async function verifyMasumiTrust(input: {
   const now = Date.now();
   const maxAgeMs = input.trust.maxRegistryAgeSeconds * 1000;
   const stale = current.expiresAt.getTime() <= now || now - current.verifiedAt.getTime() > maxAgeMs;
-  if (!stale && !input.trust.requireOnline) return current;
+  if (!stale && !input.trust.requireOnline && current.settlementAddress) return current;
 
   return refreshMasumiResourceBinding({
     resourceListingId: input.resourceListingId,
