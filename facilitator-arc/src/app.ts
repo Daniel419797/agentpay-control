@@ -9,8 +9,14 @@ export type ArcFacilitatorEnv = z.infer<typeof envSchema>;
 
 export function parseArcEnv(input: unknown = process.env): ArcFacilitatorEnv {
   const env = envSchema.parse(input);
-  if (env.APP_ENV === "production" && (!env.MANAGED_SIGNING_API_KEY || !env.SETTLEMENT_API_KEY || !env.CONTRACT_EXECUTION_API_KEY)) {
-    throw new Error("Production capability-specific facilitator API keys are required");
+  if (env.APP_ENV === "production") {
+    const capabilityKeys = [env.MANAGED_SIGNING_API_KEY, env.SETTLEMENT_API_KEY, env.CONTRACT_EXECUTION_API_KEY];
+    if (capabilityKeys.some((key) => !key)) {
+      throw new Error("Production capability-specific facilitator API keys are required");
+    }
+    if (new Set(capabilityKeys).size !== capabilityKeys.length) {
+      throw new Error("Production capability-specific facilitator API keys must be distinct");
+    }
   }
   return env;
 }
