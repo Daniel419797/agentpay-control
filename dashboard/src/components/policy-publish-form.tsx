@@ -178,6 +178,10 @@ export function PolicyPublishForm({ agentId, agentNetwork, pythEnabled, masumiEn
       return;
     }
 
+    const activeFrom = localDateToIso(form.get("activeFrom"));
+    const activeUntil = localDateToIso(form.get("activeUntil"));
+    const maxTransactionsPerHour = optionalNumber(form.get("maxTransactionsPerHour"));
+    const cooldownSeconds = optionalNumber(form.get("cooldownSeconds"));
     const body = {
       assetId: asset.id,
       perTransactionLimitAtomic: perTx,
@@ -194,10 +198,10 @@ export function PolicyPublishForm({ agentId, agentNetwork, pythEnabled, masumiEn
       allowedWeekdays: form.getAll("allowedWeekdays").map(Number),
       ...(allowedStartMinute !== undefined ? { allowedStartMinute } : {}),
       ...(allowedEndMinute !== undefined ? { allowedEndMinute } : {}),
-      ...(localDateToIso(form.get("activeFrom")) ? { activeFrom: localDateToIso(form.get("activeFrom")) } : {}),
-      ...(localDateToIso(form.get("activeUntil")) ? { activeUntil: localDateToIso(form.get("activeUntil")) } : {}),
-      ...(optionalNumber(form.get("maxTransactionsPerHour")) !== undefined ? { maxTransactionsPerHour: optionalNumber(form.get("maxTransactionsPerHour")) } : {}),
-      ...(optionalNumber(form.get("cooldownSeconds")) !== undefined ? { cooldownSeconds: optionalNumber(form.get("cooldownSeconds")) } : {}),
+      ...(activeFrom ? { activeFrom } : {}),
+      ...(activeUntil ? { activeUntil } : {}),
+      ...(maxTransactionsPerHour !== undefined ? { maxTransactionsPerHour } : {}),
+      ...(cooldownSeconds !== undefined ? { cooldownSeconds } : {}),
       catalyst: { ...(oracle ? { oracle } : {}), ...(masumi ? { masumi } : {}), ...(keri ? { keri } : {}) },
     };
 
@@ -236,18 +240,18 @@ export function PolicyPublishForm({ agentId, agentNetwork, pythEnabled, masumiEn
       <label>Rejection threshold<input name="rejectionThreshold" type="number" min="1" max="20" defaultValue="1" /></label>
       <label>Maximum transactions per hour<input name="maxTransactionsPerHour" type="number" min="1" max="10000" placeholder="Optional" /></label>
       <label>Cooldown seconds<input name="cooldownSeconds" type="number" min="0" max="86400" placeholder="Optional" /></label>
-      <label>Active from<input name="activeFrom" type="datetime-local" /></label>
-      <label>Active until<input name="activeUntil" type="datetime-local" /></label>
-      <label>Allowed start time<input name="allowedStartTime" type="time" /></label>
-      <label>Allowed end time<input name="allowedEndTime" type="time" /></label>
+      <label>Active from (local date/time)<input name="activeFrom" type="datetime-local" /></label>
+      <label>Active until (local date/time)<input name="activeUntil" type="datetime-local" /></label>
+      <label>Allowed start time (UTC)<input name="allowedStartTime" type="time" /></label>
+      <label>Allowed end time (UTC)<input name="allowedEndTime" type="time" /></label>
     </div>
 
     <fieldset className="app-form-section">
-      <legend>Allowed weekdays</legend>
+      <legend>Allowed weekdays (UTC)</legend>
       <div className="button-row">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label, index) => <label className="checkbox-label" key={label}><input type="checkbox" name="allowedWeekdays" value={index} /> {label}</label>)}
       </div>
-      <p className="form-help">Leave every day unchecked to allow all weekdays. Time windows use the organization's configured timezone at policy evaluation.</p>
+      <p className="form-help">Leave every day unchecked to allow all weekdays. Weekday and recurring clock-window evaluation is UTC; active-from/active-until are converted from the browser's local date/time into absolute timestamps before publication.</p>
     </fieldset>
 
     <fieldset className="app-form-section">
