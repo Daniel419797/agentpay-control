@@ -49,7 +49,8 @@ export async function POST(request: Request) {
       invoices,
       crossChain,
       fiat,
-      incidents: { submissions: incidents, masumiRefundMutations: masumiRefundMutationIncidents },
+      incidents,
+      masumiRefundMutationIncidents,
       automations: { scheduled: scheduledAutomations, eventDriven: eventAutomations, deferredPayments: deferredAutomations, contractReconciliation },
       intelligence,
     });
