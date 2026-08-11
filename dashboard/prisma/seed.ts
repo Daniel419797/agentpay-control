@@ -2,6 +2,8 @@ import "dotenv/config";
 
 import { db } from "../src/lib/db";
 
+const cardanoAssetUnit = /^[0-9a-f]{56}(?:[0-9a-f]{2}){0,32}$/;
+
 function resourceServerBaseUrl() {
   const raw = process.env.RESOURCE_SERVER_URL ?? "http://localhost:3200";
   const url = new URL(raw);
@@ -13,6 +15,14 @@ function hederaProviderAccountId() {
   const accountId = process.env.HEDERA_PROVIDER_ACCOUNT_ID ?? "0.0.9651458";
   if (!/^0\.0\.\d+$/.test(accountId)) throw new Error("HEDERA_PROVIDER_ACCOUNT_ID must be a Hedera account ID");
   return accountId;
+}
+
+function configuredCardanoUsdcx(network: "preprod" | "mainnet") {
+  const name = network === "preprod" ? "CARDANO_PREPROD_USDCX_ASSET_ID" : "CARDANO_MAINNET_USDCX_ASSET_ID";
+  const value = process.env[name]?.trim().toLowerCase();
+  if (!value) return null;
+  if (!cardanoAssetUnit.test(value)) throw new Error(`${name} must be an exact Cardano policy-id plus asset-name unit`);
+  return value;
 }
 
 async function main() {
@@ -54,6 +64,14 @@ async function main() {
       update: { name: "Cardano", decimals: 6, verified: true, type: "NATIVE", hederaTokenId: null },
       create: { network, type: "NATIVE", symbol: "ADA", name: "Cardano", decimals: 6, verified: true },
     });
+    const suffix = network === "cardano:preprod" ? "preprod" : "mainnet";
+    if (configuredCardanoUsdcx(suffix)) {
+      await db.asset.upsert({
+        where: { network_symbol: { network, symbol: "USDCX" } },
+        update: { name: "USD Coin xReserve", decimals: 6, verified: true, type: "TOKEN", hederaTokenId: null },
+        create: { network, type: "TOKEN", symbol: "USDCX", name: "USD Coin xReserve", decimals: 6, verified: true },
+      });
+    }
   }
 
   const testnetHbar = await db.asset.findUnique({ where: { network_symbol: { network: "hedera:testnet", symbol: "HBAR" } } });
@@ -63,13 +81,18 @@ async function main() {
   const arcUsdc = await db.asset.findUnique({ where: { network_symbol: { network: "eip155:5042002", symbol: "USDC" } } });
   const cardanoPreprodAda = await db.asset.findUnique({ where: { network_symbol: { network: "cardano:preprod", symbol: "ADA" } } });
   const cardanoMainnetAda = await db.asset.findUnique({ where: { network_symbol: { network: "cardano:mainnet", symbol: "ADA" } } });
+  const cardanoPreprodUsdcx = configuredCardanoUsdcx("preprod") ? await db.asset.findUnique({ where: { network_symbol: { network: "cardano:preprod", symbol: "USDCX" } } }) : null;
+  const cardanoMainnetUsdcx = configuredCardanoUsdcx("mainnet") ? await db.asset.findUnique({ where: { network_symbol: { network: "cardano:mainnet", symbol: "USDCX" } } }) : null;
   if (!testnetHbar || !mainnetHbar || !cardanoPreprodAda || !cardanoMainnetAda) throw new Error("Required native payment assets are missing");
 
   const hederaNetworkAssetSets: Array<{ hbar: { id: string }; usdc: { id: string } | null }> = [
     { hbar: testnetHbar, usdc: testnetUsdc },
     { hbar: mainnetHbar, usdc: mainnetUsdc },
   ];
-  const cardanoAssets = [cardanoPreprodAda, cardanoMainnetAda];
+  const cardanoAssets = [
+    { ada: cardanoPreprodAda, usdcx: cardanoPreprodUsdcx },
+    { ada: cardanoMainnetAda, usdcx: cardanoMainnetUsdcx },
+  ];
 
   const providerAccountId = hederaProviderAccountId();
   const provider = await db.resourceProvider.upsert({
@@ -132,12 +155,19 @@ async function main() {
       });
     }
     if (["eth-price", "btc-price", "llama-inference"].includes(resource.slug)) {
-      for (const ada of cardanoAssets) {
+      for (const assets of cardanoAssets) {
         await db.resourcePrice.upsert({
-          where: { resourceListingId_assetId: { resourceListingId: listing.id, assetId: ada.id } },
+          where: { resourceListingId_assetId: { resourceListingId: listing.id, assetId: assets.ada.id } },
           update: { atomicAmount: 1_000_000 },
-          create: { resourceListingId: listing.id, assetId: ada.id, atomicAmount: 1_000_000 },
+          create: { resourceListingId: listing.id, assetId: assets.ada.id, atomicAmount: 1_000_000 },
         });
+        if (assets.usdcx) {
+          await db.resourcePrice.upsert({
+            where: { resourceListingId_assetId: { resourceListingId: listing.id, assetId: assets.usdcx.id } },
+            update: { atomicAmount: 1_000_000 },
+            create: { resourceListingId: listing.id, assetId: assets.usdcx.id, atomicAmount: 1_000_000 },
+          });
+        }
       }
     }
   }
