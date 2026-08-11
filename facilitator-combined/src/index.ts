@@ -16,6 +16,12 @@ const app = new Hono();
 const targets = { hedera, arc, cardano };
 const networks = { hedera: hedera.network, arc: arc.network, cardano: cardano.network };
 
+function boundedFailure(error: unknown, message: string) {
+  const code = error instanceof Error ? error.message : "INVALID_REQUEST";
+  const status = code === "REQUEST_BODY_TOO_LARGE" ? 413 : 400;
+  return new Response(JSON.stringify({ code, message }), { status, headers: { "content-type": "application/json" } });
+}
+
 async function requestNetwork(request: Request) {
   const text = await boundedRequestText(request.clone());
   return paymentNetworkFromJson(text);
@@ -28,9 +34,7 @@ async function dispatchPayment(request: Request) {
     if (!targetName) return new Response(JSON.stringify({ code: "NETWORK_UNSUPPORTED", message: "The requested payment network is not served by this facilitator." }), { status: 422, headers: { "content-type": "application/json" } });
     return targets[targetName].app.fetch(request);
   } catch (error) {
-    const code = error instanceof Error ? error.message : "INVALID_REQUEST";
-    const status = code === "REQUEST_BODY_TOO_LARGE" ? 413 : 400;
-    return new Response(JSON.stringify({ code, message: "A bounded request with matching payment requirement and payload networks is required." }), { status, headers: { "content-type": "application/json" } });
+    return boundedFailure(error, "A bounded request with matching payment requirement and payload networks is required.");
   }
 }
 
@@ -57,6 +61,19 @@ app.get("/supported", async (c) => {
 
 app.post("/verify", (c) => dispatchPayment(c.req.raw));
 app.post("/settle", (c) => dispatchPayment(c.req.raw));
+
+// Cardano's current child parser enforces 128 KiB after decoding. Enforce the
+// same ceiling while streaming at the public combined-service boundary so the
+// namespaced route cannot buffer an unbounded chunked request first.
+app.use(`${env.CARDANO_BASE_PATH}/*`, async (c, next) => {
+  if (c.req.method !== "POST") return next();
+  try {
+    await boundedRequestText(c.req.raw.clone(), 128 * 1024);
+    return next();
+  } catch (error) {
+    return boundedFailure(error, "A bounded Cardano facilitator request is required.");
+  }
+});
 
 app.route(env.HEDERA_BASE_PATH, hedera.app);
 app.route(env.ARC_BASE_PATH, arc.app);
