@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { ExactEvmScheme } from "@x402/evm/exact/facilitator";
 import { ExactEvmScheme as ExactEvmClientScheme } from "@x402/evm/exact/client";
 import { toFacilitatorEvmSigner, verifyTypedDataSignature } from "@x402/evm";
@@ -38,6 +39,23 @@ export const envSchema = z.object({
 
 export type ArcConfig = z.infer<typeof envSchema>;
 
+type SettlementEvidence = { transactionId?: Hex };
+
+export class SettlementEvidenceScope {
+  private readonly storage = new AsyncLocalStorage<SettlementEvidence>();
+
+  async capture<T>(operation: () => Promise<T>): Promise<{ result: T; transactionId?: Hex }> {
+    const evidence: SettlementEvidence = {};
+    const result = await this.storage.run(evidence, operation);
+    return { result, transactionId: evidence.transactionId };
+  }
+
+  record(transactionId: Hex) {
+    const evidence = this.storage.getStore();
+    if (evidence && !evidence.transactionId) evidence.transactionId = transactionId;
+  }
+}
+
 function toAccount(value: string) {
   const key = value.startsWith("0x") ? value as Hex : `0x${value}` as Hex;
   return privateKeyToAccount(key);
@@ -48,7 +66,7 @@ export class EvmFacilitator {
   private readonly payerAccount: ReturnType<typeof privateKeyToAccount>;
   private readonly relayerAccount: ReturnType<typeof privateKeyToAccount>;
   private readonly contractAccount: ReturnType<typeof privateKeyToAccount>;
-  private lastSettlementTransactionHash: Hex | undefined;
+  private readonly settlementEvidence = new SettlementEvidenceScope();
   readonly walletClient: WalletClient;
   private readonly contractWalletClient: WalletClient;
   readonly publicClient: PublicClient;
@@ -90,12 +108,12 @@ export class EvmFacilitator {
       readContract: (args: any) => this.publicClient.readContract(args),
       sendTransaction: async (args: any) => {
         const transactionHash = await this.walletClient.sendTransaction({ ...args, account: this.relayerAccount, chain: this.walletClient.chain });
-        this.lastSettlementTransactionHash = transactionHash;
+        this.settlementEvidence.record(transactionHash);
         return transactionHash;
       },
       writeContract: async (args: any) => {
         const transactionHash = await this.walletClient.writeContract({ ...args, account: this.relayerAccount, chain: this.walletClient.chain });
-        this.lastSettlementTransactionHash = transactionHash;
+        this.settlementEvidence.record(transactionHash);
         return transactionHash;
       },
       waitForTransactionReceipt: (args: any) => this.publicClient.waitForTransactionReceipt(args),
@@ -108,12 +126,8 @@ export class EvmFacilitator {
     this.network = `eip155:${chain.id}`;
   }
 
-  beginSettlementEvidenceCapture() {
-    this.lastSettlementTransactionHash = undefined;
-  }
-
-  get settlementTransactionCandidate(): Hex | undefined {
-    return this.lastSettlementTransactionHash;
+  captureSettlementEvidence<T>(operation: () => Promise<T>) {
+    return this.settlementEvidence.capture(operation);
   }
 
   get providerAddress(): string {
