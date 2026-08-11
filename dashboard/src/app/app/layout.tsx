@@ -1,5 +1,10 @@
 import { AppShell } from "@/components/app-shell";
-import { isHederaMainnetEnabled, isManagedArcEnabled } from "@/domain/network-router";
+import {
+  isHederaMainnetEnabled,
+  isManagedArcEnabled,
+  isManagedCardanoMainnetEnabled,
+  isManagedCardanoPreprodEnabled,
+} from "@/domain/network-router";
 import { getConfig } from "@/lib/config";
 
 // All routes in this segment are organization-scoped and read live data.
@@ -9,5 +14,14 @@ export const dynamic = "force-dynamic";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const config = getConfig();
-  return <AppShell mainnetEnabled={isHederaMainnetEnabled(config)} arcEnabled={isManagedArcEnabled(config)}>{children}</AppShell>;
+  return (
+    <AppShell
+      mainnetEnabled={isHederaMainnetEnabled(config)}
+      arcEnabled={isManagedArcEnabled(config)}
+      cardanoPreprodEnabled={isManagedCardanoPreprodEnabled(config)}
+      cardanoMainnetEnabled={isManagedCardanoMainnetEnabled(config)}
+    >
+      {children}
+    </AppShell>
+  );
 }
