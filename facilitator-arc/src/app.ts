@@ -7,6 +7,10 @@ import type { PaymentPayload, PaymentRequirements } from "@x402/core/types";
 
 export type ArcFacilitatorEnv = z.infer<typeof envSchema>;
 
+function normalizePrivateKey(value: string) {
+  return value.replace(/^0x/i, "").toLowerCase();
+}
+
 export function parseArcEnv(input: unknown = process.env): ArcFacilitatorEnv {
   const env = envSchema.parse(input);
   if (env.APP_ENV === "production") {
@@ -16,6 +20,14 @@ export function parseArcEnv(input: unknown = process.env): ArcFacilitatorEnv {
     }
     if (new Set(capabilityKeys).size !== capabilityKeys.length) {
       throw new Error("Production capability-specific facilitator API keys must be distinct");
+    }
+
+    if (!env.ARC_RELAYER_PRIVATE_KEY || !env.ARC_CONTRACT_EXECUTION_PRIVATE_KEY) {
+      throw new Error("Production Arc relayer and contract-execution private keys are required");
+    }
+    const chainKeys = [env.ARC_PAYER_PRIVATE_KEY, env.ARC_RELAYER_PRIVATE_KEY, env.ARC_CONTRACT_EXECUTION_PRIVATE_KEY].map(normalizePrivateKey);
+    if (new Set(chainKeys).size !== chainKeys.length) {
+      throw new Error("Production Arc payer, relayer, and contract-execution private keys must be distinct");
     }
   }
   return env;
