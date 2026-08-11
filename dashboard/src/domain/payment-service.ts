@@ -137,7 +137,7 @@ export async function createPaidRequest(agentId: string, idempotencyKey: string,
     await assertPlanLimit(tx, agent.organizationId, "PAYMENT_INTENTS");
     const policy = agent.effectivePolicy;
     if (!policy) throw new Error("POLICY_NOT_PUBLISHED");
-    const listing = await tx.resourceListing.findFirst({ where: { OR: [{ endpoint: canonical.resourceUrl }, { slug: resourceUrl.pathname.split("/").filter(Boolean).at(-1) }], status: "ACTIVE" }, include: { provider: true, prices: { where: { assetId: policy.assetId }, take: 1 } } });
+    const listing = await tx.resourceListing.findFirst({ where: { endpoint: canonical.resourceUrl, status: "ACTIVE" }, include: { provider: true, prices: { where: { assetId: policy.assetId }, take: 1 } } });
     if (!listing?.prices[0]) throw new Error("RESOURCE_PRICE_NOT_FOUND");
     const expectedPayee = providerPayeeForNetwork(listing.provider, agent.network, config);
     const requirement = selectRequirement(required, { network: agent.network, asset: x402AssetIdentifier(policy.asset, agent.network, config), amount: listing.prices[0].atomicAmount.toString(), payTo: expectedPayee, resourceUrl: canonical.resourceUrl });
