@@ -1,3 +1,4 @@
+import { Prisma } from "@/generated/prisma/client";
 import { paymentAccountForNetwork } from "@/domain/payment-routing";
 import { getConfig } from "@/lib/config";
 import { db } from "@/lib/db";
@@ -35,7 +36,7 @@ function isMirrorTransaction(value: unknown): value is MirrorTransaction {
 }
 
 async function recordReconciliationIncident(
-  tx: Parameters<Parameters<typeof db.$transaction>[0]>[0],
+  tx: Prisma.TransactionClient,
   organizationId: string,
   paymentIntentId: string,
   title: string,
@@ -50,10 +51,7 @@ async function recordReconciliationIncident(
 
 export async function reconcileUnknownHederaPayments(limit = 25, now = new Date()) {
   const candidates = await db.paymentIntent.findMany({
-    where: {
-      status: "SUBMISSION_UNKNOWN",
-      attempts: { some: { status: "UNKNOWN", candidateTransactionId: { not: null } } },
-    },
+    where: { status: "SUBMISSION_UNKNOWN", attempts: { some: { status: "UNKNOWN", candidateTransactionId: { not: null } } } },
     include: {
       quote: { include: { asset: true } },
       reservation: true,
@@ -75,10 +73,7 @@ export async function reconcileUnknownHederaPayments(limit = 25, now = new Date(
     try {
       const payer = paymentAccountForNetwork(intent.agent.accounts, quote.network);
       const normalized = normalizeTransactionId(candidateTransactionId);
-      const mirrorResponse = await fetch(`${mirrorUrlForNetwork(quote.network).replace(/\/$/, "")}/api/v1/transactions/${encodeURIComponent(normalized)}`, {
-        cache: "no-store",
-        signal: AbortSignal.timeout(10_000),
-      });
+      const mirrorResponse = await fetch(`${mirrorUrlForNetwork(quote.network).replace(/\/$/, "")}/api/v1/transactions/${encodeURIComponent(normalized)}`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
       if (mirrorResponse.status === 404) {
         results.push({ paymentIntentId: intent.id, outcome: "PENDING", transactionId: candidateTransactionId });
         continue;
@@ -91,14 +86,7 @@ export async function reconcileUnknownHederaPayments(limit = 25, now = new Date(
         continue;
       }
 
-      const outcome = hederaPaymentReconciliationOutcome(
-        transaction,
-        { type: quote.asset.type, hederaTokenId: quote.asset.hederaTokenId },
-        payer.accountId,
-        quote.payToAccountId,
-        quote.amountAtomic.toString(),
-      );
-
+      const outcome = hederaPaymentReconciliationOutcome(transaction, { type: quote.asset.type, hederaTokenId: quote.asset.hederaTokenId }, payer.accountId, quote.payToAccountId, quote.amountAtomic.toString());
       const changed = await db.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`payment-reconcile:${intent.id}`}, 0))`;
         const current = await tx.paymentIntent.findUniqueOrThrow({ where: { id: intent.id }, select: { status: true } });
@@ -117,38 +105,15 @@ export async function reconcileUnknownHederaPayments(limit = 25, now = new Date(
 
         await tx.settlement.upsert({
           where: { paymentAttemptId: attempt.id },
-          create: {
-            paymentAttemptId: attempt.id,
-            assetId: quote.assetId,
-            status: outcome === "CONFIRMED" ? "CONFIRMED" : "FAILED",
-            network: quote.network,
-            transactionId,
-            consensusTimestamp: transaction.consensus_timestamp,
-            payerAccountId: payer.accountId,
-            payeeAccountId: quote.payToAccountId,
-            amountAtomic: quote.amountAtomic,
-            resultCode: outcome === "MISMATCH" ? "TRANSFER_MISMATCH" : transaction.result,
-            submittedAt: attempt.createdAt,
-            confirmedAt: now,
-          },
-          update: {
-            status: outcome === "CONFIRMED" ? "CONFIRMED" : "FAILED",
-            transactionId,
-            consensusTimestamp: transaction.consensus_timestamp,
-            resultCode: outcome === "MISMATCH" ? "TRANSFER_MISMATCH" : transaction.result,
-            confirmedAt: now,
-          },
+          create: { paymentAttemptId: attempt.id, assetId: quote.assetId, status: outcome === "CONFIRMED" ? "CONFIRMED" : "FAILED", network: quote.network, transactionId, consensusTimestamp: transaction.consensus_timestamp, payerAccountId: payer.accountId, payeeAccountId: quote.payToAccountId, amountAtomic: quote.amountAtomic, resultCode: outcome === "MISMATCH" ? "TRANSFER_MISMATCH" : transaction.result, submittedAt: attempt.createdAt, confirmedAt: now },
+          update: { status: outcome === "CONFIRMED" ? "CONFIRMED" : "FAILED", transactionId, consensusTimestamp: transaction.consensus_timestamp, resultCode: outcome === "MISMATCH" ? "TRANSFER_MISMATCH" : transaction.result, confirmedAt: now },
         });
 
         if (outcome === "CONFIRMED") {
           await tx.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "CONFIRMED", errorCode: null } });
           await tx.paymentIntent.update({ where: { id: intent.id }, data: { status: "SETTLED" } });
           await tx.spendReservation.updateMany({ where: { paymentIntentId: intent.id }, data: { status: "SETTLED" } });
-          await tx.resourceFulfillment.upsert({
-            where: { paymentIntentId: intent.id },
-            create: { paymentIntentId: intent.id, status: "FAILED", errorCode: "SETTLED_FULFILLMENT_UNAVAILABLE" },
-            update: { status: "FAILED", errorCode: "SETTLED_FULFILLMENT_UNAVAILABLE" },
-          });
+          await tx.resourceFulfillment.upsert({ where: { paymentIntentId: intent.id }, create: { paymentIntentId: intent.id, status: "FAILED", errorCode: "SETTLED_FULFILLMENT_UNAVAILABLE" }, update: { status: "FAILED", errorCode: "SETTLED_FULFILLMENT_UNAVAILABLE" } });
           await recordReconciliationIncident(tx, intent.organizationId, intent.id, "Payment settled but fulfillment evidence is unavailable", `Hedera transaction ${transactionId} confirms settlement after an ambiguous resource response. The payment is settled, but the original paid resource response could not be recovered automatically.`);
           await tx.outboxEvent.create({ data: { organizationId: intent.organizationId, eventType: "PAYMENT_SETTLED_RECONCILED", aggregateType: "PAYMENT_INTENT", aggregateId: intent.id, payload: { transactionId, network: quote.network, fulfillmentRecovered: false } } });
         } else if (outcome === "FAILED") {
@@ -167,7 +132,6 @@ export async function reconcileUnknownHederaPayments(limit = 25, now = new Date(
         }
         return true;
       });
-
       results.push({ paymentIntentId: intent.id, outcome: changed ? outcome : "ALREADY_RECONCILED", transactionId: transaction.transaction_id });
     } catch (error) {
       results.push({ paymentIntentId: intent.id, outcome: "ERROR", transactionId: candidateTransactionId, error: error instanceof Error ? error.message : "UNKNOWN_ERROR" });
