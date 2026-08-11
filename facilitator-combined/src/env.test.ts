@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { networkEnv, parseCombinedEnv } from "./env.js";
 
+const PAYER = "1".repeat(64);
+const RELAYER = "2".repeat(64);
+const CONTRACT = "3".repeat(64);
+
 function productionEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   return {
     APP_ENV: "production",
@@ -10,6 +14,9 @@ function productionEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
     ARC_MANAGED_SIGNING_API_KEY: "a-signing-secret-abcdefghijklmnopqrstuvwxyz",
     ARC_SETTLEMENT_API_KEY: "a-settlement-secret-abcdefghijklmnopqrstuvwxyz",
     ARC_CONTRACT_EXECUTION_API_KEY: "a-contract-secret-abcdefghijklmnopqrstuvwxyz",
+    ARC_PAYER_PRIVATE_KEY: PAYER,
+    ARC_RELAYER_PRIVATE_KEY: RELAYER,
+    ARC_CONTRACT_EXECUTION_PRIVATE_KEY: CONTRACT,
     ...overrides,
   };
 }
@@ -22,6 +29,13 @@ describe("combined facilitator environment", () => {
       HEDERA_SETTLEMENT_API_KEY: duplicate,
       ARC_SETTLEMENT_API_KEY: duplicate,
     }))).toThrow(/must all be distinct/);
+  });
+
+  it("requires independent Arc payer, relayer, and contract keys", () => {
+    const missing = productionEnv();
+    delete missing.ARC_RELAYER_PRIVATE_KEY;
+    expect(() => parseCombinedEnv(missing)).toThrow(/requires Arc payer, relayer, and contract-execution private keys/);
+    expect(() => parseCombinedEnv(productionEnv({ ARC_RELAYER_PRIVATE_KEY: `0x${PAYER}` }))).toThrow(/private keys must be distinct/);
   });
 
   it("maps network-specific secrets to each child facilitator", () => {
