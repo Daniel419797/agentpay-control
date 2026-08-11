@@ -58,9 +58,39 @@ function requirementIdentifierMatches(network: string, actual: string, expected:
   return network.startsWith("eip155:") ? actual.toLowerCase() === expected.toLowerCase() : actual === expected;
 }
 
+function canonicalResourceUrl(value: string) {
+  const url = new URL(value);
+  url.hash = "";
+  return url.toString();
+}
+
+function expectedCardanoResourceBinding(resourceUrl: string) {
+  return createHash("sha256").update(canonicalResourceUrl(resourceUrl)).digest("hex");
+}
+
+function cardanoRequirementSafe(requirement: PaymentRequirement, resourceUrl: string) {
+  if (!requirement.network.startsWith("cardano:")) return true;
+  // AgentPay's Cardano rail is a direct, server-submitted exact x402 rail.
+  // Masumi registry/identity may authorize the seller, but Masumi escrow is a
+  // separate settlement protocol and must never be silently treated as direct.
+  if (requirement.extra.assetTransferMethod !== "default") return false;
+  if (requirement.extra.submissionPolicy !== "server") return false;
+  if (requirement.extra.resourceBinding !== expectedCardanoResourceBinding(resourceUrl)) return false;
+  const confirmation = requirement.extra.confirmationPolicy;
+  if (!confirmation || typeof confirmation !== "object") return false;
+  const l1 = (confirmation as Record<string, unknown>).l1Confirmations;
+  return typeof l1 === "number" && Number.isInteger(l1) && l1 >= 1 && l1 <= 120;
+}
+
 export function selectRequirement(required: PaymentRequired, expected: { network: string; asset: string; amount: string; payTo: string; resourceUrl: string }) {
-  if (new URL(required.resource.url).toString() !== new URL(expected.resourceUrl).toString()) throw new Error("X402_RESOURCE_MISMATCH");
-  const selected = required.accepts.find((requirement) => requirement.network === expected.network && requirementIdentifierMatches(requirement.network, requirement.asset, expected.asset) && requirement.amount === expected.amount && requirementIdentifierMatches(requirement.network, requirement.payTo, expected.payTo));
+  if (canonicalResourceUrl(required.resource.url) !== canonicalResourceUrl(expected.resourceUrl)) throw new Error("X402_RESOURCE_MISMATCH");
+  const selected = required.accepts.find((requirement) =>
+    requirement.network === expected.network
+    && requirementIdentifierMatches(requirement.network, requirement.asset, expected.asset)
+    && requirement.amount === expected.amount
+    && requirementIdentifierMatches(requirement.network, requirement.payTo, expected.payTo)
+    && cardanoRequirementSafe(requirement, expected.resourceUrl)
+  );
   if (!selected) throw new Error("X402_REQUIREMENT_MISMATCH");
   return selected;
 }
@@ -75,7 +105,9 @@ export async function createManagedPaymentPayload(facilitatorUrlOrRequirement: s
   if (!response.ok) throw new Error(`FACILITATOR_SIGNING_${response.status}`);
   const body = await response.json() as { paymentPayload?: unknown; transactionId?: unknown };
   if (typeof body.transactionId !== "string" || body.transactionId.length < 8) throw new Error("FACILITATOR_TRANSACTION_ID_MISSING");
-  return { paymentPayload: paymentPayloadSchema.parse(body.paymentPayload), transactionId: body.transactionId };
+  const parsedPayload = paymentPayloadSchema.parse(body.paymentPayload);
+  if (JSON.stringify(parsedPayload.accepted) !== JSON.stringify(req)) throw new Error("FACILITATOR_REQUIREMENT_MISMATCH");
+  return { paymentPayload: parsedPayload, transactionId: body.transactionId };
 }
 
 function settlementCandidateFromBody(body: unknown) {
