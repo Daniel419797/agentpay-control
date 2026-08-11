@@ -9,6 +9,16 @@ import { createManagedPaymentPayload, discoverX402, fulfillX402Resource, parsePa
 import { assertSafeResourceUrl } from "@/lib/safe-url";
 import { retrySerializable } from "@/lib/retry";
 import { assertPlanLimit } from "@/domain/entitlement-service";
+import {
+  combinePolicyOutcomes,
+  evaluateUsdPolicy,
+  loadCatalystPolicyContext,
+  verifyMasumiTrust,
+  valueWithPyth,
+  type MasumiResourceBinding,
+  type OracleValuation,
+} from "@/domain/catalyst-policy";
+import { assertPythObservation } from "@/lib/pyth";
 
 export type PaidRequestInput = { resourceUrl: string; purpose?: string; maxAmountAtomic?: string };
 export type PaidRequestContext = { initiatedByUserId?: string };
@@ -173,6 +183,49 @@ export async function createPaidRequest(
   if (preexisting) { if (preexisting.requestHash !== requestHash) throw new Error("IDEMPOTENCY_CONFLICT"); return preexisting; }
 
   const required = await discoverX402(resourceUrl, config.APP_ENV === "production");
+
+  // External oracle/registry calls happen before entering the serializable
+  // transaction. Their exact facts are then revalidated and persisted inside
+  // the transaction so no network call holds a database lock.
+  const preflightAgent = await db.agent.findUniqueOrThrow({
+    where: { id: agentId },
+    include: { effectivePolicy: { include: { asset: true } } },
+  });
+  const preflightPolicy = preflightAgent.effectivePolicy;
+  if (!preflightPolicy) throw new Error("POLICY_NOT_PUBLISHED");
+  const preflightListing = await db.resourceListing.findFirst({
+    where: { endpoint: canonical.resourceUrl, status: "ACTIVE" },
+    include: { provider: true, prices: { where: { assetId: preflightPolicy.assetId }, take: 1 } },
+  });
+  if (!preflightListing?.prices[0]) throw new Error("RESOURCE_PRICE_NOT_FOUND");
+  const preflightPayee = providerPayeeForNetwork(preflightListing.provider, preflightAgent.network, config);
+  const preflightRequirement = selectRequirement(required, {
+    network: preflightAgent.network,
+    asset: x402AssetIdentifier(preflightPolicy.asset, preflightAgent.network, config),
+    amount: preflightListing.prices[0].atomicAmount.toString(),
+    payTo: preflightPayee,
+    resourceUrl: canonical.resourceUrl,
+  });
+  const catalyst = await loadCatalystPolicyContext(preflightPolicy.id);
+  let oracleValuation: OracleValuation | null = null;
+  if (catalyst.oracle) {
+    oracleValuation = await valueWithPyth({
+      oracle: catalyst.oracle,
+      assetSymbol: preflightPolicy.asset.symbol,
+      assetDecimals: preflightPolicy.asset.decimals,
+      amountAtomic: preflightRequirement.amount,
+    });
+  }
+  let masumiBinding: MasumiResourceBinding | null = null;
+  if (catalyst.masumi?.required) {
+    masumiBinding = await verifyMasumiTrust({
+      trust: catalyst.masumi,
+      resourceListingId: preflightListing.id,
+      resourceUrl: canonical.resourceUrl,
+      cardanoNetwork: preflightAgent.network,
+    });
+  }
+
   const result = await retrySerializable(() => db.$transaction(async (tx) => {
     const agent = await tx.agent.findUniqueOrThrow({ where: { id: agentId }, include: { organization: true, effectivePolicy: { include: { asset: true } }, accounts: { where: { status: "ACTIVE" }, include: { balances: { orderBy: { asOf: "desc" }, take: 1 } } } } });
     const existing = await tx.paymentIntent.findUnique({ where: { organizationId_agentId_idempotencyKey: { organizationId: agent.organizationId, agentId, idempotencyKey } }, include: { quote: { include: { asset: true } }, approval: true, attempts: { include: { settlement: true } } } });
@@ -184,13 +237,30 @@ export async function createPaidRequest(
     await assertPlanLimit(tx, agent.organizationId, "PAYMENT_INTENTS");
     const policy = agent.effectivePolicy;
     if (!policy) throw new Error("POLICY_NOT_PUBLISHED");
+    if (policy.id !== preflightPolicy.id || policy.assetId !== preflightPolicy.assetId || agent.network !== preflightAgent.network) throw new Error("PAYMENT_CONTEXT_CHANGED_RETRY");
     const listing = await tx.resourceListing.findFirst({ where: { endpoint: canonical.resourceUrl, status: "ACTIVE" }, include: { provider: true, prices: { where: { assetId: policy.assetId }, take: 1 } } });
     if (!listing?.prices[0]) throw new Error("RESOURCE_PRICE_NOT_FOUND");
+    if (listing.id !== preflightListing.id || listing.prices[0].atomicAmount.toString() !== preflightRequirement.amount) throw new Error("PAYMENT_CONTEXT_CHANGED_RETRY");
 
     const expectedPayee = providerPayeeForNetwork(listing.provider, agent.network, config);
     const requirement = selectRequirement(required, { network: agent.network, asset: x402AssetIdentifier(policy.asset, agent.network, config), amount: listing.prices[0].atomicAmount.toString(), payTo: expectedPayee, resourceUrl: canonical.resourceUrl });
     const amountAtomic = requirement.amount;
+    if (requirement.asset !== preflightRequirement.asset || requirement.payTo !== preflightRequirement.payTo || requirement.network !== preflightRequirement.network) throw new Error("PAYMENT_CONTEXT_CHANGED_RETRY");
     if (input.maxAmountAtomic && BigInt(amountAtomic) > BigInt(input.maxAmountAtomic)) throw new Error("MAX_AMOUNT_EXCEEDED");
+
+    if (catalyst.masumi?.required) {
+      if (!masumiBinding) throw new Error("MASUMI_RESOURCE_NOT_BOUND");
+      const bindingRows = await tx.$queryRaw<Array<{ metadataHash: string; agentIdentifier: string; expiresAt: Date }>>`
+        SELECT "metadataHash", "agentIdentifier", "expiresAt"
+        FROM "MasumiResourceBinding"
+        WHERE "resourceListingId" = ${listing.id}::uuid
+        LIMIT 1
+      `;
+      const stored = bindingRows[0];
+      if (!stored || stored.metadataHash !== masumiBinding.metadataHash || stored.agentIdentifier.toLowerCase() !== masumiBinding.agentIdentifier.toLowerCase() || new Date(stored.expiresAt).getTime() <= Date.now()) {
+        throw new Error("MASUMI_BINDING_CHANGED_RETRY");
+      }
+    }
 
     const account = paymentAccountForNetwork(agent.accounts, requirement.network);
     if (!isManagedSigningAccount(account)) throw new Error("MANAGED_SIGNER_REQUIRED");
@@ -224,7 +294,7 @@ export async function createPaidRequest(
     ]);
     const availableBalance = BigInt(rawBalanceAtomic) - BigInt(balanceCommitted._sum.amountAtomic?.toString() ?? "0");
     const balanceAtomic = (availableBalance > 0n ? availableBalance : 0n).toString();
-    const decision = evaluatePolicy({
+    const baseDecision = evaluatePolicy({
       agentStatus: agent.status,
       organizationKillSwitch: agent.organization.killSwitchEnabled,
       assetSupported: true,
@@ -257,11 +327,79 @@ export async function createPaidRequest(
       cooldownSeconds: policy.cooldownSeconds,
       overLimitAction: policy.overLimitAction,
     });
+
+    let usdFacts: Record<string, unknown> | null = null;
+    let combined = { decision: baseDecision.decision, reasonCodes: baseDecision.reasonCodes };
+    if (catalyst.oracle) {
+      if (!oracleValuation) throw new Error("PYTH_VALUATION_REQUIRED");
+      assertPythObservation(oracleValuation.observation, {
+        maxAgeSeconds: catalyst.oracle.maxPriceAgeSeconds,
+        maxConfidenceBps: catalyst.oracle.maxConfidenceBps,
+        nowSeconds: Math.floor(now.getTime() / 1000),
+      });
+      const usdRows = sharedTreasury
+        ? await tx.$queryRaw<Array<{ hourlyUsdMicros: bigint; dailyUsdMicros: bigint; monthlyUsdMicros: bigint }>>`
+            SELECT
+              COALESCE(SUM(u."usdMicros") FILTER (WHERE r."createdAt" >= ${hourStart}), 0)::bigint AS "hourlyUsdMicros",
+              COALESCE(SUM(u."usdMicros") FILTER (WHERE r."createdAt" >= ${dayStart}), 0)::bigint AS "dailyUsdMicros",
+              COALESCE(SUM(u."usdMicros") FILTER (WHERE r."createdAt" >= ${monthStart}), 0)::bigint AS "monthlyUsdMicros"
+            FROM "UsdSpendReservationSnapshot" u
+            JOIN "SpendReservation" r ON r."id" = u."spendReservationId"
+            JOIN "Agent" a ON a."id" = r."agentId"
+            WHERE a."organizationId" = ${agent.organizationId}::uuid
+              AND r."status" IN ('ACTIVE', 'CONSUMED', 'SETTLED')
+              AND r."createdAt" >= ${monthStart}
+          `
+        : await tx.$queryRaw<Array<{ hourlyUsdMicros: bigint; dailyUsdMicros: bigint; monthlyUsdMicros: bigint }>>`
+            SELECT
+              COALESCE(SUM(u."usdMicros") FILTER (WHERE r."createdAt" >= ${hourStart}), 0)::bigint AS "hourlyUsdMicros",
+              COALESCE(SUM(u."usdMicros") FILTER (WHERE r."createdAt" >= ${dayStart}), 0)::bigint AS "dailyUsdMicros",
+              COALESCE(SUM(u."usdMicros") FILTER (WHERE r."createdAt" >= ${monthStart}), 0)::bigint AS "monthlyUsdMicros"
+            FROM "UsdSpendReservationSnapshot" u
+            JOIN "SpendReservation" r ON r."id" = u."spendReservationId"
+            WHERE r."agentId" = ${agentId}::uuid
+              AND r."status" IN ('ACTIVE', 'CONSUMED', 'SETTLED')
+              AND r."createdAt" >= ${monthStart}
+          `;
+      const spend = usdRows[0] ?? { hourlyUsdMicros: 0n, dailyUsdMicros: 0n, monthlyUsdMicros: 0n };
+      const usdDecision = evaluateUsdPolicy({ requestedUsdMicros: oracleValuation.usdMicros, spend, limits: catalyst.oracle, overLimitAction: policy.overLimitAction });
+      combined = combinePolicyOutcomes(combined, usdDecision);
+      usdFacts = {
+        quoteCurrency: "USD",
+        requestedUsdMicros: oracleValuation.usdMicros.toString(),
+        hourlyUsdMicros: BigInt(spend.hourlyUsdMicros).toString(),
+        dailyUsdMicros: BigInt(spend.dailyUsdMicros).toString(),
+        monthlyUsdMicros: BigInt(spend.monthlyUsdMicros).toString(),
+        feedId: oracleValuation.observation.feedId,
+        price: oracleValuation.observation.price.toString(),
+        confidence: oracleValuation.observation.confidence.toString(),
+        exponent: oracleValuation.observation.exponent,
+        publishTime: oracleValuation.observation.publishTime,
+      };
+    }
+
     const challengeValidUntil = new Date(now.getTime() + requirement.maxTimeoutSeconds * 1000);
     const validUntil = policy.activeUntil && policy.activeUntil < challengeValidUntil ? policy.activeUntil : challengeValidUntil;
     const fingerprint = paymentFingerprint({ network: requirement.network, scheme: requirement.scheme, payerAccountId: account.accountId, payeeAccountId: requirement.payTo, assetId: policy.assetId, amountAtomic, resourceUrl: canonical.resourceUrl, validUntil: validUntil.toISOString() });
-    const status = decision.decision === "ALLOW" ? "AUTHORIZED" : decision.decision === "DENY" ? "DENIED" : "APPROVAL_PENDING";
+    const status = combined.decision === "ALLOW" ? "AUTHORIZED" : combined.decision === "DENY" ? "DENIED" : "APPROVAL_PENDING";
     const rawChallenge = JSON.parse(JSON.stringify(required));
+    const facts = {
+      canonical,
+      amountAtomic,
+      balanceAtomic,
+      network: requirement.network,
+      payerAccountId: account.accountId,
+      payeeAccountId: requirement.payTo,
+      policyVersionId: policy.id,
+      oracle: usdFacts,
+      masumi: masumiBinding ? {
+        agentIdentifier: masumiBinding.agentIdentifier,
+        registryPolicyId: masumiBinding.registryPolicyId,
+        metadataHash: masumiBinding.metadataHash,
+        capabilityName: masumiBinding.capabilityName,
+        verifiedAt: masumiBinding.verifiedAt.toISOString(),
+      } : null,
+    };
     const intent = await tx.paymentIntent.create({
       data: {
         organizationId: agent.organizationId,
@@ -273,12 +411,29 @@ export async function createPaidRequest(
         purpose: input.purpose,
         status,
         quote: { create: { x402Version: 2, scheme: requirement.scheme, network: requirement.network, resourceDescription: required.resource.description ?? listing.description, payToAccountId: requirement.payTo, assetId: policy.assetId, amountAtomic, validUntil, fingerprint, rawChallenge } },
-        decisions: { create: { policyVersionId: policy.id, outcome: decision.decision, reasonCodes: decision.reasonCodes, factsHash: hash({ canonical, amountAtomic, balanceAtomic, network: requirement.network, payerAccountId: account.accountId, payeeAccountId: requirement.payTo, policyVersionId: policy.id }), spendBeforeAtomic: daily._sum.amountAtomic ?? 0, reservedBeforeAtomic: balanceCommitted._sum.amountAtomic ?? 0, projectedAtomic: decision.projectedSpendAtomic } },
-        reservation: decision.decision === "DENY" ? undefined : { create: { agentId, assetId: policy.assetId, amountAtomic, windowStart: dayStart, windowEnd: new Date(dayStart.getTime() + 86_400_000), expiresAt: validUntil } },
-        approval: decision.decision === "REQUIRE_APPROVAL" ? { create: { requestPurpose: input.purpose, expiresAt: validUntil, requiredApprovals: policy.approvalThreshold, requiredRejections: policy.rejectionThreshold } } : undefined,
+        decisions: { create: { policyVersionId: policy.id, outcome: combined.decision, reasonCodes: combined.reasonCodes, factsHash: hash(facts), spendBeforeAtomic: daily._sum.amountAtomic ?? 0, reservedBeforeAtomic: balanceCommitted._sum.amountAtomic ?? 0, projectedAtomic: baseDecision.projectedSpendAtomic } },
+        reservation: combined.decision === "DENY" ? undefined : { create: { agentId, assetId: policy.assetId, amountAtomic, windowStart: dayStart, windowEnd: new Date(dayStart.getTime() + 86_400_000), expiresAt: validUntil } },
+        approval: combined.decision === "REQUIRE_APPROVAL" ? { create: { requestPurpose: input.purpose, expiresAt: validUntil, requiredApprovals: policy.approvalThreshold, requiredRejections: policy.rejectionThreshold } } : undefined,
       },
-      include: { quote: { include: { asset: true } }, approval: true, fulfillment: true, attempts: { include: { settlement: true } } },
+      include: { quote: { include: { asset: true } }, approval: true, reservation: true, fulfillment: true, attempts: { include: { settlement: true } } },
     });
+
+    if (oracleValuation && intent.reservation) {
+      await tx.$executeRaw`
+        INSERT INTO "UsdSpendReservationSnapshot" (
+          "spendReservationId", "usdMicros", "feedId", "price", "confidence", "exponent", "publishTime", "createdAt"
+        ) VALUES (
+          ${intent.reservation.id}::uuid,
+          ${oracleValuation.usdMicros.toString()}::bigint,
+          ${oracleValuation.observation.feedId},
+          ${oracleValuation.observation.price.toString()}::numeric,
+          ${oracleValuation.observation.confidence.toString()}::numeric,
+          ${oracleValuation.observation.exponent},
+          ${new Date(oracleValuation.observation.publishTime * 1000)},
+          now()
+        )
+      `;
+    }
 
     await tx.auditEvent.create({
       data: {
@@ -289,7 +444,16 @@ export async function createPaidRequest(
         targetType: "PAYMENT_INTENT",
         targetId: intent.id,
         result: "SUCCESS",
-        metadata: { agentId, status, network: requirement.network, amountAtomic, initiatorType: context.initiatedByUserId ? "USER" : "AGENT" },
+        metadata: {
+          agentId,
+          status,
+          network: requirement.network,
+          amountAtomic,
+          policyReasons: combined.reasonCodes,
+          oracle: usdFacts,
+          masumi: masumiBinding ? { agentIdentifier: masumiBinding.agentIdentifier, metadataHash: masumiBinding.metadataHash } : null,
+          initiatorType: context.initiatedByUserId ? "USER" : "AGENT",
+        },
       },
     });
 
