@@ -62,9 +62,20 @@ export async function GET(request: Request) {
     const workspace = await workspaceFromRequest(request);
     if (!workspace) return problem(401, "AUTH_REQUIRED", "Sign in before viewing Masumi escrow purchases.");
     if (!workspaceHasRole(workspace, ["OWNER", "OPERATOR", "APPROVER", "VIEWER", "PROVIDER_ADMIN"])) return problem(403, "ROLE_REQUIRED", "Workspace access is required.");
+    const organizationId = workspace.organization.id;
     const rows = await db.$queryRaw<Array<Record<string, unknown>>>`
-      SELECT "id","agentId","resourceListingId","paymentIntentId","network","agentIdentifier","jobId","blockchainIdentifier","sellerAddress","paymentType","state","providerState","amounts","resultHash","resultVerifiedAt","refundRequestedAt","refundAuthorizedAt","disputedAt","completedAt","lastReconciledAt","failureCode","createdAt","updatedAt"
-      FROM "MasumiEscrowPurchase" WHERE "organizationId" = ${workspace.organization.id}::uuid ORDER BY "createdAt" DESC LIMIT 100`;
+      SELECT p."id",p."agentId",p."resourceListingId",p."paymentIntentId",p."network",p."agentIdentifier",p."jobId",p."blockchainIdentifier",p."sellerAddress",p."paymentType",p."state",p."providerState",p."amounts",p."resultHash",p."resultVerifiedAt",p."refundRequestedAt",p."refundAuthorizedAt",p."disputedAt",p."completedAt",p."lastReconciledAt",p."failureCode",p."createdAt",p."updatedAt",
+        CASE
+          WHEN p."organizationId" = ${organizationId}::uuid AND rp."organizationId" = ${organizationId}::uuid THEN 'BOTH'
+          WHEN p."organizationId" = ${organizationId}::uuid THEN 'BUYER'
+          ELSE 'SELLER'
+        END AS "workspaceRole",
+        r."name" AS "resourceName"
+      FROM "MasumiEscrowPurchase" p
+      LEFT JOIN "ResourceListing" r ON r."id" = p."resourceListingId"
+      LEFT JOIN "ResourceProvider" rp ON rp."id" = r."providerId"
+      WHERE p."organizationId" = ${organizationId}::uuid OR rp."organizationId" = ${organizationId}::uuid
+      ORDER BY p."createdAt" DESC LIMIT 100`;
     return ok(rows.map(serialize));
   } catch (error) { return handleApiError(error); }
 }
