@@ -3,6 +3,8 @@ import { parseEnabledNetworks, requiresNetwork } from "./network-selection.js";
 
 const hederaId = /^0\.0\.\d+$/;
 const evmAddress = /^0x[0-9a-fA-F]{40}$/;
+const cardanoPreprodAddress = /^addr_test1[0-9a-z]+$/;
+const cardanoMainnetAddress = /^addr1[0-9a-z]+$/;
 const optionalUrl = z.string().url().optional().or(z.literal(""));
 
 const schema = z.object({
@@ -11,6 +13,8 @@ const schema = z.object({
   FACILITATOR_URL: optionalUrl,
   HEDERA_MAINNET_FACILITATOR_URL: optionalUrl,
   ARC_FACILITATOR_URL: optionalUrl,
+  CARDANO_PREPROD_FACILITATOR_URL: optionalUrl,
+  CARDANO_MAINNET_FACILITATOR_URL: optionalUrl,
   PROVIDER_ACCOUNT_ID: z.string().optional(),
   HEDERA_MAINNET_PROVIDER_ACCOUNT_ID: z.string().optional(),
   USDC_TOKEN_ID: z.string().optional(),
@@ -18,9 +22,13 @@ const schema = z.object({
   FACILITATOR_FEE_PAYER_ID: z.string().optional(),
   ARC_PROVIDER_ADDRESS: z.string().optional(),
   ARC_USDC_ADDRESS: z.string().optional(),
+  CARDANO_PREPROD_PROVIDER_ADDRESS: z.string().optional(),
+  CARDANO_MAINNET_PROVIDER_ADDRESS: z.string().optional(),
   FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
   HEDERA_MAINNET_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
   ARC_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
+  CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
+  CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
 });
 
 function rawAppEnv(input: unknown): string | undefined {
@@ -30,10 +38,7 @@ function rawAppEnv(input: unknown): string | undefined {
 }
 
 function requireHttps(name: string, value: string | undefined, errors: string[]) {
-  if (!value) {
-    errors.push(name);
-    return;
-  }
+  if (!value) { errors.push(name); return; }
   if (new URL(value).protocol !== "https:") errors.push(`${name} must use HTTPS`);
 }
 
@@ -45,9 +50,7 @@ export function productionPreflightErrors(input: unknown = process.env): string[
   if (rawAppEnv(input) !== "production") return [];
 
   const parsed = schema.safeParse(input);
-  if (!parsed.success) {
-    return parsed.error.issues.map((issue) => `${issue.path.join(".") || "environment"}: ${issue.message}`);
-  }
+  if (!parsed.success) return parsed.error.issues.map((issue) => `${issue.path.join(".") || "environment"}: ${issue.message}`);
   const env = parsed.data;
   const enabled = parseEnabledNetworks(env.ENABLED_NETWORKS);
   const errors: string[] = [];
@@ -75,14 +78,24 @@ export function productionPreflightErrors(input: unknown = process.env): string[
     if (!env.ARC_FACILITATOR_SETTLEMENT_API_KEY) errors.push("ARC_FACILITATOR_SETTLEMENT_API_KEY");
   }
 
+  if (requiresNetwork(enabled, "cardano:preprod")) {
+    requireHttps("CARDANO_PREPROD_FACILITATOR_URL", env.CARDANO_PREPROD_FACILITATOR_URL, errors);
+    requireMatch("CARDANO_PREPROD_PROVIDER_ADDRESS", env.CARDANO_PREPROD_PROVIDER_ADDRESS, cardanoPreprodAddress, errors);
+    if (!env.CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY) errors.push("CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY");
+  }
+
+  if (requiresNetwork(enabled, "cardano:mainnet")) {
+    requireHttps("CARDANO_MAINNET_FACILITATOR_URL", env.CARDANO_MAINNET_FACILITATOR_URL, errors);
+    requireMatch("CARDANO_MAINNET_PROVIDER_ADDRESS", env.CARDANO_MAINNET_PROVIDER_ADDRESS, cardanoMainnetAddress, errors);
+    if (!env.CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY) errors.push("CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY");
+  }
+
   return [...new Set(errors)];
 }
 
 export function assertProductionPreflight(input: unknown = process.env): void {
   const errors = productionPreflightErrors(input);
-  if (errors.length) {
-    throw new Error(`Invalid production resource-server configuration: ${errors.join(", ")}`);
-  }
+  if (errors.length) throw new Error(`Invalid production resource-server configuration: ${errors.join(", ")}`);
 }
 
 assertProductionPreflight();
