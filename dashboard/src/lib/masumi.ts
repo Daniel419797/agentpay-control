@@ -20,12 +20,25 @@ const entrySchema = z.object({
   tags: z.array(z.string()).optional().default([]),
 }).passthrough();
 
+const paymentInformationEntrySchema = entrySchema.extend({
+  sellerWallet: z.object({
+    address: z.string().regex(/^addr(_test)?1[0-9a-z]+$/),
+    vkey: z.string().min(1),
+  }),
+});
+
 const registryResponseSchema = z.object({
   status: z.string(),
   data: z.object({ entries: z.array(entrySchema) }),
 });
 
+const paymentInformationResponseSchema = z.object({
+  status: z.string(),
+  data: paymentInformationEntrySchema,
+});
+
 export type MasumiEntry = z.infer<typeof entrySchema>;
+export type MasumiVerifiedEntry = z.infer<typeof paymentInformationEntrySchema>;
 export type MasumiNetwork = "Preprod" | "Mainnet";
 
 export type MasumiConfig = {
@@ -51,7 +64,8 @@ function stable(value: unknown): string {
   return `{${Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${stable(item)}`).join(",")}}`;
 }
 
-export function masumiMetadataHash(entry: MasumiEntry): string {
+export function masumiMetadataHash(entry: MasumiEntry | MasumiVerifiedEntry): string {
+  const sellerWallet = "sellerWallet" in entry ? entry.sellerWallet : undefined;
   return createHash("sha256").update(stable({
     agentIdentifier: entry.agentIdentifier,
     apiBaseUrl: entry.apiBaseUrl,
@@ -59,12 +73,15 @@ export function masumiMetadataHash(entry: MasumiEntry): string {
     registryPolicyId: entry.RegistrySource.policyId,
     capability: entry.Capability ?? null,
     paymentType: entry.paymentType ?? null,
+    pricing: entry.AgentPricing ?? null,
+    sellerAddress: sellerWallet?.address ?? null,
+    sellerVkey: sellerWallet?.vkey ?? null,
     metadataVersion: entry.metadataVersion ?? null,
   })).digest("hex");
 }
 
 function headers(config: MasumiConfig) {
-  const result: Record<string, string> = { "content-type": "application/json", accept: "application/json" };
+  const result: Record<string, string> = { accept: "application/json" };
   if (config.apiKey) result.token = config.apiKey;
   return result;
 }
@@ -72,7 +89,7 @@ function headers(config: MasumiConfig) {
 async function queryRegistry(body: unknown, config: MasumiConfig): Promise<MasumiEntry[]> {
   const response = await fetch(`${config.baseUrl}/registry-entry/`, {
     method: "POST",
-    headers: headers(config),
+    headers: { ...headers(config), "content-type": "application/json" },
     body: JSON.stringify(body),
     cache: "no-store",
     redirect: "error",
@@ -84,11 +101,26 @@ async function queryRegistry(body: unknown, config: MasumiConfig): Promise<Masum
   return payload.data.entries;
 }
 
+async function paymentInformation(agentIdentifier: string, config: MasumiConfig): Promise<MasumiVerifiedEntry> {
+  const url = new URL(`${config.baseUrl}/payment-information/`);
+  url.searchParams.set("agentIdentifier", agentIdentifier);
+  const response = await fetch(url, {
+    headers: headers(config),
+    cache: "no-store",
+    redirect: "error",
+    signal: AbortSignal.timeout(config.requestTimeoutMs),
+  });
+  if (!response.ok) throw new Error(`MASUMI_PAYMENT_INFORMATION_${response.status}`);
+  const payload = paymentInformationResponseSchema.parse(await response.json());
+  if (payload.status.toLowerCase() !== "success") throw new Error("MASUMI_PAYMENT_INFORMATION_INVALID");
+  return payload.data;
+}
+
 export async function fetchMasumiAgent(
   agentIdentifier: string,
   network: MasumiNetwork,
   config: MasumiConfig = masumiConfigFromEnv(),
-): Promise<MasumiEntry> {
+): Promise<MasumiVerifiedEntry> {
   if (!/^[0-9a-fA-F]{57,250}$/.test(agentIdentifier)) throw new Error("MASUMI_AGENT_IDENTIFIER_INVALID");
   const entries = await queryRegistry({
     network,
@@ -99,7 +131,15 @@ export async function fetchMasumiAgent(
   const exact = entries.filter((entry) => entry.agentIdentifier.toLowerCase() === agentIdentifier.toLowerCase());
   if (exact.length !== 1) throw new Error(exact.length ? "MASUMI_AGENT_AMBIGUOUS" : "MASUMI_AGENT_NOT_VERIFIED");
   if (exact[0].status !== "Online") throw new Error("MASUMI_AGENT_OFFLINE");
-  return exact[0];
+
+  const payment = await paymentInformation(agentIdentifier, config);
+  if (payment.agentIdentifier.toLowerCase() !== exact[0].agentIdentifier.toLowerCase()) throw new Error("MASUMI_PAYMENT_INFORMATION_IDENTITY_MISMATCH");
+  if (payment.RegistrySource.policyId !== exact[0].RegistrySource.policyId) throw new Error("MASUMI_PAYMENT_INFORMATION_REGISTRY_MISMATCH");
+  if (new URL(payment.apiBaseUrl).toString() !== new URL(exact[0].apiBaseUrl).toString()) throw new Error("MASUMI_PAYMENT_INFORMATION_URL_MISMATCH");
+  if (payment.status !== "Online") throw new Error("MASUMI_AGENT_OFFLINE");
+  const expectedPrefix = network === "Mainnet" ? "addr1" : "addr_test1";
+  if (!payment.sellerWallet.address.startsWith(expectedPrefix)) throw new Error("MASUMI_SELLER_WALLET_NETWORK_MISMATCH");
+  return payment;
 }
 
 export async function discoverMasumiAgents(
@@ -119,7 +159,7 @@ export async function discoverMasumiAgents(
 }
 
 export function assertMasumiEntryMatches(
-  entry: MasumiEntry,
+  entry: MasumiEntry | MasumiVerifiedEntry,
   expected: { network: MasumiNetwork; agentIdentifier: string; resourceUrl: string; allowedCapabilities?: string[] },
 ) {
   if (entry.agentIdentifier.toLowerCase() !== expected.agentIdentifier.toLowerCase()) throw new Error("MASUMI_AGENT_IDENTIFIER_MISMATCH");
