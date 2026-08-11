@@ -76,6 +76,7 @@ const settlementResponseSchema = z.object({
   errorReason: z.string().optional(),
   payer: z.string().optional(),
   transaction: z.string(),
+  transactionId: z.string().optional(),
   network: z.string(),
   amount: z.string().optional(),
   extensions: z.record(z.string(), z.unknown()).optional(),
@@ -194,13 +195,21 @@ async function handlePaidRequest(c: Context, category: string, resourceId: strin
     if (!verifyRes.ok || verifyResult.isValid !== true) return c.json({ code: "PAYMENT_INVALID", message: verifyResult.invalidReason || "Payment verification failed" }, 402);
 
     const settleRes = await fetch(`${facilitatorUrl.replace(/\/$/, "")}/settle`, {
-      method: "POST", headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(settlementApiKey ? { authorization: `Bearer ${settlementApiKey}` } : {}) }, body: JSON.stringify(verifyBody), signal: AbortSignal.timeout(30_000),
+      method: "POST", headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(settlementApiKey ? { authorization: `Bearer ${settlementApiKey}` } : {}) }, body: JSON.stringify(verifyBody), signal: AbortSignal.timeout(75_000),
     });
     const rawSettlement = await settleRes.json().catch(() => ({}));
     const parsedSettlement = settlementResponseSchema.safeParse(rawSettlement);
     if (!settleRes.ok || !parsedSettlement.success || parsedSettlement.data.success !== true) {
       const errorReason = parsedSettlement.success ? parsedSettlement.data.errorReason : undefined;
-      if (settleRes.status >= 500 || errorReason === "settlement_unknown") return c.json({ code: "SETTLEMENT_UNKNOWN", message: "Settlement may have been submitted but could not be confirmed." }, 503);
+      const transactionCandidate = parsedSettlement.success ? (parsedSettlement.data.transactionId ?? parsedSettlement.data.transaction || undefined) : undefined;
+      if (settleRes.status >= 500 || errorReason === "settlement_unknown") {
+        return c.json({
+          code: "SETTLEMENT_UNKNOWN",
+          message: "Settlement may have been submitted but could not be confirmed.",
+          network,
+          ...(transactionCandidate ? { transactionId: transactionCandidate } : {}),
+        }, 503);
+      }
       return c.json({ code: "SETTLEMENT_FAILED", message: errorReason || "Settlement failed" }, 422);
     }
     const settleResult = parsedSettlement.data;
