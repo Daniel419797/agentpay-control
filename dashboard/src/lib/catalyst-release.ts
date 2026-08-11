@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import { cardanoAssetReadinessErrors } from "@/lib/cardano-assets";
 import { cardanoTransactionEvidence } from "@/lib/cardano";
+import { verifyLiveMasumiDependencies } from "@/lib/catalyst-live-masumi";
 import { getConfig } from "@/lib/config";
 import { db } from "@/lib/db";
 import { fetchAgentPayDuneAnalytics, duneReadinessErrors } from "@/lib/dune";
@@ -46,7 +47,7 @@ function duneTransactionHash(row: Record<string, unknown>) {
   return typeof value === "string" && /^[0-9a-f]{64}$/i.test(value) ? value.toLowerCase() : null;
 }
 export async function liveCatalystDependencyChecks() {
-  const [ada, usdcx, dune] = await Promise.all([fetchPythPrice("ADA"), fetchPythPrice("USDCX"), fetchAgentPayDuneAnalytics()]);
+  const [ada, usdcx, dune, masumi] = await Promise.all([fetchPythPrice("ADA"), fetchPythPrice("USDCX"), fetchAgentPayDuneAnalytics(), verifyLiveMasumiDependencies()]);
   assertPythObservation(ada, { maxAgeSeconds: 60, maxConfidenceBps: 1000 });
   assertPythObservation(usdcx, { maxAgeSeconds: 60, maxConfidenceBps: 1000 });
   if (!dune.overview.rows.length) throw new Error("DUNE_OVERVIEW_EMPTY");
@@ -63,6 +64,7 @@ export async function liveCatalystDependencyChecks() {
   }
   return {
     pyth: { ada: { feedId: ada.feedId, publishTime: ada.publishTime }, usdcx: { feedId: usdcx.feedId, publishTime: usdcx.publishTime } },
+    masumi,
     dune: { overviewQueryId: dune.overview.queryId, activityQueryId: dune.activity?.queryId ?? null, sampleQueryId: dune.sample.queryId, dashboardUrl: dune.dashboardUrl, executedAt: dune.overview.executedAt, independentlyVerifiedTransactionIds: verifiedSamples },
   };
 }
