@@ -18,6 +18,8 @@ export function rateLimitProblem(retryAfterSeconds: number) {
 export function handleApiError(error: unknown) {
   if (error instanceof ZodError) return problem(422, "VALIDATION_ERROR", "The request did not pass validation.", error.flatten());
   if (error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE") return problem(413, "REQUEST_BODY_TOO_LARGE", "The request body exceeds the allowed size.");
+  if (error instanceof Error && error.message === "UNSUPPORTED_MEDIA_TYPE") return problem(415, "UNSUPPORTED_MEDIA_TYPE", "The request Content-Type is not supported.");
+  if (error instanceof Error && error.message === "INVALID_MULTIPART") return problem(400, "INVALID_MULTIPART", "The multipart request body is malformed.");
   if (error instanceof SyntaxError) return problem(400, "INVALID_JSON", "The request body is not valid JSON.");
   logError("api_request_failed", error);
   return problem(500, "INTERNAL_ERROR", "The request could not be completed.");
@@ -31,6 +33,8 @@ export async function requestBody(request: Request, maxBytes = 64 * 1024): Promi
     return Object.fromEntries(new URLSearchParams(await boundedText(request, maxBytes)).entries());
   }
 
+  if (!contentType.includes("multipart/form-data")) throw new Error("UNSUPPORTED_MEDIA_TYPE");
+
   // FormData does not expose a streaming size limit. Read the body through the
   // same bounded reader first, then parse a reconstructed in-memory request.
   // This prevents chunked multipart requests from bypassing Content-Length checks.
@@ -43,8 +47,12 @@ export async function requestBody(request: Request, maxBytes = 64 * 1024): Promi
     headers,
     body,
   });
-  const form = await boundedRequest.formData();
-  return Object.fromEntries(form.entries());
+  try {
+    const form = await boundedRequest.formData();
+    return Object.fromEntries(form.entries());
+  } catch {
+    throw new Error("INVALID_MULTIPART");
+  }
 }
 
 export async function boundedJson(request: Request, maxBytes = 64 * 1024): Promise<unknown> {
