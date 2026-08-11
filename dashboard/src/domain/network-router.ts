@@ -46,9 +46,9 @@ class DefaultNetworkRouter implements NetworkRouter {
       };
     }
 
-    if (config.ARC_FACILITATOR_URL || !production) {
+    if (isManagedArcEnabled(config)) {
       this.routes["eip155:5042002"] = {
-        facilitatorUrl: config.ARC_FACILITATOR_URL ?? "http://localhost:8788",
+        facilitatorUrl: config.ARC_FACILITATOR_URL!,
         facilitatorApiKey: config.ARC_FACILITATOR_SIGNING_API_KEY ?? (production ? undefined : config.ARC_FACILITATOR_API_KEY),
         explorerUrl: "https://testnet.arcscan.app/tx",
         nativeAsset: config.ARC_USDC_ADDRESS,
