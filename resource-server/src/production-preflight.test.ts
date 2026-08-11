@@ -9,6 +9,7 @@ function productionEnv(overrides: Record<string, string> = {}) {
     FACILITATOR_URL: "https://facilitator.agentpay.example/hedera",
     PROVIDER_ACCOUNT_ID: "0.0.12345",
     USDC_TOKEN_ID: "0.0.45678",
+    FACILITATOR_FEE_PAYER_ID: "0.0.67890",
     FACILITATOR_SETTLEMENT_API_KEY: "hedera-settlement-secret-abcdefghijklmnopqrstuvwxyz",
     ARC_FACILITATOR_URL: "https://facilitator.agentpay.example/arc",
     ARC_PROVIDER_ADDRESS: "0x1111111111111111111111111111111111111111",
@@ -27,6 +28,12 @@ test("fails closed on localhost or HTTP facilitator configuration", () => {
     FACILITATOR_URL: "http://localhost:8787/hedera",
   }));
   assert.equal(errors.some((error) => error.includes("FACILITATOR_URL must use HTTPS")), true);
+});
+
+test("requires explicit Hedera fee payer before advertising Hedera x402", () => {
+  const env = productionEnv();
+  delete (env as Record<string, string>).FACILITATOR_FEE_PAYER_ID;
+  assert.equal(productionPreflightErrors(env).includes("FACILITATOR_FEE_PAYER_ID"), true);
 });
 
 test("requires explicit Arc settlement destination and token", () => {
