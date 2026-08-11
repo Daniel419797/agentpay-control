@@ -14,6 +14,22 @@ const createAgent = z.object({
   custody: z.enum(["SELF_CUSTODY", "PLATFORM_MANAGED_TESTNET"]).default("SELF_CUSTODY"),
 });
 
+async function arcUsdcBalance(accountId: string) {
+  const config = getConfig();
+  if (!config.ARC_RPC_URL) throw new Error("ARC_RPC_UNAVAILABLE");
+  const data = `0x70a08231${accountId.slice(2).toLowerCase().padStart(64, "0")}`;
+  const response = await fetch(config.ARC_RPC_URL, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to: config.ARC_USDC_ADDRESS, data }, "latest"] }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) throw new Error("ARC_BALANCE_UNAVAILABLE");
+  const payload = z.object({ result: z.string().regex(/^0x[0-9a-fA-F]+$/) }).safeParse(await response.json());
+  if (!payload.success) throw new Error("ARC_BALANCE_UNAVAILABLE");
+  return BigInt(payload.data.result).toString();
+}
+
 export async function GET(request: Request) {
   try {
     const workspace = await workspaceFromRequest(request);
@@ -53,11 +69,12 @@ export async function POST(request: Request) {
     const config = getConfig();
     const isArc = input.network === "eip155:5042002";
     const isHederaMainnet = input.network === "hedera:mainnet";
-    if (isArc && input.custody !== "SELF_CUSTODY") {
-      return problem(400, "CUSTODY_UNSUPPORTED", "Arc agents must use SELF_CUSTODY. Platform-managed is not yet supported for Arc.");
+    if (isArc && input.asset !== "USDC") return problem(400, "ASSET_UNSUPPORTED", "Arc testnet agents use the configured USDC rail.");
+    if (isArc && input.custody !== "PLATFORM_MANAGED_TESTNET") {
+      return problem(400, "CUSTODY_UNSUPPORTED", "Arc browser-wallet custody is not enabled. Use the isolated managed Arc signer.");
     }
     if (isHederaMainnet && input.custody !== "SELF_CUSTODY") {
-      return problem(400, "CUSTODY_UNSUPPORTED", "Hedera Mainnet agents must use SELF_CUSTODY. Platform-managed is only available for testnet.");
+      return problem(400, "CUSTODY_UNSUPPORTED", "Hedera Mainnet agents must use SELF_CUSTODY. Platform-managed custody is intentionally testnet-only.");
     }
 
     const [asset, wallet] = await Promise.all([
@@ -68,41 +85,34 @@ export async function POST(request: Request) {
     ]);
     if (!asset) return problem(409, "ASSET_NOT_CONFIGURED", `${input.asset} is not configured for ${input.network}.`);
     if (input.custody === "SELF_CUSTODY" && !wallet) return problem(409, "WALLET_REQUIRED", `Connect and verify a wallet for ${input.network} before creating a self-custody agent.`);
-    const managedSignerAvailable = isHederaMainnet
-      ? config.HEDERA_MAINNET_FACILITATOR_URL
-      : config.HEDERA_PAYER_ACCOUNT_ID && config.FACILITATOR_URL;
+
+    const managedSignerAvailable = isArc
+      ? Boolean(config.ARC_FACILITATOR_URL && config.ARC_FACILITATOR_SIGNING_API_KEY && config.ARC_PAYER_ADDRESS)
+      : Boolean(config.HEDERA_PAYER_ACCOUNT_ID && config.FACILITATOR_URL && config.FACILITATOR_SIGNING_API_KEY);
     if (input.custody === "PLATFORM_MANAGED_TESTNET" && !managedSignerAvailable) {
-      return problem(503, "MANAGED_SIGNER_UNAVAILABLE", "The managed testnet signer is not configured.");
+      return problem(503, "MANAGED_SIGNER_UNAVAILABLE", `The managed ${isArc ? "Arc" : "Hedera"} testnet signer is not fully configured.`);
     }
-    const accountId = input.custody === "SELF_CUSTODY" ? wallet!.accountId : config.HEDERA_PAYER_ACCOUNT_ID!;
+
+    const accountId = input.custody === "SELF_CUSTODY"
+      ? wallet!.accountId
+      : isArc
+        ? config.ARC_PAYER_ADDRESS!
+        : config.HEDERA_PAYER_ACCOUNT_ID!;
     const network = input.custody === "SELF_CUSTODY" ? wallet!.network : input.network;
     if (input.custody === "SELF_CUSTODY") {
       const inUse = await db.paymentAccount.findFirst({ where: { network, accountId } });
       if (inUse) return problem(409, "WALLET_ALREADY_ASSIGNED", "This wallet already backs another agent.");
     }
+
     let evmAddress: string | undefined;
     let publicKey: string | undefined;
     let initialBalanceAtomic = "0";
 
     if (isArc) {
       evmAddress = accountId.toLowerCase();
-      try {
-        const rpcUrl = config.ARC_RPC_URL ?? "https://rpc.testnet.arc.network";
-        const rpcResponse = await fetch(rpcUrl, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getBalance", params: [accountId, "latest"] }),
-          signal: AbortSignal.timeout(10_000),
-        });
-        if (rpcResponse.ok) {
-          const result = await rpcResponse.json() as { result?: string };
-          initialBalanceAtomic = result.result ? String(BigInt(result.result)) : "0";
-        }
-      } catch { /* balance unavailable, continue with 0 */ }
+      initialBalanceAtomic = await arcUsdcBalance(evmAddress);
     } else {
-      const mirrorUrl = isHederaMainnet
-        ? config.HEDERA_MAINNET_MIRROR_NODE_URL
-        : config.HEDERA_MIRROR_NODE_URL;
+      const mirrorUrl = isHederaMainnet ? config.HEDERA_MAINNET_MIRROR_NODE_URL : config.HEDERA_MIRROR_NODE_URL;
       const mirrorResponse = await fetch(`${mirrorUrl}/api/v1/accounts/${accountId}`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
       if (!mirrorResponse.ok) return problem(502, "MIRROR_NODE_UNAVAILABLE", "The wallet balance could not be read from Hedera.");
       const mirror = await mirrorResponse.json() as { balance?: { balance?: number }; evm_address?: string; key?: { key?: string } };
@@ -119,6 +129,7 @@ export async function POST(request: Request) {
           name: input.name,
           description: input.description || null,
           status: "ACTIVE",
+          network,
           defaultAssetId: asset.id,
           accounts: {
             create: {
@@ -135,7 +146,7 @@ export async function POST(request: Request) {
                   assetId: asset.id,
                   atomicAmount: initialBalanceAtomic,
                   spendableAtomic: initialBalanceAtomic,
-                  source: isArc ? "ARC_RPC" : "HEDERA_MIRROR_NODE",
+                  source: isArc ? "ARC_USDC_RPC" : "HEDERA_MIRROR_NODE",
                   asOf: new Date(),
                 },
               },
@@ -152,7 +163,7 @@ export async function POST(request: Request) {
           targetType: "AGENT",
           targetId: created.id,
           result: "SUCCESS",
-          metadata: { accountId, custodyType: input.custody },
+          metadata: { accountId, network, custodyType: input.custody },
         },
       });
       return created;
@@ -163,6 +174,7 @@ export async function POST(request: Request) {
     return ok(agent, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message === "PLAN_AGENTS_LIMIT_REACHED") return problem(402, error.message, "Your plan's active-agent limit has been reached.");
+    if (error instanceof Error && ["ARC_RPC_UNAVAILABLE", "ARC_BALANCE_UNAVAILABLE"].includes(error.message)) return problem(502, error.message, "The Arc USDC balance could not be verified before agent activation.");
     return handleApiError(error);
   }
 }
