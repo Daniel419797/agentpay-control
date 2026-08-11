@@ -69,6 +69,11 @@ function requireHttps(name: string, value: string | undefined, errors: string[])
   if (new URL(value).protocol !== "https:") errors.push(`${name} must use HTTPS`);
 }
 
+function isExactBase64Url32(value: string | undefined) {
+  if (!value || !/^[A-Za-z0-9_-]{43}$/.test(value)) return false;
+  return Buffer.from(value, "base64url").length === 32;
+}
+
 function assertDistinctSecrets(entries: Array<[string, string | undefined]>, errors: string[]) {
   const populated = entries.filter((entry): entry is [string, string] => Boolean(entry[1]));
   const byValue = new Map<string, string[]>();
@@ -105,8 +110,8 @@ export function productionConfigErrors(config: AppConfig): string[] {
   if (!config.ARC_RPC_URL) errors.push("ARC_RPC_URL");
   if (!config.ARC_PROVIDER_ADDRESS) errors.push("ARC_PROVIDER_ADDRESS");
   if (!config.HEDERA_PAYER_ACCOUNT_ID) errors.push("HEDERA_PAYER_ACCOUNT_ID");
-  if (!config.KEY_ENCRYPTION_MASTER_KEY || Buffer.from(config.KEY_ENCRYPTION_MASTER_KEY, "base64url").length !== 32) {
-    errors.push("KEY_ENCRYPTION_MASTER_KEY must be a base64url-encoded 32-byte key");
+  if (!isExactBase64Url32(config.KEY_ENCRYPTION_MASTER_KEY)) {
+    errors.push("KEY_ENCRYPTION_MASTER_KEY must be exactly 32 random bytes encoded as unpadded base64url");
   }
   if (!config.SUPABASE_URL || !config.SUPABASE_ANON_KEY) errors.push("SUPABASE_URL / SUPABASE_ANON_KEY");
   if (config.HEDERA_OPERATOR_ID || config.HEDERA_OPERATOR_KEY) errors.push("Hedera operator credentials must be held only by the facilitator");
