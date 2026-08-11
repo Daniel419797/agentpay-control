@@ -2,19 +2,32 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { idempotencyKeyForRequest, releaseIdempotencyKey, shouldRetainIdempotencyKey } from "@/lib/client-idempotency";
 
 type Option = { id: string; label: string };
 type CardOption = { id: string; label: string; status: string; version: number };
 type FiatAccountOption = { id: string; label: string; currency: string; status: string };
 
 async function apiRequest(path: string, body: unknown, method = "POST") {
-  const response = await fetch(path, {
-    method,
-    headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
-    body: JSON.stringify(body),
-  });
-  const payload = await response.json().catch(() => ({})) as { detail?: string };
-  if (!response.ok) throw new Error(payload.detail ?? "The request could not be completed.");
+  const idempotency = await idempotencyKeyForRequest(method, path, body);
+  try {
+    const response = await fetch(path, {
+      method,
+      headers: { "content-type": "application/json", "idempotency-key": idempotency.key },
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json().catch(() => ({})) as { detail?: string };
+    if (!response.ok) {
+      if (!shouldRetainIdempotencyKey(response.status)) releaseIdempotencyKey(idempotency.storageKey);
+      throw new Error(payload.detail ?? "The request could not be completed.");
+    }
+    releaseIdempotencyKey(idempotency.storageKey);
+  } catch (error) {
+    // A network exception is ambiguous: the provider-side request may already
+    // have crossed the external boundary. Keep the same idempotency key for
+    // the next same-body retry instead of creating a second financial action.
+    throw error;
+  }
 }
 
 export function CardOperations({
@@ -128,6 +141,6 @@ export function CardOperations({
       <div className="app-form"><h3>Card lifecycle</h3>{cards.length ? <div className="operation-list">{cards.map((card) => <div className="operation-row" key={card.id}><div><strong>{card.label}</strong><span>{card.status}</span></div><div className="rule-actions">{card.status === "ACTIVE" && <button className="secondary-button" type="button" disabled={Boolean(busy)} onClick={() => void changeCardStatus(card, "FROZEN")}>Freeze</button>}{card.status === "FROZEN" && <button className="secondary-button" type="button" disabled={Boolean(busy)} onClick={() => void changeCardStatus(card, "ACTIVE")}>Activate</button>}{card.status !== "CANCELED" && <button className="danger-button" type="button" disabled={Boolean(busy)} onClick={() => void changeCardStatus(card, "CANCELED")}>Cancel</button>}</div></div>)}</div> : <p className="panel-description">Issue a card to enable lifecycle controls.</p>}</div>
       {canOpenFiatAccount ? <form className="app-form" onSubmit={openFiatAccount}><h3>Open fiat account</h3><label>Account name<input name="displayName" minLength={2} maxLength={50} placeholder="Agent operating account" required /></label><label>Currency<input name="currency" defaultValue="USD" minLength={3} maxLength={3} required /></label><button className="secondary-button" type="submit" disabled={!enabled || Boolean(busy)}>{busy === "fiat-account" ? "Opening…" : "Open account"}</button></form> : <div className="app-form"><h3>Open fiat account</h3><p className="panel-description">Opening a new fiat account requires Owner access and recent authentication.</p></div>}
     </div>
-    <form className="app-form section-gap" onSubmit={createFiatTransfer}><h3>Move fiat</h3><div className="form-grid"><label>Fiat account<select name="fiatAccountId" required>{fiatAccounts.map((account) => <option key={account.id} value={account.id}>{account.label}</option>)}</select></label><label>Direction<select name="direction" defaultValue="DEPOSIT"><option value="DEPOSIT">Deposit</option><option value="WITHDRAWAL">Withdrawal</option></select></label><label>Amount in minor units<input name="amountMinor" inputMode="numeric" pattern="[0-9]+" placeholder="50000" required /></label><label>Payment instrument ID<input name="instrumentId" minLength={4} maxLength={200} autoComplete="off" required /></label><label>Description<input name="description" maxLength={200} /></label><input name="currency" type="hidden" value={fiatAccounts[0]?.currency ?? "USD"} readOnly /></div><p className="panel-description">Instrument identifiers are encrypted at rest and retained only for idempotent recovery. Ambiguous provider outcomes remain pending reconciliation and must not be retried with a new idempotency key.</p><button className="primary-button" type="submit" disabled={!enabled || !fiatAccounts.some((account) => account.status === "ACTIVE") || Boolean(busy)}>{busy === "fiat-transfer" ? "Submitting…" : "Submit transfer"}</button></form>
+    <form className="app-form section-gap" onSubmit={createFiatTransfer}><h3>Move fiat</h3><div className="form-grid"><label>Fiat account<select name="fiatAccountId" required>{fiatAccounts.map((account) => <option key={account.id} value={account.id}>{account.label}</option>)}</select></label><label>Direction<select name="direction" defaultValue="DEPOSIT"><option value="DEPOSIT">Deposit</option><option value="WITHDRAWAL">Withdrawal</option></select></label><label>Amount in minor units<input name="amountMinor" inputMode="numeric" pattern="[0-9]+" placeholder="50000" required /></label><label>Payment instrument ID<input name="instrumentId" minLength={4} maxLength={200} autoComplete="off" required /></label><label>Description<input name="description" maxLength={200} /></label><input name="currency" type="hidden" value={fiatAccounts[0]?.currency ?? "USD"} readOnly /></div><p className="panel-description">Instrument identifiers are encrypted at rest and retained only for idempotent recovery. Ambiguous provider outcomes retain the same browser idempotency key across retries so a network failure does not create a second financial action.</p><button className="primary-button" type="submit" disabled={!enabled || !fiatAccounts.some((account) => account.status === "ACTIVE") || Boolean(busy)}>{busy === "fiat-transfer" ? "Submitting…" : "Submit transfer"}</button></form>
   </section>;
 }
