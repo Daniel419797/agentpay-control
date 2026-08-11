@@ -23,6 +23,41 @@ async function failBeforeSigning(intentId: string, organizationId: string, code:
   });
 }
 
+async function markSubmissionUnknown(
+  intent: { id: string; organizationId: string },
+  attemptId: string,
+  network: string,
+  code: string,
+  candidateTransactionId?: string,
+) {
+  await db.$transaction([
+    db.paymentAttempt.update({
+      where: { id: attemptId },
+      data: {
+        status: "UNKNOWN",
+        errorCode: code,
+        ...(candidateTransactionId ? { candidateTransactionId } : {}),
+      },
+    }),
+    db.paymentIntent.update({ where: { id: intent.id }, data: { status: "SUBMISSION_UNKNOWN" } }),
+    db.resourceFulfillment.upsert({
+      where: { paymentIntentId: intent.id },
+      create: { paymentIntentId: intent.id, status: "PENDING", errorCode: code },
+      update: { status: "PENDING", errorCode: code },
+    }),
+    db.outboxEvent.create({
+      data: {
+        organizationId: intent.organizationId,
+        eventType: "PAYMENT_RECONCILIATION_REQUIRED",
+        aggregateType: "PAYMENT_INTENT",
+        aggregateId: intent.id,
+        payload: { attemptId, network, candidateTransactionId: candidateTransactionId ?? null, code },
+      },
+    }),
+  ]);
+  return db.paymentIntent.findUniqueOrThrow({ where: { id: intent.id }, include: { quote: { include: { asset: true } }, fulfillment: true, attempts: { include: { settlement: true } } } });
+}
+
 export async function executeAuthorizedIntent(intentId: string) {
   const intent = await db.paymentIntent.findUniqueOrThrow({
     where: { id: intentId },
@@ -50,6 +85,7 @@ export async function executeAuthorizedIntent(intentId: string) {
     await failBeforeSigning(intent.id, intent.organizationId, preSignError);
     throw new Error(preSignError);
   }
+
   const effectivePolicy = intent.agent.effectivePolicy!;
   const scheduleViolation = policyScheduleViolation({
     evaluatedAt: new Date(),
@@ -63,6 +99,7 @@ export async function executeAuthorizedIntent(intentId: string) {
     await failBeforeSigning(intent.id, intent.organizationId, scheduleViolation);
     throw new Error(scheduleViolation);
   }
+
   const account = paymentAccountForNetwork(intent.agent.accounts, intent.quote!.network);
   if (account.custodyType !== "PLATFORM_MANAGED_TESTNET" || account.signingMode !== "AUTONOMOUS_MANAGED") throw new Error("MANAGED_SIGNER_REQUIRED");
   const config = getConfig();
@@ -74,6 +111,7 @@ export async function executeAuthorizedIntent(intentId: string) {
   } else {
     throw new Error("MANAGED_SIGNER_NETWORK_UNSUPPORTED");
   }
+
   const required = parsePaymentRequired(intent.quote!.rawChallenge);
   const requirement = selectRequirement(required, {
     network: intent.quote!.network,
@@ -86,11 +124,25 @@ export async function executeAuthorizedIntent(intentId: string) {
   if (claimed.count !== 1) throw new Error("PAYMENT_ALREADY_CLAIMED");
   const attemptNumber = (await db.paymentAttempt.count({ where: { paymentIntentId: intent.id } })) + 1;
   const attempt = await db.paymentAttempt.create({ data: { paymentIntentId: intent.id, attemptNumber, status: "STARTED", facilitatorRequestId: randomUUID() } });
+
+  let confirmedSettlement: { transactionId: string; network: string } | undefined;
   try {
     const signed = await createManagedPaymentPayload(requirement);
     await db.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "SIGNED", signatureFingerprint: hash(signed.paymentPayload), candidateTransactionId: signed.transactionId } });
+
     const fulfillment = await fulfillX402Resource(intent.resourceUrl, requirement, signed.paymentPayload, config.APP_ENV === "production");
+    confirmedSettlement = { transactionId: fulfillment.transactionId, network: fulfillment.network };
+
+    // Persist the strongest settlement evidence before the larger bookkeeping
+    // transaction. If later DB/audit writes fail, reconciliation can still use
+    // the exact chain transaction returned by the resource server.
+    await db.paymentAttempt.update({
+      where: { id: attempt.id },
+      data: { status: "SUBMITTED", candidateTransactionId: fulfillment.transactionId },
+    });
+
     if (fulfillment.network !== requirement.network) throw new Error("SETTLEMENT_NETWORK_MISMATCH");
+
     return db.$transaction(async (tx) => {
       await tx.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "CONFIRMED" } });
       await tx.settlement.create({ data: { paymentAttemptId: attempt.id, assetId: intent.quote!.assetId, status: "CONFIRMED", network: fulfillment.network, transactionId: fulfillment.transactionId, payerAccountId: account.accountId, payeeAccountId: intent.quote!.payToAccountId, amountAtomic: intent.quote!.amountAtomic, resultCode: "SUCCESS", submittedAt: new Date(), confirmedAt: new Date() } });
@@ -101,17 +153,19 @@ export async function executeAuthorizedIntent(intentId: string) {
       return tx.paymentIntent.update({ where: { id: intent.id }, data: { status: "SETTLED" }, include: { quote: { include: { asset: true } }, fulfillment: true, attempts: { include: { settlement: true } } } });
     });
   } catch (error) {
-    if (error instanceof X402SubmissionUnknownError) {
-      await db.$transaction([
-        db.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "UNKNOWN", errorCode: error.message } }),
-        db.paymentIntent.update({ where: { id: intent.id }, data: { status: "SUBMISSION_UNKNOWN" } }),
-        db.resourceFulfillment.upsert({ where: { paymentIntentId: intent.id }, create: { paymentIntentId: intent.id, status: "PENDING", errorCode: error.message }, update: { status: "PENDING", errorCode: error.message } }),
-        db.outboxEvent.create({ data: { organizationId: intent.organizationId, eventType: "PAYMENT_RECONCILIATION_REQUIRED", aggregateType: "PAYMENT_INTENT", aggregateId: intent.id, payload: { attemptId: attempt.id, network: requirement.network } } }),
-      ]);
-      return db.paymentIntent.findUniqueOrThrow({ where: { id: intent.id }, include: { quote: { include: { asset: true } }, fulfillment: true, attempts: { include: { settlement: true } } } });
+    const errorCode = error instanceof Error ? error.message.slice(0, 120) : "PAYMENT_FAILED";
+    if (error instanceof X402SubmissionUnknownError || confirmedSettlement) {
+      return markSubmissionUnknown(
+        intent,
+        attempt.id,
+        requirement.network,
+        confirmedSettlement ? `POST_SETTLEMENT_${errorCode}` : errorCode,
+        confirmedSettlement?.transactionId,
+      );
     }
+
     await db.$transaction([
-      db.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "FAILED", errorCode: error instanceof Error ? error.message.slice(0, 120) : "PAYMENT_FAILED" } }),
+      db.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "FAILED", errorCode } }),
       db.paymentIntent.update({ where: { id: intent.id }, data: { status: "FAILED_BEFORE_SUBMISSION" } }),
       db.spendReservation.updateMany({ where: { paymentIntentId: intent.id, status: "ACTIVE" }, data: { status: "RELEASED" } }),
     ]);
@@ -126,6 +180,7 @@ export async function createPaidRequest(agentId: string, idempotencyKey: string,
   const requestHash = hash(canonical);
   const preexisting = await db.paymentIntent.findFirst({ where: { agentId, idempotencyKey }, include: { quote: { include: { asset: true } }, approval: true, fulfillment: true, attempts: { include: { settlement: true } } } });
   if (preexisting) { if (preexisting.requestHash !== requestHash) throw new Error("IDEMPOTENCY_CONFLICT"); return preexisting; }
+
   const required = await discoverX402(resourceUrl, config.APP_ENV === "production");
   const result = await retrySerializable(() => db.$transaction(async (tx) => {
     const agent = await tx.agent.findUniqueOrThrow({ where: { id: agentId }, include: { organization: true, effectivePolicy: { include: { asset: true } }, accounts: { where: { status: "ACTIVE" }, include: { balances: { orderBy: { asOf: "desc" }, take: 1 } } } } });
@@ -134,16 +189,21 @@ export async function createPaidRequest(agentId: string, idempotencyKey: string,
       if (existing.requestHash !== requestHash) throw new Error("IDEMPOTENCY_CONFLICT");
       return { intent: existing, shouldExecute: false };
     }
+
     await assertPlanLimit(tx, agent.organizationId, "PAYMENT_INTENTS");
     const policy = agent.effectivePolicy;
     if (!policy) throw new Error("POLICY_NOT_PUBLISHED");
     const listing = await tx.resourceListing.findFirst({ where: { endpoint: canonical.resourceUrl, status: "ACTIVE" }, include: { provider: true, prices: { where: { assetId: policy.assetId }, take: 1 } } });
     if (!listing?.prices[0]) throw new Error("RESOURCE_PRICE_NOT_FOUND");
+
     const expectedPayee = providerPayeeForNetwork(listing.provider, agent.network, config);
     const requirement = selectRequirement(required, { network: agent.network, asset: x402AssetIdentifier(policy.asset, agent.network, config), amount: listing.prices[0].atomicAmount.toString(), payTo: expectedPayee, resourceUrl: canonical.resourceUrl });
     const amountAtomic = requirement.amount;
     if (input.maxAmountAtomic && BigInt(amountAtomic) > BigInt(input.maxAmountAtomic)) throw new Error("MAX_AMOUNT_EXCEEDED");
+
     const account = paymentAccountForNetwork(agent.accounts, requirement.network);
+    if (account.custodyType !== "PLATFORM_MANAGED_TESTNET" || account.signingMode !== "AUTONOMOUS_MANAGED") throw new Error("MANAGED_SIGNER_REQUIRED");
+
     const now = new Date();
     const rawBalanceAtomic = account.balances[0]?.spendableAtomic.toString() ?? "0";
     const dayStart = new Date(now); dayStart.setUTCHours(0, 0, 0, 0);
