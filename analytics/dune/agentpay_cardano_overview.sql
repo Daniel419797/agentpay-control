@@ -4,17 +4,18 @@
 --   {{provider_address}}   Cardano address receiving the AgentPay x402 payment.
 --   {{usdcx_asset_unit}}   Exact lower-case Cardano USDCx policy-id + asset-name unit.
 --
+-- Dune source of truth: cardano.transaction.
 -- This intentionally derives only facts that are safely observable from the
--- public Cardano transaction table. It does not attempt to infer AgentPay
--- organization, user, policy, or private agent metadata from chain data.
+-- public chain. It does not infer AgentPay organization, user, policy, purpose,
+-- agent secrets, or any other private application metadata.
 
 WITH agentpay_transactions AS (
   SELECT
     tx_hash,
     block_time,
     fee_lovelace,
-    inputs_count,
-    outputs_count,
+    input_count,
+    output_count,
     outputs,
     CASE
       WHEN CAST(outputs AS varchar) LIKE concat('%', '{{usdcx_asset_unit}}', '%') THEN 'USDCx'
@@ -32,6 +33,6 @@ SELECT
   sum(fee_lovelace) / 1000000.0 AS total_network_fees_ada,
   sum(CASE WHEN payment_asset = 'USDCx' THEN 1 ELSE 0 END) AS usdcx_transactions,
   sum(CASE WHEN payment_asset = 'ADA/other' THEN 1 ELSE 0 END) AS non_usdcx_transactions,
-  avg(inputs_count) AS average_input_count,
-  avg(outputs_count) AS average_output_count
+  avg(input_count) AS average_input_count,
+  avg(output_count) AS average_output_count
 FROM agentpay_transactions;
