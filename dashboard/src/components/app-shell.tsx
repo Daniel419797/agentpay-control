@@ -34,14 +34,23 @@ export function AppShell({ children, mainnetEnabled = true }: { children: React.
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
   const [operatorEmail, setOperatorEmail] = useState("Loading operator…");
+  const [roles, setRoles] = useState<string[]>([]);
 
   useEffect(() => {
-    void fetch("/api/v1/session")
+    void fetch("/api/v1/session", { cache: "no-store" })
       .then((response) => response.ok ? response.json() : null)
-      .then((body: { data?: { user?: { email?: string } } } | null) => {
+      .then((body: { data?: { user?: { email?: string }; roles?: string[] } } | null) => {
         setOperatorEmail(body?.data?.user?.email ?? "Signed-in operator");
+        setRoles(body?.data?.roles ?? []);
+      })
+      .catch(() => {
+        setOperatorEmail("Signed-in operator");
+        setRoles([]);
       });
   }, []);
+
+  const canCreateAgent = roles.includes("OWNER") || roles.includes("OPERATOR");
+
   return (
     <NetworkProvider mainnetEnabled={mainnetEnabled}>
       <div className="app-shell">
@@ -78,7 +87,7 @@ export function AppShell({ children, mainnetEnabled = true }: { children: React.
             <div className="topbar-actions">
               <NetworkSwitcher />
               <HederaWalletConnect />
-              <Link className="primary-button" href="/app/agents/new"><Plus size={16} /><span>Create agent</span></Link>
+              {canCreateAgent && <Link className="primary-button" href="/app/agents/new"><Plus size={16} /><span>Create agent</span></Link>}
             </div>
           </header>
           {children}
