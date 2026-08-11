@@ -11,7 +11,8 @@
   "author": "Daniel <praisedaniel979@gmail.com>",
   "packageManager": "npm@11.11.1",
   "engines": {
-    "node": ">=22.0.0"
+    "node": "22.x",
+    "npm": "11.11.1"
   },
   "scripts": {
     "postinstall": "prisma generate",
