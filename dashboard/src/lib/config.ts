@@ -39,6 +39,7 @@ const envSchema = z.object({
   ARC_PROVIDER_ADDRESS: z.string().regex(evmAddress).transform((value) => value.toLowerCase()).optional(),
   ARC_PAYER_ADDRESS: z.string().regex(evmAddress).transform((value) => value.toLowerCase()).optional(),
   ARC_USDC_ADDRESS: z.string().regex(evmAddress).transform((value) => value.toLowerCase()).default("0x3600000000000000000000000000000000000000"),
+  CARDANO_SETTLEMENT_STORE_API_KEY: z.string().min(32).optional(),
   CARDANO_PREPROD_FACILITATOR_URL: optionalUrl,
   CARDANO_PREPROD_FACILITATOR_API_KEY: z.string().min(32).optional(),
   CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY: z.string().min(32).optional(),
@@ -108,20 +109,14 @@ function assertDistinctSecrets(entries: Array<[string, string | undefined]>, err
     names.push(name);
     byValue.set(value, names);
   }
-  for (const names of byValue.values()) {
-    if (names.length > 1) errors.push(`${names.join(" / ")} must use distinct secrets`);
-  }
+  for (const names of byValue.values()) if (names.length > 1) errors.push(`${names.join(" / ")} must use distinct secrets`);
 }
 
 function cardanoRailRequested(values: Array<string | undefined>) {
   return values.some(Boolean);
 }
 
-function requireCardanoRail(
-  label: string,
-  values: Array<[string, string | undefined]>,
-  errors: string[],
-) {
+function requireCardanoRail(label: string, values: Array<[string, string | undefined]>, errors: string[]) {
   if (!cardanoRailRequested(values.map(([, value]) => value))) return;
   for (const [name, value] of values) if (!value) errors.push(`${label}: ${name}`);
 }
@@ -165,6 +160,23 @@ export function productionConfigErrors(config: AppConfig): string[] {
   if (!config.SUPABASE_URL || !config.SUPABASE_ANON_KEY) errors.push("SUPABASE_URL / SUPABASE_ANON_KEY");
   if (config.HEDERA_OPERATOR_ID || config.HEDERA_OPERATOR_KEY) errors.push("Hedera operator credentials must be held only by the facilitator");
 
+  const preprodRequested = cardanoRailRequested([
+    config.CARDANO_PREPROD_FACILITATOR_URL,
+    config.CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY,
+    config.CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY,
+    config.CARDANO_PREPROD_PAYER_ADDRESS,
+    config.CARDANO_PREPROD_PROVIDER_ADDRESS,
+    config.CARDANO_PREPROD_BLOCKFROST_PROJECT_ID,
+  ]);
+  const mainnetRequested = cardanoRailRequested([
+    config.CARDANO_MAINNET_FACILITATOR_URL,
+    config.CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY,
+    config.CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY,
+    config.CARDANO_MAINNET_PAYER_ADDRESS,
+    config.CARDANO_MAINNET_PROVIDER_ADDRESS,
+    config.CARDANO_MAINNET_BLOCKFROST_PROJECT_ID,
+  ]);
+
   requireCardanoRail("Cardano Preprod", [
     ["CARDANO_PREPROD_FACILITATOR_URL", config.CARDANO_PREPROD_FACILITATOR_URL],
     ["CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY", config.CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY],
@@ -181,6 +193,7 @@ export function productionConfigErrors(config: AppConfig): string[] {
     ["CARDANO_MAINNET_PROVIDER_ADDRESS", config.CARDANO_MAINNET_PROVIDER_ADDRESS],
     ["CARDANO_MAINNET_BLOCKFROST_PROJECT_ID", config.CARDANO_MAINNET_BLOCKFROST_PROJECT_ID],
   ], errors);
+  if ((preprodRequested || mainnetRequested) && !config.CARDANO_SETTLEMENT_STORE_API_KEY) errors.push("CARDANO_SETTLEMENT_STORE_API_KEY");
 
   assertDistinctSecrets([
     ["FACILITATOR_SIGNING_API_KEY", config.FACILITATOR_SIGNING_API_KEY],
@@ -194,6 +207,7 @@ export function productionConfigErrors(config: AppConfig): string[] {
     ["CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY", config.CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY],
     ["CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY", config.CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY],
     ["CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY", config.CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY],
+    ["CARDANO_SETTLEMENT_STORE_API_KEY", config.CARDANO_SETTLEMENT_STORE_API_KEY],
   ], errors);
 
   if (config.VIRTUAL_CARDS_ENABLED) {
@@ -208,20 +222,15 @@ export function productionConfigErrors(config: AppConfig): string[] {
 
 export function parseEnv(input: unknown = process.env): AppConfig {
   const requested = requestedAppEnv(input);
-  if (requested !== undefined && !appEnvironments.includes(requested as (typeof appEnvironments)[number])) {
-    throw new Error(`Invalid APP_ENV: ${requested}`);
-  }
+  if (requested !== undefined && !appEnvironments.includes(requested as (typeof appEnvironments)[number])) throw new Error(`Invalid APP_ENV: ${requested}`);
 
   const result = envSchema.safeParse(input);
   if (!result.success) {
     const summary = issueSummary(result.error);
     if (requested === "production") throw new Error(`Invalid production environment: ${summary}`);
-
     console.error("[config] Environment validation failed:", summary);
     const filtered: Record<string, string | undefined> = {};
-    if (input && typeof input === "object") {
-      for (const [key, value] of Object.entries(input as Record<string, unknown>)) filtered[key] = typeof value === "string" ? value : undefined;
-    }
+    if (input && typeof input === "object") for (const [key, value] of Object.entries(input as Record<string, unknown>)) filtered[key] = typeof value === "string" ? value : undefined;
     for (const issue of result.error.issues) delete filtered[String(issue.path[0] ?? "")];
     const retry = envSchema.safeParse(filtered);
     if (retry.success) return retry.data;
