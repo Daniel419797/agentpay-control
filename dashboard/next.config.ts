@@ -4,6 +4,14 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   typedRoutes: true,
+  rewrites: async () => ({
+    beforeFiles: [
+      { source: "/api/v1/organization/export", destination: "/api/v1/organization/export-complete" },
+      { source: "/api/v1/organization/export-stream", destination: "/api/v1/organization/export-complete" },
+    ],
+    afterFiles: [],
+    fallback: [],
+  }),
   headers: async () => [
     {
       source: "/(.*)",
