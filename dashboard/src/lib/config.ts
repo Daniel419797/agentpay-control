@@ -54,48 +54,118 @@ export type AppConfig = z.infer<typeof envSchema>;
 
 let cached: AppConfig | undefined;
 
-export function getConfig(): AppConfig {
-  if (cached) return cached;
-  const parsed = parseEnv();
-  if (parsed.APP_ENV === "production") {
-    const missing: string[] = [];
-    if (new URL(parsed.NEXT_PUBLIC_APP_URL).protocol !== "https:") missing.push("NEXT_PUBLIC_APP_URL must use HTTPS");
-    if (parsed.AUTH_SECRET === "development-only-secret-change-before-deploy") missing.push("AUTH_SECRET");
-    if (!parsed.CRON_SECRET) missing.push("CRON_SECRET");
-    if (!parsed.FACILITATOR_URL) missing.push("FACILITATOR_URL");
-    if (!parsed.FACILITATOR_SIGNING_API_KEY) missing.push("FACILITATOR_SIGNING_API_KEY");
-    if (!parsed.FACILITATOR_SETTLEMENT_API_KEY) missing.push("FACILITATOR_SETTLEMENT_API_KEY");
-    if (!parsed.FACILITATOR_CONTRACT_API_KEY) missing.push("FACILITATOR_CONTRACT_API_KEY");
-    if (!parsed.ARC_FACILITATOR_URL) missing.push("ARC_FACILITATOR_URL");
-    if (!parsed.ARC_FACILITATOR_SIGNING_API_KEY) missing.push("ARC_FACILITATOR_SIGNING_API_KEY");
-    if (!parsed.ARC_FACILITATOR_CONTRACT_API_KEY) missing.push("ARC_FACILITATOR_CONTRACT_API_KEY");
-    if (!parsed.ARC_RPC_URL) missing.push("ARC_RPC_URL");
-    if (!parsed.ARC_PROVIDER_ADDRESS) missing.push("ARC_PROVIDER_ADDRESS");
-    if (!parsed.HEDERA_PAYER_ACCOUNT_ID) missing.push("HEDERA_PAYER_ACCOUNT_ID");
-    if (!parsed.KEY_ENCRYPTION_MASTER_KEY || Buffer.from(parsed.KEY_ENCRYPTION_MASTER_KEY, "base64url").length !== 32) missing.push("KEY_ENCRYPTION_MASTER_KEY");
-    if (!parsed.SUPABASE_URL || !parsed.SUPABASE_ANON_KEY) missing.push("SUPABASE_URL / SUPABASE_ANON_KEY");
-    if (parsed.HEDERA_OPERATOR_ID || parsed.HEDERA_OPERATOR_KEY) missing.push("Hedera operator credentials must be held only by the facilitator");
-    if (parsed.VIRTUAL_CARDS_ENABLED) {
-      if (parsed.CARD_PROVIDER !== "STRIPE") missing.push("CARD_PROVIDER=STRIPE");
-      if (!parsed.STRIPE_RESTRICTED_KEY) missing.push("STRIPE_RESTRICTED_KEY");
-      if (!parsed.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) missing.push("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY");
-      if (!parsed.STRIPE_WEBHOOK_SECRET) missing.push("STRIPE_WEBHOOK_SECRET");
-    }
-    if (missing.length) console.warn(`[config] Missing production env vars: ${missing.join(", ")}`);
+function requestedAppEnv(input: unknown): string | undefined {
+  if (!input || typeof input !== "object") return undefined;
+  const value = (input as Record<string, unknown>).APP_ENV;
+  return typeof value === "string" ? value : undefined;
+}
+
+function issueSummary(error: z.ZodError): string {
+  return error.issues.map((issue) => `${issue.path.join(".") || "environment"}: ${issue.message}`).join(" | ");
+}
+
+function requireHttps(name: string, value: string | undefined, errors: string[]) {
+  if (!value) return;
+  if (new URL(value).protocol !== "https:") errors.push(`${name} must use HTTPS`);
+}
+
+function assertDistinctSecrets(entries: Array<[string, string | undefined]>, errors: string[]) {
+  const populated = entries.filter((entry): entry is [string, string] => Boolean(entry[1]));
+  const byValue = new Map<string, string[]>();
+  for (const [name, value] of populated) {
+    const names = byValue.get(value) ?? [];
+    names.push(name);
+    byValue.set(value, names);
   }
-  cached = parsed;
+  for (const names of byValue.values()) {
+    if (names.length > 1) errors.push(`${names.join(" / ")} must use distinct secrets`);
+  }
+}
+
+export function productionConfigErrors(config: AppConfig): string[] {
+  if (config.APP_ENV !== "production") return [];
+
+  const errors: string[] = [];
+  requireHttps("NEXT_PUBLIC_APP_URL", config.NEXT_PUBLIC_APP_URL, errors);
+  requireHttps("FACILITATOR_URL", config.FACILITATOR_URL, errors);
+  requireHttps("ARC_FACILITATOR_URL", config.ARC_FACILITATOR_URL, errors);
+  requireHttps("HEDERA_MAINNET_FACILITATOR_URL", config.HEDERA_MAINNET_FACILITATOR_URL, errors);
+  requireHttps("ARC_RPC_URL", config.ARC_RPC_URL, errors);
+  requireHttps("SUPABASE_URL", config.SUPABASE_URL, errors);
+
+  if (config.AUTH_SECRET === "development-only-secret-change-before-deploy") errors.push("AUTH_SECRET");
+  if (!config.CRON_SECRET) errors.push("CRON_SECRET");
+  if (!config.FACILITATOR_URL) errors.push("FACILITATOR_URL");
+  if (!config.FACILITATOR_SIGNING_API_KEY) errors.push("FACILITATOR_SIGNING_API_KEY");
+  if (!config.FACILITATOR_SETTLEMENT_API_KEY) errors.push("FACILITATOR_SETTLEMENT_API_KEY");
+  if (!config.FACILITATOR_CONTRACT_API_KEY) errors.push("FACILITATOR_CONTRACT_API_KEY");
+  if (!config.ARC_FACILITATOR_URL) errors.push("ARC_FACILITATOR_URL");
+  if (!config.ARC_FACILITATOR_SIGNING_API_KEY) errors.push("ARC_FACILITATOR_SIGNING_API_KEY");
+  if (!config.ARC_FACILITATOR_CONTRACT_API_KEY) errors.push("ARC_FACILITATOR_CONTRACT_API_KEY");
+  if (!config.ARC_RPC_URL) errors.push("ARC_RPC_URL");
+  if (!config.ARC_PROVIDER_ADDRESS) errors.push("ARC_PROVIDER_ADDRESS");
+  if (!config.HEDERA_PAYER_ACCOUNT_ID) errors.push("HEDERA_PAYER_ACCOUNT_ID");
+  if (!config.KEY_ENCRYPTION_MASTER_KEY || Buffer.from(config.KEY_ENCRYPTION_MASTER_KEY, "base64url").length !== 32) {
+    errors.push("KEY_ENCRYPTION_MASTER_KEY must be a base64url-encoded 32-byte key");
+  }
+  if (!config.SUPABASE_URL || !config.SUPABASE_ANON_KEY) errors.push("SUPABASE_URL / SUPABASE_ANON_KEY");
+  if (config.HEDERA_OPERATOR_ID || config.HEDERA_OPERATOR_KEY) errors.push("Hedera operator credentials must be held only by the facilitator");
+
+  assertDistinctSecrets([
+    ["FACILITATOR_SIGNING_API_KEY", config.FACILITATOR_SIGNING_API_KEY],
+    ["FACILITATOR_SETTLEMENT_API_KEY", config.FACILITATOR_SETTLEMENT_API_KEY],
+    ["FACILITATOR_CONTRACT_API_KEY", config.FACILITATOR_CONTRACT_API_KEY],
+  ], errors);
+  assertDistinctSecrets([
+    ["ARC_FACILITATOR_SIGNING_API_KEY", config.ARC_FACILITATOR_SIGNING_API_KEY],
+    ["ARC_FACILITATOR_CONTRACT_API_KEY", config.ARC_FACILITATOR_CONTRACT_API_KEY],
+  ], errors);
+
+  if (config.VIRTUAL_CARDS_ENABLED) {
+    if (config.CARD_PROVIDER !== "STRIPE") errors.push("CARD_PROVIDER=STRIPE");
+    if (!config.STRIPE_RESTRICTED_KEY) errors.push("STRIPE_RESTRICTED_KEY");
+    if (!config.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) errors.push("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY");
+    if (!config.STRIPE_WEBHOOK_SECRET) errors.push("STRIPE_WEBHOOK_SECRET");
+  }
+
+  return errors;
+}
+
+export function parseEnv(input: unknown = process.env): AppConfig {
+  const result = envSchema.safeParse(input);
+  if (!result.success) {
+    const summary = issueSummary(result.error);
+    if (requestedAppEnv(input) === "production") {
+      throw new Error(`Invalid production environment: ${summary}`);
+    }
+
+    console.error("[config] Environment validation failed:", summary);
+    const filtered: Record<string, string | undefined> = {};
+    if (input && typeof input === "object") {
+      for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+        filtered[key] = typeof value === "string" ? value : undefined;
+      }
+    }
+    for (const issue of result.error.issues) delete filtered[String(issue.path[0] ?? "")];
+    const retry = envSchema.safeParse(filtered);
+    if (retry.success) return retry.data;
+    console.error("[config] Environment validation failed after dropping invalid keys, using development defaults");
+    return envSchema.parse({});
+  }
+
+  const parsed = result.data;
+  const errors = productionConfigErrors(parsed);
+  if (errors.length) {
+    throw new Error(`Invalid production configuration: ${errors.join(", ")}`);
+  }
+  return parsed;
+}
+
+export function getConfig(): AppConfig {
+  if (!cached) cached = parseEnv();
   return cached;
 }
 
-function parseEnv(): AppConfig {
-  const result = envSchema.safeParse(process.env);
-  if (result.success) return result.data;
-  console.error("[config] Environment validation failed:", result.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join(" | "));
-  const filtered: Record<string, string | undefined> = {};
-  for (const key of Object.keys(process.env)) filtered[key] = process.env[key];
-  for (const issue of result.error.issues) delete filtered[String(issue.path[0] ?? "")];
-  const retry = envSchema.safeParse(filtered);
-  if (retry.success) return retry.data;
-  console.error("[config] Environment validation failed after dropping invalid keys, using defaults");
-  return envSchema.parse({});
+export function resetConfigForTests(): void {
+  cached = undefined;
 }
