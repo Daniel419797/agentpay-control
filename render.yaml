@@ -49,10 +49,14 @@ services:
         value: preprod
       - key: CARDANO_PAYER_ADDRESS
         sync: false
+      # Optional exact policy-id + asset-name unit. Leave empty for ADA-only.
+      - key: CARDANO_USDCX_ASSET_ID
+        sync: false
       - key: CARDANO_BLOCKFROST_URL
         value: https://cardano-preprod.blockfrost.io/api/v0
       - key: CARDANO_BLOCKFROST_PROJECT_ID
         sync: false
+      # Public HTTPS URL of the separately deployed isolated signer gateway.
       - key: CARDANO_SIGNER_URL
         sync: false
       - key: CARDANO_SIGNER_API_KEY
@@ -95,6 +99,10 @@ services:
         value: production
       - key: ENABLED_NETWORKS
         value: hedera:testnet,eip155:5042002,cardano:preprod
+      # Fail closed: Cardano USDCx is not advertised merely because source support exists.
+      # Flip this to true only after the shared asset unit and funded canary are verified.
+      - key: CARDANO_USDCX_ENABLED
+        value: "false"
       - key: FACILITATOR_URL
         sync: false
       - key: ARC_FACILITATOR_URL
@@ -131,3 +139,10 @@ services:
         value: "0x3600000000000000000000000000000000000000"
       - key: CARDANO_PREPROD_PROVIDER_ADDRESS
         sync: false
+      - key: CARDANO_PREPROD_USDCX_ASSET_ID
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: CARDANO_USDCX_ASSET_ID
+      - key: CARDANO_USDCX_RESOURCE_PRICE_ATOMIC
+        value: "1000000"
