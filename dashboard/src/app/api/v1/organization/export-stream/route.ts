@@ -185,7 +185,7 @@ export async function GET(request: Request) {
         }
       },
       async cancel() {
-        if (iterator.return) await iterator.return();
+        if (iterator.return) await iterator.return(undefined);
       },
     });
     return new Response(stream, { headers: { "content-type": "application/json; charset=utf-8", "content-disposition": `attachment; filename="agentpay-${workspace.organization.slug}-export.json"`, "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
