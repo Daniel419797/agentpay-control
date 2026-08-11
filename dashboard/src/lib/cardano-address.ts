@@ -50,9 +50,10 @@ export function cardanoPaymentCredentialHash(address: string, network: "Preprod"
   const expectedHrp = network === "Mainnet" ? "addr" : "addr_test";
   const expectedNetworkId = network === "Mainnet" ? 1 : 0;
   if (decoded.hrp !== expectedHrp || decoded.networkId !== expectedNetworkId) throw new Error("CARDANO_ADDRESS_NETWORK_MISMATCH");
-  // Base/enterprise key-payment credentials. Script-payment credentials are
-  // intentionally rejected because Masumi sellingWalletVkey is a key hash.
-  if (![0, 2, 6].includes(decoded.type)) throw new Error("CARDANO_PAYMENT_KEY_CREDENTIAL_REQUIRED");
+  // Base, pointer, and enterprise addresses whose payment credential is a key
+  // hash are valid. Script-payment credentials are intentionally rejected
+  // because Masumi sellingWalletVkey is a verification-key hash.
+  if (![0, 2, 4, 6].includes(decoded.type)) throw new Error("CARDANO_PAYMENT_KEY_CREDENTIAL_REQUIRED");
   return Buffer.from(decoded.bytes.slice(1, 29)).toString("hex");
 }
 
