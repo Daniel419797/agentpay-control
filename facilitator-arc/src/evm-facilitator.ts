@@ -40,14 +40,22 @@ export const envSchema = z.object({
 export type ArcConfig = z.infer<typeof envSchema>;
 
 type SettlementEvidence = { transactionId?: Hex };
+export type SettlementCapture<T> =
+  | { result: T; error?: never; transactionId?: Hex }
+  | { result?: never; error: unknown; transactionId?: Hex };
 
 export class SettlementEvidenceScope {
   private readonly storage = new AsyncLocalStorage<SettlementEvidence>();
 
-  async capture<T>(operation: () => Promise<T>): Promise<{ result: T; transactionId?: Hex }> {
+  async capture<T>(operation: () => Promise<T>): Promise<SettlementCapture<T>> {
     const evidence: SettlementEvidence = {};
-    const result = await this.storage.run(evidence, operation);
-    return { result, transactionId: evidence.transactionId };
+    return this.storage.run(evidence, async () => {
+      try {
+        return { result: await operation(), transactionId: evidence.transactionId };
+      } catch (error) {
+        return { error, transactionId: evidence.transactionId };
+      }
+    });
   }
 
   record(transactionId: Hex) {
