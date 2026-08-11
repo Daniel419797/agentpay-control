@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { FormPage } from "@/components/workspace-page";
 import { PolicyPublishForm } from "@/components/policy-publish-form";
-import { loadCatalystPolicyContext } from "@/domain/catalyst-policy";
+import { loadCatalystPolicyContext, type CatalystPolicyContext } from "@/domain/catalyst-policy";
 import { db } from "@/lib/db";
 import { formatAtomic } from "@/lib/format";
 import { currentWorkspace } from "@/lib/workspace";
@@ -14,6 +14,8 @@ function formatUsdMicros(value: bigint | null) {
   return `$${whole}${fraction ? `.${fraction}` : ""}`;
 }
 
+type KeriPolicySummary = { required: boolean; trustedIssuerAids: string[]; allowedSchemaSaids: string[]; maxVerificationAgeSeconds: number };
+
 export default async function PolicyPage({ params }: { params: Promise<{ agentId: string }> }) {
   const [{ agentId }, workspace] = await Promise.all([params, currentWorkspace()]);
   if (!workspace) notFound();
@@ -23,14 +25,19 @@ export default async function PolicyPage({ params }: { params: Promise<{ agentId
   });
   if (!agent) notFound();
   const policy = agent.effectivePolicy;
-  const [catalyst, keriRows] = policy ? await Promise.all([
-    loadCatalystPolicyContext(policy.id),
-    db.$queryRaw<Array<{ required: boolean; trustedIssuerAids: string[]; allowedSchemaSaids: string[]; maxVerificationAgeSeconds: number }>>`
-      SELECT "required","trustedIssuerAids","allowedSchemaSaids","maxVerificationAgeSeconds"
-      FROM "KeriPolicyTrust" WHERE "policyVersionId"=${policy.id}::uuid LIMIT 1
-    `,
-  ]) : [null, []];
-  const keri = keriRows[0] ?? null;
+  let catalyst: CatalystPolicyContext | null = null;
+  let keri: KeriPolicySummary | null = null;
+  if (policy) {
+    const [catalystContext, rows] = await Promise.all([
+      loadCatalystPolicyContext(policy.id),
+      db.$queryRaw<KeriPolicySummary[]>`
+        SELECT "required","trustedIssuerAids","allowedSchemaSaids","maxVerificationAgeSeconds"
+        FROM "KeriPolicyTrust" WHERE "policyVersionId"=${policy.id}::uuid LIMIT 1
+      `,
+    ]);
+    catalyst = catalystContext;
+    keri = rows[0] ?? null;
+  }
 
   return <FormPage title={`${agent.name} spend policy`} description="Published limits are applied to every paid request before signing.">
     {policy ? <>
