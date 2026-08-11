@@ -2,6 +2,21 @@ import "dotenv/config";
 
 import { db } from "../src/lib/db";
 
+function resourceServerBaseUrl() {
+  const raw = process.env.RESOURCE_SERVER_URL ?? "http://localhost:3200";
+  const url = new URL(raw);
+  if (process.env.APP_ENV === "production" && url.protocol !== "https:") {
+    throw new Error("RESOURCE_SERVER_URL must use HTTPS when seeding production");
+  }
+  return url.toString().replace(/\/$/, "");
+}
+
+function hederaProviderAccountId() {
+  const accountId = process.env.HEDERA_PROVIDER_ACCOUNT_ID ?? "0.0.9651458";
+  if (!/^0\.0\.\d+$/.test(accountId)) throw new Error("HEDERA_PROVIDER_ACCOUNT_ID must be a Hedera account ID");
+  return accountId;
+}
+
 async function main() {
   const networks = [
     { id: "hedera:testnet", family: "HEDERA" as const, chainReference: "testnet", displayName: "Hedera Testnet", nativeSymbol: "HBAR", explorerTxUrlTemplate: "https://hashscan.io/testnet/transaction/{txHash}", finalitySeconds: 5, requiredConfirmations: 1, testnet: true, enabled: true, supportsContracts: true },
@@ -16,7 +31,9 @@ async function main() {
   for (const network of networks) await db.chainNetwork.upsert({ where: { id: network.id }, update: network, create: network });
 
   for (const suffix of ["testnet", "mainnet"] as const) {
-    const usdcTokenId = suffix === "testnet" ? "0.0.429274" : "0.0.1456980";
+    const configuredTokenId = suffix === "testnet" ? process.env.HEDERA_USDC_TOKEN_ID : process.env.HEDERA_MAINNET_USDC_TOKEN_ID;
+    const usdcTokenId = configuredTokenId || (suffix === "testnet" ? "0.0.429274" : "0.0.1456980");
+    if (!/^0\.0\.\d+$/.test(usdcTokenId)) throw new Error(`Invalid Hedera ${suffix} USDC token ID`);
     await db.asset.upsert({
       where: { network_symbol: { network: `hedera:${suffix}`, symbol: "HBAR" } },
       update: { name: "Hedera", decimals: 8, verified: true, type: "NATIVE" },
@@ -41,66 +58,87 @@ async function main() {
   const arcUsdc = await db.asset.findUnique({ where: { network_symbol: { network: "eip155:5042002", symbol: "USDC" } } });
   if (!testnetHbar || !mainnetHbar) throw new Error("HBAR asset not found for one or both Hedera networks");
 
-  const hederaNetworkAssetSets: Array<{ hbar: { id: string }; usdc: { id: string } | null; network: string }> = [
-    { hbar: testnetHbar!, usdc: testnetUsdc, network: "hedera:testnet" },
-    { hbar: mainnetHbar!, usdc: mainnetUsdc, network: "hedera:mainnet" },
+  const hederaNetworkAssetSets: Array<{ hbar: { id: string }; usdc: { id: string } | null }> = [
+    { hbar: testnetHbar, usdc: testnetUsdc },
+    { hbar: mainnetHbar, usdc: mainnetUsdc },
   ];
 
+  const providerAccountId = hederaProviderAccountId();
   const provider = await db.resourceProvider.upsert({
     where: { id: "00000000-0000-0000-0000-000000000001" },
-    update: { name: "AgentPay Demo Provider", settlementAccountId: "0.0.9651458" },
-    create: {
-      id: "00000000-0000-0000-0000-000000000001",
-      name: "AgentPay Demo Provider",
-      settlementAccountId: "0.0.9651458",
+    update: {
+      name: "AgentPay Integration Fixtures",
+      description: "Platform-owned synthetic resources for validating AgentPay x402 payment flows. Payloads are not live market data, production inference, or live research.",
+      settlementAccountId: providerAccountId,
       settlementAccountVerified: true,
       status: "ACTIVE",
+      verificationStatus: "VERIFIED",
+      verifiedAt: new Date(),
+    },
+    create: {
+      id: "00000000-0000-0000-0000-000000000001",
+      name: "AgentPay Integration Fixtures",
+      description: "Platform-owned synthetic resources for validating AgentPay x402 payment flows. Payloads are not live market data, production inference, or live research.",
+      settlementAccountId: providerAccountId,
+      settlementAccountVerified: true,
+      status: "ACTIVE",
+      verificationStatus: "VERIFIED",
+      verifiedAt: new Date(),
     },
   });
 
+  const baseUrl = resourceServerBaseUrl();
   const resources = [
-    { slug: "eth-price", category: "MARKET_DATA" as const, name: "ETH/USD Price", description: "Latest Ethereum price with 24h change, high, and low", endpoint: "http://localhost:3200/v1/market-data/ETH" },
-    { slug: "btc-price", category: "MARKET_DATA" as const, name: "BTC/USD Price", description: "Latest Bitcoin price with 24h change, high, and low", endpoint: "http://localhost:3200/v1/market-data/BTC" },
-    { slug: "report-q2", category: "FILE" as const, name: "Q2 Market Report", description: "Confidential Q2 market analysis report", endpoint: "http://localhost:3200/v1/files/report-q2" },
-    { slug: "llama-inference", category: "AI_INFERENCE" as const, name: "LLaMA 3.2 Inference", description: "Run inference on LLaMA 3.2 with custom prompt", endpoint: "http://localhost:3200/v1/inference/llama-3.2" },
-    { slug: "web-research", category: "WEB_RESEARCH" as const, name: "Web Research Query", description: "Bounded web research with source metadata", endpoint: "http://localhost:3200/v1/research" },
+    { slug: "eth-price", category: "MARKET_DATA" as const, name: "ETH/USD Demo Snapshot", description: "Synthetic ETH/USD fixture for validating paid-resource flows; not live market data.", endpoint: `${baseUrl}/v1/market-data/ETH` },
+    { slug: "btc-price", category: "MARKET_DATA" as const, name: "BTC/USD Demo Snapshot", description: "Synthetic BTC/USD fixture for validating paid-resource flows; not live market data.", endpoint: `${baseUrl}/v1/market-data/BTC` },
+    { slug: "report-q2", category: "FILE" as const, name: "Demo Market Report", description: "Synthetic document fixture for validating paid file access; not a confidential or live report.", endpoint: `${baseUrl}/v1/files/report-q2` },
+    { slug: "llama-inference", category: "AI_INFERENCE" as const, name: "Simulated LLaMA Inference", description: "Simulated inference fixture for validating metered x402 flows; no model is called.", endpoint: `${baseUrl}/v1/inference/llama-3.2` },
+    { slug: "web-research", category: "WEB_RESEARCH" as const, name: "Simulated Web Research", description: "Synthetic research fixture for validating x402 flows; no live web retrieval occurs.", endpoint: `${baseUrl}/v1/research` },
   ];
 
-  for (const r of resources) {
+  for (const resource of resources) {
     const listing = await db.resourceListing.upsert({
-      where: { slug: r.slug },
-      update: { name: r.name, description: r.description, endpoint: r.endpoint, status: "ACTIVE", providerId: provider.id },
+      where: { slug: resource.slug },
+      update: {
+        name: resource.name,
+        description: resource.description,
+        endpoint: resource.endpoint,
+        status: "ACTIVE",
+        public: true,
+        providerId: provider.id,
+      },
       create: {
         providerId: provider.id,
-        slug: r.slug,
-        category: r.category,
-        name: r.name,
-        description: r.description,
-        endpoint: r.endpoint,
+        slug: resource.slug,
+        category: resource.category,
+        name: resource.name,
+        description: resource.description,
+        endpoint: resource.endpoint,
         inputSchema: {},
         outputContentTypes: ["application/json"],
         status: "ACTIVE",
+        public: true,
       },
     });
     for (const assets of hederaNetworkAssetSets) {
       await db.resourcePrice.upsert({
         where: { resourceListingId_assetId: { resourceListingId: listing.id, assetId: assets.hbar.id } },
-        update: { atomicAmount: 5000000 },
-        create: { resourceListingId: listing.id, assetId: assets.hbar.id, atomicAmount: 5000000 },
+        update: { atomicAmount: 5_000_000 },
+        create: { resourceListingId: listing.id, assetId: assets.hbar.id, atomicAmount: 5_000_000 },
       });
-      if (assets.usdc && (r.slug === "eth-price" || r.slug === "btc-price" || r.slug === "llama-inference")) {
+      if (assets.usdc && ["eth-price", "btc-price", "llama-inference"].includes(resource.slug)) {
         await db.resourcePrice.upsert({
           where: { resourceListingId_assetId: { resourceListingId: listing.id, assetId: assets.usdc.id } },
-          update: { atomicAmount: 1000000 },
-          create: { resourceListingId: listing.id, assetId: assets.usdc.id, atomicAmount: 1000000 },
+          update: { atomicAmount: 1_000_000 },
+          create: { resourceListingId: listing.id, assetId: assets.usdc.id, atomicAmount: 1_000_000 },
         });
       }
     }
-    if (arcUsdc) {
+    if (arcUsdc && ["eth-price", "btc-price", "llama-inference"].includes(resource.slug)) {
       await db.resourcePrice.upsert({
         where: { resourceListingId_assetId: { resourceListingId: listing.id, assetId: arcUsdc.id } },
-        update: { atomicAmount: 1000000 },
-        create: { resourceListingId: listing.id, assetId: arcUsdc.id, atomicAmount: 1000000 },
+        update: { atomicAmount: 1_000_000 },
+        create: { resourceListingId: listing.id, assetId: arcUsdc.id, atomicAmount: 1_000_000 },
       });
     }
   }
