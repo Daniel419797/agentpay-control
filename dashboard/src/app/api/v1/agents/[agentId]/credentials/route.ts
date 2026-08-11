@@ -44,7 +44,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     if (input.expiresAt && new Date(input.expiresAt) <= new Date()) return problem(422, "EXPIRY_INVALID", "Credential expiry must be in the future.");
     const environmentPrefix = getConfig().APP_ENV === "production" ? "ap_live_" : "ap_test_";
     const secret = `${environmentPrefix}${randomBytes(24).toString("base64url")}`;
-    const prefix = secret.slice(0, 14);
+    const prefix = secret.slice(0, 24);
     const credential = await db.$transaction(async (tx) => {
       const created = await tx.agentCredential.create({ data: { agentId, label: input.label, prefix, secretHash: createHash("sha256").update(secret).digest("hex"), scopes: input.scopes, expiresAt: input.expiresAt ? new Date(input.expiresAt) : undefined } });
       await tx.auditEvent.create({ data: { organizationId: workspace.organization.id, actorType: "USER", actorId: workspace.user.id, action: "AGENT_CREDENTIAL_CREATED", targetType: "AGENT_CREDENTIAL", targetId: created.id, result: "SUCCESS", metadata: { agentId, prefix, scopes: created.scopes } } });
