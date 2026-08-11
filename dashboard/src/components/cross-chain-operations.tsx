@@ -6,7 +6,13 @@ import { useMemo, useState } from "react";
 type AgentOption = { id: string; label: string; networkId: string; sourceAddress: string };
 type NetworkOption = { id: string; label: string };
 type Quote = { id: string; estimatedOutputAtomic: string; minimumOutputAtomic: string; expiresAt: string; provider: string };
-type Prepared = { transfer: { id: string }; transactionRequest: { to: string; data: string; value: string; chainId: number; gasLimit?: string }; expiresAt: string };
+type Prepared = {
+  transfer: { id: string };
+  transactionRequest: { to: string; data: string; value: string; chainId: number; gasLimit?: string };
+  expiresAt: string;
+  externalWalletControl: true;
+  emergencyStopBoundary: string;
+};
 
 async function request<T>(path: string, body: unknown, idempotent = false) {
   const response = await fetch(path, {
@@ -27,6 +33,7 @@ export function CrossChainOperations({ agents, networks }: { agents: AgentOption
   const [agentId, setAgentId] = useState(agents[0]?.id ?? "");
   const [quote, setQuote] = useState<Quote | null>(null);
   const [prepared, setPrepared] = useState<Prepared | null>(null);
+  const [acknowledgedExternalControl, setAcknowledgedExternalControl] = useState(false);
   const [busy, setBusy] = useState<"quote" | "prepare" | "submit" | null>(null);
   const [error, setError] = useState("");
   const agent = useMemo(() => agents.find((candidate) => candidate.id === agentId), [agentId, agents]);
@@ -38,6 +45,7 @@ export function CrossChainOperations({ agents, networks }: { agents: AgentOption
     setError("");
     setQuote(null);
     setPrepared(null);
+    setAcknowledgedExternalControl(false);
     const form = new FormData(event.currentTarget);
     try {
       setQuote(await request<Quote>("/api/v1/cross-chain/quotes", {
@@ -60,11 +68,11 @@ export function CrossChainOperations({ agents, networks }: { agents: AgentOption
   }
 
   async function prepare() {
-    if (!quote) return;
+    if (!quote || !acknowledgedExternalControl) return;
     setBusy("prepare");
     setError("");
     try {
-      setPrepared(await request<Prepared>(`/api/v1/cross-chain/quotes/${quote.id}/prepare`, {}, true));
+      setPrepared(await request<Prepared>(`/api/v1/cross-chain/quotes/${quote.id}/prepare`, { acknowledgeExternalWalletControl: true }, true));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The transfer could not be prepared.");
     } finally {
@@ -83,6 +91,7 @@ export function CrossChainOperations({ agents, networks }: { agents: AgentOption
       router.refresh();
       setQuote(null);
       setPrepared(null);
+      setAcknowledgedExternalControl(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The transaction hash could not be recorded.");
     } finally {
@@ -91,7 +100,7 @@ export function CrossChainOperations({ agents, networks }: { agents: AgentOption
   }
 
   return <section className="panel section-gap">
-    <div className="panel-header"><div><h2 className="panel-title">New bridge transfer</h2><p className="panel-description">Get a short-lived route, inspect the exact transaction, sign it in your wallet, then submit its hash for independent verification.</p></div></div>
+    <div className="panel-header"><div><h2 className="panel-title">New bridge transfer</h2><p className="panel-description">Get a short-lived route, inspect the exact transaction, export it to your self-custody wallet, then submit its hash for independent source and destination verification.</p></div></div>
     {error && <div className="form-error" role="alert">{error}</div>}
     {!agents.length && <div className="inline-notice">No active EVM agent account is available. Add an EVM account before requesting a bridge route.</div>}
     <form className="app-form" onSubmit={createQuote}>
@@ -115,9 +124,17 @@ export function CrossChainOperations({ agents, networks }: { agents: AgentOption
         <div><span>Minimum output</span><strong>{quote.minimumOutputAtomic}</strong></div>
         <div><span>Expires</span><strong>{new Date(quote.expiresAt).toLocaleTimeString()}</strong></div>
       </div>
-      {!prepared && <button className="secondary-button" type="button" disabled={Boolean(busy)} onClick={() => void prepare()}>{busy === "prepare" ? "Preparing…" : "Prepare wallet transaction"}</button>}
+      {!prepared && <>
+        <div className="inline-notice" role="note"><strong>Self-custody boundary.</strong> AgentPay can stop new transaction exports. After the raw transaction is exported to your external wallet, an AgentPay emergency stop cannot revoke that already-disclosed payload. Verify the target, calldata, value, and wallet network before signing.</div>
+        <label style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+          <input type="checkbox" checked={acknowledgedExternalControl} onChange={(event) => setAcknowledgedExternalControl(event.target.checked)} />
+          <span>I understand that my external wallet controls the transaction after AgentPay exports it.</span>
+        </label>
+        <button className="secondary-button" type="button" disabled={Boolean(busy) || !acknowledgedExternalControl} onClick={() => void prepare()}>{busy === "prepare" ? "Preparing…" : "Export wallet transaction"}</button>
+      </>}
     </div>}
     {prepared && <form className="app-form operation-review" onSubmit={submit}>
+      <div className="inline-notice" role="status"><strong>Transaction exported.</strong> {prepared.emergencyStopBoundary} This route expires at {new Date(prepared.expiresAt).toLocaleTimeString()}.</div>
       <div className="detail-grid">
         <div><span>Chain ID</span><strong>{prepared.transactionRequest.chainId}</strong></div>
         <div><span>Target</span><strong className="mono-value">{prepared.transactionRequest.to}</strong></div>
