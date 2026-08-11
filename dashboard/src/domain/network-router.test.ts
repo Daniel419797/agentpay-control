@@ -40,13 +40,21 @@ describe("network router", () => {
     expect(() => router.getRoute("hedera:mainnet")).toThrow(/NETWORK_UNSUPPORTED/);
   });
 
-  it("advertises mainnet when a production mainnet facilitator is configured", () => {
+  it("does not advertise a production mainnet URL without its signing credential", () => {
+    mockedGetConfig.mockReturnValue(config({
+      HEDERA_MAINNET_FACILITATOR_URL: "https://mainnet-facilitator.example/hedera",
+    }));
+    expect(getNetworkRouter().supportsNetwork("hedera:mainnet")).toBe(false);
+  });
+
+  it("advertises mainnet when a production mainnet facilitator and signing credential are configured", () => {
     mockedGetConfig.mockReturnValue(config({
       HEDERA_MAINNET_FACILITATOR_URL: "https://mainnet-facilitator.example/hedera",
       HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY: "mainnet-signing-key",
     }));
     const route = getNetworkRouter().getRoute("hedera:mainnet");
     expect(route.facilitatorUrl).toBe("https://mainnet-facilitator.example/hedera");
+    expect(route.facilitatorApiKey).toBe("mainnet-signing-key");
   });
 
   it("keeps localhost mainnet available for local development", () => {
