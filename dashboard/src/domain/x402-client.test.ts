@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createManagedPaymentPayload, discoverX402, fulfillX402Resource, parsePaymentRequired, selectRequirement } from "@/domain/x402-client";
+import { createManagedPaymentPayload, discoverX402, fulfillX402Resource, parsePaymentRequired, selectRequirement, X402SubmissionUnknownError } from "@/domain/x402-client";
 
 const challenge = parsePaymentRequired({
   x402Version: 2,
@@ -61,6 +61,38 @@ describe("x402 challenge binding", () => {
     const requirement = challenge.accepts[0]!;
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ code }, { status })));
     await expect(fulfillX402Resource("https://provider.example/v1/market-data/ETH", requirement, { x402Version: 2, accepted: requirement, payload: { transaction: "signed" } })).rejects.toThrow("X402_SUBMISSION_UNKNOWN");
+  });
+
+  it("preserves an Arc transaction hash returned with an ambiguous settlement", async () => {
+    const arc = parsePaymentRequired({
+      x402Version: 2,
+      resource: { url: "https://provider.example/v1/market-data/ETH" },
+      accepts: [{ scheme: "exact", network: "eip155:5042002", asset: "0x3600000000000000000000000000000000000000", amount: "1000000", payTo: "0x2222222222222222222222222222222222222222", maxTimeoutSeconds: 900, extra: { name: "USD Coin", version: "2", assetTransferMethod: "eip3009" } }],
+    });
+    const requirement = arc.accepts[0]!;
+    const transactionId = `0x${"a".repeat(64)}`;
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ code: "SETTLEMENT_UNKNOWN", network: requirement.network, transactionId }, { status: 503 })));
+
+    try {
+      await fulfillX402Resource("https://provider.example/v1/market-data/ETH", requirement, { x402Version: 2, accepted: requirement, payload: { transaction: "signed" } });
+      throw new Error("expected X402SubmissionUnknownError");
+    } catch (error) {
+      expect(error).toBeInstanceOf(X402SubmissionUnknownError);
+      expect((error as X402SubmissionUnknownError).candidateTransactionId).toBe(transactionId);
+    }
+  });
+
+  it("does not invent transaction evidence when an ambiguous response has none", async () => {
+    const requirement = challenge.accepts[0]!;
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ code: "FACILITATOR_ERROR" }, { status: 502 })));
+
+    try {
+      await fulfillX402Resource("https://provider.example/v1/market-data/ETH", requirement, { x402Version: 2, accepted: requirement, payload: { transaction: "signed" } });
+      throw new Error("expected X402SubmissionUnknownError");
+    } catch (error) {
+      expect(error).toBeInstanceOf(X402SubmissionUnknownError);
+      expect((error as X402SubmissionUnknownError).candidateTransactionId).toBeUndefined();
+    }
   });
 
   it("keeps a verified pre-settlement rejection deterministic", async () => {
