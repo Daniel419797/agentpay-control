@@ -24,4 +24,4 @@ COPY resource-server/package.json ./resource-server/package.json
 USER node
 WORKDIR /app/resource-server
 EXPOSE 3200
-CMD ["node", "dist/index.js"]
+CMD ["npm", "start"]
