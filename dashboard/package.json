@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": false,
   "license": "MIT",
-  "description": "Policy-controlled payment OS for autonomous software agents using x402 standard on Hedera and Arc rails",
+  "description": "Policy-controlled x402 payment OS for autonomous software agents across Hedera, Arc and Cardano",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Daniel419797/agentpay-control.git"
