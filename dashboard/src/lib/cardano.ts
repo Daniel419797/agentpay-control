@@ -50,7 +50,7 @@ export type CardanoTransactionEvidence = {
   transactionHash: string;
   confirmations: number;
   validContract: boolean;
-  inputAddresses: string[];
+  inputs: Array<{ address: string; amount: Array<{ unit: string; quantity: string }> }>;
   outputs: Array<{ address: string; amount: Array<{ unit: string; quantity: string }> }>;
 };
 
@@ -71,9 +71,13 @@ export async function cardanoTransactionEvidence(network: CardanoNetwork, transa
     transactionHash,
     confirmations: latest.height - tx.block_height + 1,
     validContract: tx.valid_contract !== false,
-    inputAddresses: io.inputs.map((input) => input.address),
+    inputs: io.inputs,
     outputs: io.outputs,
   };
+}
+
+function isAdaOnly(amounts: Array<{ unit: string; quantity: string }>) {
+  return amounts.length > 0 && amounts.every((amount) => amount.unit === "lovelace");
 }
 
 export function cardanoExactPaymentMatches(
@@ -83,12 +87,14 @@ export function cardanoExactPaymentMatches(
   asset: string,
   amountAtomic: string,
 ) {
-  if (!evidence.validContract) return false;
-  if (evidence.inputAddresses.length === 0 || evidence.inputAddresses.some((address) => address !== payerAddress)) return false;
+  if (!evidence.validContract || asset !== "lovelace") return false;
+  if (evidence.inputs.length === 0 || evidence.inputs.some((input) => input.address !== payerAddress || !isAdaOnly(input.amount))) return false;
   let paid = 0n;
   for (const output of evidence.outputs) {
+    if (!isAdaOnly(output.amount)) return false;
+    if (output.address !== payeeAddress && output.address !== payerAddress) return false;
     if (output.address !== payeeAddress) continue;
-    for (const amount of output.amount) if (amount.unit === asset) paid += BigInt(amount.quantity);
+    for (const amount of output.amount) paid += BigInt(amount.quantity);
   }
   return paid === BigInt(amountAtomic);
 }
