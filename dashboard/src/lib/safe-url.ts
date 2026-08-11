@@ -20,8 +20,7 @@ function isPrivateIpv6(address: string) {
   return normalized === "::" || normalized === "::1" ||
     normalized.startsWith("::ffff:") || normalized.startsWith("0:0:0:0:0:ffff:") ||
     normalized.startsWith("fc") || normalized.startsWith("fd") ||
-    normalized.startsWith("fe8") || normalized.startsWith("fe9") ||
-    normalized.startsWith("fea") || normalized.startsWith("feb") ||
+    normalized.startsWith("fe") ||
     normalized.startsWith("ff");
 }
 
