@@ -4,6 +4,7 @@ import { getCardProvider } from "@/domain/card-provider";
 import { boundedJson, handleApiError, ok, problem } from "@/lib/api";
 import { getConfig } from "@/lib/config";
 import { db } from "@/lib/db";
+import { hasRecentAuthentication } from "@/lib/session";
 import { workspaceFromRequest, workspaceHasRole } from "@/lib/workspace";
 
 const addressSchema = z.object({
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
     const workspace = await workspaceFromRequest(request);
     if (!workspace) return problem(401, "AUTH_REQUIRED", "Sign in before creating a cardholder.");
     if (!workspaceHasRole(workspace, ["OWNER", "OPERATOR"])) return problem(403, "ROLE_REQUIRED", "Owner or operator access is required.");
+    if (!hasRecentAuthentication(workspace.session)) return problem(428, "STEP_UP_REQUIRED", "Sign in again before provisioning a cardholder.");
     if (workspace.organization.killSwitchEnabled) return problem(409, "ORGANIZATION_KILL_SWITCH_ENABLED", "The organization emergency stop is active. New cardholder provisioning is disabled.");
     const idempotencyKey = request.headers.get("idempotency-key");
     if (!idempotencyKey || idempotencyKey.length < 8 || idempotencyKey.length > 100) return problem(400, "IDEMPOTENCY_KEY_REQUIRED", "Provide an Idempotency-Key header between 8 and 100 characters.");
