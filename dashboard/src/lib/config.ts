@@ -3,6 +3,8 @@ import { z } from "zod";
 const optionalUrl = z.string().url().optional().or(z.literal(""));
 const hederaAccountId = /^0\.0\.\d+$/;
 const evmAddress = /^0x[0-9a-fA-F]{40}$/;
+const cardanoPreprodAddress = /^addr_test1[0-9a-z]+$/;
+const cardanoMainnetAddress = /^addr1[0-9a-z]+$/;
 const appEnvironments = ["development", "test", "production"] as const;
 
 const envSchema = z.object({
@@ -37,6 +39,22 @@ const envSchema = z.object({
   ARC_PROVIDER_ADDRESS: z.string().regex(evmAddress).transform((value) => value.toLowerCase()).optional(),
   ARC_PAYER_ADDRESS: z.string().regex(evmAddress).transform((value) => value.toLowerCase()).optional(),
   ARC_USDC_ADDRESS: z.string().regex(evmAddress).transform((value) => value.toLowerCase()).default("0x3600000000000000000000000000000000000000"),
+  CARDANO_PREPROD_FACILITATOR_URL: optionalUrl,
+  CARDANO_PREPROD_FACILITATOR_API_KEY: z.string().min(32).optional(),
+  CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY: z.string().min(32).optional(),
+  CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
+  CARDANO_PREPROD_PAYER_ADDRESS: z.string().regex(cardanoPreprodAddress).optional(),
+  CARDANO_PREPROD_PROVIDER_ADDRESS: z.string().regex(cardanoPreprodAddress).optional(),
+  CARDANO_PREPROD_BLOCKFROST_URL: z.string().url().default("https://cardano-preprod.blockfrost.io/api/v0"),
+  CARDANO_PREPROD_BLOCKFROST_PROJECT_ID: z.string().min(20).optional(),
+  CARDANO_MAINNET_FACILITATOR_URL: optionalUrl,
+  CARDANO_MAINNET_FACILITATOR_API_KEY: z.string().min(32).optional(),
+  CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY: z.string().min(32).optional(),
+  CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
+  CARDANO_MAINNET_PAYER_ADDRESS: z.string().regex(cardanoMainnetAddress).optional(),
+  CARDANO_MAINNET_PROVIDER_ADDRESS: z.string().regex(cardanoMainnetAddress).optional(),
+  CARDANO_MAINNET_BLOCKFROST_URL: z.string().url().default("https://cardano-mainnet.blockfrost.io/api/v0"),
+  CARDANO_MAINNET_BLOCKFROST_PROJECT_ID: z.string().min(20).optional(),
   X402_NETWORK: z.string().default("hedera:testnet"),
   KEY_ENCRYPTION_MASTER_KEY: z.string().min(32).optional(),
   RESEND_API_KEY: z.string().optional(),
@@ -95,6 +113,19 @@ function assertDistinctSecrets(entries: Array<[string, string | undefined]>, err
   }
 }
 
+function cardanoRailRequested(values: Array<string | undefined>) {
+  return values.some(Boolean);
+}
+
+function requireCardanoRail(
+  label: string,
+  values: Array<[string, string | undefined]>,
+  errors: string[],
+) {
+  if (!cardanoRailRequested(values.map(([, value]) => value))) return;
+  for (const [name, value] of values) if (!value) errors.push(`${label}: ${name}`);
+}
+
 export function productionConfigErrors(config: AppConfig): string[] {
   if (config.APP_ENV !== "production") return [];
 
@@ -104,6 +135,10 @@ export function productionConfigErrors(config: AppConfig): string[] {
   requireHttps("ARC_FACILITATOR_URL", config.ARC_FACILITATOR_URL, errors);
   requireHttps("HEDERA_MAINNET_FACILITATOR_URL", config.HEDERA_MAINNET_FACILITATOR_URL, errors);
   requireHttps("ARC_RPC_URL", config.ARC_RPC_URL, errors);
+  requireHttps("CARDANO_PREPROD_FACILITATOR_URL", config.CARDANO_PREPROD_FACILITATOR_URL, errors);
+  requireHttps("CARDANO_MAINNET_FACILITATOR_URL", config.CARDANO_MAINNET_FACILITATOR_URL, errors);
+  requireHttps("CARDANO_PREPROD_BLOCKFROST_URL", config.CARDANO_PREPROD_BLOCKFROST_URL, errors);
+  requireHttps("CARDANO_MAINNET_BLOCKFROST_URL", config.CARDANO_MAINNET_BLOCKFROST_URL, errors);
   requireHttps("SUPABASE_URL", config.SUPABASE_URL, errors);
 
   if (config.AUTH_SECRET === "development-only-secret-change-before-deploy") errors.push("AUTH_SECRET");
@@ -130,6 +165,23 @@ export function productionConfigErrors(config: AppConfig): string[] {
   if (!config.SUPABASE_URL || !config.SUPABASE_ANON_KEY) errors.push("SUPABASE_URL / SUPABASE_ANON_KEY");
   if (config.HEDERA_OPERATOR_ID || config.HEDERA_OPERATOR_KEY) errors.push("Hedera operator credentials must be held only by the facilitator");
 
+  requireCardanoRail("Cardano Preprod", [
+    ["CARDANO_PREPROD_FACILITATOR_URL", config.CARDANO_PREPROD_FACILITATOR_URL],
+    ["CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY", config.CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY],
+    ["CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY", config.CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY],
+    ["CARDANO_PREPROD_PAYER_ADDRESS", config.CARDANO_PREPROD_PAYER_ADDRESS],
+    ["CARDANO_PREPROD_PROVIDER_ADDRESS", config.CARDANO_PREPROD_PROVIDER_ADDRESS],
+    ["CARDANO_PREPROD_BLOCKFROST_PROJECT_ID", config.CARDANO_PREPROD_BLOCKFROST_PROJECT_ID],
+  ], errors);
+  requireCardanoRail("Cardano Mainnet", [
+    ["CARDANO_MAINNET_FACILITATOR_URL", config.CARDANO_MAINNET_FACILITATOR_URL],
+    ["CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY", config.CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY],
+    ["CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY", config.CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY],
+    ["CARDANO_MAINNET_PAYER_ADDRESS", config.CARDANO_MAINNET_PAYER_ADDRESS],
+    ["CARDANO_MAINNET_PROVIDER_ADDRESS", config.CARDANO_MAINNET_PROVIDER_ADDRESS],
+    ["CARDANO_MAINNET_BLOCKFROST_PROJECT_ID", config.CARDANO_MAINNET_BLOCKFROST_PROJECT_ID],
+  ], errors);
+
   assertDistinctSecrets([
     ["FACILITATOR_SIGNING_API_KEY", config.FACILITATOR_SIGNING_API_KEY],
     ["FACILITATOR_SETTLEMENT_API_KEY", config.FACILITATOR_SETTLEMENT_API_KEY],
@@ -138,6 +190,10 @@ export function productionConfigErrors(config: AppConfig): string[] {
     ["HEDERA_MAINNET_FACILITATOR_CONTRACT_API_KEY", config.HEDERA_MAINNET_FACILITATOR_CONTRACT_API_KEY],
     ["ARC_FACILITATOR_SIGNING_API_KEY", config.ARC_FACILITATOR_SIGNING_API_KEY],
     ["ARC_FACILITATOR_CONTRACT_API_KEY", config.ARC_FACILITATOR_CONTRACT_API_KEY],
+    ["CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY", config.CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY],
+    ["CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY", config.CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY],
+    ["CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY", config.CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY],
+    ["CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY", config.CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY],
   ], errors);
 
   if (config.VIRTUAL_CARDS_ENABLED) {
