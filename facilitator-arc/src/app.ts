@@ -77,30 +77,30 @@ export function createArcApp(env: ArcFacilitatorEnv): { app: Hono; network: stri
       return c.json({ success: false, errorReason: "invalid_request", errorMessage: failure.code }, failure.status);
     }
 
-    facilitator.beginSettlementEvidenceCapture();
     try {
-      const result = await facilitator.scheme.settle(body.paymentPayload, body.paymentRequirements);
-      const submittedTransaction = facilitator.settlementTransactionCandidate;
-      if (!result.success && !result.transaction && submittedTransaction) {
+      const captured = await facilitator.captureSettlementEvidence(() => facilitator.scheme.settle(body.paymentPayload, body.paymentRequirements));
+      const result = captured.result;
+      const evidence = result.transaction || captured.transactionId;
+      if (!result.success && evidence) {
         logFailure("settlement_confirmation_unknown", new Error(result.errorReason ?? "SETTLEMENT_CONFIRMATION_UNKNOWN"));
         return c.json({
           ...result,
           success: false,
-          transaction: submittedTransaction,
-          transactionId: submittedTransaction,
+          transaction: evidence,
+          transactionId: evidence,
           errorReason: "settlement_unknown",
           errorMessage: result.errorMessage ?? "SETTLEMENT_CONFIRMATION_UNKNOWN",
           network: facilitator.network,
         }, 503);
       }
-      return c.json(result);
+      return result.success
+        ? c.json({ ...result, network: result.network ?? facilitator.network })
+        : c.json({ ...result, network: result.network ?? facilitator.network }, 422);
     } catch (error) {
-      const submittedTransaction = facilitator.settlementTransactionCandidate;
       logFailure("settlement_submission_unknown", error);
       return c.json({
         success: false,
-        transaction: submittedTransaction ?? "",
-        ...(submittedTransaction ? { transactionId: submittedTransaction } : {}),
+        transaction: "",
         network: facilitator.network,
         errorReason: "settlement_unknown",
         errorMessage: "SETTLEMENT_SUBMISSION_UNKNOWN",
