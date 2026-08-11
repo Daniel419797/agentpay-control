@@ -2,14 +2,14 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { createHederaApp, parseHederaEnv } from "@agentpay/hedera-facilitator/app";
 import { createArcApp, parseArcEnv } from "@agentpay/arc-facilitator/app";
-import { createCardanoApp, parseCardanoEnv } from "./cardano.js";
+import { createCardanoNativeApp, parseCardanoNativeEnv } from "./cardano-native.js";
 import { networkEnv, parseCombinedEnv } from "./env.js";
 
 const env = parseCombinedEnv();
 
 const hedera = createHederaApp(parseHederaEnv(networkEnv(process.env, env, "hedera")));
 const arc = createArcApp(parseArcEnv(networkEnv(process.env, env, "arc")));
-const cardano = createCardanoApp(parseCardanoEnv(networkEnv(process.env, env, "cardano")));
+const cardano = createCardanoNativeApp(parseCardanoNativeEnv(networkEnv(process.env, env, "cardano")));
 
 const app = new Hono();
 
