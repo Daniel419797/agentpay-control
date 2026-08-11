@@ -10,11 +10,11 @@ export async function GET(request: Request) {
     const cookieName = isSecure ? "__Host-agentpay_oauth" : "agentpay_oauth";
     const stored = request.headers.get("cookie")?.match(new RegExp(`(?:^|;\\s*)${cookieName}=([^;]+)`))?.[1];
     const separator = stored?.lastIndexOf(".") ?? -1;
-    const verifier = separator > 0 ? stored?.slice(0, separator) : stored;
+    const verifier = separator > 0 ? stored?.slice(0, separator) : undefined;
     const expectedState = separator > 0 ? stored?.slice(separator + 1) : undefined;
     const secure = isSecure ? "; Secure" : "";
     const clearCookie = `${cookieName}=; Path=/; HttpOnly; SameSite=Lax${secure}; Max-Age=0`;
-    if (!code || !verifier || (expectedState && state !== expectedState)) {
+    if (!code || !state || !verifier || !expectedState || state !== expectedState) {
       return new Response(null, { status: 303, headers: { location: new URL("/sign-in?error=oauth_state", request.url).toString(), "set-cookie": clearCookie } });
     }
     const config = supabaseAuthConfig();
