@@ -7,6 +7,7 @@ import "./production-preflight.js";
 import { parseEnabledNetworks, requiresNetwork } from "./network-selection.js";
 import { boundedJson, sameRequirement } from "./security.js";
 import { decodeX402Header, encodeX402Header } from "./x402-headers.js";
+import { cardanoRequirementExtra, optionalCardanoAssetUnit } from "./cardano-requirements.js";
 
 const env = z.object({
   APP_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -33,8 +34,13 @@ const env = z.object({
   ARC_USDC_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   CARDANO_PREPROD_PROVIDER_ADDRESS: z.string().regex(/^addr_test1[0-9a-z]+$/).optional(),
   CARDANO_MAINNET_PROVIDER_ADDRESS: z.string().regex(/^addr1[0-9a-z]+$/).optional(),
+  CARDANO_PREPROD_USDCX_ASSET_ID: z.string().optional(),
+  CARDANO_MAINNET_USDCX_ASSET_ID: z.string().optional(),
+  CARDANO_USDCX_RESOURCE_PRICE_ATOMIC: z.string().regex(/^[1-9]\d*$/).default("1000000"),
 }).parse(process.env);
 
+const cardanoPreprodUsdcx = optionalCardanoAssetUnit("CARDANO_PREPROD_USDCX_ASSET_ID", env.CARDANO_PREPROD_USDCX_ASSET_ID);
+const cardanoMainnetUsdcx = optionalCardanoAssetUnit("CARDANO_MAINNET_USDCX_ASSET_ID", env.CARDANO_MAINNET_USDCX_ASSET_ID);
 const enabledNetworks = parseEnabledNetworks(env.ENABLED_NETWORKS);
 if (env.APP_ENV === "production") {
   if (requiresNetwork(enabledNetworks, "hedera:testnet") && !env.FACILITATOR_SETTLEMENT_API_KEY) throw new Error("Production Hedera testnet settlement API key is required");
@@ -51,6 +57,7 @@ const CardanoPreprod = { caip2: "cardano:preprod", providerAddress: env.CARDANO_
 const CardanoMainnet = { caip2: "cardano:mainnet", providerAddress: env.CARDANO_MAINNET_PROVIDER_ADDRESS ?? "", explorerUrl: "https://cardanoscan.io/transaction", facilitatorUrl: env.CARDANO_MAINNET_FACILITATOR_URL };
 
 type NetworkConfig = { caip2: string; facilitatorUrl: string; explorerUrl: string };
+type AssetPrice = { type: "NATIVE" | "TOKEN"; amount: string; assetId: string; decimals: number; symbol: string };
 const configuredNetworks: Record<string, NetworkConfig> = {
   [HederaTestnet.caip2]: HederaTestnet,
   [HederaMainnet.caip2]: HederaMainnet,
@@ -60,9 +67,8 @@ const configuredNetworks: Record<string, NetworkConfig> = {
 };
 const networks = Object.fromEntries(Object.entries(configuredNetworks).filter(([network]) => enabledNetworks.has(network as never))) as Record<string, NetworkConfig>;
 
-type AssetPrice = { type: "NATIVE" | "TOKEN"; amount: string; assetId: string; decimals: number; symbol: string };
 const requirementSchema = z.object({
-  scheme: z.literal("exact"), network: z.string().min(1), amount: z.string().regex(/^\d+$/), payTo: z.string().min(1), asset: z.string().min(1), maxTimeoutSeconds: z.number().int().positive().max(3600), extra: z.record(z.string(), z.unknown()).default({}),
+  scheme: z.literal("exact"), network: z.string().min(1), amount: z.string().regex(/^[1-9]\d*$/), payTo: z.string().min(1), asset: z.string().min(1), maxTimeoutSeconds: z.number().int().positive().max(3600), extra: z.record(z.string(), z.unknown()).default({}),
 });
 const paymentPayloadSchema = z.object({ x402Version: z.literal(2), accepted: requirementSchema, payload: z.record(z.string(), z.unknown()) }).passthrough();
 const settlementResponseSchema = z.object({
@@ -78,13 +84,21 @@ const hederaMainnetPrices: Record<string, AssetPrice> = {
   hbar: { type: "NATIVE", amount: "5000000", assetId: "0.0.0", decimals: 8, symbol: "HBAR" },
   usdc: { type: "TOKEN", amount: "1000000", assetId: HederaMainnet.usdcTokenId, decimals: 6, symbol: "USDC" },
 };
-const cardanoPrices: Record<string, AssetPrice> = { ada: { type: "NATIVE", amount: "1000000", assetId: "lovelace", decimals: 6, symbol: "ADA" } };
+const cardanoPreprodPrices: Record<string, AssetPrice> = {
+  ada: { type: "NATIVE", amount: "1000000", assetId: "lovelace", decimals: 6, symbol: "ADA" },
+  ...(cardanoPreprodUsdcx ? { usdcx: { type: "TOKEN" as const, amount: env.CARDANO_USDCX_RESOURCE_PRICE_ATOMIC, assetId: cardanoPreprodUsdcx, decimals: 6, symbol: "USDCX" } } : {}),
+};
+const cardanoMainnetPrices: Record<string, AssetPrice> = {
+  ada: { type: "NATIVE", amount: "1000000", assetId: "lovelace", decimals: 6, symbol: "ADA" },
+  ...(cardanoMainnetUsdcx ? { usdcx: { type: "TOKEN" as const, amount: env.CARDANO_USDCX_RESOURCE_PRICE_ATOMIC, assetId: cardanoMainnetUsdcx, decimals: 6, symbol: "USDCX" } } : {}),
+};
 
 function getNetworkConfig(network: string): NetworkConfig | undefined { return networks[network]; }
 function pricesForNetwork(network: string): Record<string, AssetPrice> {
   if (network === ARCTestnet.caip2) return arcPrices;
   if (network === HederaMainnet.caip2) return hederaMainnetPrices;
-  if (network === CardanoPreprod.caip2 || network === CardanoMainnet.caip2) return cardanoPrices;
+  if (network === CardanoPreprod.caip2) return cardanoPreprodPrices;
+  if (network === CardanoMainnet.caip2) return cardanoMainnetPrices;
   return hederaTestnetPrices;
 }
 function payeeForNetwork(network: string): string {
@@ -94,7 +108,7 @@ function payeeForNetwork(network: string): string {
   if (network === CardanoMainnet.caip2) return CardanoMainnet.providerAddress;
   return HederaTestnet.providerAccountId;
 }
-function requirementsForNetwork(network: string) {
+function requirementsForNetwork(network: string, resourceUrl: string) {
   const isArc = network === ARCTestnet.caip2;
   const isCardano = network === CardanoPreprod.caip2 || network === CardanoMainnet.caip2;
   const networkComplete = isArc || isCardano || Boolean(env.FACILITATOR_FEE_PAYER_ID);
@@ -102,14 +116,14 @@ function requirementsForNetwork(network: string) {
   const extra = isArc
     ? { name: "USD Coin", version: "2", assetTransferMethod: "eip3009" }
     : isCardano
-      ? { assetTransferMethod: "default", submissionPolicy: "server", confirmationPolicy: { l1Confirmations: 1 }, areFeesSponsored: false }
+      ? cardanoRequirementExtra(resourceUrl)
       : { feePayer: env.FACILITATOR_FEE_PAYER_ID! };
   return Object.values(pricesForNetwork(network))
     .filter((price) => price.assetId.length > 0 && payeeForNetwork(network).length > 0)
     .map((price) => ({ scheme: "exact" as const, network, amount: price.amount, payTo: payeeForNetwork(network), asset: price.assetId, maxTimeoutSeconds: 900, extra }));
 }
 function paymentRequirements(resourceUrl: string) {
-  const accepts = Object.keys(networks).flatMap(requirementsForNetwork);
+  const accepts = Object.keys(networks).flatMap((network) => requirementsForNetwork(network, resourceUrl));
   if (!accepts.length) throw new Error("PAYMENT_ASSET_NOT_CONFIGURED");
   return { x402Version: 2, accepts, resource: { url: resourceUrl, description: "AgentPay x402 demonstration resource", mimeType: "application/json", serviceName: "AgentPay Resource Server" } };
 }
@@ -120,8 +134,10 @@ const sharedPrices = [
   { asset: "HBAR", atomicAmount: hederaMainnetPrices.hbar.amount, network: HederaMainnet.caip2, assetId: hederaMainnetPrices.hbar.assetId },
   { asset: "USDC", atomicAmount: hederaMainnetPrices.usdc.amount, network: HederaMainnet.caip2, assetId: hederaMainnetPrices.usdc.assetId },
   { asset: "USDC", atomicAmount: arcPrices.usdc.amount, network: ARCTestnet.caip2, assetId: arcPrices.usdc.assetId },
-  { asset: "ADA", atomicAmount: cardanoPrices.ada.amount, network: CardanoPreprod.caip2, assetId: cardanoPrices.ada.assetId },
-  { asset: "ADA", atomicAmount: cardanoPrices.ada.amount, network: CardanoMainnet.caip2, assetId: cardanoPrices.ada.assetId },
+  { asset: "ADA", atomicAmount: cardanoPreprodPrices.ada.amount, network: CardanoPreprod.caip2, assetId: cardanoPreprodPrices.ada.assetId },
+  { asset: "ADA", atomicAmount: cardanoMainnetPrices.ada.amount, network: CardanoMainnet.caip2, assetId: cardanoMainnetPrices.ada.assetId },
+  ...(cardanoPreprodUsdcx ? [{ asset: "USDCX", atomicAmount: env.CARDANO_USDCX_RESOURCE_PRICE_ATOMIC, network: CardanoPreprod.caip2, assetId: cardanoPreprodUsdcx }] : []),
+  ...(cardanoMainnetUsdcx ? [{ asset: "USDCX", atomicAmount: env.CARDANO_USDCX_RESOURCE_PRICE_ATOMIC, network: CardanoMainnet.caip2, assetId: cardanoMainnetUsdcx }] : []),
 ].filter((price) => enabledNetworks.has(price.network as never) && price.assetId.length > 0 && (!price.network.startsWith("hedera:") || Boolean(env.FACILITATOR_FEE_PAYER_ID)) && payeeForNetwork(price.network).length > 0).map(({ assetId: _assetId, ...price }) => price);
 const hederaCatalogPrices = sharedPrices.filter((price) => price.network.startsWith("hedera:"));
 
@@ -153,9 +169,10 @@ function getSettlementApiKey(network: string): string | undefined {
   if (network === CardanoMainnet.caip2) return env.CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_API_KEY;
   return env.FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_API_KEY;
 }
+function networkReady(network: string) { return payeeForNetwork(network).length > 0 && Object.values(pricesForNetwork(network)).some((price) => price.assetId.length > 0); }
 
 const app = new Hono();
-app.get("/health", (c: Context) => c.json({ status: "ok", networks: Object.keys(networks).filter((network) => requirementsForNetwork(network).length > 0), resourceMode: "DEMO_SYNTHETIC" }));
+app.get("/health", (c: Context) => c.json({ status: "ok", networks: Object.keys(networks).filter(networkReady), resourceMode: "DEMO_SYNTHETIC", cardanoAssets: { preprod: Object.values(cardanoPreprodPrices).map((price) => price.symbol), mainnet: Object.values(cardanoMainnetPrices).map((price) => price.symbol) } }));
 app.get("/catalog", (c: Context) => c.json(catalog));
 
 async function handlePaidRequest(c: Context, category: string, resourceId: string, data: unknown) {
@@ -177,7 +194,7 @@ async function handlePaidRequest(c: Context, category: string, resourceId: strin
   }
 
   const matchingCanonical = canonical.accepts.find((req) => sameRequirement(payload.accepted, req));
-  if (!matchingCanonical) return c.json({ code: "PAYMENT_REQUIREMENT_MISMATCH", message: "The signed payment does not match this resource price and payee." }, 402);
+  if (!matchingCanonical) return c.json({ code: "PAYMENT_REQUIREMENT_MISMATCH", message: "The signed payment does not match this exact resource, price, asset, and payee." }, 402);
   const network = matchingCanonical.network;
   const facilitatorUrl = getFacilitatorForNetwork(network);
   if (!facilitatorUrl) return c.json({ code: "NETWORK_UNSUPPORTED", message: `Network ${network} is not supported` }, 422);
@@ -187,13 +204,13 @@ async function handlePaidRequest(c: Context, category: string, resourceId: strin
 
   try {
     const verifyRes = await fetch(`${facilitatorUrl.replace(/\/$/, "")}/verify`, {
-      method: "POST", headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(settlementApiKey ? { authorization: `Bearer ${settlementApiKey}` } : {}) }, body: JSON.stringify(verifyBody), signal: AbortSignal.timeout(15_000),
+      method: "POST", headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(settlementApiKey ? { authorization: `Bearer ${settlementApiKey}` } : {}) }, body: JSON.stringify(verifyBody), signal: AbortSignal.timeout(15_000), redirect: "error",
     });
     const verifyResult = await verifyRes.json().catch(() => ({})) as { isValid?: boolean; invalidReason?: string };
     if (!verifyRes.ok || verifyResult.isValid !== true) return c.json({ code: "PAYMENT_INVALID", message: verifyResult.invalidReason || "Payment verification failed" }, 402);
 
     const settleRes = await fetch(`${facilitatorUrl.replace(/\/$/, "")}/settle`, {
-      method: "POST", headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(settlementApiKey ? { authorization: `Bearer ${settlementApiKey}` } : {}) }, body: JSON.stringify(verifyBody), signal: AbortSignal.timeout(75_000),
+      method: "POST", headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(settlementApiKey ? { authorization: `Bearer ${settlementApiKey}` } : {}) }, body: JSON.stringify(verifyBody), signal: AbortSignal.timeout(75_000), redirect: "error",
     });
     const rawSettlement = await settleRes.json().catch(() => ({}));
     const parsedSettlement = settlementResponseSchema.safeParse(rawSettlement);
