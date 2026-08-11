@@ -3,8 +3,7 @@ import { z } from "zod";
 import { catalystEvidenceTypes, releaseEvidenceHash } from "@/lib/catalyst-release";
 import { boundedJson, handleApiError, ok, problem } from "@/lib/api";
 import { db } from "@/lib/db";
-import { hasRecentAuthentication } from "@/lib/session";
-import { workspaceFromRequest, workspaceHasRole } from "@/lib/workspace";
+import { authorizeReleaseEvidenceRequest } from "@/lib/release-evidence-auth";
 
 const evidenceType = z.enum(catalystEvidenceTypes);
 const schema = z.object({
@@ -37,34 +36,30 @@ function validateEvidence(input: z.infer<typeof schema>) {
 
 export async function GET(request: Request) {
   try {
-    const workspace = await workspaceFromRequest(request);
-    if (!workspace) return problem(401, "AUTH_REQUIRED", "Sign in before viewing release evidence.");
-    if (!workspaceHasRole(workspace, ["OWNER", "OPERATOR", "APPROVER", "VIEWER"])) return problem(403, "ROLE_REQUIRED", "Workspace access is required.");
+    if (!authorizeReleaseEvidenceRequest(request)) return problem(401, "UNAUTHORIZED", "A dedicated release-evidence credential is required.");
     const releaseSha = new URL(request.url).searchParams.get("releaseSha") ?? process.env.RELEASE_SHA ?? "";
     if (!/^[0-9a-f]{40}$/.test(releaseSha)) return problem(422, "RELEASE_SHA_REQUIRED", "Provide the exact 40-character release SHA.");
     const rows = await db.$queryRaw<Array<Record<string, unknown>>>`
-      SELECT "releaseSha","evidenceType","network","asset","transactionId","evidenceHash","evidence","verifiedBy","verifiedAt"
+      SELECT "releaseSha","evidenceType","network","asset","transactionId","evidenceHash","evidence","verifiedAt"
       FROM "ProductionReleaseEvidence" WHERE "releaseSha"=${releaseSha} ORDER BY "evidenceType" ASC
     `;
-    return ok({ releaseSha, evidence: rows });
+    return ok({ releaseSha, evidence: rows.map((row) => ({ ...row, network: row.network === "" ? null : row.network, asset: row.asset === "" ? null : row.asset })) });
   } catch (error) { return handleApiError(error); }
 }
 
 export async function POST(request: Request) {
   try {
-    const workspace = await workspaceFromRequest(request);
-    if (!workspace) return problem(401, "AUTH_REQUIRED", "Sign in before recording release evidence.");
-    if (!workspaceHasRole(workspace, ["OWNER"])) return problem(403, "ROLE_REQUIRED", "Owner access is required to attest release evidence.");
-    if (!hasRecentAuthentication(workspace.session)) return problem(428, "STEP_UP_REQUIRED", "Sign in again before attesting production release evidence.");
+    if (!authorizeReleaseEvidenceRequest(request)) return problem(401, "UNAUTHORIZED", "A dedicated release-evidence credential is required.");
     const input = schema.parse(await boundedJson(request, 128 * 1024));
     validateEvidence(input);
-    const evidenceHash = releaseEvidenceHash({ releaseSha: input.releaseSha, evidenceType: input.evidenceType, network: input.network ?? null, asset: input.asset ?? null, transactionId: input.transactionId ?? null, evidence: input.evidence });
+    const network = input.network ?? "";
+    const asset = input.asset ?? "";
+    const evidenceHash = releaseEvidenceHash({ releaseSha: input.releaseSha, evidenceType: input.evidenceType, network: network || null, asset: asset || null, transactionId: input.transactionId ?? null, evidence: input.evidence });
     await db.$executeRaw`
       INSERT INTO "ProductionReleaseEvidence" ("id","releaseSha","evidenceType","network","asset","transactionId","evidenceHash","evidence","verifiedBy","verifiedAt","createdAt")
-      VALUES (gen_random_uuid(),${input.releaseSha},${input.evidenceType},${input.network ?? null},${input.asset ?? null},${input.transactionId ?? null},${evidenceHash},${JSON.stringify(input.evidence)}::jsonb,${workspace.user.id}::uuid,now(),now())
-      ON CONFLICT ("releaseSha","evidenceType","network","asset") DO UPDATE SET "transactionId"=EXCLUDED."transactionId","evidenceHash"=EXCLUDED."evidenceHash","evidence"=EXCLUDED."evidence","verifiedBy"=EXCLUDED."verifiedBy","verifiedAt"=now()
+      VALUES (gen_random_uuid(),${input.releaseSha},${input.evidenceType},${network},${asset},${input.transactionId ?? null},${evidenceHash},${JSON.stringify(input.evidence)}::jsonb,NULL,now(),now())
+      ON CONFLICT ("releaseSha","evidenceType","network","asset") DO UPDATE SET "transactionId"=EXCLUDED."transactionId","evidenceHash"=EXCLUDED."evidenceHash","evidence"=EXCLUDED."evidence","verifiedBy"=NULL,"verifiedAt"=now()
     `;
-    await db.auditEvent.create({ data: { organizationId: workspace.organization.id, actorType: "USER", actorId: workspace.user.id, action: "PRODUCTION_RELEASE_EVIDENCE_ATTESTED", targetType: "RELEASE", targetId: input.releaseSha, result: "SUCCESS", metadata: { evidenceType: input.evidenceType, network: input.network ?? null, asset: input.asset ?? null, transactionId: input.transactionId ?? null, evidenceHash } } });
     return ok({ releaseSha: input.releaseSha, evidenceType: input.evidenceType, evidenceHash });
   } catch (error) { return handleApiError(error); }
 }
