@@ -73,14 +73,14 @@ export async function verifyVeridianCredential(input: unknown, config: VeridianK
     redirect: "error",
     signal: AbortSignal.timeout(config.timeoutMs),
   });
-  const body: unknown = await response.json().catch(() => ({}));
+  const body: unknown = await response.json().catch(() => null);
   if (!response.ok) throw new Error(`VERIDIAN_KERIA_VERIFY_${response.status}`);
-  // KERIA's credential verification endpoint is the cryptographic authority. We
-  // deliberately do not reimplement KERI/ACDC/CESR cryptography in AgentPay.
-  if (body && typeof body === "object" && "verified" in body && (body as { verified?: unknown }).verified !== true) throw new Error("VERIDIAN_CREDENTIAL_NOT_VERIFIED");
+  // The configured verifier is the cryptographic authority. HTTP success alone
+  // is not proof: adapters must return an explicit positive verification verdict.
+  if (!body || typeof body !== "object" || (body as { verified?: unknown }).verified !== true) throw new Error("VERIDIAN_CREDENTIAL_NOT_VERIFIED");
   if (config.trustedIssuerAids.length && !config.trustedIssuerAids.includes(credential.i)) throw new Error("VERIDIAN_ISSUER_NOT_TRUSTED");
   if (config.allowedSchemaSaids.length && !config.allowedSchemaSaids.includes(credential.s)) throw new Error("VERIDIAN_SCHEMA_NOT_ALLOWED");
-  const evidence = body && typeof body === "object" ? body as Record<string, unknown> : {};
+  const evidence = body as Record<string, unknown>;
   const revoked = evidence.revoked === true || evidence.status === "revoked";
   if (revoked) throw new Error("VERIDIAN_CREDENTIAL_REVOKED");
   const expiresRaw = typeof evidence.expiresAt === "string" ? evidence.expiresAt : null;
