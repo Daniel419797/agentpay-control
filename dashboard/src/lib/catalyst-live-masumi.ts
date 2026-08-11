@@ -20,7 +20,7 @@ export async function verifyLiveMasumiDependencies() {
     db.$queryRaw<BindingProbe[]>`
       SELECT "network","agentIdentifier","settlementAddress","metadataHash"
       FROM "MasumiResourceBinding"
-      WHERE "settlementAddress" IS NOT NULL AND "sellerPaymentKeyHash" IS NOT NULL AND "expiresAt" > now()
+      WHERE "settlementAddress" IS NOT NULL AND "sellerPaymentKeyHash" IS NOT NULL
       ORDER BY "verifiedAt" DESC
       LIMIT 1`,
     db.$queryRaw<PurchaseProbe[]>`
