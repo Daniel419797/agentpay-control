@@ -6,6 +6,7 @@ const evmAddress = /^0x[0-9a-fA-F]{40}$/;
 const cardanoPreprodAddress = /^addr_test1[0-9a-z]+$/;
 const cardanoMainnetAddress = /^addr1[0-9a-z]+$/;
 const cardanoAssetUnit = /^[0-9a-f]{56}(?:[0-9a-f]{2}){0,32}$/;
+export const CARDANO_MAINNET_USDCX_ASSET_ID = "1f3aec8bfe7ea4fe14c5f121e2a92e301afe414147860d557cac7e345553444378";
 const optionalUrl = z.string().url().optional().or(z.literal(""));
 
 const schema = z.object({
@@ -98,6 +99,7 @@ export function productionPreflightErrors(input: unknown = process.env): string[
     requireHttps("CARDANO_MAINNET_FACILITATOR_URL", env.CARDANO_MAINNET_FACILITATOR_URL, errors);
     requireMatch("CARDANO_MAINNET_PROVIDER_ADDRESS", env.CARDANO_MAINNET_PROVIDER_ADDRESS, cardanoMainnetAddress, errors);
     validateOptionalMatch("CARDANO_MAINNET_USDCX_ASSET_ID", env.CARDANO_MAINNET_USDCX_ASSET_ID, cardanoAssetUnit, errors);
+    if (env.CARDANO_MAINNET_USDCX_ASSET_ID && env.CARDANO_MAINNET_USDCX_ASSET_ID.toLowerCase() !== CARDANO_MAINNET_USDCX_ASSET_ID) errors.push("CARDANO_MAINNET_USDCX_ASSET_ID_MISMATCH");
     if (env.CARDANO_USDCX_ENABLED === "true" && !env.CARDANO_MAINNET_USDCX_ASSET_ID) errors.push("CARDANO_MAINNET_USDCX_ASSET_ID");
     if (!env.CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY) errors.push("CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY");
   }
