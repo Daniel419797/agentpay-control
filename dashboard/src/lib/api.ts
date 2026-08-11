@@ -4,6 +4,26 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { db } from "@/lib/db";
 import { logError } from "@/lib/logger";
 
+const operationalErrorStatus: Record<string, number> = {
+  ORGANIZATION_KILL_SWITCH_ENABLED: 409,
+  ORGANIZATION_NOT_ACTIVE: 409,
+  AGENT_NOT_FOUND: 404,
+  AGENT_NOT_ACTIVE: 409,
+  IDEMPOTENCY_CONFLICT: 409,
+  CROSS_CHAIN_NETWORK_UNAVAILABLE: 409,
+  ROUTE_PROVIDER_NETWORK_UNSUPPORTED: 409,
+  SOURCE_ADDRESS_NOT_OWNED_BY_AGENT: 409,
+  CROSS_CHAIN_QUOTE_EXPIRED: 409,
+  CROSS_CHAIN_TRANSFER_NOT_FOUND: 404,
+  CROSS_CHAIN_TRANSFER_NOT_SUBMITTABLE: 409,
+  SOURCE_TRANSACTION_CONFLICT: 409,
+  FIAT_ACCOUNT_NOT_FOUND: 404,
+  FIAT_ACCOUNT_NOT_ACTIVE: 409,
+  FIAT_PROVIDER_MISMATCH: 409,
+  FIAT_CURRENCY_MISMATCH: 409,
+  INSUFFICIENT_FUNDS: 409,
+};
+
 export function ok<T>(data: T, init?: ResponseInit) { return NextResponse.json({ data }, init); }
 export function problem(status: number, code: string, detail: string, meta?: unknown) { return NextResponse.json({ type: `https://agentpay.dev/problems/${code.toLowerCase()}`, title: code.replaceAll("_", " "), status, detail, code, meta }, { status }); }
 export function rateLimitProblem(retryAfterSeconds: number) {
@@ -15,6 +35,9 @@ export function handleApiError(error: unknown) {
   if (error instanceof Error && error.message === "UNSUPPORTED_MEDIA_TYPE") return problem(415, "UNSUPPORTED_MEDIA_TYPE", "The request Content-Type is not supported.");
   if (error instanceof Error && error.message === "INVALID_MULTIPART") return problem(400, "INVALID_MULTIPART", "The multipart request body is malformed.");
   if (error instanceof SyntaxError) return problem(400, "INVALID_JSON", "The request body is not valid JSON.");
+  if (error instanceof Error && operationalErrorStatus[error.message]) {
+    return problem(operationalErrorStatus[error.message]!, error.message, error.message.replaceAll("_", " ").toLowerCase());
+  }
   logError("api_request_failed", error);
   return problem(500, "INTERNAL_ERROR", "The request could not be completed.");
 }
