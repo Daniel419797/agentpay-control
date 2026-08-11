@@ -1,139 +1,140 @@
 # AgentPay Control
 
-A policy-controlled payment operating system for autonomous software agents using the **x402 payment standard** on **Hedera network** and **Arc Blockchain** rails.
+AgentPay is a policy-controlled payment operating system for autonomous software agents. It applies organization roles, spending policy, approvals, audit evidence, and settlement controls around x402 payments, with Hedera and Arc testnet rails implemented in this repository.
 
-Built for the [Hedera x402 Bounty](https://hedera.com/x402-bounty).
+Built originally for the Hedera x402 bounty and extended into a broader agent-payment control plane.
 
-## Repository Structure
+## Architecture
 
-```
+```text
 agentpay-control/
-├── dashboard/           → Vercel (Next.js app)
-│   ├── src/             API routes, pages, components
-│   ├── prisma/          Database schema + migrations
-│   ├── packages/        SDK, MCP server, LangChain tools
-│   ├── e2e/             Playwright tests
-│   └── package.json     Dashboard dependencies
-├── facilitator/         → Render (Hono server)
-│   └── src/index.ts     Hedera x402 facilitator: verify, settle, sign
-├── facilitator-arc/     → Render (Hono server)
-│   └── src/index.ts     Arc EVM x402 facilitator: verify, settle, sign
-├── facilitator-combined/ → Render (Hono server)
-│   └── src/index.ts     One server mounting both facilitators (/hedera, /arc)
-├── resource-server/     → Render (Hono server)
-│   └── src/index.ts     Demo resources: market-data, files, AI, research
-├── docs/                Design docs, demo script, assets
-├── render.yaml          Render deployment blueprint
-└── README.md
+├── dashboard/             Next.js operator dashboard and API (Vercel)
+│   ├── src/               Pages, API routes, domain services, security controls
+│   ├── prisma/            PostgreSQL schema and forward-only migrations
+│   ├── packages/          SDK, MCP server, LangChain integrations
+│   └── e2e/               Playwright smoke tests
+├── facilitator/           Hedera x402 facilitator
+├── facilitator-arc/       Arc EVM x402 facilitator
+├── facilitator-combined/  Production Render service mounting /hedera and /arc
+├── resource-server/       x402-protected demonstration resources
+├── docs/                  Runbooks, implementation status, release guidance
+├── render.yaml            Render blueprint for facilitator + resource server
+└── .github/workflows/     CI, CodeQL, dependency review
 ```
 
-## Supported Networks
+The dashboard is **not** provisioned by `render.yaml`; it is deployed separately to Vercel. The Render blueprint provisions the combined facilitator and resource server.
 
-| Network | Chain | CAIP-2 | Facilitator |
-|---------|-------|--------|-------------|
-| Hedera Testnet | Hedera | `hedera:testnet` | `facilitator/` |
-| Hedera Mainnet | Hedera | `hedera:mainnet` | `facilitator/` (production) |
-| Arc Testnet | Arc (EVM, Circle L1) | `eip155:5042002` | `facilitator-arc/` |
+## Supported networks
 
-The dashboard includes a **network switcher** (topbar and sidebar) to toggle between Hedera testnet and mainnet. Selection persists via URL (`?network=hedera:mainnet`) and localStorage. The agent list, creation form, wallet connection, and resource-server routing all follow the selected network.
+| Network | CAIP-2 | Role |
+|---|---|---|
+| Hedera Testnet | `hedera:testnet` | x402 signing/verification/settlement and test operation |
+| Hedera Mainnet | `hedera:mainnet` | production-capable Hedera route when separately configured |
+| Arc Testnet | `eip155:5042002` | EVM x402 and contract automation test rail |
 
-`facilitator-combined/` runs both facilitators on **one Render server**: the Hedera app is mounted at `/hedera/*` and the Arc app at `/arc/*` (paths configurable via `HEDERA_BASE_PATH` / `ARC_BASE_PATH`). Each facilitator also remains runnable standalone for local development.
+The dashboard network switcher controls the selected Hedera network for supported operator flows. Arc routes are available to the payment/domain integrations that explicitly select Arc.
 
-## Deploy
+## Production safety model
 
-### Production stack → Render
+AgentPay production configuration fails closed. Required production secrets, facilitator URLs, database dependencies, and payment-rail configuration must be valid before the relevant service is considered ready.
 
-Create a Render Blueprint from the root `render.yaml`. It provisions the dashboard,
-the combined facilitator, and the resource server in one region, deploys only
-after GitHub checks pass, wires capability credentials between services, and runs
-Prisma migrations before the dashboard starts.
+The combined facilitator uses **network-scoped, capability-scoped credentials**. Production requires six different API keys:
 
-Render prompts for every external credential. Generate `KEY_ENCRYPTION_MASTER_KEY`
-as exactly 32 random bytes encoded with base64url; a general random string is not a
-valid encryption key. Production uses separate signing, settlement, and
-contract-execution credentials—never reuse one key across capabilities.
+- Hedera managed signing
+- Hedera settlement
+- Hedera contract execution
+- Arc managed signing
+- Arc settlement
+- Arc contract execution
 
-### Combined Facilitator (Hedera + Arc) → Render
+Do not reuse these values. Hedera operator and managed payer private keys must also be separate.
 
-Use the root `render.yaml` Blueprint. It builds `facilitator-combined/Dockerfile`
-into one service that serves both networks: Hedera under `https://<svc>.onrender.com/hedera`
-and Arc under `https://<svc>.onrender.com/arc`, with an overall `/health` endpoint.
+The dashboard never needs Hedera/Arc private keys. Production private keys belong in the facilitator boundary and should ultimately be held by a KMS/HSM or external signing service where supported.
 
-Because Render can only copy raw values from other services, the two URL variables
-that include the path suffix are prompted once during Blueprint creation:
+For the complete code and external launch gates, see [`docs/production-readiness.md`](docs/production-readiness.md) and [`docs/production-runbook.md`](docs/production-runbook.md).
 
-- Dashboard `FACILITATOR_URL` = `https://agentpay-facilitator.onrender.com/hedera`
-- Dashboard `ARC_FACILITATOR_URL` = `https://agentpay-facilitator.onrender.com/arc`
-- Resource server `FACILITATOR_URL` = the same `/hedera` URL
-- Resource server `ARC_FACILITATOR_URL` = the same `/arc` URL
+## Deployment
 
-Replace the hostname with the service's actual URL shown by Render after creation
-if it differs. All other credentials are wired automatically: signing, settlement,
-and contract-execution keys plus `HEDERA_PAYER_ID` and `ARC_PROVIDER_ADDRESS`.
+### Dashboard → Vercel
 
-Provide the prompted Hedera operator/payer credentials (`HEDERA_OPERATOR_ID`,
-`HEDERA_OPERATOR_KEY`, `HEDERA_PAYER_ID`, `HEDERA_PAYER_KEY`) and Arc payer
-(`ARC_PAYER_PRIVATE_KEY`, `ARC_PROVIDER_ADDRESS`) through Render's secret
-environment UI.
+Deploy the `dashboard` application to Vercel and configure its production environment from `.env.example` plus your actual provider values. Important production rules include:
 
-Deploy a separate instance for mainnet with a different `HEDERA_NETWORK` value
-and point the dashboard's `HEDERA_MAINNET_FACILITATOR_URL` at its `/hedera` URL.
+- `APP_ENV=production`
+- HTTPS `NEXT_PUBLIC_APP_URL`
+- managed PostgreSQL `DATABASE_URL`
+- unique `AUTH_SECRET` and `CRON_SECRET`
+- exactly 32 random bytes encoded as base64url for `KEY_ENCRYPTION_MASTER_KEY`
+- production Supabase configuration
+- facilitator URLs and capability-specific API keys
+- no Hedera or Arc private keys in the dashboard environment
 
-### Resource Server → Render
+Run Prisma migrations against the production database before shifting traffic to a release.
 
-The Blueprint enables Hedera testnet and Arc testnet by default. Change
-`ENABLED_NETWORKS` only to a comma-separated subset of `hedera:testnet`,
-`hedera:mainnet`, and `eip155:5042002`; startup fails on unsupported values.
-Facilitator URLs and capability-scoped settlement keys are wired from their owning
-services. Render prompts only for the external provider settlement accounts.
+### Facilitator + resource server → Render
 
-## Local Development
+Create a Render Blueprint from the root `render.yaml`.
+
+The combined facilitator serves:
+
+```text
+https://<facilitator-host>/hedera
+https://<facilitator-host>/arc
+https://<facilitator-host>/health
+```
+
+Supply the chain credentials requested by Render. The blueprint generates the six network/capability API credentials and wires the appropriate **settlement-only** credentials into the resource server.
+
+For the resource server, also set:
+
+- `FACILITATOR_URL=https://<facilitator-host>/hedera`
+- `ARC_FACILITATOR_URL=https://<facilitator-host>/arc`
+- Hedera `PROVIDER_ACCOUNT_ID`
+- Hedera `USDC_TOKEN_ID`
+
+The resource-server container runs a production preflight before starting. An enabled network with a missing payee, asset ID, settlement credential, or HTTPS facilitator URL stops startup instead of advertising an unusable payment option.
+
+Hedera mainnet should use a separately configured production facilitator instance and production key custody rather than reusing testnet credentials.
+
+## Local development
 
 ```bash
-# Start PostgreSQL
-docker compose up -d
+# PostgreSQL
+Docker compose up -d
 
-# Dashboard (terminal 1)
+# Dashboard
 cd dashboard
 npm install
 npm run dev -- -p 3100
 
-# Hedera Facilitator (terminal 2)
+# Hedera facilitator
 cd facilitator
 npm install
 npm run dev
 
-# Arc Facilitator (terminal 3)
+# Arc facilitator
 cd facilitator-arc
 npm install
 npm run dev
 
-# Combined facilitators on one port (terminal 2 alternative)
+# Combined facilitator alternative
 cd facilitator-combined
 npm install
 npm run build --workspace=@agentpay/hedera-facilitator --workspace=@agentpay/arc-facilitator
 npm run dev
 
-# Resource Server (terminal 4)
+# Resource server
 cd resource-server
 npm install
 npm run dev
 ```
 
-To run the combined facilitator locally, create `facilitator-combined/.env` from
-`.env.example` and fill in the Hedera and Arc credentials; it serves both networks
-on one port (`/hedera`, `/arc`). The dashboard's `FACILITATOR_URL` then becomes
-`http://localhost:8787/hedera` and `ARC_FACILITATOR_URL` becomes
-`http://localhost:8787/arc`.
-
-Set the network via URL param: `http://localhost:3100/app/agents?network=hedera:mainnet`
-Or use the network switcher dropdown in the topbar.
-
-## Demo Script
-
-See [docs/demo-script.md](docs/demo-script.md) for the full <5 min bounty submission script.
+Use `facilitator-combined/.env.example` for local combined-facilitator configuration. Generic shared capability keys remain available for local development only; production uses the network-scoped keys documented in that file.
 
 ## Verification
+
+From the repository root, CI validates PostgreSQL migrations, governance invariants, dashboard lint/typecheck/tests/build, Hedera and Arc facilitator builds/tests, the combined facilitator, the resource server, Playwright browser smoke tests, production Docker builds, dependency risk, and CodeQL analysis.
+
+For the dashboard directly:
 
 ```bash
 cd dashboard
@@ -143,8 +144,15 @@ npm test
 npm run build
 ```
 
-Production deployment, recovery, monitoring, and incident procedures are documented in [docs/production-runbook.md](docs/production-runbook.md).
-Roadmap-to-release traceability is maintained in [docs/implementation-status.md](docs/implementation-status.md).
+## Feature status
+
+The repository contains implemented flows for organization-scoped agents, roles, policies, approvals, audit evidence, x402 settlement, marketplace/resources, invoicing, virtual-card/fiat provider adapters, cross-chain automation, contract automation, and financial intelligence. Some rails remain dependent on external production approvals, funded accounts, KMS/HSM custody, monitoring, DNS/TLS, and recorded canary/restore/security evidence.
+
+See [`docs/implementation-status.md`](docs/implementation-status.md) for feature traceability. **Passing repository checks means the code is eligible for launch; it does not substitute for external provider approval or operational evidence.**
+
+## Security
+
+Report suspected vulnerabilities privately according to [`SECURITY.md`](SECURITY.md). Never place production private keys, unrestricted provider credentials, card data, or session secrets in GitHub issues or pull requests.
 
 ## License
 
