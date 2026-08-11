@@ -1,19 +1,13 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { z } from "zod";
 import { createHederaApp, parseHederaEnv } from "@agentpay/hedera-facilitator/app";
 import { createArcApp, parseArcEnv } from "@agentpay/arc-facilitator/app";
+import { networkEnv, parseCombinedEnv } from "./env.js";
 
-const envSchema = z.object({
-  PORT: z.coerce.number().default(8787),
-  HEDERA_BASE_PATH: z.string().default("/hedera"),
-  ARC_BASE_PATH: z.string().default("/arc"),
-});
+const env = parseCombinedEnv();
 
-const env = envSchema.parse(process.env);
-
-const hedera = createHederaApp(parseHederaEnv());
-const arc = createArcApp(parseArcEnv());
+const hedera = createHederaApp(parseHederaEnv(networkEnv(process.env, env, "hedera")));
+const arc = createArcApp(parseArcEnv(networkEnv(process.env, env, "arc")));
 
 const app = new Hono();
 
