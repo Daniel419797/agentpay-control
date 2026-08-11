@@ -3,15 +3,18 @@ import { z } from "zod";
 import { handleApiError, ok, problem, requestBody } from "@/lib/api";
 import { getConfig } from "@/lib/config";
 import { db } from "@/lib/db";
+import { hasRecentAuthentication } from "@/lib/session";
+import { cardanoAddressLovelaceBalance, type CardanoNetwork } from "@/lib/cardano";
 import { workspaceFromRequest, workspaceHasRole } from "@/lib/workspace";
 import { assertPlanLimit } from "@/domain/entitlement-service";
+import { getNetworkRouter } from "@/domain/network-router";
 
 const createAgent = z.object({
   name: z.string().min(2).max(80),
   description: z.string().max(500).optional(),
-  network: z.enum(["hedera:testnet", "hedera:mainnet", "eip155:5042002"]).default("hedera:testnet"),
-  asset: z.enum(["HBAR", "USDC"]).default("HBAR"),
-  custody: z.enum(["SELF_CUSTODY", "PLATFORM_MANAGED_TESTNET"]).default("SELF_CUSTODY"),
+  network: z.enum(["hedera:testnet", "hedera:mainnet", "eip155:5042002", "cardano:preprod", "cardano:mainnet"]).default("hedera:testnet"),
+  asset: z.enum(["HBAR", "USDC", "ADA"]).default("HBAR"),
+  custody: z.enum(["SELF_CUSTODY", "PLATFORM_MANAGED_TESTNET", "EXTERNAL_DELEGATED"]).default("SELF_CUSTODY"),
 });
 
 async function arcUsdcBalance(accountId: string) {
@@ -75,17 +78,25 @@ export async function POST(request: Request) {
     const workspace = await workspaceFromRequest(request);
     if (!workspace) return problem(401, "AUTH_REQUIRED", "Sign in before creating an agent.");
     if (!workspaceHasRole(workspace, ["OWNER", "OPERATOR"])) return problem(403, "ROLE_REQUIRED", "Owner or Operator access is required.");
+    if (!hasRecentAuthentication(workspace.session)) return problem(401, "RECENT_AUTH_REQUIRED", "Re-authenticate before provisioning a payment signer.");
+    if (workspace.organization.killSwitchEnabled) return problem(423, "ORGANIZATION_KILL_SWITCH_ENABLED", "Disable the emergency stop before provisioning a payment signer.");
+
     const input = createAgent.parse(await requestBody(request));
     const config = getConfig();
     const isArc = input.network === "eip155:5042002";
     const isHederaMainnet = input.network === "hedera:mainnet";
+    const isCardanoPreprod = input.network === "cardano:preprod";
+    const isCardanoMainnet = input.network === "cardano:mainnet";
+    const isCardano = isCardanoPreprod || isCardanoMainnet;
+
     if (isArc && input.asset !== "USDC") return problem(400, "ASSET_UNSUPPORTED", "Arc testnet agents use the configured USDC rail.");
-    if (isArc && input.custody !== "PLATFORM_MANAGED_TESTNET") {
-      return problem(400, "CUSTODY_UNSUPPORTED", "Arc browser-wallet custody is not enabled. Use the isolated managed Arc signer.");
-    }
-    if (isHederaMainnet && input.custody !== "SELF_CUSTODY") {
-      return problem(400, "CUSTODY_UNSUPPORTED", "Hedera Mainnet agents must use SELF_CUSTODY. Platform-managed custody is intentionally testnet-only.");
-    }
+    if (isArc && input.custody !== "PLATFORM_MANAGED_TESTNET") return problem(400, "CUSTODY_UNSUPPORTED", "Arc browser-wallet custody is not enabled. Use the isolated managed Arc signer.");
+    if (isHederaMainnet && input.custody !== "SELF_CUSTODY") return problem(400, "CUSTODY_UNSUPPORTED", "Hedera Mainnet agents must use SELF_CUSTODY. Platform-managed custody is intentionally testnet-only.");
+    if (isCardano && input.asset !== "ADA") return problem(400, "ASSET_UNSUPPORTED", "The initial Cardano x402 rail supports native ADA (lovelace) only.");
+    if (isCardanoPreprod && input.custody !== "PLATFORM_MANAGED_TESTNET") return problem(400, "CUSTODY_UNSUPPORTED", "Cardano Preprod autonomous agents use the isolated managed testnet signer.");
+    if (isCardanoMainnet && input.custody !== "EXTERNAL_DELEGATED") return problem(400, "CUSTODY_UNSUPPORTED", "Cardano Mainnet autonomous agents require the separately configured delegated production signer.");
+
+    if (!getNetworkRouter().supportsNetwork(input.network)) return problem(503, "PAYMENT_RAIL_UNAVAILABLE", `${input.network} is not fully configured for this deployment.`);
 
     const [asset, wallet] = await Promise.all([
       db.asset.findUnique({ where: { network_symbol: { network: input.network, symbol: input.asset } } }),
@@ -98,16 +109,22 @@ export async function POST(request: Request) {
 
     const managedSignerAvailable = isArc
       ? Boolean(config.ARC_FACILITATOR_URL && config.ARC_FACILITATOR_SIGNING_API_KEY && config.ARC_PAYER_ADDRESS)
-      : Boolean(config.HEDERA_PAYER_ACCOUNT_ID && config.FACILITATOR_URL && config.FACILITATOR_SIGNING_API_KEY);
-    if (input.custody === "PLATFORM_MANAGED_TESTNET" && !managedSignerAvailable) {
-      return problem(503, "MANAGED_SIGNER_UNAVAILABLE", `The managed ${isArc ? "Arc" : "Hedera"} testnet signer is not fully configured.`);
-    }
+      : isCardanoPreprod
+        ? Boolean(config.CARDANO_PREPROD_FACILITATOR_URL && config.CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY && config.CARDANO_PREPROD_PAYER_ADDRESS)
+        : isCardanoMainnet
+          ? Boolean(config.CARDANO_MAINNET_FACILITATOR_URL && config.CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY && config.CARDANO_MAINNET_PAYER_ADDRESS)
+          : Boolean(config.HEDERA_PAYER_ACCOUNT_ID && config.FACILITATOR_URL && config.FACILITATOR_SIGNING_API_KEY);
+    if (input.custody !== "SELF_CUSTODY" && !managedSignerAvailable) return problem(503, "MANAGED_SIGNER_UNAVAILABLE", `The managed signer for ${input.network} is not fully configured.`);
 
     const accountId = input.custody === "SELF_CUSTODY"
       ? wallet!.accountId
       : isArc
         ? config.ARC_PAYER_ADDRESS!
-        : config.HEDERA_PAYER_ACCOUNT_ID!;
+        : isCardanoPreprod
+          ? config.CARDANO_PREPROD_PAYER_ADDRESS!
+          : isCardanoMainnet
+            ? config.CARDANO_MAINNET_PAYER_ADDRESS!
+            : config.HEDERA_PAYER_ACCOUNT_ID!;
     const network = input.custody === "SELF_CUSTODY" ? wallet!.network : input.network;
     if (input.custody === "SELF_CUSTODY") {
       const inUse = await db.paymentAccount.findFirst({ where: { network, accountId } });
@@ -117,10 +134,15 @@ export async function POST(request: Request) {
     let evmAddress: string | undefined;
     let publicKey: string | undefined;
     let initialBalanceAtomic = "0";
+    let balanceSource = "HEDERA_MIRROR_NODE";
 
     if (isArc) {
       evmAddress = accountId.toLowerCase();
       initialBalanceAtomic = await arcUsdcBalance(evmAddress);
+      balanceSource = "ARC_USDC_RPC";
+    } else if (isCardano) {
+      initialBalanceAtomic = await cardanoAddressLovelaceBalance(network as CardanoNetwork, accountId);
+      balanceSource = "CARDANO_BLOCKFROST";
     } else {
       const mirrorUrl = isHederaMainnet ? config.HEDERA_MAINNET_MIRROR_NODE_URL : config.HEDERA_MIRROR_NODE_URL;
       const mirrorResponse = await fetch(`${mirrorUrl}/api/v1/accounts/${accountId}`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
@@ -132,6 +154,9 @@ export async function POST(request: Request) {
     }
 
     const agent = await db.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`agent-provision:${workspace.organization.id}`}, 0))`;
+      const organization = await tx.organization.findUniqueOrThrow({ where: { id: workspace.organization.id }, select: { status: true, killSwitchEnabled: true } });
+      if (organization.status !== "ACTIVE" || organization.killSwitchEnabled) throw new Error("ORGANIZATION_STOPPED");
       await assertPlanLimit(tx, workspace.organization.id, "AGENTS");
       const created = await tx.agent.create({
         data: {
@@ -148,7 +173,7 @@ export async function POST(request: Request) {
               evmAddress,
               publicKey,
               custodyType: input.custody,
-              signingMode: input.custody === "SELF_CUSTODY" ? "WALLET_CONFIRMATION" : "AUTONOMOUS_MANAGED",
+              signingMode: input.custody === "SELF_CUSTODY" ? "WALLET_CONFIRMATION" : input.custody === "EXTERNAL_DELEGATED" ? "BOUNDED_DELEGATION" : "AUTONOMOUS_MANAGED",
               status: "ACTIVE",
               syncedAt: new Date(),
               balances: {
@@ -156,7 +181,7 @@ export async function POST(request: Request) {
                   assetId: asset.id,
                   atomicAmount: initialBalanceAtomic,
                   spendableAtomic: initialBalanceAtomic,
-                  source: isArc ? "ARC_USDC_RPC" : "HEDERA_MIRROR_NODE",
+                  source: balanceSource,
                   asOf: new Date(),
                 },
               },
@@ -178,13 +203,13 @@ export async function POST(request: Request) {
       });
       return created;
     });
-    if (!(request.headers.get("content-type") ?? "").includes("application/json")) {
-      return Response.redirect(new URL(`/app/agents/${agent.id}`, request.url), 303);
-    }
+    if (!(request.headers.get("content-type") ?? "").includes("application/json")) return Response.redirect(new URL(`/app/agents/${agent.id}`, request.url), 303);
     return ok(agent, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message === "PLAN_AGENTS_LIMIT_REACHED") return problem(402, error.message, "Your plan's active-agent limit has been reached.");
+    if (error instanceof Error && error.message === "ORGANIZATION_STOPPED") return problem(423, error.message, "Agent provisioning was stopped because the organization is inactive or the emergency stop became active.");
     if (error instanceof Error && ["ARC_RPC_UNAVAILABLE", "ARC_BALANCE_UNAVAILABLE"].includes(error.message)) return problem(502, error.message, "The Arc USDC balance could not be verified before agent activation.");
+    if (error instanceof Error && error.message.startsWith("CARDANO_")) return problem(502, error.message, "The Cardano balance or chain evidence could not be verified before agent activation.");
     if (error instanceof Error && error.message === "HEDERA_TOKEN_ID_REQUIRED") return problem(409, error.message, "The selected Hedera token is missing a verified token ID.");
     return handleApiError(error);
   }
