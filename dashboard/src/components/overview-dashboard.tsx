@@ -68,8 +68,8 @@ export function OverviewDashboard() {
     return () => window.removeEventListener("agentpay:payment-settled", load);
   }, [load]);
 
-  if (error) return <div className="page"><div className="empty-state"><strong>Unable to load operations</strong><p>{error}</p><button className="secondary-button" onClick={() => void load()}>Retry</button></div></div>;
-  if (!data) return <div className="page"><div className="empty-state"><strong>Loading payment operations…</strong><p>Reading current records from the workspace.</p></div></div>;
+  if (error) return <div className="page"><div className="empty-state" role="alert"><strong>Unable to load operations</strong><p>{error}</p><button className="secondary-button" onClick={() => void load()}>Retry</button></div></div>;
+  if (!data) return <div className="page"><div className="empty-state" aria-live="polite"><strong>Loading payment operations…</strong><p>Reading current records from the workspace.</p></div></div>;
 
   const settledSummary = data.metrics.settledSpend.length
     ? data.metrics.settledSpend.slice(0, 2).map((item) => `${item.amount} ${item.symbol}`).join(" · ")
@@ -89,17 +89,32 @@ export function OverviewDashboard() {
       <div className="operations-grid">
         <section className="panel">
           <header className="panel-header"><h2 className="panel-title">Recent transactions</h2><Link className="ghost-link" href="/app/transactions">View all</Link></header>
-          {data.recent.length === 0 ? <div className="empty-state"><strong>No transactions yet</strong><p>Verified wallet payments and x402 agent settlements will appear here.</p></div> : <div className="table-wrap">
-            <table className="data-table"><thead><tr><th>Time</th><th>Agent</th><th>Resource / payee</th><th>Amount</th><th>Rail</th><th>Status</th><th>Receipt</th></tr></thead><tbody>{data.recent.map((transaction) => <tr key={transaction.id}>
-              <td>{new Date(transaction.createdAt).toLocaleString()}</td>
-              <td><div className="agent-cell"><AgentAvatar /><div><div className="cell-primary">{transaction.agent}</div><div className="cell-secondary">{transaction.payer || "Policy workflow"}</div></div></div></td>
-              <td><div className="cell-primary">{transaction.resource}</div><div className="cell-secondary">{transaction.payee}</div></td>
-              <td>{transaction.amount} {transaction.asset}</td>
-              <td><span className="cell-secondary">{networkLabel(transaction.network)}</span></td>
-              <td><span className={`status-badge ${statusClass(transaction.status)}`}>{transaction.status.replaceAll("_", " ")}</span></td>
-              <td>{transaction.explorerUrl ? <a className="ghost-link" href={transaction.explorerUrl} target="_blank" rel="noreferrer">{transaction.explorerLabel ?? "Explorer"}</a> : <span className="cell-secondary">Pending</span>}</td>
-            </tr>)}</tbody></table>
-          </div>}
+          {data.recent.length === 0 ? <div className="empty-state"><strong>No transactions yet</strong><p>Verified wallet payments and x402 agent settlements will appear here.</p></div> : <>
+            <div className="table-wrap">
+              <table className="data-table"><thead><tr><th>Time</th><th>Agent</th><th>Resource / payee</th><th>Amount</th><th>Rail</th><th>Status</th><th>Receipt</th></tr></thead><tbody>{data.recent.map((transaction) => <tr key={transaction.id}>
+                <td>{new Date(transaction.createdAt).toLocaleString()}</td>
+                <td><div className="agent-cell"><AgentAvatar /><div><div className="cell-primary">{transaction.agent}</div><div className="cell-secondary">{transaction.payer || "Policy workflow"}</div></div></div></td>
+                <td><div className="cell-primary">{transaction.resource}</div><div className="cell-secondary">{transaction.payee}</div></td>
+                <td>{transaction.amount} {transaction.asset}</td>
+                <td><span className="cell-secondary">{networkLabel(transaction.network)}</span></td>
+                <td><span className={`status-badge ${statusClass(transaction.status)}`}>{transaction.status.replaceAll("_", " ")}</span></td>
+                <td>{transaction.explorerUrl ? <a className="ghost-link" href={transaction.explorerUrl} target="_blank" rel="noreferrer">{transaction.explorerLabel ?? "Explorer"}</a> : <span className="cell-secondary">Pending</span>}</td>
+              </tr>)}</tbody></table>
+            </div>
+            <div className="transaction-mobile" aria-label="Recent transactions">
+              {data.recent.map((transaction) => <article className="transaction-card" key={`mobile-${transaction.id}`}>
+                <div className="transaction-top">
+                  <div><div className="transaction-resource">{transaction.resource}</div><div className="transaction-meta">{transaction.agent} · {networkLabel(transaction.network)}</div></div>
+                  <div className="transaction-amount">{transaction.amount} {transaction.asset}</div>
+                </div>
+                <div className="transaction-bottom">
+                  <span className={`status-badge ${statusClass(transaction.status)}`}>{transaction.status.replaceAll("_", " ")}</span>
+                  {transaction.explorerUrl ? <a className="ghost-link" href={transaction.explorerUrl} target="_blank" rel="noreferrer">{transaction.explorerLabel ?? "Explorer"}</a> : <span className="cell-secondary">Receipt pending</span>}
+                </div>
+                <div className="transaction-meta">{new Date(transaction.createdAt).toLocaleString()} · Payee {transaction.payee}</div>
+              </article>)}
+            </div>
+          </>}
         </section>
         <div className="right-rail">
           <section className="panel">
@@ -108,7 +123,7 @@ export function OverviewDashboard() {
           </section>
           <section className="panel" style={{ marginTop: 18 }}>
             <header className="panel-header"><h2 className="panel-title">Agents</h2><Link className="ghost-link" href="/app/agents">View all</Link></header>
-            {data.agents.length === 0 ? <div className="empty-state"><strong>No agents yet</strong><p>Create an agent on one of the configured payment rails.</p></div> : <div className="agent-list">{data.agents.map((agent) => <div className="agent-row" key={agent.id}><div className="agent-identity"><AgentAvatar /><div><div className="agent-name">{agent.name}</div><div className="agent-state"><span className="status-dot" />{agent.status} · {networkLabel(agent.network)}</div></div></div><div className="agent-balance"><small>{agent.accountId ?? "No account"}</small></div></div>)}</div>}
+            {data.agents.length === 0 ? <div className="empty-state"><strong>No agents yet</strong><p>Create an agent on one of the configured payment rails.</p></div> : <div className="agent-list">{data.agents.map((agent) => <div className="agent-row" key={agent.id}><div className="agent-identity"><AgentAvatar /><div><div className="agent-name">{agent.name}</div><div className="agent-state"><span className="status-dot" aria-hidden="true" />{agent.status} · {networkLabel(agent.network)}</div></div></div><div className="agent-balance"><small>{agent.accountId ?? "No account"}</small></div></div>)}</div>}
           </section>
         </div>
       </div>
