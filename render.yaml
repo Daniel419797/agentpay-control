@@ -13,15 +13,25 @@ services:
     envVars:
       - key: APP_ENV
         value: production
+      - key: HEDERA_BASE_PATH
+        value: /hedera
+      - key: ARC_BASE_PATH
+        value: /arc
+      - key: CARDANO_BASE_PATH
+        value: /cardano
       - key: HEDERA_NETWORK
         value: testnet
       - key: HEDERA_OPERATOR_ID
         sync: false
       - key: HEDERA_OPERATOR_KEY
         sync: false
+      - key: HEDERA_OPERATOR_KEY_TYPE
+        sync: false
       - key: HEDERA_PAYER_ID
         sync: false
       - key: HEDERA_PAYER_KEY
+        sync: false
+      - key: HEDERA_PAYER_KEY_TYPE
         sync: false
       - key: ARC_PAYER_PRIVATE_KEY
         sync: false
@@ -35,6 +45,22 @@ services:
         value: "0x3600000000000000000000000000000000000000"
       - key: ARC_PROVIDER_ADDRESS
         sync: false
+      - key: CARDANO_NETWORK
+        value: preprod
+      - key: CARDANO_PAYER_ADDRESS
+        sync: false
+      - key: CARDANO_BLOCKFROST_URL
+        value: https://cardano-preprod.blockfrost.io/api/v0
+      - key: CARDANO_BLOCKFROST_PROJECT_ID
+        sync: false
+      - key: CARDANO_SIGNER_URL
+        sync: false
+      - key: CARDANO_SIGNER_API_KEY
+        sync: false
+      - key: CARDANO_SETTLEMENT_STORE_URL
+        sync: false
+      - key: CARDANO_SETTLEMENT_STORE_API_KEY
+        sync: false
       - key: HEDERA_MANAGED_SIGNING_API_KEY
         generateValue: true
       - key: HEDERA_SETTLEMENT_API_KEY
@@ -46,6 +72,10 @@ services:
       - key: ARC_SETTLEMENT_API_KEY
         generateValue: true
       - key: ARC_CONTRACT_EXECUTION_API_KEY
+        generateValue: true
+      - key: CARDANO_MANAGED_SIGNING_API_KEY
+        generateValue: true
+      - key: CARDANO_SETTLEMENT_API_KEY
         generateValue: true
       - key: CONTRACT_ALLOWLIST_JSON
         value: "[]"
@@ -64,10 +94,12 @@ services:
       - key: APP_ENV
         value: production
       - key: ENABLED_NETWORKS
-        value: hedera:testnet,eip155:5042002
+        value: hedera:testnet,eip155:5042002,cardano:preprod
       - key: FACILITATOR_URL
         sync: false
       - key: ARC_FACILITATOR_URL
+        sync: false
+      - key: CARDANO_PREPROD_FACILITATOR_URL
         sync: false
       - key: FACILITATOR_SETTLEMENT_API_KEY
         fromService:
@@ -79,9 +111,16 @@ services:
           type: web
           name: agentpay-facilitator
           envVarKey: ARC_SETTLEMENT_API_KEY
+      - key: CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: CARDANO_SETTLEMENT_API_KEY
       - key: PROVIDER_ACCOUNT_ID
         sync: false
       - key: USDC_TOKEN_ID
+        sync: false
+      - key: FACILITATOR_FEE_PAYER_ID
         sync: false
       - key: ARC_PROVIDER_ADDRESS
         fromService:
@@ -90,3 +129,5 @@ services:
           envVarKey: ARC_PROVIDER_ADDRESS
       - key: ARC_USDC_ADDRESS
         value: "0x3600000000000000000000000000000000000000"
+      - key: CARDANO_PREPROD_PROVIDER_ADDRESS
+        sync: false
