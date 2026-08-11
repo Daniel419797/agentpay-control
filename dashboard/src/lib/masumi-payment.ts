@@ -109,13 +109,23 @@ export async function fetchMasumiJobStatus(entry: MasumiVerifiedEntry, jobId: st
   if (!response.ok) throw new Error(`MASUMI_AGENT_STATUS_${response.status}`); return statusSchema.parse(await response.json());
 }
 
+export function assertMasumiRefundTransition(purchase: MasumiPurchase, expectedState: "RefundRequested" | "RefundAuthorized") {
+  if (purchase.NextAction.requestedAction !== expectedState) {
+    throw new Error(expectedState === "RefundRequested" ? "MASUMI_REFUND_STATE_INVALID" : "MASUMI_REFUND_AUTH_STATE_INVALID");
+  }
+}
+
 export async function requestMasumiRefund(network: MasumiNetwork, blockchainIdentifier: string, config: MasumiPaymentConfig = masumiPaymentConfigFromEnv()) {
   const parsed = purchaseResponseSchema.parse(await providerJson(`${config.baseUrl}/purchase/request-refund`, config, { method: "POST", body: JSON.stringify({ network, blockchainIdentifier }) }));
-  if (parsed.status.toLowerCase() !== "success" || parsed.data.blockchainIdentifier !== blockchainIdentifier) throw new Error("MASUMI_REFUND_RESPONSE_INVALID"); return parsed.data;
+  if (parsed.status.toLowerCase() !== "success" || parsed.data.blockchainIdentifier !== blockchainIdentifier || parsed.data.PaymentSource.network !== network) throw new Error("MASUMI_REFUND_RESPONSE_INVALID");
+  assertMasumiRefundTransition(parsed.data, "RefundRequested");
+  return parsed.data;
 }
 export async function authorizeMasumiRefund(network: MasumiNetwork, blockchainIdentifier: string, config: MasumiPaymentConfig = masumiPaymentConfigFromEnv()) {
   const parsed = purchaseResponseSchema.parse(await providerJson(`${config.baseUrl}/payment/authorize-refund`, config, { method: "POST", body: JSON.stringify({ network, blockchainIdentifier }) }));
-  if (parsed.status.toLowerCase() !== "success" || parsed.data.blockchainIdentifier !== blockchainIdentifier) throw new Error("MASUMI_REFUND_AUTH_RESPONSE_INVALID"); return parsed.data;
+  if (parsed.status.toLowerCase() !== "success" || parsed.data.blockchainIdentifier !== blockchainIdentifier || parsed.data.PaymentSource.network !== network) throw new Error("MASUMI_REFUND_AUTH_RESPONSE_INVALID");
+  assertMasumiRefundTransition(parsed.data, "RefundAuthorized");
+  return parsed.data;
 }
 export function verifyMasumiResultHash(purchase: MasumiPurchase, status: MasumiJobStatus) {
   if (status.status !== "completed" || status.result === undefined) throw new Error("MASUMI_JOB_RESULT_NOT_COMPLETE");
