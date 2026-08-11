@@ -23,10 +23,26 @@ export function handleApiError(error: unknown) {
   return problem(500, "INTERNAL_ERROR", "The request could not be completed.");
 }
 
-export async function requestBody(request: Request): Promise<unknown> {
+export async function requestBody(request: Request, maxBytes = 64 * 1024): Promise<unknown> {
   const contentType = request.headers.get("content-type") ?? "";
-  if (contentType.includes("application/json")) return boundedJson(request);
-  const form = await request.formData();
+  if (contentType.includes("application/json")) return boundedJson(request, maxBytes);
+
+  if (contentType.includes("application/x-www-form-urlencoded")) {
+    return Object.fromEntries(new URLSearchParams(await boundedText(request, maxBytes)).entries());
+  }
+
+  // FormData does not expose a streaming size limit. Read the body through the
+  // same bounded reader first, then parse a reconstructed in-memory request.
+  // This prevents chunked multipart requests from bypassing Content-Length checks.
+  const bytes = await boundedBytes(request, maxBytes);
+  const headers = new Headers(request.headers);
+  headers.delete("content-length");
+  const boundedRequest = new Request(request.url, {
+    method: request.method,
+    headers,
+    body: bytes,
+  });
+  const form = await boundedRequest.formData();
   return Object.fromEntries(form.entries());
 }
 
@@ -35,9 +51,13 @@ export async function boundedJson(request: Request, maxBytes = 64 * 1024): Promi
 }
 
 export async function boundedText(request: Request, maxBytes = 64 * 1024): Promise<string> {
+  return new TextDecoder().decode(await boundedBytes(request, maxBytes));
+}
+
+export async function boundedBytes(request: Request, maxBytes = 64 * 1024): Promise<Uint8Array> {
   const declared = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(declared) && declared > maxBytes) throw new Error("REQUEST_BODY_TOO_LARGE");
-  if (!request.body) return "";
+  if (!request.body) return new Uint8Array();
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -57,7 +77,7 @@ export async function boundedText(request: Request, maxBytes = 64 * 1024): Promi
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return new TextDecoder().decode(bytes);
+  return bytes;
 }
 
 export async function authorizeAgentRequest(request: Request, agentId: string, scope: string) {
