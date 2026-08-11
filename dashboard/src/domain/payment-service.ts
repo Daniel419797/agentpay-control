@@ -10,6 +10,7 @@ import { retrySerializable } from "@/lib/retry";
 import { assertPlanLimit } from "@/domain/entitlement-service";
 
 export type PaidRequestInput = { resourceUrl: string; purpose?: string; maxAmountAtomic?: string };
+export type PaidRequestContext = { initiatedByUserId?: string };
 
 function hash(value: unknown) { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
 
@@ -133,9 +134,6 @@ export async function executeAuthorizedIntent(intentId: string) {
     const fulfillment = await fulfillX402Resource(intent.resourceUrl, requirement, signed.paymentPayload, config.APP_ENV === "production");
     confirmedSettlement = { transactionId: fulfillment.transactionId, network: fulfillment.network };
 
-    // Persist the strongest settlement evidence before the larger bookkeeping
-    // transaction. If later DB/audit writes fail, reconciliation can still use
-    // the exact chain transaction returned by the resource server.
     await db.paymentAttempt.update({
       where: { id: attempt.id },
       data: { status: "SUBMITTED", candidateTransactionId: fulfillment.transactionId },
@@ -175,7 +173,12 @@ export async function executeAuthorizedIntent(intentId: string) {
   }
 }
 
-export async function createPaidRequest(agentId: string, idempotencyKey: string, input: PaidRequestInput) {
+export async function createPaidRequest(
+  agentId: string,
+  idempotencyKey: string,
+  input: PaidRequestInput,
+  context: PaidRequestContext = {},
+) {
   const config = getConfig();
   const resourceUrl = await assertSafeResourceUrl(input.resourceUrl, config.APP_ENV === "production");
   const canonical = { agentId, resourceUrl: resourceUrl.toString(), purpose: input.purpose ?? null, maxAmountAtomic: input.maxAmountAtomic ?? null };
@@ -290,6 +293,22 @@ export async function createPaidRequest(agentId: string, idempotencyKey: string,
       },
       include: { quote: { include: { asset: true } }, approval: true, fulfillment: true, attempts: { include: { settlement: true } } },
     });
+
+    if (context.initiatedByUserId) {
+      await tx.auditEvent.create({
+        data: {
+          organizationId: agent.organizationId,
+          actorType: "USER",
+          actorId: context.initiatedByUserId,
+          action: "PAYMENT_REQUEST_INITIATED",
+          targetType: "PAYMENT_INTENT",
+          targetId: intent.id,
+          result: "SUCCESS",
+          metadata: { agentId, status, network: requirement.network, amountAtomic },
+        },
+      });
+    }
+
     return { intent, shouldExecute: status === "AUTHORIZED" };
   }, { isolationLevel: "Serializable" }));
   return result.shouldExecute ? executeAuthorizedIntent(result.intent.id) : result.intent;
