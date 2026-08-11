@@ -8,6 +8,7 @@ import {
   isManagedCardanoMainnetEnabled,
   isManagedCardanoPreprodEnabled,
 } from "@/domain/network-router";
+import { cardanoAssetConfigFromEnv } from "@/lib/cardano-assets";
 import { getConfig } from "@/lib/config";
 import { currentWorkspace, workspaceHasRole } from "@/lib/workspace";
 
@@ -19,6 +20,8 @@ export default async function NewAgentPage() {
   }
 
   const config = getConfig();
+  const cardanoAssets = cardanoAssetConfigFromEnv();
+  const usdcxEnabled = process.env.CARDANO_USDCX_ENABLED === "true";
   return (
     <FormPage
       title="Create agent"
@@ -29,6 +32,8 @@ export default async function NewAgentPage() {
         arcEnabled={isManagedArcEnabled(config)}
         cardanoPreprodEnabled={isManagedCardanoPreprodEnabled(config)}
         cardanoMainnetEnabled={isManagedCardanoMainnetEnabled(config)}
+        cardanoPreprodUsdcxEnabled={usdcxEnabled && Boolean(cardanoAssets.preprodUsdcxAssetId)}
+        cardanoMainnetUsdcxEnabled={usdcxEnabled && Boolean(cardanoAssets.mainnetUsdcxAssetId)}
       />
     </FormPage>
   );
