@@ -4,6 +4,7 @@ import { z } from "zod";
 import { boundedJson, handleApiError, ok, problem } from "@/lib/api";
 import { getConfig } from "@/lib/config";
 import { db } from "@/lib/db";
+import { notificationDestinationDisplay } from "@/lib/notification-destination";
 import { assertSafeResourceUrl } from "@/lib/safe-url";
 import { encryptSecret } from "@/lib/secret-box";
 import { workspaceFromRequest, workspaceHasRole } from "@/lib/workspace";
@@ -19,13 +20,18 @@ const createSchema = z.discriminatedUnion("type", [
   z.object({ ...common, type: z.literal("EMAIL"), destination: z.string().email() }),
 ]);
 
+function safeEndpoint<T extends { type: string; destination: string; signingSecretEncrypted: string | null }>(endpoint: T) {
+  const { signingSecretEncrypted: _secret, destination, ...safe } = endpoint;
+  return { ...safe, destination: notificationDestinationDisplay(endpoint.type, destination), hasSigningSecret: Boolean(_secret) };
+}
+
 export async function GET(request: Request) {
   try {
     const workspace = await workspaceFromRequest(request);
     if (!workspace) return problem(401, "AUTH_REQUIRED", "Sign in before viewing notification endpoints.");
     if (!workspaceHasRole(workspace, ["OWNER", "OPERATOR", "VIEWER"])) return problem(403, "ROLE_REQUIRED", "Notification access is required.");
     const endpoints = await db.notificationEndpoint.findMany({ where: { organizationId: workspace.organization.id }, orderBy: { createdAt: "desc" } });
-    return ok(endpoints.map(({ signingSecretEncrypted: _secret, ...endpoint }) => ({ ...endpoint, hasSigningSecret: Boolean(_secret) })));
+    return ok(endpoints.map(safeEndpoint));
   } catch (error) {
     return handleApiError(error);
   }
@@ -47,9 +53,7 @@ export async function POST(request: Request) {
       await tx.auditEvent.create({ data: { organizationId: workspace.organization.id, actorType: "USER", actorId: workspace.user.id, action: "NOTIFICATION_ENDPOINT_CREATED", targetType: "NOTIFICATION_ENDPOINT", targetId: created.id, result: "SUCCESS", metadata: { type: created.type, name: created.name } } });
       return created;
     });
-    const { signingSecretEncrypted: _encrypted, ...safe } = endpoint;
-    void _encrypted;
-    return ok({ ...safe, signingSecret }, { status: 201 });
+    return ok({ ...safeEndpoint(endpoint), signingSecret }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message === "PLAN_NOTIFICATION_ENDPOINTS_LIMIT_REACHED") return problem(402, error.message, "Your plan's notification-endpoint limit has been reached.");
     return handleApiError(error);
