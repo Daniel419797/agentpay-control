@@ -347,13 +347,8 @@ function decodeSignedTransaction(transactionBase64: string) {
     const addressBytes = asBytes(addressNode, "CARDANO_OUTPUT_ADDRESS_INVALID");
     if (!valueNode) throw new Error("CARDANO_OUTPUT_VALUE_INVALID");
     const value = untag(valueNode);
-    let lovelace: bigint;
-    if (typeof value.value === "bigint") lovelace = value.value;
-    else {
-      const parts = asArray(value, "CARDANO_OUTPUT_VALUE_INVALID");
-      if (parts.length !== 2) throw new Error("CARDANO_OUTPUT_VALUE_INVALID");
-      lovelace = asBigInt(parts[0], "CARDANO_OUTPUT_VALUE_INVALID");
-    }
+    if (typeof value.value !== "bigint") throw new Error("CARDANO_MULTI_ASSET_OUTPUT_UNSUPPORTED");
+    const lovelace = value.value;
     if (lovelace < 0n) throw new Error("CARDANO_OUTPUT_VALUE_INVALID");
     return { addressBytes, lovelace };
   });
@@ -418,6 +413,7 @@ async function sourceOutput(env: CardanoFacilitatorEnv, ref: string) {
   if (data.hash !== hash) throw new Error("CARDANO_INPUT_EVIDENCE_HASH_MISMATCH");
   const output = data.outputs.find((row) => row.output_index === index);
   if (!output) throw new Error("CARDANO_INPUT_EVIDENCE_MISSING");
+  if (output.amount.some((amount) => amount.unit !== "lovelace")) throw new Error("CARDANO_MULTI_ASSET_INPUT_UNSUPPORTED");
   return output;
 }
 
