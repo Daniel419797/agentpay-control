@@ -20,6 +20,7 @@ A release is eligible for production only when every repository gate is green an
 - Arc payer, x402 relayer, and explicit contract-execution private keys are all present and distinct in production.
 - Agent API credentials issued in production use the `ap_live_` prefix; non-production credentials use `ap_test_`. New credentials use collision-resistant lookup prefixes while legacy shorter prefixes remain readable during migration.
 - OAuth uses PKCE plus one-time state bound to an HttpOnly host cookie.
+- Unsafe cookie-authenticated API mutations require the exact configured application origin.
 - An unconfigured Hedera mainnet is not advertised by the production network router or operator switcher; configuring its facilitator also requires a mainnet signing capability credential.
 - Arc appears in the operator network selector only when its facilitator, signing capability, and public managed payer address are configured. Arc browser-wallet/self-custody flows are not advertised as implemented.
 - Hedera contract automation is bound to the allowlisted `hedera:testnet` or `hedera:mainnet` route. The selected network ID is persisted before submission and is reused for reconciliation instead of being re-derived from mutable rule state.
@@ -28,19 +29,27 @@ A release is eligible for production only when every repository gate is green an
 - Current x402 V2 HTTP headers use Base64-encoded JSON for `PAYMENT-REQUIRED`, `PAYMENT-SIGNATURE`, and `PAYMENT-RESPONSE`. Temporary raw-JSON decoding is compatibility-only and is not emitted by AgentPay.
 - The bundled resource server advertises all fully configured enabled payment rails in one x402 challenge; callers do not need a private network-selection header before receiving a 402 challenge.
 - After signing, ambiguous settlement outcomes never become safe-to-retry pre-submission failures. Network errors, facilitator 5xx/unknown settlement, malformed success evidence, oversized responses, or missing transaction evidence leave the payment `SUBMISSION_UNKNOWN` and keep spend reserved.
+- When the Arc facilitator broadcasts an EIP-3009 transfer but confirmation becomes uncertain, it retains and returns the exact transaction hash as **candidate evidence**, never as proof of success. The resource server and dashboard preserve that candidate for reconciliation.
 - Hedera `SUBMISSION_UNKNOWN` payments with a pre-recorded candidate transaction ID are reconciled automatically from the correct mirror node against the exact payer, payee, asset/token ID, and atomic amount. Proven failures release spend; successful transfer mismatches/replays retain spend and open an urgent incident.
-- Arc ambiguous x402 submissions remain incident-driven and are never blindly resubmitted until the signed authorization can be deterministically mapped to recoverable chain evidence.
+- Arc `SUBMISSION_UNKNOWN` payments with an exact broadcast transaction hash are reconciled from the configured Arc RPC only after required confirmations. Confirmation requires a successful receipt plus an exact USDC `Transfer` from the managed payer to the quoted payee for the quoted atomic amount. Reverts release spend; transfer mismatches/replays retain spend and open an urgent incident. Ambiguous Arc payments without a recoverable hash remain held for investigation and are never blindly resubmitted.
+- A confirmed chain settlement whose paid-resource response could not be recovered remains `SETTLED`; fulfillment is marked unavailable and an operational support case is opened instead of pretending the purchase never happened.
+- Human operator-initiated payments that require approval enforce four-eyes review: the same user who initiated the payment cannot cast an approving vote. Rejection by the initiator remains allowed. Agent-credential-initiated payments do not fabricate a human initiator.
+- Organization emergency stop blocks new autonomous x402 signing, cross-chain quote/signature preparation, fiat transfer submission, cardholder/card/fiat-account provisioning, card reactivation, agent credential creation, and new automation side effects. Defensive card freeze/cancel, evidence ingestion, and reconciliation remain available.
+- Automation activation requires Owner access plus recent authentication. Scheduled/event workers skip emergency-stopped organizations rather than failing the whole maintenance cycle, while already-submitted contract reconciliation continues.
 - Organization-owned marketplace providers currently publish paid resources only on verified Hedera testnet settlement. Arc/mainnet third-party settlement remains disabled until a network-specific provider settlement-account model and ownership verification exist. Platform-owned bundled resources may use deployment-configured payees on enabled rails.
 - Enabled resource-server networks have explicit HTTPS facilitator URLs, settlement credentials, provider/payee identifiers, and payment asset identifiers.
 - Dashboard readiness validates PostgreSQL migration state plus the exact x402 network advertised by every configured facilitator.
 - Hedera account snapshots store the selected asset balance: native HBAR uses tinybar balance and token assets use the selected token relationship. Arc managed agents store the configured USDC contract balance.
+- Payment authorization subtracts unresolved reservations and settlements newer than the last chain balance snapshot, preventing stale balance snapshots from reopening already-spent funds.
 - Card authorization spend windows are serialized and period-bounded; equal provider timestamps cannot bypass cumulative limits.
 - Definitive fiat-provider 4xx rejection is terminal `FAILED`; only network/5xx/malformed-submission uncertainty becomes `SUBMISSION_UNKNOWN` and is reconciled with the same idempotency key.
+- Notification webhook signing secrets are encrypted at rest and only returned at creation/rotation. Slack and generic webhook destination URLs are treated as credentials and are redacted from browser/API read responses and server-rendered settings HTML.
+- Automation action ciphertext and webhook secret hashes are not returned in normal browser/API reads.
 - Unsafe request bodies are size-bounded for JSON, URL-encoded, and multipart form submissions.
 - Outbound user-configurable resource fetches reject private/link-local/multicast addresses and use DNS-pinned connections in production.
 - Audit events remain immutable and hash-chain continuous. Retention maintenance may redact fulfillment bodies and delete eligible notification deliveries but does not delete audit-chain rows until a checkpointed externally verifiable archival protocol exists.
 - Runtime containers execute as an unprivileged user.
-- Operator UI hides write actions when the active membership lacks the required role; backend role enforcement remains authoritative.
+- Operator UI hides write actions when the active membership lacks the required role; server-rendered settings reads apply the same role boundary instead of bypassing API authorization.
 - Overview accounting never sums atomic amounts across different assets/decimal scales; settled spend and budget utilization are asset/network aware and explorer links follow the actual settlement rail.
 
 ### External launch gates
@@ -79,6 +88,7 @@ The dashboard is deployed separately from the Render blueprint. At minimum produ
 - if Hedera mainnet platform resources are enabled, `HEDERA_MAINNET_PROVIDER_ACCOUNT_ID` must identify their payee
 - if mainnet contract automation is enabled, `HEDERA_MAINNET_FACILITATOR_CONTRACT_API_KEY` and `HEDERA_MAINNET_PAYER_ACCOUNT_ID` are required and must remain independent from testnet capabilities
 - Arc facilitator URL plus signing and contract capability keys, Arc RPC URL/provider address, public `ARC_PAYER_ADDRESS`, and configured `ARC_USDC_ADDRESS`
+- when production seed data for the bundled fixture provider is installed, HTTPS `RESOURCE_SERVER_URL` pointing to the deployed resource server
 
 Do not place `HEDERA_OPERATOR_KEY`, `HEDERA_PAYER_KEY`, `ARC_PAYER_PRIVATE_KEY`, `ARC_RELAYER_PRIVATE_KEY`, or `ARC_CONTRACT_EXECUTION_PRIVATE_KEY` in Vercel.
 
@@ -102,17 +112,18 @@ The production start command runs a preflight before starting the HTTP server. E
 
 The resource server emits current x402 V2 Base64 payment headers and advertises every fully configured enabled rail in its 402 challenge. Legacy raw-JSON payment-signature input is accepted only as a migration compatibility path.
 
-The bundled `/v1/*` market, file, inference, and research resources are explicitly synthetic integration fixtures. They must not be marketed or exposed as live market data, real model inference, or live web research without replacing the fixture implementations with production providers and appropriate provider-level monitoring/SLOs.
+The bundled `/v1/*` market, file, inference, and research resources are explicitly synthetic integration fixtures. Production seeding uses `RESOURCE_SERVER_URL`; localhost endpoints are prohibited when `APP_ENV=production`. These fixtures must not be marketed or exposed as live market data, real model inference, or live web research without replacing the fixture implementations with production providers and appropriate provider-level monitoring/SLOs.
 
 ## Operational reconciliation
 
 - Run `POST /api/v1/internal/maintenance` on the documented schedule with the internal service credential.
 - Hedera unknown x402 submissions are reconciled from mirror-node evidence before unresolved-submission incident escalation.
+- Arc unknown x402 submissions with a captured transaction hash are reconciled from exact Arc receipt/log evidence before incident escalation. Unknown Arc submissions without a recoverable hash stay held and incident-driven; do not retry settlement blindly.
 - Fiat ambiguous submissions are retried only through the provider's stable idempotency key.
 - Hedera contract unknown submissions reconcile against the network ID persisted before submission.
-- Arc ambiguous x402 submissions remain held and incident-driven until deterministic authorization-to-chain evidence is implemented; do not retry settlement blindly.
 - A confirmed payment whose paid resource response was lost is recorded as settled, keeps spend settled, marks fulfillment unavailable, and opens an operational support case rather than pretending the purchase never happened.
 - A successful chain transaction whose transfer evidence does not match the signed quote is a settlement mismatch: spend remains consumed and an urgent incident is opened.
+- Emergency stop does not disable reconciliation. Operators must be able to account for transactions that may have been submitted before the stop became active.
 
 ## Release procedure
 
