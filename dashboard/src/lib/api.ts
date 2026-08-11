@@ -37,10 +37,11 @@ export async function requestBody(request: Request, maxBytes = 64 * 1024): Promi
   const bytes = await boundedBytes(request, maxBytes);
   const headers = new Headers(request.headers);
   headers.delete("content-length");
+  const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
   const boundedRequest = new Request(request.url, {
     method: request.method,
     headers,
-    body: bytes,
+    body,
   });
   const form = await boundedRequest.formData();
   return Object.fromEntries(form.entries());
