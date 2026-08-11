@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { prepareCrossChainTransfer } from "@/domain/cross-chain-service";
 import { boundedJson, handleApiError, ok, problem } from "@/lib/api";
+import { getConfig } from "@/lib/config";
 import { hasRecentAuthentication } from "@/lib/session";
 import { workspaceFromRequest, workspaceHasRole } from "@/lib/workspace";
 
@@ -12,6 +13,13 @@ export async function POST(request: Request, context: { params: Promise<{ quoteI
     const workspace = await workspaceFromRequest(request);
     if (!workspace) return problem(401, "AUTH_REQUIRED", "Sign in before preparing a transfer.");
     if (!workspaceHasRole(workspace, ["OWNER", "OPERATOR"])) return problem(403, "ROLE_REQUIRED", "Owner or operator access is required.");
+    if (getConfig().APP_ENV === "production") {
+      return problem(
+        503,
+        "CROSS_CHAIN_EXTERNAL_WALLET_EXPORT_DISABLED",
+        "Self-custody bridge transaction export is disabled in production. Production cross-chain transfers require a server-controlled submission path that revalidates organization status and the emergency stop immediately before broadcast.",
+      );
+    }
     if (!hasRecentAuthentication(workspace.session)) return problem(428, "STEP_UP_REQUIRED", "Sign in again before exporting a self-custody bridge transaction.");
     schema.parse(await boundedJson(request));
     const idempotencyKey = request.headers.get("idempotency-key");
