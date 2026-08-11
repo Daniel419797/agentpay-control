@@ -48,11 +48,7 @@ export function destinationTransferMatches(destinationToken: string, destination
   });
 }
 
-export function sourceTransactionMatches(
-  sourceAddress: string,
-  expected: z.infer<typeof transactionRequestSchema>,
-  transaction: DestinationTransaction
-) {
+export function sourceTransactionMatches(sourceAddress: string, expected: z.infer<typeof transactionRequestSchema>, transaction: DestinationTransaction) {
   return transaction.from.toLowerCase() === sourceAddress.toLowerCase()
     && transaction.to?.toLowerCase() === expected.to.toLowerCase()
     && transaction.input.toLowerCase() === expected.data.toLowerCase()
@@ -94,11 +90,7 @@ export async function verifySourceTransaction(quote: { sourceNetworkId: string; 
     rpc(url, "eth_getTransactionByHash", [transactionHash], rpcTransactionSchema, "SOURCE"),
     rpc(url, "eth_blockNumber", [], hex, "SOURCE"),
   ]);
-  if (
-    receipt.transactionHash.toLowerCase() !== transactionHash.toLowerCase()
-    || transaction.hash.toLowerCase() !== transactionHash.toLowerCase()
-    || BigInt(receipt.status) !== 1n
-  ) throw new Error("SOURCE_TRANSACTION_FAILED");
+  if (receipt.transactionHash.toLowerCase() !== transactionHash.toLowerCase() || transaction.hash.toLowerCase() !== transactionHash.toLowerCase() || BigInt(receipt.status) !== 1n) throw new Error("SOURCE_TRANSACTION_FAILED");
   const network = await db.chainNetwork.findUniqueOrThrow({ where: { id: quote.sourceNetworkId } });
   const confirmations = BigInt(blockHex) - BigInt(receipt.blockNumber) + 1n;
   if (confirmations < BigInt(network.requiredConfirmations)) throw new Error("SOURCE_CONFIRMATIONS_PENDING");
@@ -108,11 +100,14 @@ export async function verifySourceTransaction(quote: { sourceNetworkId: string; 
 }
 
 export async function createCrossChainQuote(organizationId: string, input: CrossChainQuoteInput) {
-  const [agent, source, destination] = await Promise.all([
+  const [organization, agent, source, destination] = await Promise.all([
+    db.organization.findUnique({ where: { id: organizationId }, select: { status: true, killSwitchEnabled: true } }),
     db.agent.findFirst({ where: { id: input.agentId, organizationId, status: "ACTIVE" }, include: { accounts: { where: { status: "ACTIVE" } } } }),
     db.chainNetwork.findFirst({ where: { id: input.sourceNetworkId, enabled: true } }),
     db.chainNetwork.findFirst({ where: { id: input.destinationNetworkId, enabled: true } }),
   ]);
+  if (!organization || organization.status !== "ACTIVE") throw new Error("ORGANIZATION_NOT_ACTIVE");
+  if (organization.killSwitchEnabled) throw new Error("ORGANIZATION_KILL_SWITCH_ENABLED");
   if (!agent) throw new Error("AGENT_NOT_FOUND");
   if (!source || !destination || source.id === destination.id) throw new Error("CROSS_CHAIN_NETWORK_UNAVAILABLE");
   if (source.family !== "EVM" || destination.family !== "EVM") throw new Error("ROUTE_PROVIDER_NETWORK_UNSUPPORTED");
@@ -130,6 +125,9 @@ export async function createCrossChainQuote(organizationId: string, input: Cross
 export async function prepareCrossChainTransfer(quoteId: string, organizationId: string, idempotencyKey: string) {
   return db.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${quoteId}, 0))`;
+    const organization = await tx.organization.findUnique({ where: { id: organizationId }, select: { status: true, killSwitchEnabled: true } });
+    if (!organization || organization.status !== "ACTIVE") throw new Error("ORGANIZATION_NOT_ACTIVE");
+    if (organization.killSwitchEnabled) throw new Error("ORGANIZATION_KILL_SWITCH_ENABLED");
     const quote = await tx.crossChainRouteQuote.findFirst({ where: { id: quoteId, organizationId } });
     if (!quote || quote.status !== "ACTIVE" || quote.expiresAt <= new Date()) throw new Error("CROSS_CHAIN_QUOTE_EXPIRED");
     const existing = await tx.crossChainTransfer.findUnique({ where: { organizationId_idempotencyKey: { organizationId, idempotencyKey } } });
@@ -144,7 +142,7 @@ export async function recordCrossChainSubmission(transferId: string, organizatio
     const transfer = await tx.crossChainTransfer.findFirst({ where: { id: transferId, organizationId }, include: { quote: true } });
     if (!transfer) throw new Error("CROSS_CHAIN_TRANSFER_NOT_FOUND");
     if (transfer.sourceTransactionHash && transfer.sourceTransactionHash.toLowerCase() !== sourceTransactionHash.toLowerCase()) throw new Error("SOURCE_TRANSACTION_CONFLICT");
-    if (!['AWAITING_SIGNATURE', 'SUBMITTED', 'BRIDGING'].includes(transfer.status)) throw new Error("CROSS_CHAIN_TRANSFER_NOT_SUBMITTABLE");
+    if (!["AWAITING_SIGNATURE", "SUBMITTED", "BRIDGING"].includes(transfer.status)) throw new Error("CROSS_CHAIN_TRANSFER_NOT_SUBMITTABLE");
     await tx.crossChainRouteQuote.update({ where: { id: transfer.quoteId }, data: { status: "CONSUMED" } });
     const updated = await tx.crossChainTransfer.update({ where: { id: transfer.id }, data: { status: "SUBMITTED", sourceTransactionHash, submittedAt: transfer.submittedAt ?? new Date() } });
     await tx.outboxEvent.create({ data: { organizationId, eventType: "CROSS_CHAIN_TRANSFER_SUBMITTED", aggregateType: "CROSS_CHAIN_TRANSFER", aggregateId: transfer.id, payload: { sourceTransactionHash, sourceNetworkId: transfer.quote.sourceNetworkId, destinationNetworkId: transfer.quote.destinationNetworkId } } });
