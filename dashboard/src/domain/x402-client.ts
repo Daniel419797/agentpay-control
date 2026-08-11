@@ -78,7 +78,22 @@ export async function createManagedPaymentPayload(facilitatorUrlOrRequirement: s
   return { paymentPayload: paymentPayloadSchema.parse(body.paymentPayload), transactionId: body.transactionId };
 }
 
-export class X402SubmissionUnknownError extends Error { constructor() { super("X402_SUBMISSION_UNKNOWN"); } }
+function settlementCandidateFromBody(body: unknown) {
+  if (!body || typeof body !== "object") return undefined;
+  const record = body as Record<string, unknown>;
+  for (const key of ["transactionId", "transaction"]) {
+    const value = record[key];
+    if (typeof value === "string" && value.length >= 8 && value.length <= 200) return value;
+  }
+  return undefined;
+}
+
+export class X402SubmissionUnknownError extends Error {
+  constructor(readonly candidateTransactionId?: string) {
+    super("X402_SUBMISSION_UNKNOWN");
+    this.name = "X402SubmissionUnknownError";
+  }
+}
 
 function ambiguousPostPaymentFailure(status: number, code: string) {
   return status >= 500 || ["SETTLEMENT_FAILED", "SETTLEMENT_UNKNOWN", "SETTLEMENT_EVIDENCE_MISSING", "SETTLEMENT_NETWORK_MISMATCH", "FACILITATOR_ERROR"].includes(code);
@@ -88,7 +103,7 @@ export async function fulfillX402Resource(resourceUrl: string, requirement: Paym
   let response: Response;
   try {
     response = await safeFetch(resourceUrl, {
-      method: "GET", redirect: "manual", cache: "no-store", signal: AbortSignal.timeout(30_000),
+      method: "GET", redirect: "manual", cache: "no-store", signal: AbortSignal.timeout(90_000),
       headers: { accept: "application/json", "payment-signature": encodeX402Header(paymentPayload) },
     }, production);
   } catch { throw new X402SubmissionUnknownError(); }
@@ -100,10 +115,11 @@ export async function fulfillX402Resource(resourceUrl: string, requirement: Paym
   try { body = JSON.parse(text); } catch { /* retain text */ }
   if (!response.ok) {
     const code = typeof body === "object" && body && "code" in body ? String((body as { code: unknown }).code) : `HTTP_${response.status}`;
-    if (ambiguousPostPaymentFailure(response.status, code)) throw new X402SubmissionUnknownError();
+    if (ambiguousPostPaymentFailure(response.status, code)) throw new X402SubmissionUnknownError(settlementCandidateFromBody(body));
     throw new Error(`RESOURCE_FULFILLMENT_${code}`);
   }
 
+  const nestedTransaction = typeof body === "object" && body && "settled" in body ? (body as { settled?: { transactionId?: string } }).settled?.transactionId : undefined;
   const paymentResponseHeader = response.headers.get("payment-response");
   let transactionId: string | undefined;
   let settlementNetwork: string | undefined;
@@ -112,7 +128,7 @@ export async function fulfillX402Resource(resourceUrl: string, requirement: Paym
       const decoded = decodeX402Header(paymentResponseHeader, 64 * 1024);
       const standard = standardPaymentResponseSchema.safeParse(decoded);
       if (standard.success) {
-        if (!standard.data.success) throw new X402SubmissionUnknownError();
+        if (!standard.data.success) throw new X402SubmissionUnknownError(nestedTransaction);
         transactionId = standard.data.transaction;
         settlementNetwork = standard.data.network;
       } else {
@@ -122,10 +138,9 @@ export async function fulfillX402Resource(resourceUrl: string, requirement: Paym
       }
     } catch (error) {
       if (error instanceof X402SubmissionUnknownError) throw error;
-      throw new X402SubmissionUnknownError();
+      throw new X402SubmissionUnknownError(nestedTransaction);
     }
   }
-  const nestedTransaction = typeof body === "object" && body && "settled" in body ? (body as { settled?: { transactionId?: string } }).settled?.transactionId : undefined;
   transactionId ??= nestedTransaction;
   if (!transactionId) throw new X402SubmissionUnknownError();
   const contentType = response.headers.get("content-type") ?? "application/octet-stream";
