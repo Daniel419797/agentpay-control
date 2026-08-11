@@ -25,6 +25,10 @@ services:
         sync: false
       - key: ARC_PAYER_PRIVATE_KEY
         sync: false
+      - key: ARC_RELAYER_PRIVATE_KEY
+        sync: false
+      - key: ARC_CONTRACT_EXECUTION_PRIVATE_KEY
+        sync: false
       - key: ARC_RPC_URL
         value: https://rpc.testnet.arc.network
       - key: ARC_USDC_ADDRESS
