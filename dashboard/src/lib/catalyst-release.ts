@@ -68,6 +68,35 @@ export async function liveCatalystDependencyChecks() {
     dune: { overviewQueryId: dune.overview.queryId, activityQueryId: dune.activity?.queryId ?? null, sampleQueryId: dune.sample.queryId, dashboardUrl: dune.dashboardUrl, executedAt: dune.overview.executedAt, independentlyVerifiedTransactionIds: verifiedSamples },
   };
 }
+
+type LiveDependencies = Awaited<ReturnType<typeof liveCatalystDependencyChecks>>;
+const READINESS_SUCCESS_TTL_MS = 30_000;
+const READINESS_FAILURE_TTL_MS = 10_000;
+let readinessCache: { expiresAt: number; value?: LiveDependencies; error?: string } | null = null;
+let readinessProbe: Promise<LiveDependencies> | null = null;
+
+async function cachedLiveCatalystDependencyChecks() {
+  const now = Date.now();
+  if (readinessCache && readinessCache.expiresAt > now) {
+    if (readinessCache.value) return readinessCache.value;
+    throw new Error(readinessCache.error ?? "CATALYST_DEPENDENCY_CHECK_FAILED");
+  }
+  if (!readinessProbe) {
+    readinessProbe = liveCatalystDependencyChecks()
+      .then((value) => {
+        readinessCache = { expiresAt: Date.now() + READINESS_SUCCESS_TTL_MS, value };
+        return value;
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : "CATALYST_DEPENDENCY_CHECK_FAILED";
+        readinessCache = { expiresAt: Date.now() + READINESS_FAILURE_TTL_MS, error: message };
+        throw error;
+      })
+      .finally(() => { readinessProbe = null; });
+  }
+  return readinessProbe;
+}
+
 export async function catalystReleaseEvidenceStatus(releaseSha = process.env.RELEASE_SHA ?? "") {
   if (!/^[0-9a-f]{40}$/.test(releaseSha)) return { releaseSha, complete: false, present: [], missing: [...catalystEvidenceTypes] as CatalystEvidenceType[] };
   const rows = await db.$queryRaw<Array<{ evidenceType: CatalystEvidenceType; transactionId: string | null; evidenceHash: string; verifiedAt: Date }>>`SELECT "evidenceType","transactionId","evidenceHash","verifiedAt" FROM "ProductionReleaseEvidence" WHERE "releaseSha"=${releaseSha}`;
@@ -79,8 +108,8 @@ export async function catalystProductionReadiness() {
   if (process.env.CATALYST_PRODUCTION_ENABLED !== "true") return { enabled: false, ready: false, configErrors: [], evidence: null, liveDependencies: null };
   const configErrors = catalystProductionConfigErrors(process.env);
   if (configErrors.length) return { enabled: true, ready: false, configErrors, evidence: null, liveDependencies: null };
-  let liveDependencies: Awaited<ReturnType<typeof liveCatalystDependencyChecks>> | null = null;
-  try { liveDependencies = await liveCatalystDependencyChecks(); }
+  let liveDependencies: LiveDependencies | null = null;
+  try { liveDependencies = await cachedLiveCatalystDependencyChecks(); }
   catch (error) { return { enabled: true, ready: false, configErrors: [error instanceof Error ? error.message : "CATALYST_DEPENDENCY_CHECK_FAILED"], evidence: await catalystReleaseEvidenceStatus(), liveDependencies: null }; }
   const evidence = await catalystReleaseEvidenceStatus();
   return { enabled: true, ready: evidence.complete, configErrors: [], evidence, liveDependencies };
