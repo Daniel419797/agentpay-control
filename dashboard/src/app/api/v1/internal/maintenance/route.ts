@@ -3,6 +3,7 @@ import { reconcileUnknownHederaPayments } from "@/domain/payment-reconciliation-
 import { reconcileUnknownArcPayments } from "@/domain/arc-payment-reconciliation-service";
 import { reconcileUnknownCardanoPayments } from "@/domain/cardano-payment-reconciliation-service";
 import { reconcilePendingMasumiEscrows } from "@/domain/masumi-escrow-service";
+import { openUnresolvedMasumiRefundMutationIncidents } from "@/domain/masumi-refund-mutation-incidents";
 import { reconcilePendingMasumiRefundMutations } from "@/domain/masumi-refund-mutation-service";
 import { runResourceHealthChecks } from "@/domain/resource-health-service";
 import { markOverdueInvoices } from "@/domain/invoice-service";
@@ -35,7 +36,10 @@ export async function POST(request: Request) {
       reconcileUnknownContractExecutions(),
       runAllFinancialIntelligence(),
     ]);
-    const incidents = await openUnresolvedSubmissionIncidents();
+    const [incidents, masumiRefundMutationIncidents] = await Promise.all([
+      openUnresolvedSubmissionIncidents(),
+      openUnresolvedMasumiRefundMutationIncidents(),
+    ]);
     return ok({
       payments,
       paymentReconciliation: { hedera: hederaPaymentReconciliation, arc: arcPaymentReconciliation, cardano: cardanoPaymentReconciliation, masumiEscrow: masumiEscrowReconciliation, masumiRefundMutations: masumiRefundMutationReconciliation },
@@ -45,7 +49,7 @@ export async function POST(request: Request) {
       invoices,
       crossChain,
       fiat,
-      incidents,
+      incidents: { submissions: incidents, masumiRefundMutations: masumiRefundMutationIncidents },
       automations: { scheduled: scheduledAutomations, eventDriven: eventAutomations, deferredPayments: deferredAutomations, contractReconciliation },
       intelligence,
     });
