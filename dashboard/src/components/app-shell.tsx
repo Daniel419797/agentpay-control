@@ -30,7 +30,7 @@ const navigation: Array<{ label: string; href: Route; icon: typeof LayoutDashboa
   { label: "Settings", href: "/app/settings", icon: Settings }
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, mainnetEnabled = true }: { children: React.ReactNode; mainnetEnabled?: boolean }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
   const [operatorEmail, setOperatorEmail] = useState("Loading operator…");
@@ -43,7 +43,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       });
   }, []);
   return (
-    <NetworkProvider>
+    <NetworkProvider mainnetEnabled={mainnetEnabled}>
       <div className="app-shell">
         {navOpen && <button className="nav-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}
         <aside className={`sidebar${navOpen ? " sidebar-open" : ""}`} aria-label="Primary navigation">
@@ -55,7 +55,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               height={35}
               priority
             />
-            {/* <span>Control</span> */}
           </div>
           <nav className="nav-list">
             {navigation.map((item) => <div className="nav-entry" key={item.href}>{item.group && <span className="nav-group">{item.group}</span>}<Link className={`nav-link${pathname === item.href || (item.href !== "/app/overview" && pathname.startsWith(`${item.href}/`)) ? " active" : ""}`} href={item.href} onClick={() => setNavOpen(false)}><item.icon aria-hidden="true" size={17} />{item.label}</Link></div>)}
