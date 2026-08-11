@@ -1,14 +1,59 @@
 import { db } from "@/lib/db";
 
 export async function openUnresolvedMasumiRefundMutationIncidents(limit = 100, now = new Date(), thresholdMs = 15 * 60_000) {
+  const boundedLimit = Math.max(1, Math.min(limit, 500));
   const cutoff = new Date(now.getTime() - thresholdMs);
-  const rows = await db.$queryRaw<Array<{ claimId: string; escrowPurchaseId: string; organizationId: string; operation: string; status: string }>>`
-    SELECT c."id" AS "claimId",c."escrowPurchaseId",p."organizationId",c."operation",c."status"
-    FROM "MasumiEscrowMutationClaim" c
-    JOIN "MasumiEscrowPurchase" p ON p."id"=c."escrowPurchaseId"
-    WHERE c."status" IN ('PREPARED','SUBMISSION_UNKNOWN') AND c."updatedAt" <= ${cutoff}
-    ORDER BY c."updatedAt" ASC
-    LIMIT ${Math.max(1, Math.min(limit, 500))}`;
+  const [rows, resolvedRows] = await Promise.all([
+    db.$queryRaw<Array<{ claimId: string; escrowPurchaseId: string; organizationId: string; operation: string; status: string }>>`
+      SELECT c."id" AS "claimId",c."escrowPurchaseId",p."organizationId",c."operation",c."status"
+      FROM "MasumiEscrowMutationClaim" c
+      JOIN "MasumiEscrowPurchase" p ON p."id"=c."escrowPurchaseId"
+      WHERE c."status" IN ('PREPARED','SUBMISSION_UNKNOWN') AND c."updatedAt" <= ${cutoff}
+      ORDER BY c."updatedAt" ASC
+      LIMIT ${boundedLimit}`,
+    db.$queryRaw<Array<{ claimId: string; escrowPurchaseId: string; organizationId: string; operation: string; supportCaseId: string }>>`
+      SELECT c."id" AS "claimId",c."escrowPurchaseId",p."organizationId",c."operation",s."id" AS "supportCaseId"
+      FROM "MasumiEscrowMutationClaim" c
+      JOIN "MasumiEscrowPurchase" p ON p."id"=c."escrowPurchaseId"
+      JOIN "SupportCase" s ON s."organizationId"=p."organizationId" AND s."sourceType"='MASUMI_REFUND_MUTATION' AND s."sourceId"=c."id"::text
+      WHERE c."status"='CONFIRMED' AND s."status" IN ('OPEN','IN_PROGRESS','WAITING_ON_CUSTOMER')
+      ORDER BY c."updatedAt" ASC
+      LIMIT ${boundedLimit}`,
+  ]);
+
+  let resolved = 0;
+  for (const row of resolvedRows) {
+    const didResolve = await db.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`incident:MASUMI_REFUND_MUTATION:${row.claimId}`}, 0))`;
+      const changed = await tx.supportCase.updateMany({
+        where: { id: row.supportCaseId, organizationId: row.organizationId, status: { in: ["OPEN", "IN_PROGRESS", "WAITING_ON_CUSTOMER"] } },
+        data: { status: "RESOLVED" },
+      });
+      if (changed.count !== 1) return false;
+      await tx.auditEvent.create({
+        data: {
+          organizationId: row.organizationId,
+          actorType: "SYSTEM",
+          action: "RECONCILIATION_INCIDENT_RESOLVED",
+          targetType: "SUPPORT_CASE",
+          targetId: row.supportCaseId,
+          result: "SUCCESS",
+          metadata: { sourceType: "MASUMI_REFUND_MUTATION", sourceId: row.claimId, escrowPurchaseId: row.escrowPurchaseId, operation: row.operation, mutationStatus: "CONFIRMED" },
+        },
+      });
+      await tx.outboxEvent.create({
+        data: {
+          organizationId: row.organizationId,
+          eventType: "RECONCILIATION_INCIDENT_RESOLVED",
+          aggregateType: "MASUMI_REFUND_MUTATION",
+          aggregateId: row.claimId,
+          payload: { supportCaseId: row.supportCaseId, escrowPurchaseId: row.escrowPurchaseId, operation: row.operation, mutationStatus: "CONFIRMED" },
+        },
+      });
+      return true;
+    });
+    if (didResolve) resolved += 1;
+  }
 
   let opened = 0;
   for (const row of rows) {
@@ -55,5 +100,5 @@ export async function openUnresolvedMasumiRefundMutationIncidents(limit = 100, n
     });
     if (didOpen) opened += 1;
   }
-  return { scanned: rows.length, opened };
+  return { scanned: rows.length, opened, resolved };
 }
