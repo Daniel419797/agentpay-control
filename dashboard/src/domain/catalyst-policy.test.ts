@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { combinePolicyOutcomes, evaluateUsdPolicy } from "@/domain/catalyst-policy";
+import { combinePolicyOutcomes, evaluateUsdPolicy, masumiNetworkForCardano } from "@/domain/catalyst-policy";
 
 const limits = {
   policyVersionId: "00000000-0000-0000-0000-000000000001",
@@ -41,5 +41,12 @@ describe("Catalyst policy composition", () => {
       "USD_DAILY_LIMIT_EXCEEDED",
       "USD_MONTHLY_LIMIT_EXCEEDED",
     ]));
+  });
+
+  it("maps Cardano policy networks to the only valid Masumi network", () => {
+    expect(masumiNetworkForCardano("cardano:preprod")).toBe("Preprod");
+    expect(masumiNetworkForCardano("cardano:mainnet")).toBe("Mainnet");
+    expect(() => masumiNetworkForCardano("cardano:preview")).toThrow("MASUMI_CARDANO_NETWORK_REQUIRED");
+    expect(() => masumiNetworkForCardano("hedera:testnet")).toThrow("MASUMI_CARDANO_NETWORK_REQUIRED");
   });
 });
