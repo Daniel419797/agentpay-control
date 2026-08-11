@@ -1,5 +1,6 @@
-type MirrorTransfer = { account: string; amount: number };
-export type MirrorTokenTransfer = { token_id: string; account: string; amount: number };
+export type MirrorAtomicAmount = string | number;
+type MirrorTransfer = { account: string; amount: MirrorAtomicAmount };
+export type MirrorTokenTransfer = { token_id: string; account: string; amount: MirrorAtomicAmount };
 export type MirrorTransaction = {
   consensus_timestamp: string;
   result: string;
@@ -38,14 +39,32 @@ export function formatTinybarsAsHbar(amountTinybar: number): string {
   return (amountTinybar / 100_000_000).toFixed(8).replace(/\.?0+$/, "");
 }
 
-function transferTotals(transfers: Array<{ account: string; amount: number }>, payerAccountId: string, payeeAccountId: string) {
-  const payerDebit = transfers.filter((transfer) => transfer.account === payerAccountId).reduce((total, transfer) => total + BigInt(transfer.amount), 0n);
-  const payeeCredit = transfers.filter((transfer) => transfer.account === payeeAccountId).reduce((total, transfer) => total + BigInt(transfer.amount), 0n);
+export function parseMirrorNodeJson(text: string): unknown {
+  if (text.length > 1_000_000) throw new Error("MIRROR_RESPONSE_TOO_LARGE");
+  // Mirror Node represents atomic transfer values as JSON integers. Quote those
+  // integer tokens before JSON.parse so values beyond Number.MAX_SAFE_INTEGER
+  // retain their exact decimal representation for BigInt verification.
+  const losslessAmounts = text.replace(/("amount"\s*:\s*)(-?\d+)(?=\s*[,}])/g, "$1\"$2\"");
+  return JSON.parse(losslessAmounts) as unknown;
+}
+
+function atomic(value: MirrorAtomicAmount): bigint {
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value)) throw new Error("MIRROR_TRANSFER_AMOUNT_UNSAFE");
+    return BigInt(value);
+  }
+  if (!/^-?\d+$/.test(value)) throw new Error("MIRROR_TRANSFER_AMOUNT_INVALID");
+  return BigInt(value);
+}
+
+function transferTotals(transfers: Array<{ account: string; amount: MirrorAtomicAmount }>, payerAccountId: string, payeeAccountId: string) {
+  const payerDebit = transfers.filter((transfer) => transfer.account === payerAccountId).reduce((total, transfer) => total + atomic(transfer.amount), 0n);
+  const payeeCredit = transfers.filter((transfer) => transfer.account === payeeAccountId).reduce((total, transfer) => total + atomic(transfer.amount), 0n);
   return { payerDebit, payeeCredit };
 }
 
 export function verifyHederaPayment(transaction: MirrorTransaction, payerAccountId: string, payeeAccountId: string, amountTinybar: number): boolean {
-  if (transaction.result !== "SUCCESS") return false;
+  if (transaction.result !== "SUCCESS" || !Number.isSafeInteger(amountTinybar)) return false;
   const totals = transferTotals(transaction.transfers, payerAccountId, payeeAccountId);
   const amount = BigInt(amountTinybar);
   return totals.payerDebit <= -amount && totals.payeeCredit >= amount;
