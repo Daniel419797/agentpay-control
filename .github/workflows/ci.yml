@@ -29,8 +29,8 @@ jobs:
       CRON_SECRET: ci-cron-secret-that-is-at-least-thirty-two-characters
       APP_ENV: test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -78,7 +78,7 @@ jobs:
           - facilitator-combined
           - resource-server
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: docker/setup-buildx-action@v3
       - name: Build ${{ matrix.service }} production image
         uses: docker/build-push-action@v6
