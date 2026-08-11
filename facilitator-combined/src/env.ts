@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const privateKey = z.string().regex(/^(0x)?[0-9a-fA-F]{64}$/).optional();
+
 const combinedEnvSchema = z.object({
   APP_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().default(8787),
@@ -11,9 +13,16 @@ const combinedEnvSchema = z.object({
   ARC_MANAGED_SIGNING_API_KEY: z.string().min(32).optional(),
   ARC_SETTLEMENT_API_KEY: z.string().min(32).optional(),
   ARC_CONTRACT_EXECUTION_API_KEY: z.string().min(32).optional(),
+  ARC_PAYER_PRIVATE_KEY: privateKey,
+  ARC_RELAYER_PRIVATE_KEY: privateKey,
+  ARC_CONTRACT_EXECUTION_PRIVATE_KEY: privateKey,
 });
 
 export type CombinedEnv = z.infer<typeof combinedEnvSchema>;
+
+function normalizePrivateKey(value: string) {
+  return value.replace(/^0x/i, "").toLowerCase();
+}
 
 export function parseCombinedEnv(input: NodeJS.ProcessEnv = process.env): CombinedEnv {
   const env = combinedEnvSchema.parse(input);
@@ -30,6 +39,11 @@ export function parseCombinedEnv(input: NodeJS.ProcessEnv = process.env): Combin
     ];
     if (keys.some((key) => !key)) throw new Error("Production combined facilitator requires network-scoped capability API keys");
     if (new Set(keys).size !== keys.length) throw new Error("Production network-scoped capability API keys must all be distinct");
+
+    const arcKeys = [env.ARC_PAYER_PRIVATE_KEY, env.ARC_RELAYER_PRIVATE_KEY, env.ARC_CONTRACT_EXECUTION_PRIVATE_KEY];
+    if (arcKeys.some((key) => !key)) throw new Error("Production combined facilitator requires Arc payer, relayer, and contract-execution private keys");
+    const normalized = arcKeys.map((key) => normalizePrivateKey(key!));
+    if (new Set(normalized).size !== normalized.length) throw new Error("Production Arc payer, relayer, and contract-execution private keys must be distinct");
   }
   return env;
 }
