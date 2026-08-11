@@ -6,6 +6,10 @@ import { privateKeyToAccount } from "viem/accounts";
 import { z } from "zod";
 
 const privateKeySchema = z.string().regex(/^(0x)?[0-9a-fA-F]{64}$/, "Must be a 64-char hex private key");
+const optionalPrivateKeySchema = z.preprocess(
+  (value) => value === "" ? undefined : value,
+  privateKeySchema.optional(),
+);
 
 const arcTestnet = defineChain({
   id: 5042002,
@@ -19,8 +23,8 @@ const arcTestnet = defineChain({
 export const envSchema = z.object({
   APP_ENV: z.enum(["development", "test", "production"]).default("development"),
   ARC_PAYER_PRIVATE_KEY: privateKeySchema,
-  ARC_RELAYER_PRIVATE_KEY: privateKeySchema.optional(),
-  ARC_CONTRACT_EXECUTION_PRIVATE_KEY: privateKeySchema.optional(),
+  ARC_RELAYER_PRIVATE_KEY: optionalPrivateKeySchema,
+  ARC_CONTRACT_EXECUTION_PRIVATE_KEY: optionalPrivateKeySchema,
   ARC_RPC_URL: z.string().url().default("https://rpc.testnet.arc.network"),
   ARC_USDC_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).default("0x3600000000000000000000000000000000000000"),
   ARC_PROVIDER_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
