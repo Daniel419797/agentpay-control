@@ -5,6 +5,8 @@ function productionEnv(overrides: Record<string, string> = {}) {
   return {
     APP_ENV: "production",
     ARC_PAYER_PRIVATE_KEY: "1".repeat(64),
+    ARC_RELAYER_PRIVATE_KEY: "2".repeat(64),
+    ARC_CONTRACT_EXECUTION_PRIVATE_KEY: "3".repeat(64),
     ARC_RPC_URL: "https://rpc.testnet.arc.network",
     ARC_PROVIDER_ADDRESS: "0x1111111111111111111111111111111111111111",
     MANAGED_SIGNING_API_KEY: "signing-secret-abcdefghijklmnopqrstuvwxyz-123",
@@ -15,7 +17,7 @@ function productionEnv(overrides: Record<string, string> = {}) {
 }
 
 describe("Arc facilitator production environment", () => {
-  it("accepts independent capability credentials", () => {
+  it("accepts independent capability and chain credentials", () => {
     expect(parseArcEnv(productionEnv()).APP_ENV).toBe("production");
   });
 
@@ -31,5 +33,17 @@ describe("Arc facilitator production environment", () => {
       MANAGED_SIGNING_API_KEY: duplicate,
       SETTLEMENT_API_KEY: duplicate,
     }))).toThrow(/must be distinct/);
+  });
+
+  it("rejects missing relayer or contract-execution private keys", () => {
+    const env = productionEnv();
+    delete (env as Record<string, string>).ARC_RELAYER_PRIVATE_KEY;
+    expect(() => parseArcEnv(env)).toThrow(/relayer and contract-execution private keys are required/);
+  });
+
+  it("rejects private-key reuse across payer relayer and contract execution", () => {
+    expect(() => parseArcEnv(productionEnv({
+      ARC_RELAYER_PRIVATE_KEY: "1".repeat(64),
+    }))).toThrow(/private keys must be distinct/);
   });
 });
