@@ -14,7 +14,7 @@ const schema = z.object({
 
 async function authorizeCaller(request: Request, agentId: string) {
   if (await authorizeAgentRequest(request, agentId, "payments:create")) {
-    return { authorized: true as const, rateSubject: `agent:${agentId}` };
+    return { authorized: true as const, rateSubject: `agent:${agentId}`, initiatedByUserId: undefined };
   }
 
   const workspace = await workspaceFromRequest(request);
@@ -29,7 +29,7 @@ async function authorizeCaller(request: Request, agentId: string) {
   });
   if (!ownedAgent) return { authorized: false as const, response: problem(404, "AGENT_NOT_FOUND", "Agent not found in the active workspace.") };
 
-  return { authorized: true as const, rateSubject: `operator:${workspace.user.id}:${agentId}` };
+  return { authorized: true as const, rateSubject: `operator:${workspace.user.id}:${agentId}`, initiatedByUserId: workspace.user.id };
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ agentId: string }> }) {
@@ -46,7 +46,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     const rate = await enforceRateLimit(request, { scope: "agent-paid-request", subject: caller.rateSubject, limit: 60, windowMs: 60_000 });
     if (!rate.allowed) return rateLimitProblem(rate.retryAfterSeconds);
 
-    const result = await createPaidRequest(agentId, key, schema.parse(await boundedJson(request)));
+    const result = await createPaidRequest(
+      agentId,
+      key,
+      schema.parse(await boundedJson(request)),
+      { initiatedByUserId: caller.initiatedByUserId },
+    );
     return ok(result, { status: result.status === "APPROVAL_PENDING" ? 202 : 200 });
   } catch (error) {
     if (error instanceof Error) {
