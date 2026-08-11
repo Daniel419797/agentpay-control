@@ -104,18 +104,14 @@ export function productionConfigErrors(config: AppConfig): string[] {
   if (!config.FACILITATOR_SIGNING_API_KEY) errors.push("FACILITATOR_SIGNING_API_KEY");
   if (!config.FACILITATOR_SETTLEMENT_API_KEY) errors.push("FACILITATOR_SETTLEMENT_API_KEY");
   if (!config.FACILITATOR_CONTRACT_API_KEY) errors.push("FACILITATOR_CONTRACT_API_KEY");
-  if (config.HEDERA_MAINNET_FACILITATOR_URL && !config.HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY) {
-    errors.push("HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY");
-  }
+  if (config.HEDERA_MAINNET_FACILITATOR_URL && !config.HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY) errors.push("HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY");
   if (!config.ARC_FACILITATOR_URL) errors.push("ARC_FACILITATOR_URL");
   if (!config.ARC_FACILITATOR_SIGNING_API_KEY) errors.push("ARC_FACILITATOR_SIGNING_API_KEY");
   if (!config.ARC_FACILITATOR_CONTRACT_API_KEY) errors.push("ARC_FACILITATOR_CONTRACT_API_KEY");
   if (!config.ARC_RPC_URL) errors.push("ARC_RPC_URL");
   if (!config.ARC_PROVIDER_ADDRESS) errors.push("ARC_PROVIDER_ADDRESS");
   if (!config.HEDERA_PAYER_ACCOUNT_ID) errors.push("HEDERA_PAYER_ACCOUNT_ID");
-  if (!isExactBase64Url32(config.KEY_ENCRYPTION_MASTER_KEY)) {
-    errors.push("KEY_ENCRYPTION_MASTER_KEY must be exactly 32 random bytes encoded as unpadded base64url");
-  }
+  if (!isExactBase64Url32(config.KEY_ENCRYPTION_MASTER_KEY)) errors.push("KEY_ENCRYPTION_MASTER_KEY must be exactly 32 random bytes encoded as unpadded base64url");
   if (!config.SUPABASE_URL || !config.SUPABASE_ANON_KEY) errors.push("SUPABASE_URL / SUPABASE_ANON_KEY");
   if (config.HEDERA_OPERATOR_ID || config.HEDERA_OPERATOR_KEY) errors.push("Hedera operator credentials must be held only by the facilitator");
 
@@ -123,8 +119,7 @@ export function productionConfigErrors(config: AppConfig): string[] {
     ["FACILITATOR_SIGNING_API_KEY", config.FACILITATOR_SIGNING_API_KEY],
     ["FACILITATOR_SETTLEMENT_API_KEY", config.FACILITATOR_SETTLEMENT_API_KEY],
     ["FACILITATOR_CONTRACT_API_KEY", config.FACILITATOR_CONTRACT_API_KEY],
-  ], errors);
-  assertDistinctSecrets([
+    ["HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY", config.HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY],
     ["ARC_FACILITATOR_SIGNING_API_KEY", config.ARC_FACILITATOR_SIGNING_API_KEY],
     ["ARC_FACILITATOR_CONTRACT_API_KEY", config.ARC_FACILITATOR_CONTRACT_API_KEY],
   ], errors);
@@ -143,16 +138,12 @@ export function parseEnv(input: unknown = process.env): AppConfig {
   const result = envSchema.safeParse(input);
   if (!result.success) {
     const summary = issueSummary(result.error);
-    if (requestedAppEnv(input) === "production") {
-      throw new Error(`Invalid production environment: ${summary}`);
-    }
+    if (requestedAppEnv(input) === "production") throw new Error(`Invalid production environment: ${summary}`);
 
     console.error("[config] Environment validation failed:", summary);
     const filtered: Record<string, string | undefined> = {};
     if (input && typeof input === "object") {
-      for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
-        filtered[key] = typeof value === "string" ? value : undefined;
-      }
+      for (const [key, value] of Object.entries(input as Record<string, unknown>)) filtered[key] = typeof value === "string" ? value : undefined;
     }
     for (const issue of result.error.issues) delete filtered[String(issue.path[0] ?? "")];
     const retry = envSchema.safeParse(filtered);
@@ -163,9 +154,7 @@ export function parseEnv(input: unknown = process.env): AppConfig {
 
   const parsed = result.data;
   const errors = productionConfigErrors(parsed);
-  if (errors.length) {
-    throw new Error(`Invalid production configuration: ${errors.join(", ")}`);
-  }
+  if (errors.length) throw new Error(`Invalid production configuration: ${errors.join(", ")}`);
   return parsed;
 }
 
