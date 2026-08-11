@@ -166,10 +166,18 @@ services:
       # Flip this to true only after the shared asset unit and funded canary are verified.
       - key: CARDANO_USDCX_ENABLED
         value: "false"
+      # The combined facilitator's root dispatcher selects the namespaced rail
+      # from the exact network binding in the x402 payload/requirement pair.
       - key: FACILITATOR_URL
-        sync: false
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: RENDER_EXTERNAL_URL
       - key: ARC_FACILITATOR_URL
-        sync: false
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: RENDER_EXTERNAL_URL
       - key: CARDANO_PREPROD_FACILITATOR_URL
         fromService:
           type: web
