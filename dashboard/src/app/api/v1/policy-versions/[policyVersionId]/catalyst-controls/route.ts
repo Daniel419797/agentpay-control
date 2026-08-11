@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { masumiNetworkForCardano } from "@/domain/catalyst-policy";
 import { boundedJson, handleApiError, ok, problem } from "@/lib/api";
 import { db } from "@/lib/db";
 import { hasRecentAuthentication } from "@/lib/session";
@@ -63,6 +64,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ poli
     if (!version) return problem(404, "POLICY_VERSION_NOT_FOUND", "Policy version not found in the active workspace.");
     if (version.status !== "DRAFT") return problem(409, "POLICY_VERSION_IMMUTABLE", "Catalyst controls can only be changed on a draft policy version.");
     if ((input.masumi?.enabled || input.keri?.enabled) && !version.asset.network.startsWith("cardano:")) return problem(422, "CATALYST_CARDANO_POLICY_REQUIRED", "Masumi and KERI trust controls require a Cardano policy asset.");
+    if (input.masumi?.enabled) {
+      let expectedNetwork: "Preprod" | "Mainnet";
+      try { expectedNetwork = masumiNetworkForCardano(version.asset.network); }
+      catch { return problem(422, "CATALYST_CARDANO_POLICY_REQUIRED", "Masumi trust controls require a supported Cardano Preprod or Mainnet policy asset."); }
+      if (input.masumi.network !== expectedNetwork) return problem(422, "MASUMI_POLICY_NETWORK_MISMATCH", `Masumi ${input.masumi.network} trust cannot be attached to ${version.asset.network}; expected ${expectedNetwork}.`);
+    }
     if (input.keri?.enabled && (!input.keri.trustedIssuerAids.length || !input.keri.allowedSchemaSaids.length)) return problem(422, "VERIDIAN_POLICY_ALLOWLIST_REQUIRED", "KERI policy enforcement requires at least one trusted issuer AID and allowed schema SAID.");
 
     await db.$transaction(async (tx) => {
