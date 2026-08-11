@@ -12,6 +12,7 @@ export async function GET(request: Request) {
     return ok({
       user: workspace.user,
       activeOrganization: workspace.organization,
+      roles: workspace.membership.roles,
       mode: session.mode,
     });
   } catch (error) {
