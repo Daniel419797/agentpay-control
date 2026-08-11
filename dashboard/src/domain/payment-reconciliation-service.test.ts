@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { hederaPaymentReconciliationOutcome } from "@/domain/payment-reconciliation-service";
-import type { MirrorTransaction } from "@/lib/hedera-payment";
+import { parseMirrorNodeJson, type MirrorTransaction } from "@/lib/hedera-payment";
 
 function transaction(overrides: Partial<MirrorTransaction> = {}): MirrorTransaction {
   return {
@@ -31,6 +31,13 @@ describe("Hedera x402 reconciliation evidence", () => {
       ],
     });
     expect(hederaPaymentReconciliationOutcome(row, { type: "TOKEN", hederaTokenId: "0.0.429274" }, "0.0.123", "0.0.456", "1000000")).toBe("CONFIRMED");
+  });
+
+  it("preserves atomic amounts larger than Number.MAX_SAFE_INTEGER", () => {
+    const raw = `{"transactions":[{"consensus_timestamp":"1753510000.123456789","result":"SUCCESS","transaction_id":"0.0.123@1753510000.123456789","transfers":[{"account":"0.0.123","amount":-9007199254740993},{"account":"0.0.456","amount":9007199254740993}],"token_transfers":[]}]}`;
+    const parsed = parseMirrorNodeJson(raw) as { transactions: MirrorTransaction[] };
+    expect(parsed.transactions[0]!.transfers[0]!.amount).toBe("-9007199254740993");
+    expect(hederaPaymentReconciliationOutcome(parsed.transactions[0]!, { type: "NATIVE" }, "0.0.123", "0.0.456", "9007199254740993")).toBe("CONFIRMED");
   });
 
   it("rejects a successful transaction whose transfer does not match the quote", () => {
