@@ -46,16 +46,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
     const access = await providerAccess(request, providerId, true);
     if ("error" in access) return access.error;
     const input = schema.parse(await boundedJson(request));
-    await assertSafeResourceUrl(input.endpoint, getConfig().APP_ENV === "production");
+    const endpoint = await assertSafeResourceUrl(input.endpoint, getConfig().APP_ENV === "production");
+    const canonicalEndpoint = endpoint.toString();
     const asset = await db.asset.findUnique({ where: { id: input.assetId } });
     if (!asset?.verified) return problem(409, "ASSET_NOT_VERIFIED", "The resource price must use a verified asset.");
     if (asset.network !== "hedera:testnet") return problem(409, "PROVIDER_NETWORK_SETTLEMENT_UNSUPPORTED", "Organization marketplace providers currently support verified Hedera testnet settlement only. Other rails remain disabled until a network-specific settlement account is verified.");
     if (input.public && access.provider.verificationStatus !== "VERIFIED") return problem(409, "PROVIDER_NOT_VERIFIED", "Verify the provider before publishing marketplace resources.");
     const row = await db.$transaction(async (tx) => {
-      const resource = await tx.resourceListing.create({ data: { providerId, category: input.category, name: input.name, slug: input.slug, description: input.description, endpoint: input.endpoint, status: input.public ? "ACTIVE" : "DRAFT", public: input.public, inputSchema: JSON.parse(JSON.stringify(input.inputSchema)), outputContentTypes: input.outputContentTypes, tags: [...new Set(input.tags)], termsUrl: input.termsUrl, serviceLevel: input.serviceLevel, prices: { create: { assetId: input.assetId, atomicAmount: input.atomicAmount } } } });
-      await tx.auditEvent.create({ data: { organizationId: access.workspace.organization.id, actorType: "USER", actorId: access.workspace.user.id, action: "MARKETPLACE_RESOURCE_CREATED", targetType: "RESOURCE_LISTING", targetId: resource.id, result: "SUCCESS", metadata: { public: resource.public, category: resource.category, settlementNetwork: asset.network } } });
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`resource-endpoint:${canonicalEndpoint}`}, 0))`;
+      const duplicate = await tx.resourceListing.findFirst({ where: { endpoint: canonicalEndpoint }, select: { id: true } });
+      if (duplicate) throw new Error("RESOURCE_ENDPOINT_ALREADY_REGISTERED");
+      const resource = await tx.resourceListing.create({ data: { providerId, category: input.category, name: input.name, slug: input.slug, description: input.description, endpoint: canonicalEndpoint, status: input.public ? "ACTIVE" : "DRAFT", public: input.public, inputSchema: JSON.parse(JSON.stringify(input.inputSchema)), outputContentTypes: input.outputContentTypes, tags: [...new Set(input.tags)], termsUrl: input.termsUrl, serviceLevel: input.serviceLevel, prices: { create: { assetId: input.assetId, atomicAmount: input.atomicAmount } } } });
+      await tx.auditEvent.create({ data: { organizationId: access.workspace.organization.id, actorType: "USER", actorId: access.workspace.user.id, action: "MARKETPLACE_RESOURCE_CREATED", targetType: "RESOURCE_LISTING", targetId: resource.id, result: "SUCCESS", metadata: { public: resource.public, category: resource.category, settlementNetwork: asset.network, endpoint: canonicalEndpoint } } });
       return resource;
-    });
+    }, { isolationLevel: "Serializable" });
     return ok(row, { status: 201 });
-  } catch (error) { return handleApiError(error); }
+  } catch (error) {
+    if (error instanceof Error && error.message === "RESOURCE_ENDPOINT_ALREADY_REGISTERED") return problem(409, error.message, "This canonical resource endpoint is already registered.");
+    return handleApiError(error);
+  }
 }
