@@ -35,6 +35,10 @@ export function x402AssetIdentifier(asset: PaymentAsset, network: string, config
     if (asset.type === "NATIVE") return "0.0.0";
     return required(asset.hederaTokenId ?? undefined, "HEDERA_TOKEN_ID_REQUIRED");
   }
+  if (network === "cardano:preprod" || network === "cardano:mainnet") {
+    if (asset.type !== "NATIVE" || asset.symbol !== "ADA") throw new Error("CARDANO_ASSET_UNSUPPORTED");
+    return "lovelace";
+  }
   throw new Error("PAYMENT_NETWORK_UNSUPPORTED");
 }
 
@@ -47,6 +51,8 @@ export function paymentAccountForNetwork<T extends PaymentAccountLike>(accounts:
 export function managedPayerMatches(account: PaymentAccountLike, config: AppConfig = getConfig()): boolean {
   if (account.network === "hedera:testnet") return Boolean(config.HEDERA_PAYER_ACCOUNT_ID && config.HEDERA_PAYER_ACCOUNT_ID === account.accountId);
   if (account.network === "eip155:5042002") return Boolean(config.ARC_PAYER_ADDRESS && config.ARC_PAYER_ADDRESS.toLowerCase() === account.accountId.toLowerCase());
+  if (account.network === "cardano:preprod") return Boolean(config.CARDANO_PREPROD_PAYER_ADDRESS && config.CARDANO_PREPROD_PAYER_ADDRESS === account.accountId);
+  if (account.network === "cardano:mainnet") return Boolean(config.CARDANO_MAINNET_PAYER_ADDRESS && config.CARDANO_MAINNET_PAYER_ADDRESS === account.accountId);
   return false;
 }
 
@@ -61,6 +67,8 @@ export function providerPayeeForNetwork(provider: ResourceProviderLike, network:
     if (network === "hedera:testnet") return config.HEDERA_PROVIDER_ACCOUNT_ID;
     if (network === "hedera:mainnet") return required(config.HEDERA_MAINNET_PROVIDER_ACCOUNT_ID, "PLATFORM_MAINNET_PAYEE_NOT_CONFIGURED");
     if (network === "eip155:5042002") return required(config.ARC_PROVIDER_ADDRESS, "PLATFORM_ARC_PAYEE_NOT_CONFIGURED").toLowerCase();
+    if (network === "cardano:preprod") return required(config.CARDANO_PREPROD_PROVIDER_ADDRESS, "PLATFORM_CARDANO_PREPROD_PAYEE_NOT_CONFIGURED");
+    if (network === "cardano:mainnet") return required(config.CARDANO_MAINNET_PROVIDER_ADDRESS, "PLATFORM_CARDANO_MAINNET_PAYEE_NOT_CONFIGURED");
     throw new Error("PLATFORM_PROVIDER_NETWORK_UNSUPPORTED");
   }
 
