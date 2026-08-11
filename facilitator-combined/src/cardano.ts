@@ -1,6 +1,7 @@
 import { createHash, createPublicKey, timingSafeEqual, verify as verifySignature } from "node:crypto";
 import { Hono } from "hono";
 import { z } from "zod";
+import { blake2b } from "./blake2b.js";
 
 const CARDANO_TRANSACTION_MAX_BYTES = 64 * 1024;
 const CARDANO_MAX_INPUTS = 64;
@@ -11,7 +12,6 @@ const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
 const BECH32_ALPHABET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
 type CardanoNetwork = "cardano:preprod" | "cardano:mainnet";
-type ClaimState = "CLAIMED" | "SUBMISSION_STARTED" | "CONFIRMED" | "REJECTED";
 
 type Requirement = {
   scheme: "exact";
@@ -124,10 +124,6 @@ function stable(value: unknown): string {
 
 function sameRequirement(left: Requirement, right: Requirement) {
   return left.scheme === right.scheme && left.network === right.network && left.amount === right.amount && left.payTo === right.payTo && left.asset === right.asset && left.maxTimeoutSeconds === right.maxTimeoutSeconds && stable(left.extra) === stable(right.extra);
-}
-
-function blake2b(bytes: Uint8Array, length: number) {
-  return createHash("blake2b512", { outputLength: length }).update(bytes).digest();
 }
 
 function cborLength(buffer: Buffer, offset: number, additional: number): { value: bigint | null; offset: number } {
@@ -318,7 +314,10 @@ function decodeSignedTransaction(transactionBase64: string) {
   for (const [key] of body.entries!) if (typeof key.value !== "bigint" || !allowedBodyKeys.has(key.value)) throw new Error("CARDANO_PHASE1_OPERATION_UNSUPPORTED");
   for (const [key] of witnessSet.entries!) if (key.value !== 0n) throw new Error("CARDANO_SCRIPT_OR_BOOTSTRAP_WITNESS_UNSUPPORTED");
 
-  const inputNodes = asArray(mapEntry(body, 0n)!, "CARDANO_INPUTS_INVALID");
+  const inputNode = mapEntry(body, 0n);
+  const outputNode = mapEntry(body, 1n);
+  if (!inputNode || !outputNode) throw new Error("CARDANO_TRANSACTION_IO_REQUIRED");
+  const inputNodes = asArray(inputNode, "CARDANO_INPUTS_INVALID");
   if (!inputNodes.length || inputNodes.length > CARDANO_MAX_INPUTS) throw new Error("CARDANO_INPUT_COUNT_INVALID");
   const inputs = inputNodes.map((node) => {
     const pair = asArray(node, "CARDANO_INPUT_INVALID");
@@ -329,7 +328,7 @@ function decodeSignedTransaction(transactionBase64: string) {
     return `${hash.toString("hex")}#${index.toString()}`;
   });
 
-  const outputNodes = asArray(mapEntry(body, 1n)!, "CARDANO_OUTPUTS_INVALID");
+  const outputNodes = asArray(outputNode, "CARDANO_OUTPUTS_INVALID");
   if (!outputNodes.length) throw new Error("CARDANO_OUTPUTS_INVALID");
   const outputs = outputNodes.map((node) => {
     const untagged = untag(node);
@@ -346,7 +345,8 @@ function decodeSignedTransaction(transactionBase64: string) {
       [addressNode, valueNode] = items;
     }
     const addressBytes = asBytes(addressNode, "CARDANO_OUTPUT_ADDRESS_INVALID");
-    const value = untag(valueNode!);
+    if (!valueNode) throw new Error("CARDANO_OUTPUT_VALUE_INVALID");
+    const value = untag(valueNode);
     let lovelace: bigint;
     if (typeof value.value === "bigint") lovelace = value.value;
     else {
@@ -360,8 +360,10 @@ function decodeSignedTransaction(transactionBase64: string) {
 
   const fee = asBigInt(mapEntry(body, 2n), "CARDANO_FEE_REQUIRED");
   const ttl = asBigInt(mapEntry(body, 3n), "CARDANO_TTL_REQUIRED");
-  const validityStart = mapEntry(body, 8n) ? asBigInt(mapEntry(body, 8n), "CARDANO_VALIDITY_START_INVALID") : undefined;
-  const networkId = mapEntry(body, 15n) ? asBigInt(mapEntry(body, 15n), "CARDANO_NETWORK_ID_INVALID") : undefined;
+  const validityStartNode = mapEntry(body, 8n);
+  const networkIdNode = mapEntry(body, 15n);
+  const validityStart = validityStartNode ? asBigInt(validityStartNode, "CARDANO_VALIDITY_START_INVALID") : undefined;
+  const networkId = networkIdNode ? asBigInt(networkIdNode, "CARDANO_NETWORK_ID_INVALID") : undefined;
   if (fee < 0n || ttl < 0n) throw new Error("CARDANO_TRANSACTION_NUMERIC_INVALID");
 
   const bodyBytes = bytes.subarray(body.start, body.end);
