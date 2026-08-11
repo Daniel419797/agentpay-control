@@ -11,7 +11,7 @@ import {
   Settings, ShieldCheck, Store
 } from "lucide-react";
 import { HederaWalletConnect } from "@/components/hedera-wallet-connect";
-import { NetworkProvider } from "@/domain/network-context";
+import { NetworkProvider, useNetwork } from "@/domain/network-context";
 import { NetworkSwitcher } from "@/components/network-switcher";
 
 const navigation: Array<{ label: string; href: Route; icon: typeof LayoutDashboard; group?: string }> = [
@@ -30,7 +30,15 @@ const navigation: Array<{ label: string; href: Route; icon: typeof LayoutDashboa
   { label: "Settings", href: "/app/settings", icon: Settings }
 ];
 
-export function AppShell({ children, mainnetEnabled = true }: { children: React.ReactNode; mainnetEnabled?: boolean }) {
+function SignerControl() {
+  const { network } = useNetwork();
+  if (network === "eip155:5042002") {
+    return <span className="account-chip" title="Arc payments are signed by the isolated AgentPay facilitator">Arc managed signer</span>;
+  }
+  return <HederaWalletConnect />;
+}
+
+function ShellContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
   const [operatorEmail, setOperatorEmail] = useState("Loading operator…");
@@ -52,47 +60,47 @@ export function AppShell({ children, mainnetEnabled = true }: { children: React.
   const canCreateAgent = roles.includes("OWNER") || roles.includes("OPERATOR");
 
   return (
-    <NetworkProvider mainnetEnabled={mainnetEnabled}>
-      <div className="app-shell">
-        {navOpen && <button className="nav-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}
-        <aside className={`sidebar${navOpen ? " sidebar-open" : ""}`} aria-label="Primary navigation">
-          <div className="sidebar-brand">
-            <Image
-              src="/brand/agentpay-lockup-white.png"
-              alt="AgentPay"
-              width={177}
-              height={35}
-              priority
-            />
+    <div className="app-shell">
+      {navOpen && <button className="nav-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}
+      <aside className={`sidebar${navOpen ? " sidebar-open" : ""}`} aria-label="Primary navigation">
+        <div className="sidebar-brand">
+          <Image src="/brand/agentpay-lockup-white.png" alt="AgentPay" width={177} height={35} priority />
+        </div>
+        <nav className="nav-list">
+          {navigation.map((item) => <div className="nav-entry" key={item.href}>{item.group && <span className="nav-group">{item.group}</span>}<Link className={`nav-link${pathname === item.href || (item.href !== "/app/overview" && pathname.startsWith(`${item.href}/`)) ? " active" : ""}`} href={item.href} onClick={() => setNavOpen(false)}><item.icon aria-hidden="true" size={17} />{item.label}</Link></div>)}
+        </nav>
+        <div className="sidebar-spacer" />
+        <div className="sidebar-context">
+          <span className="context-label">Environment</span>
+          <NetworkSwitcher compact />
+        </div>
+        <div className="sidebar-context">
+          <span className="context-label">Operator</span>
+          <span className="context-value">{operatorEmail}</span>
+        </div>
+      </aside>
+      <main className="main-area">
+        <header className="topbar">
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button className="mobile-nav-button" aria-label="Open navigation" aria-expanded={navOpen} onClick={() => setNavOpen(true)}><Menu size={20} /></button>
+            <span className="topbar-title">Payment operations</span>
           </div>
-          <nav className="nav-list">
-            {navigation.map((item) => <div className="nav-entry" key={item.href}>{item.group && <span className="nav-group">{item.group}</span>}<Link className={`nav-link${pathname === item.href || (item.href !== "/app/overview" && pathname.startsWith(`${item.href}/`)) ? " active" : ""}`} href={item.href} onClick={() => setNavOpen(false)}><item.icon aria-hidden="true" size={17} />{item.label}</Link></div>)}
-          </nav>
-          <div className="sidebar-spacer" />
-          <div className="sidebar-context">
-            <span className="context-label">Environment</span>
-            <NetworkSwitcher compact />
+          <div className="topbar-actions">
+            <NetworkSwitcher />
+            <SignerControl />
+            {canCreateAgent && <Link className="primary-button" href="/app/agents/new"><Plus size={16} /><span>Create agent</span></Link>}
           </div>
-          <div className="sidebar-context">
-            <span className="context-label">Operator</span>
-            <span className="context-value">{operatorEmail}</span>
-          </div>
-        </aside>
-        <main className="main-area">
-          <header className="topbar">
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <button className="mobile-nav-button" aria-label="Open navigation" aria-expanded={navOpen} onClick={() => setNavOpen(true)}><Menu size={20} /></button>
-              <span className="topbar-title">Payment operations</span>
-            </div>
-            <div className="topbar-actions">
-              <NetworkSwitcher />
-              <HederaWalletConnect />
-              {canCreateAgent && <Link className="primary-button" href="/app/agents/new"><Plus size={16} /><span>Create agent</span></Link>}
-            </div>
-          </header>
-          {children}
-        </main>
-      </div>
+        </header>
+        {children}
+      </main>
+    </div>
+  );
+}
+
+export function AppShell({ children, mainnetEnabled = true, arcEnabled = false }: { children: React.ReactNode; mainnetEnabled?: boolean; arcEnabled?: boolean }) {
+  return (
+    <NetworkProvider mainnetEnabled={mainnetEnabled} arcEnabled={arcEnabled}>
+      <ShellContent>{children}</ShellContent>
     </NetworkProvider>
   );
 }
