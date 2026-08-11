@@ -46,11 +46,16 @@ describe("production configuration", () => {
     expect(() => parseEnv(productionEnv({ FACILITATOR_URL: "http://facilitator.example/hedera" }))).toThrow(/FACILITATOR_URL must use HTTPS/);
   });
 
-  it("rejects capability-secret reuse", () => {
+  it("rejects capability-secret reuse within and across networks", () => {
     const duplicate = "duplicate-capability-secret-abcdefghijklmnopqrstuvwxyz";
     expect(() => parseEnv(productionEnv({
       FACILITATOR_SIGNING_API_KEY: duplicate,
       FACILITATOR_SETTLEMENT_API_KEY: duplicate,
+    }))).toThrow(/must use distinct secrets/);
+
+    expect(() => parseEnv(productionEnv({
+      FACILITATOR_SIGNING_API_KEY: duplicate,
+      ARC_FACILITATOR_SIGNING_API_KEY: duplicate,
     }))).toThrow(/must use distinct secrets/);
   });
 
