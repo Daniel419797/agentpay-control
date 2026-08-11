@@ -41,4 +41,12 @@ describe("Hedera facilitator production environment", () => {
       HEDERA_PAYER_KEY: "same-chain-private-key",
     }))).toThrow(/settlement and managed payer keys must be distinct/);
   });
+
+  it("rejects equivalent ECDSA keys with different serialized prefixes", () => {
+    const key = "a".repeat(64);
+    expect(() => parseHederaEnv(productionEnv({
+      HEDERA_OPERATOR_KEY: `0x${key}`,
+      HEDERA_PAYER_KEY: key,
+    }))).toThrow(/settlement and managed payer keys must be distinct/);
+  });
 });
