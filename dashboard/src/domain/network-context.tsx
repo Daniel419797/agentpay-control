@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useCallback, useEffect, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useCallback, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 
 export type NetworkId = "hedera:testnet" | "hedera:mainnet";
 
@@ -32,7 +32,7 @@ function notifyListeners() {
   for (const listener of listeners) listener();
 }
 
-function setNetwork(value: NetworkId) {
+function persistNetwork(value: NetworkId) {
   snapshot = value;
   localStorage.setItem(NETWORK_STORAGE_KEY, value);
   const url = new URL(window.location.href);
@@ -61,38 +61,31 @@ const NetworkContext = createContext<{
 }>({
   network: "hedera:testnet",
   setNetwork: () => {},
-  networks: [
-    { id: "hedera:testnet", label: "Hedera Testnet", testnet: true },
-    { id: "hedera:mainnet", label: "Hedera Mainnet", testnet: false },
-  ],
+  networks: [{ id: "hedera:testnet", label: "Hedera Testnet", testnet: true }],
 });
 
-export function NetworkProvider({ children }: { children: ReactNode }) {
+export function NetworkProvider({ children, mainnetEnabled = true }: { children: ReactNode; mainnetEnabled?: boolean }) {
   const network = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const networks = useMemo(() => [
+    { id: "hedera:testnet" as const, label: "Hedera Testnet", testnet: true },
+    ...(mainnetEnabled ? [{ id: "hedera:mainnet" as const, label: "Hedera Mainnet", testnet: false }] : []),
+  ], [mainnetEnabled]);
 
   useEffect(() => {
     const resolved = resolveNetwork();
-    if (resolved !== snapshot) {
-      snapshot = resolved;
-      notifyListeners();
-    }
-  }, []);
+    const allowed = networks.some((candidate) => candidate.id === resolved) ? resolved : "hedera:testnet";
+    if (allowed !== snapshot || allowed !== resolved) persistNetwork(allowed);
+  }, [networks]);
 
   const handleSetNetwork = useCallback((value: NetworkId) => {
-    setNetwork(value);
-  }, []);
+    if (!networks.some((candidate) => candidate.id === value)) return;
+    persistNetwork(value);
+  }, [networks]);
+
+  const activeNetwork = networks.some((candidate) => candidate.id === network) ? network : "hedera:testnet";
 
   return (
-    <NetworkContext.Provider
-      value={{
-        network,
-        setNetwork: handleSetNetwork,
-        networks: [
-          { id: "hedera:testnet", label: "Hedera Testnet", testnet: true },
-          { id: "hedera:mainnet", label: "Hedera Mainnet", testnet: false },
-        ],
-      }}
-    >
+    <NetworkContext.Provider value={{ network: activeNetwork, setNetwork: handleSetNetwork, networks }}>
       {children}
     </NetworkContext.Provider>
   );
