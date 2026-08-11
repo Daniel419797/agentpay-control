@@ -5,6 +5,7 @@ COPY package.json package-lock.json ./
 COPY dashboard/package.json ./dashboard/package.json
 COPY facilitator/package.json ./facilitator/package.json
 COPY facilitator-arc/package.json ./facilitator-arc/package.json
+COPY facilitator-combined/package.json ./facilitator-combined/package.json
 COPY resource-server/package.json ./resource-server/package.json
 
 FROM workspace AS build
