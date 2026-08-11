@@ -10,6 +10,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ pur
     if (!workspaceHasRole(workspace, ["OWNER", "OPERATOR"])) return problem(403, "ROLE_REQUIRED", "Owner or Operator access is required.");
     if (!hasRecentAuthentication(workspace.session)) return problem(428, "STEP_UP_REQUIRED", "Sign in again before requesting an escrow refund.");
     const { purchaseId } = await params;
-    return ok(await requestEscrowRefundDurably(purchaseId, workspace.organization.id), { status: 202 });
+    return ok(await requestEscrowRefundDurably(purchaseId, workspace.organization.id, workspace.user.id), { status: 202 });
   } catch (error) { return handleApiError(error); }
 }
