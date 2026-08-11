@@ -3,15 +3,11 @@ import { db } from "@/lib/db";
 import { getConfig } from "@/lib/config";
 import { evaluatePolicy, policyScheduleViolation } from "@/domain/policy";
 import { paymentFingerprint } from "@/domain/fingerprint";
+import { managedPayerMatches, paymentAccountForNetwork, providerPayeeForNetwork, x402AssetIdentifier } from "@/domain/payment-routing";
 import { createManagedPaymentPayload, discoverX402, fulfillX402Resource, parsePaymentRequired, selectRequirement, X402SubmissionUnknownError } from "@/domain/x402-client";
 import { assertSafeResourceUrl } from "@/lib/safe-url";
 import { retrySerializable } from "@/lib/retry";
 import { assertPlanLimit } from "@/domain/entitlement-service";
-
-function assetRequirementIdentifier(asset: { type: string; hederaTokenId?: string | null }, network: string): string {
-  if (network.startsWith("eip155:")) return asset.hederaTokenId ?? "";
-  return asset.type === "NATIVE" ? "0.0.0" : asset.hederaTokenId ?? "";
-}
 
 export type PaidRequestInput = { resourceUrl: string; purpose?: string; maxAmountAtomic?: string };
 
@@ -67,21 +63,21 @@ export async function executeAuthorizedIntent(intentId: string) {
     await failBeforeSigning(intent.id, intent.organizationId, scheduleViolation);
     throw new Error(scheduleViolation);
   }
-  const account = intent.agent.accounts.find((candidate) => candidate.status === "ACTIVE");
-  if (!account) throw new Error("PAYMENT_ACCOUNT_UNAVAILABLE");
+  const account = paymentAccountForNetwork(intent.agent.accounts, intent.quote!.network);
   if (account.custodyType !== "PLATFORM_MANAGED_TESTNET" || account.signingMode !== "AUTONOMOUS_MANAGED") throw new Error("MANAGED_SIGNER_REQUIRED");
   const config = getConfig();
-  const isArc = account.network.startsWith("eip155:");
-  if (isArc) {
-    if (!config.ARC_FACILITATOR_URL) throw new Error("LIVE_FACILITATOR_REQUIRED");
+  if (!managedPayerMatches(account, config)) throw new Error("MANAGED_PAYER_MISMATCH");
+  if (account.network === "eip155:5042002") {
+    if (!config.ARC_FACILITATOR_URL || !config.ARC_FACILITATOR_SIGNING_API_KEY) throw new Error("LIVE_FACILITATOR_REQUIRED");
+  } else if (account.network === "hedera:testnet") {
+    if (!config.FACILITATOR_URL || !config.FACILITATOR_SIGNING_API_KEY) throw new Error("LIVE_FACILITATOR_REQUIRED");
   } else {
-    if (!config.FACILITATOR_URL) throw new Error("LIVE_FACILITATOR_REQUIRED");
-    if (config.HEDERA_PAYER_ACCOUNT_ID && config.HEDERA_PAYER_ACCOUNT_ID !== account.accountId) throw new Error("MANAGED_PAYER_MISMATCH");
+    throw new Error("MANAGED_SIGNER_NETWORK_UNSUPPORTED");
   }
   const required = parsePaymentRequired(intent.quote!.rawChallenge);
   const requirement = selectRequirement(required, {
     network: intent.quote!.network,
-    asset: assetRequirementIdentifier(intent.quote!.asset, intent.quote!.network),
+    asset: x402AssetIdentifier(intent.quote!.asset, intent.quote!.network, config),
     amount: intent.quote!.amountAtomic.toString(),
     payTo: intent.quote!.payToAccountId,
     resourceUrl: intent.resourceUrl,
@@ -94,13 +90,14 @@ export async function executeAuthorizedIntent(intentId: string) {
     const signed = await createManagedPaymentPayload(requirement);
     await db.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "SIGNED", signatureFingerprint: hash(signed.paymentPayload), candidateTransactionId: signed.transactionId } });
     const fulfillment = await fulfillX402Resource(intent.resourceUrl, requirement, signed.paymentPayload, config.APP_ENV === "production");
+    if (fulfillment.network !== requirement.network) throw new Error("SETTLEMENT_NETWORK_MISMATCH");
     return db.$transaction(async (tx) => {
       await tx.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "CONFIRMED" } });
       await tx.settlement.create({ data: { paymentAttemptId: attempt.id, assetId: intent.quote!.assetId, status: "CONFIRMED", network: fulfillment.network, transactionId: fulfillment.transactionId, payerAccountId: account.accountId, payeeAccountId: intent.quote!.payToAccountId, amountAtomic: intent.quote!.amountAtomic, resultCode: "SUCCESS", submittedAt: new Date(), confirmedAt: new Date() } });
       const responseBody = JSON.parse(JSON.stringify(fulfillment.body));
       await tx.resourceFulfillment.upsert({ where: { paymentIntentId: intent.id }, create: { paymentIntentId: intent.id, status: "FULFILLED", contentType: fulfillment.contentType, contentHash: fulfillment.contentHash, contentBytes: fulfillment.contentBytes, responseBody, fulfilledAt: new Date() }, update: { status: "FULFILLED", contentType: fulfillment.contentType, contentHash: fulfillment.contentHash, contentBytes: fulfillment.contentBytes, responseBody, errorCode: null, fulfilledAt: new Date() } });
       await tx.spendReservation.updateMany({ where: { paymentIntentId: intent.id }, data: { status: "SETTLED" } });
-      await tx.outboxEvent.create({ data: { organizationId: intent.organizationId, eventType: "PAYMENT_SETTLED", aggregateType: "PAYMENT_INTENT", aggregateId: intent.id, payload: { transactionId: fulfillment.transactionId, resourceUrl: intent.resourceUrl } } });
+      await tx.outboxEvent.create({ data: { organizationId: intent.organizationId, eventType: "PAYMENT_SETTLED", aggregateType: "PAYMENT_INTENT", aggregateId: intent.id, payload: { transactionId: fulfillment.transactionId, network: fulfillment.network, resourceUrl: intent.resourceUrl } } });
       return tx.paymentIntent.update({ where: { id: intent.id }, data: { status: "SETTLED" }, include: { quote: { include: { asset: true } }, fulfillment: true, attempts: { include: { settlement: true } } } });
     });
   } catch (error) {
@@ -109,7 +106,7 @@ export async function executeAuthorizedIntent(intentId: string) {
         db.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "UNKNOWN", errorCode: error.message } }),
         db.paymentIntent.update({ where: { id: intent.id }, data: { status: "SUBMISSION_UNKNOWN" } }),
         db.resourceFulfillment.upsert({ where: { paymentIntentId: intent.id }, create: { paymentIntentId: intent.id, status: "PENDING", errorCode: error.message }, update: { status: "PENDING", errorCode: error.message } }),
-        db.outboxEvent.create({ data: { organizationId: intent.organizationId, eventType: "PAYMENT_RECONCILIATION_REQUIRED", aggregateType: "PAYMENT_INTENT", aggregateId: intent.id, payload: { attemptId: attempt.id } } }),
+        db.outboxEvent.create({ data: { organizationId: intent.organizationId, eventType: "PAYMENT_RECONCILIATION_REQUIRED", aggregateType: "PAYMENT_INTENT", aggregateId: intent.id, payload: { attemptId: attempt.id, network: requirement.network } } }),
       ]);
       return db.paymentIntent.findUniqueOrThrow({ where: { id: intent.id }, include: { quote: { include: { asset: true } }, fulfillment: true, attempts: { include: { settlement: true } } } });
     }
@@ -142,11 +139,11 @@ export async function createPaidRequest(agentId: string, idempotencyKey: string,
     if (!policy) throw new Error("POLICY_NOT_PUBLISHED");
     const listing = await tx.resourceListing.findFirst({ where: { OR: [{ endpoint: canonical.resourceUrl }, { slug: resourceUrl.pathname.split("/").filter(Boolean).at(-1) }], status: "ACTIVE" }, include: { provider: true, prices: { where: { assetId: policy.assetId }, take: 1 } } });
     if (!listing?.prices[0]) throw new Error("RESOURCE_PRICE_NOT_FOUND");
-    const requirement = selectRequirement(required, { network: agent.network, asset: assetRequirementIdentifier(policy.asset, agent.network), amount: listing.prices[0].atomicAmount.toString(), payTo: listing.provider.settlementAccountId, resourceUrl: canonical.resourceUrl });
+    const expectedPayee = providerPayeeForNetwork(listing.provider, agent.network, config);
+    const requirement = selectRequirement(required, { network: agent.network, asset: x402AssetIdentifier(policy.asset, agent.network, config), amount: listing.prices[0].atomicAmount.toString(), payTo: expectedPayee, resourceUrl: canonical.resourceUrl });
     const amountAtomic = requirement.amount;
     if (input.maxAmountAtomic && BigInt(amountAtomic) > BigInt(input.maxAmountAtomic)) throw new Error("MAX_AMOUNT_EXCEEDED");
-    const account = agent.accounts[0];
-    if (!account) throw new Error("PAYMENT_ACCOUNT_UNAVAILABLE");
+    const account = paymentAccountForNetwork(agent.accounts, requirement.network);
     const now = new Date();
     const rawBalanceAtomic = account.balances[0]?.spendableAtomic.toString() ?? "0";
     const dayStart = new Date(now); dayStart.setUTCHours(0, 0, 0, 0);
@@ -213,7 +210,7 @@ export async function createPaidRequest(agentId: string, idempotencyKey: string,
         purpose: input.purpose,
         status,
         quote: { create: { x402Version: 2, scheme: requirement.scheme, network: requirement.network, resourceDescription: required.resource.description ?? listing.description, payToAccountId: requirement.payTo, assetId: policy.assetId, amountAtomic, validUntil, fingerprint, rawChallenge } },
-        decisions: { create: { policyVersionId: policy.id, outcome: decision.decision, reasonCodes: decision.reasonCodes, factsHash: hash({ canonical, amountAtomic, balanceAtomic, policyVersionId: policy.id }), spendBeforeAtomic: daily._sum.amountAtomic ?? 0, reservedBeforeAtomic: active._sum.amountAtomic ?? 0, projectedAtomic: decision.projectedSpendAtomic } },
+        decisions: { create: { policyVersionId: policy.id, outcome: decision.decision, reasonCodes: decision.reasonCodes, factsHash: hash({ canonical, amountAtomic, balanceAtomic, network: requirement.network, payerAccountId: account.accountId, payeeAccountId: requirement.payTo, policyVersionId: policy.id }), spendBeforeAtomic: daily._sum.amountAtomic ?? 0, reservedBeforeAtomic: active._sum.amountAtomic ?? 0, projectedAtomic: decision.projectedSpendAtomic } },
         reservation: decision.decision === "DENY" ? undefined : { create: { agentId, assetId: policy.assetId, amountAtomic, windowStart: dayStart, windowEnd: new Date(dayStart.getTime() + 86_400_000), expiresAt: validUntil } },
         approval: decision.decision === "REQUIRE_APPROVAL" ? { create: { requestPurpose: input.purpose, expiresAt: validUntil, requiredApprovals: policy.approvalThreshold, requiredRejections: policy.rejectionThreshold } } : undefined,
       },
