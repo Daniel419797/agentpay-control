@@ -3,9 +3,10 @@ import { z } from "zod";
 const optionalUrl = z.string().url().optional().or(z.literal(""));
 const hederaAccountId = /^0\.0\.\d+$/;
 const evmAddress = /^0x[0-9a-fA-F]{40}$/;
+const appEnvironments = ["development", "test", "production"] as const;
 
 const envSchema = z.object({
-  APP_ENV: z.enum(["development", "test", "production"]).default("development"),
+  APP_ENV: z.enum(appEnvironments).default("development"),
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3100"),
   DATABASE_URL: z.string().min(1).default("postgresql://agentpay:agentpay@localhost:54329/agentpay?schema=public"),
   AUTH_SECRET: z.string().min(32).default("development-only-secret-change-before-deploy"),
@@ -123,6 +124,7 @@ export function productionConfigErrors(config: AppConfig): string[] {
   if (!config.ARC_FACILITATOR_CONTRACT_API_KEY) errors.push("ARC_FACILITATOR_CONTRACT_API_KEY");
   if (!config.ARC_RPC_URL) errors.push("ARC_RPC_URL");
   if (!config.ARC_PROVIDER_ADDRESS) errors.push("ARC_PROVIDER_ADDRESS");
+  if (!config.ARC_PAYER_ADDRESS) errors.push("ARC_PAYER_ADDRESS");
   if (!config.HEDERA_PAYER_ACCOUNT_ID) errors.push("HEDERA_PAYER_ACCOUNT_ID");
   if (!isExactBase64Url32(config.KEY_ENCRYPTION_MASTER_KEY)) errors.push("KEY_ENCRYPTION_MASTER_KEY must be exactly 32 random bytes encoded as unpadded base64url");
   if (!config.SUPABASE_URL || !config.SUPABASE_ANON_KEY) errors.push("SUPABASE_URL / SUPABASE_ANON_KEY");
@@ -149,10 +151,15 @@ export function productionConfigErrors(config: AppConfig): string[] {
 }
 
 export function parseEnv(input: unknown = process.env): AppConfig {
+  const requested = requestedAppEnv(input);
+  if (requested !== undefined && !appEnvironments.includes(requested as (typeof appEnvironments)[number])) {
+    throw new Error(`Invalid APP_ENV: ${requested}`);
+  }
+
   const result = envSchema.safeParse(input);
   if (!result.success) {
     const summary = issueSummary(result.error);
-    if (requestedAppEnv(input) === "production") throw new Error(`Invalid production environment: ${summary}`);
+    if (requested === "production") throw new Error(`Invalid production environment: ${summary}`);
 
     console.error("[config] Environment validation failed:", summary);
     const filtered: Record<string, string | undefined> = {};
