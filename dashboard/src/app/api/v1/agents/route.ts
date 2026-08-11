@@ -30,6 +30,16 @@ async function arcUsdcBalance(accountId: string) {
   return BigInt(payload.data.result).toString();
 }
 
+function hederaAssetBalance(
+  asset: { type: string; hederaTokenId: string | null },
+  balance: { balance?: number; tokens?: Array<{ token_id?: string; balance?: number }> } | undefined,
+) {
+  if (asset.type === "NATIVE") return String(balance?.balance ?? 0);
+  if (!asset.hederaTokenId) throw new Error("HEDERA_TOKEN_ID_REQUIRED");
+  const token = balance?.tokens?.find((candidate) => candidate.token_id === asset.hederaTokenId);
+  return String(token?.balance ?? 0);
+}
+
 export async function GET(request: Request) {
   try {
     const workspace = await workspaceFromRequest(request);
@@ -115,8 +125,8 @@ export async function POST(request: Request) {
       const mirrorUrl = isHederaMainnet ? config.HEDERA_MAINNET_MIRROR_NODE_URL : config.HEDERA_MIRROR_NODE_URL;
       const mirrorResponse = await fetch(`${mirrorUrl}/api/v1/accounts/${accountId}`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
       if (!mirrorResponse.ok) return problem(502, "MIRROR_NODE_UNAVAILABLE", "The wallet balance could not be read from Hedera.");
-      const mirror = await mirrorResponse.json() as { balance?: { balance?: number }; evm_address?: string; key?: { key?: string } };
-      initialBalanceAtomic = String(mirror.balance?.balance ?? 0);
+      const mirror = await mirrorResponse.json() as { balance?: { balance?: number; tokens?: Array<{ token_id?: string; balance?: number }> }; evm_address?: string; key?: { key?: string } };
+      initialBalanceAtomic = hederaAssetBalance(asset, mirror.balance);
       evmAddress = mirror.evm_address;
       publicKey = mirror.key?.key;
     }
@@ -163,7 +173,7 @@ export async function POST(request: Request) {
           targetType: "AGENT",
           targetId: created.id,
           result: "SUCCESS",
-          metadata: { accountId, network, custodyType: input.custody },
+          metadata: { accountId, network, custodyType: input.custody, asset: asset.symbol },
         },
       });
       return created;
@@ -175,6 +185,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof Error && error.message === "PLAN_AGENTS_LIMIT_REACHED") return problem(402, error.message, "Your plan's active-agent limit has been reached.");
     if (error instanceof Error && ["ARC_RPC_UNAVAILABLE", "ARC_BALANCE_UNAVAILABLE"].includes(error.message)) return problem(502, error.message, "The Arc USDC balance could not be verified before agent activation.");
+    if (error instanceof Error && error.message === "HEDERA_TOKEN_ID_REQUIRED") return problem(409, error.message, "The selected Hedera token is missing a verified token ID.");
     return handleApiError(error);
   }
 }
