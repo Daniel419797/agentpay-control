@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { paymentNetworkFromJson, ROOT_DISPATCH_BODY_LIMIT, targetForNetwork } from "./root-dispatch.js";
+import { boundedRequestText, paymentNetworkFromJson, ROOT_DISPATCH_BODY_LIMIT, targetForNetwork } from "./root-dispatch.js";
 
 const networks = { hedera: "hedera:testnet", arc: "eip155:5042002", cardano: "cardano:preprod" };
 
@@ -17,6 +17,21 @@ describe("combined facilitator root dispatch", () => {
   it("rejects malformed and oversized dispatch bodies", () => {
     expect(() => paymentNetworkFromJson("{" )).toThrow("INVALID_JSON");
     expect(() => paymentNetworkFromJson("{}", ROOT_DISPATCH_BODY_LIMIT + 1)).toThrow("REQUEST_BODY_TOO_LARGE");
+  });
+
+  it("enforces the body cap while streaming even without Content-Length", async () => {
+    const oversized = new Request("http://agentpay.internal/verify", {
+      method: "POST",
+      body: "x".repeat(ROOT_DISPATCH_BODY_LIMIT + 1),
+    });
+    expect(oversized.headers.get("content-length")).toBeNull();
+    await expect(boundedRequestText(oversized)).rejects.toThrow("REQUEST_BODY_TOO_LARGE");
+  });
+
+  it("returns a bounded UTF-8 request body", async () => {
+    const expected = body("cardano:preprod");
+    const request = new Request("http://agentpay.internal/verify", { method: "POST", body: expected });
+    await expect(boundedRequestText(request)).resolves.toBe(expected);
   });
 
   it("maps only exact configured network identifiers", () => {
