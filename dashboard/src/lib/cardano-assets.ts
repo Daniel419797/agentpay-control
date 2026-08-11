@@ -27,7 +27,7 @@ export function cardanoAssetIdentifier(
   if (network !== "cardano:preprod" && network !== "cardano:mainnet") throw new Error("CARDANO_NETWORK_UNSUPPORTED");
   const symbol = asset.symbol.toUpperCase();
   if (asset.type === "NATIVE" && symbol === "ADA") return "lovelace";
-  if (asset.type === "TOKEN" && (symbol === "USDCX" || symbol === "USDC")) {
+  if (asset.type === "TOKEN" && symbol === "USDCX") {
     const assetId = network === "cardano:mainnet" ? config.mainnetUsdcxAssetId : config.preprodUsdcxAssetId;
     if (!assetId) throw new Error(network === "cardano:mainnet" ? "CARDANO_MAINNET_USDCX_ASSET_ID_REQUIRED" : "CARDANO_PREPROD_USDCX_ASSET_ID_REQUIRED");
     return assetId;
