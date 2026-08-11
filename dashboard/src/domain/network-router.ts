@@ -1,4 +1,4 @@
-import { getConfig } from "@/lib/config";
+import { getConfig, type AppConfig } from "@/lib/config";
 
 export type NetworkRoute = {
   facilitatorUrl: string;
@@ -13,24 +13,29 @@ export interface NetworkRouter {
   supportedNetworks(): string[];
 }
 
+export function isHederaMainnetEnabled(config: AppConfig): boolean {
+  if (config.APP_ENV !== "production") return true;
+  return Boolean(config.HEDERA_MAINNET_FACILITATOR_URL && config.HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY);
+}
+
 class DefaultNetworkRouter implements NetworkRouter {
   private readonly routes: Record<string, NetworkRoute> = {};
 
   constructor() {
     const config = getConfig();
-    const allowLocalFallback = config.APP_ENV !== "production";
+    const production = config.APP_ENV === "production";
 
     this.routes["hedera:testnet"] = {
       facilitatorUrl: config.FACILITATOR_URL ?? "http://localhost:8787",
-      facilitatorApiKey: config.FACILITATOR_SIGNING_API_KEY ?? config.FACILITATOR_API_KEY,
+      facilitatorApiKey: config.FACILITATOR_SIGNING_API_KEY ?? (production ? undefined : config.FACILITATOR_API_KEY),
       explorerUrl: "https://hashscan.io/testnet/transaction",
       nativeAsset: "0.0.0",
     };
 
-    if (config.HEDERA_MAINNET_FACILITATOR_URL || allowLocalFallback) {
+    if (isHederaMainnetEnabled(config)) {
       this.routes["hedera:mainnet"] = {
         facilitatorUrl: config.HEDERA_MAINNET_FACILITATOR_URL ?? "http://localhost:8787",
-        facilitatorApiKey: config.HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY ?? config.HEDERA_MAINNET_FACILITATOR_API_KEY,
+        facilitatorApiKey: config.HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY ?? (production ? undefined : config.HEDERA_MAINNET_FACILITATOR_API_KEY),
         explorerUrl: "https://hashscan.io/mainnet/transaction",
         nativeAsset: "0.0.0",
       };
@@ -38,7 +43,7 @@ class DefaultNetworkRouter implements NetworkRouter {
 
     this.routes["eip155:5042002"] = {
       facilitatorUrl: config.ARC_FACILITATOR_URL ?? "http://localhost:8788",
-      facilitatorApiKey: config.ARC_FACILITATOR_SIGNING_API_KEY ?? config.ARC_FACILITATOR_API_KEY,
+      facilitatorApiKey: config.ARC_FACILITATOR_SIGNING_API_KEY ?? (production ? undefined : config.ARC_FACILITATOR_API_KEY),
       explorerUrl: "https://testnet.arcscan.app/tx",
       nativeAsset: "0x3600000000000000000000000000000000000000",
     };
