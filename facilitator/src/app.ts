@@ -20,7 +20,12 @@ export type HederaFacilitatorEnv = z.infer<typeof hederaEnvSchema>;
 
 export function parseHederaEnv(input: unknown = process.env): HederaFacilitatorEnv {
   const env = hederaEnvSchema.parse(input);
-  if (env.APP_ENV === "production" && (!env.MANAGED_SIGNING_API_KEY || !env.SETTLEMENT_API_KEY || !env.CONTRACT_EXECUTION_API_KEY)) throw new Error("Production capability-specific facilitator API keys are required");
+  if (env.APP_ENV === "production") {
+    const capabilityKeys = [env.MANAGED_SIGNING_API_KEY, env.SETTLEMENT_API_KEY, env.CONTRACT_EXECUTION_API_KEY];
+    if (capabilityKeys.some((key) => !key)) throw new Error("Production capability-specific facilitator API keys are required");
+    if (new Set(capabilityKeys).size !== capabilityKeys.length) throw new Error("Production capability-specific facilitator API keys must be distinct");
+    if (env.HEDERA_OPERATOR_KEY === env.HEDERA_PAYER_KEY) throw new Error("Production settlement and managed payer keys must be distinct");
+  }
   if (env.APP_ENV !== "production" && env.HEDERA_NETWORK === "mainnet") throw new Error("Mainnet is prohibited outside production");
   return env;
 }
