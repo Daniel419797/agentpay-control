@@ -3,13 +3,14 @@ import { parseEnabledNetworks, requiresNetwork } from "./network-selection.js";
 
 const hederaId = /^0\.0\.\d+$/;
 const evmAddress = /^0x[0-9a-fA-F]{40}$/;
+const optionalUrl = z.string().url().optional().or(z.literal(""));
 
 const schema = z.object({
-  APP_ENV: z.enum(["development", "test", "production"]).default("development"),
+  APP_ENV: z.literal("production"),
   ENABLED_NETWORKS: z.string().default("hedera:testnet,eip155:5042002"),
-  FACILITATOR_URL: z.string().url().optional(),
-  HEDERA_MAINNET_FACILITATOR_URL: z.string().url().optional(),
-  ARC_FACILITATOR_URL: z.string().url().optional(),
+  FACILITATOR_URL: optionalUrl,
+  HEDERA_MAINNET_FACILITATOR_URL: optionalUrl,
+  ARC_FACILITATOR_URL: optionalUrl,
   PROVIDER_ACCOUNT_ID: z.string().optional(),
   HEDERA_MAINNET_PROVIDER_ACCOUNT_ID: z.string().optional(),
   USDC_TOKEN_ID: z.string().optional(),
@@ -20,6 +21,12 @@ const schema = z.object({
   HEDERA_MAINNET_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
   ARC_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
 });
+
+function rawAppEnv(input: unknown): string | undefined {
+  if (!input || typeof input !== "object") return undefined;
+  const value = (input as Record<string, unknown>).APP_ENV;
+  return typeof value === "string" ? value : undefined;
+}
 
 function requireHttps(name: string, value: string | undefined, errors: string[]) {
   if (!value) {
@@ -34,13 +41,13 @@ function requireMatch(name: string, value: string | undefined, pattern: RegExp, 
 }
 
 export function productionPreflightErrors(input: unknown = process.env): string[] {
+  if (rawAppEnv(input) !== "production") return [];
+
   const parsed = schema.safeParse(input);
   if (!parsed.success) {
     return parsed.error.issues.map((issue) => `${issue.path.join(".") || "environment"}: ${issue.message}`);
   }
   const env = parsed.data;
-  if (env.APP_ENV !== "production") return [];
-
   const enabled = parseEnabledNetworks(env.ENABLED_NETWORKS);
   const errors: string[] = [];
 
