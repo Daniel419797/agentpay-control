@@ -111,7 +111,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           <div className="topbar-actions">
             <NetworkSwitcher />
             <SignerControl operatingState={operatingState} />
-            {canCreateAgent && <Link className="primary-button" href="/app/agents/new"><Plus size={16} /><span>Create agent</span></Link>}
+            {canCreateAgent && <Link className="primary-button" href="/app/agents/new" aria-label="Create agent"><Plus size={16} aria-hidden="true" /><span>Create agent</span></Link>}
           </div>
         </header>
         {operatingState === "STOPPED" && <div className="form-error" role="status" style={{ margin: "16px 24px 0" }}><strong>Emergency stop active.</strong> New payment signing, card/fiat provisioning, cross-chain preparation, credentials, and automation side effects are disabled. Reconciliation and defensive actions remain available.</div>}
