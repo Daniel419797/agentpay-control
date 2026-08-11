@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { automationApproverIsIndependent, automationPaymentOutcome, contractCodeHashMatches, contractMirrorOutcome } from "./automation-service";
+import { automationApproverIsIndependent, automationOrganizationError, automationPaymentOutcome, contractCodeHashMatches, contractMirrorOutcome } from "./automation-service";
 import { keccak256 } from "ethers";
 import { destinationTransferMatches, sourceTransactionMatches } from "./cross-chain-service";
 import { fiatSubmissionFailureStatus, isRetryableFiatSubmission } from "./fiat-reconciliation-service";
@@ -12,6 +12,13 @@ describe("production financial security invariants", () => {
     expect(automationApproverIsIndependent("creator", null, "creator")).toBe(false);
     expect(automationApproverIsIndependent("creator", "trigger", "trigger")).toBe(false);
     expect(automationApproverIsIndependent("creator", "trigger", "approver")).toBe(true);
+  });
+
+  it("blocks new automation side effects when the organization is stopped", () => {
+    expect(automationOrganizationError("ACTIVE", false)).toBeNull();
+    expect(automationOrganizationError("ACTIVE", true)).toBe("ORGANIZATION_KILL_SWITCH_ENABLED");
+    expect(automationOrganizationError("SUSPENDED", false)).toBe("ORGANIZATION_NOT_ACTIVE");
+    expect(automationOrganizationError(undefined, undefined)).toBe("ORGANIZATION_NOT_ACTIVE");
   });
 
   it("defers an automation payment while policy approval is pending", () => {
