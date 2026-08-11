@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: agentpay-cardano-signer-preprod
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    dockerContext: .
+    dockerfilePath: cardano-signer/Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: CARDANO_NETWORK
+        value: preprod
+      - key: CARDANO_PAYER_ADDRESS
+        sync: false
+      - key: CARDANO_BLOCKFROST_URL
+        value: https://cardano-preprod.blockfrost.io/api/v0
+      - key: CARDANO_BLOCKFROST_PROJECT_ID
+        sync: false
+      # Use the same gateway capability in CARDANO_SIGNER_API_KEY on the
+      # combined facilitator. Keep it distinct from the remote custody key.
+      - key: CARDANO_SIGNER_API_KEY
+        sync: false
+      - key: CARDANO_PAYMENT_PUBLIC_KEY_HEX
+        sync: false
+      # This points at the actual Ed25519/HSM signing boundary. AgentPay sends
+      # only the 32-byte Cardano transaction-body hash and verifies the reply.
+      - key: CARDANO_ED25519_SIGNER_URL
+        sync: false
+      - key: CARDANO_ED25519_SIGNER_API_KEY
+        sync: false
+      - key: CARDANO_MIN_OUTPUT_LOVELACE
+        value: "1000000"
+      - key: CARDANO_MIN_CHANGE_LOVELACE
+        value: "2000000"
+      - key: CARDANO_MAX_INPUTS
+        value: "20"
