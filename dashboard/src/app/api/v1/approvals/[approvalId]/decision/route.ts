@@ -76,6 +76,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ app
     if (errorCode(error) === "P2002") return problem(409, "APPROVAL_ALREADY_DECIDED", "You have already voted on this approval.");
     if (errorCode(error) === "P2034") return problem(409, "APPROVAL_CONCURRENT_UPDATE", "Another approval vote was recorded. Retry with the latest state.");
     if (error instanceof Error && ["PAYMENT_QUOTE_EXPIRED", "SPEND_RESERVATION_INVALID", "POLICY_CHANGED", "POLICY_NOT_ACTIVE", "POLICY_EXPIRED", "OUTSIDE_POLICY_SCHEDULE"].includes(error.message)) return problem(409, error.message, error.message.replaceAll("_", " "));
+    if (error instanceof Error && ["PYTH_VALUATION_INCREASED_AFTER_AUTHORIZATION", "PYTH_FEED_CHANGED_AFTER_AUTHORIZATION", "PYTH_AUTHORIZATION_SNAPSHOT_MISSING"].includes(error.message)) {
+      return problem(409, error.message, "The oracle-backed authorization is no longer valid. Recreate the payment request and obtain approval again.");
+    }
+    if (error instanceof Error && error.message.startsWith("PYTH_")) {
+      return problem(503, "PYTH_REVALIDATION_UNAVAILABLE", "The current oracle evidence could not safely revalidate this approved payment. No payment was submitted.");
+    }
     return handleApiError(error);
   }
 }
