@@ -2,9 +2,10 @@ import { Prisma } from "@/generated/prisma/client";
 import { paymentAccountForNetwork } from "@/domain/payment-routing";
 import { getConfig } from "@/lib/config";
 import { db } from "@/lib/db";
-import { normalizeTransactionId, verifyHederaAssetPayment, type MirrorTransaction } from "@/lib/hedera-payment";
+import { normalizeTransactionId, parseMirrorNodeJson, verifyHederaAssetPayment, type MirrorAtomicAmount, type MirrorTransaction } from "@/lib/hedera-payment";
 
 export type HederaPaymentReconciliationOutcome = "CONFIRMED" | "FAILED" | "MISMATCH";
+type HederaReconciliationResult = HederaPaymentReconciliationOutcome | "REPLAY" | "ALREADY_RECONCILED";
 
 export function hederaPaymentReconciliationOutcome(
   transaction: MirrorTransaction,
@@ -24,6 +25,10 @@ function mirrorUrlForNetwork(network: string) {
   throw new Error("PAYMENT_RECONCILIATION_NETWORK_UNSUPPORTED");
 }
 
+function isAtomicAmount(value: unknown): value is MirrorAtomicAmount {
+  return (typeof value === "string" && /^-?\d+$/.test(value)) || (typeof value === "number" && Number.isSafeInteger(value));
+}
+
 function isMirrorTransaction(value: unknown): value is MirrorTransaction {
   if (!value || typeof value !== "object") return false;
   const row = value as Record<string, unknown>;
@@ -31,8 +36,8 @@ function isMirrorTransaction(value: unknown): value is MirrorTransaction {
     && typeof row.result === "string"
     && typeof row.consensus_timestamp === "string"
     && Array.isArray(row.transfers)
-    && row.transfers.every((item) => Boolean(item) && typeof item === "object" && typeof (item as Record<string, unknown>).account === "string" && typeof (item as Record<string, unknown>).amount === "number")
-    && (row.token_transfers === undefined || (Array.isArray(row.token_transfers) && row.token_transfers.every((item) => Boolean(item) && typeof item === "object" && typeof (item as Record<string, unknown>).token_id === "string" && typeof (item as Record<string, unknown>).account === "string" && typeof (item as Record<string, unknown>).amount === "number")));
+    && row.transfers.every((item) => Boolean(item) && typeof item === "object" && typeof (item as Record<string, unknown>).account === "string" && isAtomicAmount((item as Record<string, unknown>).amount))
+    && (row.token_transfers === undefined || (Array.isArray(row.token_transfers) && row.token_transfers.every((item) => Boolean(item) && typeof item === "object" && typeof (item as Record<string, unknown>).token_id === "string" && typeof (item as Record<string, unknown>).account === "string" && isAtomicAmount((item as Record<string, unknown>).amount))));
 }
 
 async function recordReconciliationIncident(
@@ -51,7 +56,11 @@ async function recordReconciliationIncident(
 
 export async function reconcileUnknownHederaPayments(limit = 25, now = new Date()) {
   const candidates = await db.paymentIntent.findMany({
-    where: { status: "SUBMISSION_UNKNOWN", attempts: { some: { status: "UNKNOWN", candidateTransactionId: { not: null } } } },
+    where: {
+      status: "SUBMISSION_UNKNOWN",
+      quote: { network: { in: ["hedera:testnet", "hedera:mainnet"] } },
+      attempts: { some: { status: "UNKNOWN", candidateTransactionId: { not: null } } },
+    },
     include: {
       quote: { include: { asset: true } },
       reservation: true,
@@ -59,12 +68,11 @@ export async function reconcileUnknownHederaPayments(limit = 25, now = new Date(
       attempts: { where: { status: "UNKNOWN", candidateTransactionId: { not: null } }, orderBy: { attemptNumber: "desc" }, take: 1 },
     },
     orderBy: { updatedAt: "asc" },
-    take: Math.max(limit * 2, limit),
+    take: limit,
   });
 
   const results: Array<{ paymentIntentId: string; outcome: string; transactionId?: string; error?: string }> = [];
   for (const intent of candidates) {
-    if (results.length >= limit) break;
     const quote = intent.quote;
     const attempt = intent.attempts[0];
     if (!quote || !attempt?.candidateTransactionId || !["hedera:testnet", "hedera:mainnet"].includes(quote.network)) continue;
@@ -79,18 +87,18 @@ export async function reconcileUnknownHederaPayments(limit = 25, now = new Date(
         continue;
       }
       if (!mirrorResponse.ok) throw new Error(`MIRROR_NODE_${mirrorResponse.status}`);
-      const payload = await mirrorResponse.json() as { transactions?: unknown[] };
-      const transaction = payload.transactions?.find((row) => isMirrorTransaction(row) && normalizeTransactionId(row.transaction_id) === normalized);
+      const parsed = parseMirrorNodeJson(await mirrorResponse.text()) as { transactions?: unknown[] };
+      const transaction = parsed.transactions?.find((row) => isMirrorTransaction(row) && normalizeTransactionId(row.transaction_id) === normalized);
       if (!transaction || !isMirrorTransaction(transaction)) {
         results.push({ paymentIntentId: intent.id, outcome: "PENDING", transactionId: candidateTransactionId });
         continue;
       }
 
       const outcome = hederaPaymentReconciliationOutcome(transaction, { type: quote.asset.type, hederaTokenId: quote.asset.hederaTokenId }, payer.accountId, quote.payToAccountId, quote.amountAtomic.toString());
-      const changed = await db.$transaction(async (tx) => {
+      const reconciled: HederaReconciliationResult = await db.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`payment-reconcile:${intent.id}`}, 0))`;
         const current = await tx.paymentIntent.findUniqueOrThrow({ where: { id: intent.id }, select: { status: true } });
-        if (current.status !== "SUBMISSION_UNKNOWN") return false;
+        if (current.status !== "SUBMISSION_UNKNOWN") return "ALREADY_RECONCILED" as const;
 
         const transactionId = transaction.transaction_id;
         const duplicate = await tx.settlement.findFirst({ where: { network: quote.network, transactionId } });
@@ -100,7 +108,7 @@ export async function reconcileUnknownHederaPayments(limit = 25, now = new Date(
           await tx.spendReservation.updateMany({ where: { paymentIntentId: intent.id, status: "ACTIVE" }, data: { status: "CONSUMED" } });
           await recordReconciliationIncident(tx, intent.organizationId, intent.id, "Duplicate settlement transaction detected", `Transaction ${transactionId} is already associated with another payment attempt. The spend reservation remains consumed pending investigation.`);
           await tx.outboxEvent.create({ data: { organizationId: intent.organizationId, eventType: "PAYMENT_SETTLEMENT_REPLAY_DETECTED", aggregateType: "PAYMENT_INTENT", aggregateId: intent.id, payload: { transactionId, network: quote.network } } });
-          return true;
+          return "REPLAY" as const;
         }
 
         await tx.settlement.upsert({
@@ -130,9 +138,9 @@ export async function reconcileUnknownHederaPayments(limit = 25, now = new Date(
           await recordReconciliationIncident(tx, intent.organizationId, intent.id, "Settled Hedera transaction does not match payment quote", `Transaction ${transactionId} succeeded but its transfer evidence does not match the quoted payer, payee, asset, and amount. The reservation remains consumed pending investigation.`);
           await tx.outboxEvent.create({ data: { organizationId: intent.organizationId, eventType: "PAYMENT_SETTLEMENT_MISMATCH", aggregateType: "PAYMENT_INTENT", aggregateId: intent.id, payload: { transactionId, network: quote.network } } });
         }
-        return true;
+        return outcome;
       });
-      results.push({ paymentIntentId: intent.id, outcome: changed ? outcome : "ALREADY_RECONCILED", transactionId: transaction.transaction_id });
+      results.push({ paymentIntentId: intent.id, outcome: reconciled, transactionId: transaction.transaction_id });
     } catch (error) {
       results.push({ paymentIntentId: intent.id, outcome: "ERROR", transactionId: candidateTransactionId, error: error instanceof Error ? error.message : "UNKNOWN_ERROR" });
     }
