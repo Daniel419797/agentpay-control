@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { getNetworkRouter } from "@/domain/network-router";
+import { decodeX402Header, encodeX402Header } from "@/domain/x402-headers";
 import { safeFetch } from "@/lib/safe-url";
 
 const MAX_CHALLENGE_BYTES = 64 * 1024;
@@ -9,6 +10,7 @@ const MAX_FULFILLMENT_BYTES = 1024 * 1024;
 const paymentRequirementSchema = z.object({ scheme: z.literal("exact"), network: z.string().min(1), asset: z.string().min(1), amount: z.string().regex(/^\d+$/), payTo: z.string().min(1), maxTimeoutSeconds: z.number().int().positive().max(3600), extra: z.record(z.string(), z.unknown()).default({}) });
 const paymentRequiredSchema = z.object({ x402Version: z.literal(2), error: z.string().optional(), resource: z.object({ url: z.string().url(), description: z.string().optional(), mimeType: z.string().optional(), serviceName: z.string().optional(), tags: z.array(z.string()).optional(), iconUrl: z.string().url().optional() }), accepts: z.array(paymentRequirementSchema).min(1), extensions: z.record(z.string(), z.unknown()).optional() });
 const paymentPayloadSchema = z.object({ x402Version: z.literal(2), accepted: paymentRequirementSchema, payload: z.record(z.string(), z.unknown()), resource: z.record(z.string(), z.unknown()).optional(), extensions: z.record(z.string(), z.unknown()).optional() });
+const paymentResponseSchema = z.object({ transactionId: z.string().optional(), transaction: z.string().optional(), network: z.string().optional() }).passthrough();
 
 export type PaymentRequirement = z.infer<typeof paymentRequirementSchema>;
 export type PaymentRequired = z.infer<typeof paymentRequiredSchema>;
@@ -39,11 +41,15 @@ export async function discoverX402(resourceUrl: URL, production = false) {
   const response = await safeFetch(resourceUrl, { method: "GET", redirect: "manual", cache: "no-store", signal: AbortSignal.timeout(10_000), headers: { accept: "application/json" } }, production);
   if (response.status !== 402) throw new Error("X402_PAYMENT_REQUIRED_EXPECTED");
   const header = response.headers.get("payment-required");
-  if (header && Buffer.byteLength(header) > MAX_CHALLENGE_BYTES) throw new Error("RESOURCE_RESPONSE_TOO_LARGE");
-  const text = header ?? await boundedText(response, MAX_CHALLENGE_BYTES);
   let candidate: unknown;
-  try { candidate = JSON.parse(text); } catch { throw new Error("X402_CHALLENGE_INVALID"); }
-  if (!header && typeof candidate === "object" && candidate && "paymentRequirements" in candidate) candidate = (candidate as { paymentRequirements: unknown }).paymentRequirements;
+  if (header) {
+    try { candidate = decodeX402Header(header, MAX_CHALLENGE_BYTES); }
+    catch { throw new Error("X402_CHALLENGE_INVALID"); }
+  } else {
+    const text = await boundedText(response, MAX_CHALLENGE_BYTES);
+    try { candidate = JSON.parse(text); } catch { throw new Error("X402_CHALLENGE_INVALID"); }
+    if (typeof candidate === "object" && candidate && "paymentRequirements" in candidate) candidate = (candidate as { paymentRequirements: unknown }).paymentRequirements;
+  }
   return paymentRequiredSchema.parse(candidate);
 }
 
@@ -80,7 +86,10 @@ function ambiguousPostPaymentFailure(status: number, code: string) {
 export async function fulfillX402Resource(resourceUrl: string, requirement: PaymentRequirement, paymentPayload: z.infer<typeof paymentPayloadSchema>, production = false) {
   let response: Response;
   try {
-    response = await safeFetch(resourceUrl, { method: "GET", redirect: "manual", cache: "no-store", signal: AbortSignal.timeout(30_000), headers: { accept: "application/json", "payment-signature": JSON.stringify(paymentPayload), "payment-requirements": JSON.stringify(requirement) } }, production);
+    response = await safeFetch(resourceUrl, {
+      method: "GET", redirect: "manual", cache: "no-store", signal: AbortSignal.timeout(30_000),
+      headers: { accept: "application/json", "payment-signature": encodeX402Header(paymentPayload) },
+    }, production);
   } catch { throw new X402SubmissionUnknownError(); }
 
   let text: string;
@@ -95,9 +104,9 @@ export async function fulfillX402Resource(resourceUrl: string, requirement: Paym
   }
 
   const paymentResponseHeader = response.headers.get("payment-response");
-  let paymentResponse: { transactionId?: string; transaction?: string; network?: string } = {};
+  let paymentResponse: z.infer<typeof paymentResponseSchema> = {};
   if (paymentResponseHeader) {
-    try { paymentResponse = JSON.parse(paymentResponseHeader); }
+    try { paymentResponse = paymentResponseSchema.parse(decodeX402Header(paymentResponseHeader, 64 * 1024)); }
     catch { throw new X402SubmissionUnknownError(); }
   }
   const nestedTransaction = typeof body === "object" && body && "settled" in body ? (body as { settled?: { transactionId?: string } }).settled?.transactionId : undefined;
