@@ -18,6 +18,8 @@ A release is eligible for production only when every repository gate is green an
 - Hedera operator and managed payer private keys are not the same credential.
 - Arc payer, x402 relayer, and explicit contract-execution private keys are all present and distinct in production.
 - An unconfigured Hedera mainnet is not advertised by the production network router or operator switcher; configuring its facilitator also requires a mainnet signing capability credential.
+- Hedera contract automation is bound to the allowlisted `hedera:testnet` or `hedera:mainnet` route. The selected network ID is persisted before submission and is reused for reconciliation instead of being re-derived from mutable rule state.
+- Mainnet contract automation has its own facilitator contract capability credential and payer account ID; it never falls back to testnet contract credentials, payer identity, or mirror-node evidence.
 - Enabled resource-server networks have explicit HTTPS facilitator URLs, settlement credentials, provider/payee identifiers, and payment asset identifiers.
 - Dashboard readiness validates PostgreSQL migration state plus the exact x402 network advertised by every configured facilitator.
 - Unsafe request bodies are size-bounded for JSON, URL-encoded, and multipart form submissions.
@@ -55,9 +57,10 @@ The dashboard is deployed separately from the Render blueprint. At minimum produ
 - canonical unpadded base64url `KEY_ENCRYPTION_MASTER_KEY` representing exactly 32 random bytes
 - `SUPABASE_URL` and `SUPABASE_ANON_KEY`
 - Hedera testnet facilitator URL plus signing, settlement, and contract capability keys
+- `HEDERA_PAYER_ACCOUNT_ID` for testnet managed contract transaction identity
 - if `HEDERA_MAINNET_FACILITATOR_URL` is configured, `HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY` is also required
+- if mainnet contract automation is enabled, `HEDERA_MAINNET_FACILITATOR_CONTRACT_API_KEY` and `HEDERA_MAINNET_PAYER_ACCOUNT_ID` are required and must remain independent from testnet capabilities
 - Arc facilitator URL plus signing and contract capability keys and Arc RPC/provider address
-- `HEDERA_PAYER_ACCOUNT_ID`
 
 Do not place `HEDERA_OPERATOR_KEY`, `HEDERA_PAYER_KEY`, `ARC_PAYER_PRIVATE_KEY`, `ARC_RELAYER_PRIVATE_KEY`, or `ARC_CONTRACT_EXECUTION_PRIVATE_KEY` in Vercel.
 
@@ -72,6 +75,8 @@ Arc production requires three independent chain credentials:
 - `ARC_CONTRACT_EXECUTION_PRIVATE_KEY` for allowlisted explicit contract calls.
 
 Do not reuse those values. Move them to KMS/HSM/external signing before real-value launch where supported.
+
+A Hedera mainnet facilitator is deployed separately from the default testnet Render service. If mainnet contract automation is used, expose that instance to the dashboard with its mainnet contract capability key and the public payer account ID used to pre-record transaction identity. The raw mainnet payer private key remains only in the mainnet facilitator.
 
 ### Resource server (Render)
 
