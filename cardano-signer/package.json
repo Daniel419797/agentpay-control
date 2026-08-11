@@ -1,0 +1,14 @@
+{
+  "name": "@agentpay/cardano-signer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "typecheck": "node --check cardano.mjs && node --check server.mjs",
+    "test": "node --test *.test.mjs"
+  }
+}
