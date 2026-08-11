@@ -1,4 +1,5 @@
 export type MasumiRefundOperation = "REQUEST_REFUND" | "AUTHORIZE_REFUND";
+export type MasumiRefundProviderOutcome = "CONFIRMED" | "FAILED" | "SUBMISSION_UNKNOWN";
 
 export function masumiRefundTargetReached(operation: MasumiRefundOperation, providerState: string) {
   if (operation === "REQUEST_REFUND") return providerState === "RefundRequested" || providerState === "RefundAuthorized";
@@ -8,6 +9,12 @@ export function masumiRefundTargetReached(operation: MasumiRefundOperation, prov
 export function masumiRefundTerminallyPrecluded(operation: MasumiRefundOperation, providerState: string) {
   if (masumiRefundTargetReached(operation, providerState)) return false;
   return providerState === "Completed" || providerState === "Disputed";
+}
+
+export function classifyMasumiRefundProviderState(operation: MasumiRefundOperation, providerState: string): MasumiRefundProviderOutcome {
+  if (masumiRefundTargetReached(operation, providerState)) return "CONFIRMED";
+  if (masumiRefundTerminallyPrecluded(operation, providerState)) return "FAILED";
+  return "SUBMISSION_UNKNOWN";
 }
 
 export function isAmbiguousMasumiRefundError(error: unknown) {
