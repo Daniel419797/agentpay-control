@@ -3,7 +3,19 @@ import { describe, expect, it } from "vitest";
 import { createPinnedLookup, isPrivateAddress, validateResourceUrl } from "@/lib/safe-url";
 
 describe("resource URL safety", () => {
-  it.each(["127.0.0.1", "10.2.3.4", "172.20.1.2", "192.168.1.1", "::1", "fd00::1"])("blocks private address %s", (address) => {
+  it.each([
+    "127.0.0.1",
+    "10.2.3.4",
+    "172.20.1.2",
+    "192.168.1.1",
+    "169.254.169.254",
+    "::1",
+    "fd00::1",
+    "fe80::1",
+    "ff02::1",
+    "::ffff:127.0.0.1",
+    "0:0:0:0:0:ffff:7f00:1",
+  ])("blocks non-public address %s", (address) => {
     expect(isPrivateAddress(address)).toBe(true);
   });
 
