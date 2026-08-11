@@ -3,20 +3,38 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-type AgentNetwork = "hedera:testnet" | "hedera:mainnet" | "eip155:5042002";
-type Custody = "PLATFORM_MANAGED_TESTNET" | "SELF_CUSTODY";
+type AgentNetwork = "hedera:testnet" | "hedera:mainnet" | "eip155:5042002" | "cardano:preprod" | "cardano:mainnet";
+type Custody = "PLATFORM_MANAGED_TESTNET" | "SELF_CUSTODY" | "EXTERNAL_DELEGATED";
+type Asset = "HBAR" | "USDC" | "ADA";
 
-export function CreateAgentForm({ mainnetEnabled, arcEnabled }: { mainnetEnabled: boolean; arcEnabled: boolean }) {
+type Props = {
+  mainnetEnabled: boolean;
+  arcEnabled: boolean;
+  cardanoPreprodEnabled: boolean;
+  cardanoMainnetEnabled: boolean;
+};
+
+function defaultsForNetwork(network: AgentNetwork): { custody: Custody; asset: Asset } {
+  if (network === "eip155:5042002") return { custody: "PLATFORM_MANAGED_TESTNET", asset: "USDC" };
+  if (network === "cardano:preprod") return { custody: "PLATFORM_MANAGED_TESTNET", asset: "ADA" };
+  if (network === "cardano:mainnet") return { custody: "EXTERNAL_DELEGATED", asset: "ADA" };
+  if (network === "hedera:mainnet") return { custody: "SELF_CUSTODY", asset: "HBAR" };
+  return { custody: "PLATFORM_MANAGED_TESTNET", asset: "HBAR" };
+}
+
+export function CreateAgentForm({ mainnetEnabled, arcEnabled, cardanoPreprodEnabled, cardanoMainnetEnabled }: Props) {
   const router = useRouter();
   const [network, setNetwork] = useState<AgentNetwork>("hedera:testnet");
   const [custody, setCustody] = useState<Custody>("PLATFORM_MANAGED_TESTNET");
+  const [asset, setAsset] = useState<Asset>("HBAR");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const selfCustody = custody === "SELF_CUSTODY";
 
   function changeNetwork(value: AgentNetwork) {
+    const next = defaultsForNetwork(value);
     setNetwork(value);
-    setCustody(value === "hedera:mainnet" ? "SELF_CUSTODY" : value === "eip155:5042002" ? "PLATFORM_MANAGED_TESTNET" : "PLATFORM_MANAGED_TESTNET");
+    setCustody(next.custody);
+    setAsset(next.asset);
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -32,9 +50,8 @@ export function CreateAgentForm({ mainnetEnabled, arcEnabled }: { mainnetEnabled
           name: String(form.get("name")).trim(),
           description: String(form.get("description")).trim() || undefined,
           network,
-          custodyType: custody,
-          ...(selfCustody && String(form.get("accountId")).trim() ? { accountId: String(form.get("accountId")).trim() } : {}),
-          ...(String(form.get("publicKey")).trim() ? { publicKey: String(form.get("publicKey")).trim() } : {}),
+          asset,
+          custody,
         }),
       });
       const payload = await response.json().catch(() => ({})) as { data?: { id?: string }; detail?: string };
@@ -48,18 +65,38 @@ export function CreateAgentForm({ mainnetEnabled, arcEnabled }: { mainnetEnabled
     }
   }
 
+  const cardano = network.startsWith("cardano:");
+
   return <form className="app-form" onSubmit={submit}>
     {error && <div className="form-error" role="alert">{error}</div>}
     <label>Agent name<input name="name" required minLength={2} maxLength={80} placeholder="Treasury research agent" /></label>
     <label>Description<textarea name="description" maxLength={500} rows={4} placeholder="What this agent is permitted to do" /></label>
-    <label>Payment rail<select name="network" value={network} onChange={(event) => changeNetwork(event.target.value as AgentNetwork)}><option value="hedera:testnet">Hedera Testnet</option>{mainnetEnabled && <option value="hedera:mainnet">Hedera Mainnet</option>}{arcEnabled && <option value="eip155:5042002">Arc Testnet</option>}</select></label>
-    <label>Custody<select name="custodyType" value={custody} onChange={(event) => setCustody(event.target.value as Custody)} disabled={network !== "hedera:testnet"}>{network === "hedera:mainnet" ? <option value="SELF_CUSTODY">Self-custody wallet confirmation</option> : network === "eip155:5042002" ? <option value="PLATFORM_MANAGED_TESTNET">Managed testnet signer</option> : <><option value="PLATFORM_MANAGED_TESTNET">Managed testnet signer</option><option value="SELF_CUSTODY">Self-custody wallet confirmation</option></>}</select></label>
-    {selfCustody && <><label>Verified account ID <span className="optional">optional</span><input name="accountId" placeholder="0.0.12345" pattern="0\.0\.\d+" /></label><p className="form-help">If supplied, the account must match a wallet identity you already verified for this network. Leave it blank to use your most recently verified identity.</p></>}
-    {!selfCustody && network === "hedera:testnet" && <p className="form-help">The account is assigned from the isolated managed payer configured for the testnet facilitator. The dashboard never receives its private key.</p>}
-    {network === "hedera:mainnet" && <p className="form-help">Mainnet agents require explicit wallet confirmation for payments. Managed testnet custody is never reused on mainnet.</p>}
-    {network === "eip155:5042002" && <p className="form-help">Arc Testnet agents use the isolated managed EVM signer configured for this deployment and the verified configured USDC asset.</p>}
-    <label>Public key <span className="optional">optional</span><input name="publicKey" placeholder="Public key metadata" minLength={20} maxLength={200} /></label>
-    <p className="form-help">Provisioning a payment agent requires recent authentication and is blocked while the organization emergency stop is active.</p>
+    <label>Payment rail<select name="network" value={network} onChange={(event) => changeNetwork(event.target.value as AgentNetwork)}>
+      <option value="hedera:testnet">Hedera Testnet</option>
+      {mainnetEnabled && <option value="hedera:mainnet">Hedera Mainnet</option>}
+      {arcEnabled && <option value="eip155:5042002">Arc Testnet</option>}
+      {cardanoPreprodEnabled && <option value="cardano:preprod">Cardano Preprod</option>}
+      {cardanoMainnetEnabled && <option value="cardano:mainnet">Cardano Mainnet</option>}
+    </select></label>
+    <label>Custody<select name="custody" value={custody} onChange={(event) => setCustody(event.target.value as Custody)} disabled={network !== "hedera:testnet"}>
+      {network === "hedera:testnet" ? <><option value="PLATFORM_MANAGED_TESTNET">Managed testnet signer · autonomous</option><option value="SELF_CUSTODY">Verified wallet · confirmation required</option></> : null}
+      {network === "hedera:mainnet" && <option value="SELF_CUSTODY">Verified wallet · confirmation required</option>}
+      {network === "eip155:5042002" && <option value="PLATFORM_MANAGED_TESTNET">Managed Arc signer · autonomous</option>}
+      {network === "cardano:preprod" && <option value="PLATFORM_MANAGED_TESTNET">Managed Cardano Preprod signer · autonomous</option>}
+      {network === "cardano:mainnet" && <option value="EXTERNAL_DELEGATED">Delegated production signer · autonomous</option>}
+    </select></label>
+    <label>Default asset<select name="asset" value={asset} onChange={(event) => setAsset(event.target.value as Asset)} disabled={network === "eip155:5042002" || cardano}>
+      {network.startsWith("hedera:") && <option value="HBAR">HBAR</option>}
+      {network.startsWith("hedera:") && <option value="USDC">USDC</option>}
+      {network === "eip155:5042002" && <option value="USDC">USDC</option>}
+      {cardano && <option value="ADA">ADA</option>}
+    </select></label>
+    {network === "hedera:testnet" && custody === "PLATFORM_MANAGED_TESTNET" && <p className="form-help">The account is assigned from the isolated managed payer configured for the Hedera testnet facilitator. The dashboard never receives its private key.</p>}
+    {network === "hedera:mainnet" && <p className="form-help">Hedera Mainnet requires a previously verified wallet identity and explicit wallet confirmation for payments.</p>}
+    {network === "eip155:5042002" && <p className="form-help">Arc Testnet uses the isolated managed EVM signer and configured USDC contract.</p>}
+    {network === "cardano:preprod" && <p className="form-help">Cardano Preprod uses x402 exact with signed eUTxO transactions. The managed signer builds the signed transaction outside the dashboard; AgentPay verifies settlement against Cardano chain evidence.</p>}
+    {network === "cardano:mainnet" && <p className="form-help">Cardano Mainnet is shown only when a separately configured delegated production signer, provider address, and chain-evidence credentials are complete. AgentPay does not store the signing secret in the dashboard.</p>}
+    <p className="form-help">Provisioning requires recent authentication and is blocked while the organization emergency stop is active.</p>
     <button className="primary-button" type="submit" disabled={busy}>{busy ? "Creating…" : "Create agent"}</button>
   </form>;
 }
