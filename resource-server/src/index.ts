@@ -71,6 +71,15 @@ const requirementSchema = z.object({
   scheme: z.literal("exact"), network: z.string().min(1), amount: z.string().regex(/^\d+$/), payTo: z.string().min(1), asset: z.string().min(1), maxTimeoutSeconds: z.number().int().positive().max(3600), extra: z.record(z.string(), z.unknown()).default({}),
 });
 const paymentPayloadSchema = z.object({ x402Version: z.literal(2), accepted: requirementSchema, payload: z.record(z.string(), z.unknown()) }).passthrough();
+const settlementResponseSchema = z.object({
+  success: z.boolean(),
+  errorReason: z.string().optional(),
+  payer: z.string().optional(),
+  transaction: z.string(),
+  network: z.string(),
+  amount: z.string().optional(),
+  extensions: z.record(z.string(), z.unknown()).optional(),
+});
 
 const arcPrices: Record<string, AssetPrice> = { usdc: { type: "TOKEN", amount: "1000000", assetId: ARCTestnet.usdcAddress, decimals: 6, symbol: "USDC" } };
 const hederaTestnetPrices: Record<string, AssetPrice> = {
@@ -187,19 +196,29 @@ async function handlePaidRequest(c: Context, category: string, resourceId: strin
     const settleRes = await fetch(`${facilitatorUrl.replace(/\/$/, "")}/settle`, {
       method: "POST", headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(settlementApiKey ? { authorization: `Bearer ${settlementApiKey}` } : {}) }, body: JSON.stringify(verifyBody), signal: AbortSignal.timeout(30_000),
     });
-    const settleResult = await settleRes.json().catch(() => ({})) as { success?: boolean; transaction?: string; transactionId?: string; errorReason?: string };
-    if (!settleRes.ok || settleResult.success !== true) {
-      if (settleRes.status >= 500 || settleResult.errorReason === "settlement_unknown") return c.json({ code: "SETTLEMENT_UNKNOWN", message: "Settlement may have been submitted but could not be confirmed." }, 503);
-      return c.json({ code: "SETTLEMENT_FAILED", message: settleResult.errorReason || "Settlement failed" }, 422);
+    const rawSettlement = await settleRes.json().catch(() => ({}));
+    const parsedSettlement = settlementResponseSchema.safeParse(rawSettlement);
+    if (!settleRes.ok || !parsedSettlement.success || parsedSettlement.data.success !== true) {
+      const errorReason = parsedSettlement.success ? parsedSettlement.data.errorReason : undefined;
+      if (settleRes.status >= 500 || errorReason === "settlement_unknown") return c.json({ code: "SETTLEMENT_UNKNOWN", message: "Settlement may have been submitted but could not be confirmed." }, 503);
+      return c.json({ code: "SETTLEMENT_FAILED", message: errorReason || "Settlement failed" }, 422);
     }
-    const transactionId = settleResult.transaction ?? settleResult.transactionId;
-    if (!transactionId) return c.json({ code: "SETTLEMENT_EVIDENCE_MISSING", message: "Facilitator did not return a transaction ID" }, 502);
+    const settleResult = parsedSettlement.data;
+    if (settleResult.network !== network) return c.json({ code: "SETTLEMENT_NETWORK_MISMATCH", message: "Facilitator settlement evidence returned a different network." }, 502);
+    if (!settleResult.transaction) return c.json({ code: "SETTLEMENT_EVIDENCE_MISSING", message: "Facilitator did not return a transaction ID" }, 502);
 
-    const paymentResponse = { x402Version: 2, transactionId, network, settledAt: new Date().toISOString() };
+    const paymentResponse = {
+      success: true,
+      transaction: settleResult.transaction,
+      network: settleResult.network,
+      ...(settleResult.payer ? { payer: settleResult.payer } : {}),
+      amount: settleResult.amount ?? matchingCanonical.amount,
+      ...(settleResult.extensions ? { extensions: settleResult.extensions } : {}),
+    };
     c.header("PAYMENT-RESPONSE", encodeX402Header(paymentResponse));
     const networkConfig = getNetworkConfig(network);
-    const explorerUrl = networkConfig ? `${networkConfig.explorerUrl}/${transactionId}` : undefined;
-    return c.json({ resourceId: generateResourceId(), category, content: data, settled: { transactionId, explorerUrl } });
+    const explorerUrl = networkConfig ? `${networkConfig.explorerUrl}/${settleResult.transaction}` : undefined;
+    return c.json({ resourceId: generateResourceId(), category, content: data, settled: { transactionId: settleResult.transaction, explorerUrl } });
   } catch (error) {
     console.error(JSON.stringify({ event: "facilitator_request_failed", errorType: error instanceof Error ? error.name : "UnknownError" }));
     return c.json({ code: "FACILITATOR_ERROR", message: "Facilitator communication failed" }, 502);
