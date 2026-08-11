@@ -17,7 +17,7 @@ A release is eligible for production only when every repository gate is green an
 - The combined facilitator uses six unique API credentials: signing, settlement, and contract execution for Hedera, and the same three independently for Arc.
 - Hedera operator and managed payer private keys are not the same credential.
 - Arc payer, x402 relayer, and explicit contract-execution private keys are all present and distinct in production.
-- An unconfigured Hedera mainnet is not advertised by the production network router or operator switcher.
+- An unconfigured Hedera mainnet is not advertised by the production network router or operator switcher; configuring its facilitator also requires a mainnet signing capability credential.
 - Enabled resource-server networks have explicit HTTPS facilitator URLs, settlement credentials, provider/payee identifiers, and payment asset identifiers.
 - Dashboard readiness validates PostgreSQL migration state plus the exact x402 network advertised by every configured facilitator.
 - Unsafe request bodies are size-bounded for JSON, URL-encoded, and multipart form submissions.
@@ -55,6 +55,7 @@ The dashboard is deployed separately from the Render blueprint. At minimum produ
 - canonical unpadded base64url `KEY_ENCRYPTION_MASTER_KEY` representing exactly 32 random bytes
 - `SUPABASE_URL` and `SUPABASE_ANON_KEY`
 - Hedera testnet facilitator URL plus signing, settlement, and contract capability keys
+- if `HEDERA_MAINNET_FACILITATOR_URL` is configured, `HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY` is also required
 - Arc facilitator URL plus signing and contract capability keys and Arc RPC/provider address
 - `HEDERA_PAYER_ACCOUNT_ID`
 
