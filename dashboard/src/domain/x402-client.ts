@@ -96,6 +96,12 @@ export async function discoverX402(resourceUrl: URL, production = false) {
   return paymentRequiredSchema.parse(candidate);
 }
 
+function requirementIdentifierMatches(network: string, actual: string, expected: string) {
+  return network.startsWith("eip155:")
+    ? actual.toLowerCase() === expected.toLowerCase()
+    : actual === expected;
+}
+
 export function selectRequirement(
   required: PaymentRequired,
   expected: { network: string; asset: string; amount: string; payTo: string; resourceUrl: string },
@@ -103,9 +109,9 @@ export function selectRequirement(
   if (new URL(required.resource.url).toString() !== new URL(expected.resourceUrl).toString()) throw new Error("X402_RESOURCE_MISMATCH");
   const selected = required.accepts.find((requirement) =>
     requirement.network === expected.network &&
-    requirement.asset === expected.asset &&
+    requirementIdentifierMatches(requirement.network, requirement.asset, expected.asset) &&
     requirement.amount === expected.amount &&
-    requirement.payTo === expected.payTo
+    requirementIdentifierMatches(requirement.network, requirement.payTo, expected.payTo)
   );
   if (!selected) throw new Error("X402_REQUIREMENT_MISMATCH");
   return selected;
