@@ -12,6 +12,7 @@ describe("resource URL safety", () => {
     "::1",
     "fd00::1",
     "fe80::1",
+    "fec0::1",
     "ff02::1",
     "::ffff:127.0.0.1",
     "0:0:0:0:0:ffff:7f00:1",
