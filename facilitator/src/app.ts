@@ -93,14 +93,20 @@ export function createHederaApp(env: HederaFacilitatorEnv): { app: Hono; network
   });
   app.post("/settle", async c => {
     if (!authorized(env.SETTLEMENT_API_KEY, c.req.header("authorization"))) return c.json({ code: "UNAUTHORIZED" }, 401);
+    let body: z.infer<typeof x402Request>;
     try {
-      const body = x402Request.parse(await boundedJson(c.req.raw));
+      body = x402Request.parse(await boundedJson(c.req.raw));
       const verified = await x402Scheme.verify(body.paymentPayload, body.paymentRequirements);
       if (!verified.isValid) return c.json(verified, 422);
-      return c.json(await x402Scheme.settle(body.paymentPayload, body.paymentRequirements));
     } catch (error) {
       const failure = publicFailure(error, "INVALID_REQUEST", 400);
       return c.json({ success: false, errorReason: "invalid_request", errorMessage: failure.code }, failure.status);
+    }
+    try {
+      return c.json(await x402Scheme.settle(body.paymentPayload, body.paymentRequirements));
+    } catch (error) {
+      logFailure("settlement_submission_unknown", error);
+      return c.json({ success: false, errorReason: "settlement_unknown", errorMessage: "SETTLEMENT_SUBMISSION_UNKNOWN" }, 503);
     }
   });
   app.post("/contract-execute", async c => {
