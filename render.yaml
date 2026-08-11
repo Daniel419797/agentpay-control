@@ -1,4 +1,49 @@
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
 services:
+
+  - type: web
+    name: agentpay-cardano-signer-preprod
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    dockerContext: .
+    dockerfilePath: cardano-signer/Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: CARDANO_NETWORK
+        value: preprod
+      - key: CARDANO_PAYER_ADDRESS
+        sync: false
+      - key: CARDANO_USDCX_ASSET_ID
+        sync: false
+      - key: CARDANO_BLOCKFROST_URL
+        value: https://cardano-preprod.blockfrost.io/api/v0
+      - key: CARDANO_BLOCKFROST_PROJECT_ID
+        sync: false
+      # Gateway capability generated and kept by Render. The facilitator reads
+      # this exact value through fromService instead of copying it manually.
+      - key: CARDANO_SIGNER_API_KEY
+        generateValue: true
+      - key: CARDANO_PAYMENT_PUBLIC_KEY_HEX
+        sync: false
+      # Actual Ed25519 custody remains outside this web service. It receives
+      # only a 32-byte transaction-body hash and returns a signature.
+      - key: CARDANO_ED25519_SIGNER_URL
+        sync: false
+      - key: CARDANO_ED25519_SIGNER_API_KEY
+        sync: false
+      - key: CARDANO_MIN_OUTPUT_LOVELACE
+        value: "1000000"
+      - key: CARDANO_TOKEN_OUTPUT_LOVELACE
+        value: "2000000"
+      - key: CARDANO_MIN_CHANGE_LOVELACE
+        value: "2000000"
+      - key: CARDANO_MAX_INPUTS
+        value: "20"
 
   - type: web
     name: agentpay-facilitator
@@ -48,19 +93,37 @@ services:
       - key: CARDANO_NETWORK
         value: preprod
       - key: CARDANO_PAYER_ADDRESS
-        sync: false
-      # Optional exact policy-id + asset-name unit. Leave empty for ADA-only.
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-preprod
+          envVarKey: CARDANO_PAYER_ADDRESS
       - key: CARDANO_USDCX_ASSET_ID
-        sync: false
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-preprod
+          envVarKey: CARDANO_USDCX_ASSET_ID
       - key: CARDANO_BLOCKFROST_URL
-        value: https://cardano-preprod.blockfrost.io/api/v0
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-preprod
+          envVarKey: CARDANO_BLOCKFROST_URL
       - key: CARDANO_BLOCKFROST_PROJECT_ID
-        sync: false
-      # Public HTTPS URL of the separately deployed isolated signer gateway.
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-preprod
+          envVarKey: CARDANO_BLOCKFROST_PROJECT_ID
       - key: CARDANO_SIGNER_URL
-        sync: false
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-preprod
+          envVarKey: RENDER_EXTERNAL_URL
       - key: CARDANO_SIGNER_API_KEY
-        sync: false
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-preprod
+          envVarKey: CARDANO_SIGNER_API_KEY
+      # Dashboard HTTPS claim-store endpoint and matching capability are still
+      # supplied explicitly because the dashboard is deployed outside Render.
       - key: CARDANO_SETTLEMENT_STORE_URL
         sync: false
       - key: CARDANO_SETTLEMENT_STORE_API_KEY
@@ -108,7 +171,10 @@ services:
       - key: ARC_FACILITATOR_URL
         sync: false
       - key: CARDANO_PREPROD_FACILITATOR_URL
-        sync: false
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: RENDER_EXTERNAL_URL
       - key: FACILITATOR_SETTLEMENT_API_KEY
         fromService:
           type: web
@@ -142,7 +208,7 @@ services:
       - key: CARDANO_PREPROD_USDCX_ASSET_ID
         fromService:
           type: web
-          name: agentpay-facilitator
+          name: agentpay-cardano-signer-preprod
           envVarKey: CARDANO_USDCX_ASSET_ID
       - key: CARDANO_USDCX_RESOURCE_PRICE_ATOMIC
         value: "1000000"
