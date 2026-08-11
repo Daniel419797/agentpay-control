@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { hederaContractRoute } from "@/domain/hedera-contract-route";
 
 const routingConfig = {
+  APP_ENV: "production" as const,
   FACILITATOR_URL: "https://testnet-facilitator.example/hedera",
   FACILITATOR_CONTRACT_API_KEY: "t".repeat(32),
   HEDERA_PAYER_ACCOUNT_ID: "0.0.111",
@@ -36,6 +37,24 @@ describe("Hedera contract routing", () => {
       ...routingConfig,
       HEDERA_MAINNET_FACILITATOR_CONTRACT_API_KEY: undefined,
     })).toThrow("CONTRACT_MAINNET_CAPABILITY_NOT_CONFIGURED");
+  });
+
+  it("does not accept a generic facilitator key as a production contract capability", () => {
+    expect(() => hederaContractRoute("hedera:testnet", {
+      ...routingConfig,
+      FACILITATOR_CONTRACT_API_KEY: undefined,
+      FACILITATOR_API_KEY: "legacy-generic-secret-abcdefghijklmnopqrstuvwxyz",
+    })).toThrow("CONTRACT_TESTNET_CAPABILITY_NOT_CONFIGURED");
+  });
+
+  it("keeps the generic capability fallback only for local development", () => {
+    const route = hederaContractRoute("hedera:testnet", {
+      ...routingConfig,
+      APP_ENV: "development",
+      FACILITATOR_CONTRACT_API_KEY: undefined,
+      FACILITATOR_API_KEY: "legacy-generic-secret-abcdefghijklmnopqrstuvwxyz",
+    });
+    expect(route.contractApiKey).toBe("legacy-generic-secret-abcdefghijklmnopqrstuvwxyz");
   });
 
   it("rejects non-Hedera contract networks", () => {
