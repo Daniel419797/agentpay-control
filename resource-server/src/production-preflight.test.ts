@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { productionPreflightErrors } from "./production-preflight.js";
+import { CARDANO_MAINNET_USDCX_ASSET_ID, productionPreflightErrors } from "./production-preflight.js";
 
 const CARDANO_PREPROD_PROVIDER = "addr_test1vr8nl3s7rk0tqn4rd9u49s0k52f9sezrt98rs4cnpfj47wggeuy4d";
-const USDCX_UNIT = `${"ab".repeat(28)}5553444378`;
+const CARDANO_MAINNET_PROVIDER = `addr1${"q".repeat(80)}`;
+const TEST_STABLE_UNIT = `${"ab".repeat(28)}5553444378`;
 
 function productionEnv(overrides: Record<string, string> = {}) {
   return {
@@ -64,7 +65,7 @@ test("accepts a complete Cardano Preprod exact-payment resource rail", () => {
   assert.deepEqual(errors, []);
 });
 
-test("requires an exact Cardano asset unit before advertising USDCx", () => {
+test("requires an exact Cardano asset unit before advertising a Preprod test stablecoin", () => {
   const base = {
     ENABLED_NETWORKS: "cardano:preprod",
     CARDANO_USDCX_ENABLED: "true",
@@ -73,8 +74,20 @@ test("requires an exact Cardano asset unit before advertising USDCx", () => {
     CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY: "cardano-settlement-secret-abcdefghijklmnopqrstuvwxyz",
   };
   assert.equal(productionPreflightErrors(productionEnv(base)).includes("CARDANO_PREPROD_USDCX_ASSET_ID"), true);
-  assert.deepEqual(productionPreflightErrors(productionEnv({ ...base, CARDANO_PREPROD_USDCX_ASSET_ID: USDCX_UNIT })), []);
+  assert.deepEqual(productionPreflightErrors(productionEnv({ ...base, CARDANO_PREPROD_USDCX_ASSET_ID: TEST_STABLE_UNIT })), []);
   assert.equal(productionPreflightErrors(productionEnv({ ...base, CARDANO_PREPROD_USDCX_ASSET_ID: "not-an-asset" })).includes("CARDANO_PREPROD_USDCX_ASSET_ID"), true);
+});
+
+test("pins Mainnet USDCx to the canonical Circle xReserve Cardano asset", () => {
+  const base = {
+    ENABLED_NETWORKS: "cardano:mainnet",
+    CARDANO_USDCX_ENABLED: "true",
+    CARDANO_MAINNET_FACILITATOR_URL: "https://facilitator.agentpay.example/cardano",
+    CARDANO_MAINNET_PROVIDER_ADDRESS: CARDANO_MAINNET_PROVIDER,
+    CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY: "cardano-mainnet-settlement-secret-abcdefghijklmnopqrstuvwxyz",
+  };
+  assert.deepEqual(productionPreflightErrors(productionEnv({ ...base, CARDANO_MAINNET_USDCX_ASSET_ID: CARDANO_MAINNET_USDCX_ASSET_ID })), []);
+  assert.equal(productionPreflightErrors(productionEnv({ ...base, CARDANO_MAINNET_USDCX_ASSET_ID: TEST_STABLE_UNIT })).includes("CARDANO_MAINNET_USDCX_ASSET_ID_MISMATCH"), true);
 });
 
 test("fails closed on partial or insecure Cardano Preprod resource configuration", () => {
