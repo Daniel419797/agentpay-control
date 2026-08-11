@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { Prisma } from "@/generated/prisma/client";
 import { paymentAccountForNetwork } from "@/domain/payment-routing";
 import { getConfig } from "@/lib/config";
 import { db } from "@/lib/db";
@@ -21,6 +22,7 @@ const receiptSchema = z.object({
 
 export type ArcReceipt = z.infer<typeof receiptSchema>;
 export type ArcPaymentReconciliationOutcome = "CONFIRMED" | "FAILED" | "MISMATCH";
+type ArcReconciliationResult = ArcPaymentReconciliationOutcome | "REPLAY" | "ALREADY_RECONCILED";
 
 function addressTopic(address: string) {
   return `0x${address.replace(/^0x/i, "").toLowerCase().padStart(64, "0")}`;
@@ -64,8 +66,8 @@ async function rpc(method: string, params: unknown[]) {
   return envelope.result;
 }
 
-async function ensureIncident(organizationId: string, paymentIntentId: string, title: string, description: string) {
-  await db.supportCase.upsert({
+async function ensureIncident(tx: Prisma.TransactionClient, organizationId: string, paymentIntentId: string, title: string, description: string) {
+  await tx.supportCase.upsert({
     where: { organizationId_sourceType_sourceId: { organizationId, sourceType: "PAYMENT_INTENT", sourceId: paymentIntentId } },
     create: { organizationId, createdBy: null, sourceType: "PAYMENT_INTENT", sourceId: paymentIntentId, title, description, category: "RECONCILIATION_INCIDENT", severity: "URGENT" },
     update: { title, description, severity: "URGENT", status: "OPEN" },
@@ -75,19 +77,22 @@ async function ensureIncident(organizationId: string, paymentIntentId: string, t
 export async function reconcileUnknownArcPayments(limit = 25, now = new Date()) {
   const config = getConfig();
   const candidates = await db.paymentIntent.findMany({
-    where: { status: "SUBMISSION_UNKNOWN", attempts: { some: { status: "UNKNOWN", candidateTransactionId: { not: null } } } },
+    where: {
+      status: "SUBMISSION_UNKNOWN",
+      quote: { network: ARC_NETWORK },
+      attempts: { some: { status: "UNKNOWN", candidateTransactionId: { not: null } } },
+    },
     include: {
       quote: { include: { asset: true } },
       agent: { include: { accounts: { where: { status: "ACTIVE" } } } },
       attempts: { where: { status: "UNKNOWN", candidateTransactionId: { not: null } }, orderBy: { attemptNumber: "desc" }, take: 1 },
     },
     orderBy: { updatedAt: "asc" },
-    take: Math.max(limit * 3, limit),
+    take: limit,
   });
 
   const results: Array<{ paymentIntentId: string; outcome: string; transactionId?: string; error?: string }> = [];
   for (const intent of candidates) {
-    if (results.length >= limit) break;
     const quote = intent.quote;
     const attempt = intent.attempts[0];
     if (!quote || quote.network !== ARC_NETWORK || !attempt?.candidateTransactionId) continue;
@@ -103,8 +108,9 @@ export async function reconcileUnknownArcPayments(limit = 25, now = new Date()) 
       const [receiptValue, latestBlockValue, network] = await Promise.all([
         rpc("eth_getTransactionReceipt", [transactionHash]),
         rpc("eth_blockNumber", []),
-        db.chainNetwork.findUnique({ where: { id: ARC_NETWORK }, select: { requiredConfirmations: true } }),
+        db.chainNetwork.findUnique({ where: { id: ARC_NETWORK }, select: { requiredConfirmations: true, enabled: true } }),
       ]);
+      if (!network || !network.enabled) throw new Error("ARC_NETWORK_CONFIGURATION_MISSING");
       if (receiptValue === null) {
         results.push({ paymentIntentId: intent.id, outcome: "PENDING", transactionId: transactionHash });
         continue;
@@ -113,22 +119,23 @@ export async function reconcileUnknownArcPayments(limit = 25, now = new Date()) 
       if (receipt.transactionHash.toLowerCase() !== transactionHash.toLowerCase()) throw new Error("ARC_TRANSACTION_HASH_MISMATCH");
       const latestBlock = hex.parse(latestBlockValue);
       const confirmations = BigInt(latestBlock) - BigInt(receipt.blockNumber) + 1n;
-      if (confirmations < BigInt(network?.requiredConfirmations ?? 1)) {
+      if (confirmations < BigInt(network.requiredConfirmations)) {
         results.push({ paymentIntentId: intent.id, outcome: "PENDING_CONFIRMATIONS", transactionId: transactionHash });
         continue;
       }
 
       const outcome = arcPaymentReconciliationOutcome(receipt, config.ARC_USDC_ADDRESS, payer.accountId, quote.payToAccountId, quote.amountAtomic.toString());
-      const changed = await db.$transaction(async (tx) => {
+      const reconciled: ArcReconciliationResult = await db.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`payment-reconcile:${intent.id}`}, 0))`;
         const current = await tx.paymentIntent.findUniqueOrThrow({ where: { id: intent.id }, select: { status: true } });
-        if (current.status !== "SUBMISSION_UNKNOWN") return false;
+        if (current.status !== "SUBMISSION_UNKNOWN") return "ALREADY_RECONCILED" as const;
 
         const duplicate = await tx.settlement.findFirst({ where: { network: quote.network, transactionId: transactionHash } });
         if (duplicate && duplicate.paymentAttemptId !== attempt.id) {
           await tx.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "FAILED", errorCode: "SETTLEMENT_TRANSACTION_REPLAY" } });
           await tx.paymentIntent.update({ where: { id: intent.id }, data: { status: "SETTLEMENT_FAILED" } });
           await tx.spendReservation.updateMany({ where: { paymentIntentId: intent.id, status: "ACTIVE" }, data: { status: "CONSUMED" } });
+          await ensureIncident(tx, intent.organizationId, intent.id, "Duplicate Arc settlement transaction detected", `Transaction ${transactionHash} is already associated with another payment attempt. The spend reservation remains consumed pending investigation.`);
           await tx.outboxEvent.create({ data: { organizationId: intent.organizationId, eventType: "PAYMENT_SETTLEMENT_REPLAY_DETECTED", aggregateType: "PAYMENT_INTENT", aggregateId: intent.id, payload: { transactionId: transactionHash, network: quote.network } } });
           return "REPLAY" as const;
         }
@@ -161,6 +168,7 @@ export async function reconcileUnknownArcPayments(limit = 25, now = new Date()) 
           await tx.paymentIntent.update({ where: { id: intent.id }, data: { status: "SETTLED" } });
           await tx.spendReservation.updateMany({ where: { paymentIntentId: intent.id }, data: { status: "SETTLED" } });
           await tx.resourceFulfillment.upsert({ where: { paymentIntentId: intent.id }, create: { paymentIntentId: intent.id, status: "FAILED", errorCode: "SETTLED_FULFILLMENT_UNAVAILABLE" }, update: { status: "FAILED", errorCode: "SETTLED_FULFILLMENT_UNAVAILABLE" } });
+          await ensureIncident(tx, intent.organizationId, intent.id, "Payment settled but fulfillment evidence is unavailable", `Arc transaction ${transactionHash} confirms settlement after an ambiguous resource response. The original paid resource response could not be recovered automatically.`);
           await tx.outboxEvent.create({ data: { organizationId: intent.organizationId, eventType: "PAYMENT_SETTLED_RECONCILED", aggregateType: "PAYMENT_INTENT", aggregateId: intent.id, payload: { transactionId: transactionHash, network: quote.network, fulfillmentRecovered: false } } });
         } else if (outcome === "FAILED") {
           await tx.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "FAILED", errorCode: "EVM_TRANSACTION_FAILED" } });
@@ -173,22 +181,13 @@ export async function reconcileUnknownArcPayments(limit = 25, now = new Date()) 
           await tx.paymentIntent.update({ where: { id: intent.id }, data: { status: "SETTLEMENT_FAILED" } });
           await tx.spendReservation.updateMany({ where: { paymentIntentId: intent.id, status: "ACTIVE" }, data: { status: "CONSUMED" } });
           await tx.resourceFulfillment.upsert({ where: { paymentIntentId: intent.id }, create: { paymentIntentId: intent.id, status: "FAILED", errorCode: "SETTLEMENT_TRANSFER_MISMATCH" }, update: { status: "FAILED", errorCode: "SETTLEMENT_TRANSFER_MISMATCH" } });
+          await ensureIncident(tx, intent.organizationId, intent.id, "Arc settlement does not match payment quote", `Transaction ${transactionHash} succeeded but its USDC transfer does not match the quoted payer, payee, and amount. The reservation remains consumed pending investigation.`);
           await tx.outboxEvent.create({ data: { organizationId: intent.organizationId, eventType: "PAYMENT_SETTLEMENT_MISMATCH", aggregateType: "PAYMENT_INTENT", aggregateId: intent.id, payload: { transactionId: transactionHash, network: quote.network } } });
         }
         return outcome;
       });
 
-      if (changed === "REPLAY") {
-        await ensureIncident(intent.organizationId, intent.id, "Duplicate Arc settlement transaction detected", `Transaction ${transactionHash} is already associated with another payment attempt. The spend reservation remains consumed pending investigation.`);
-        results.push({ paymentIntentId: intent.id, outcome: "REPLAY", transactionId: transactionHash });
-        continue;
-      }
-      if (changed === "MISMATCH") {
-        await ensureIncident(intent.organizationId, intent.id, "Arc settlement does not match payment quote", `Transaction ${transactionHash} succeeded but its USDC transfer does not match the quoted payer, payee, and amount. The reservation remains consumed pending investigation.`);
-      } else if (changed === "CONFIRMED") {
-        await ensureIncident(intent.organizationId, intent.id, "Payment settled but fulfillment evidence is unavailable", `Arc transaction ${transactionHash} confirms settlement after an ambiguous resource response. The original paid resource response could not be recovered automatically.`);
-      }
-      results.push({ paymentIntentId: intent.id, outcome: changed === false ? "ALREADY_RECONCILED" : changed, transactionId: transactionHash });
+      results.push({ paymentIntentId: intent.id, outcome: reconciled, transactionId: transactionHash });
     } catch (error) {
       results.push({ paymentIntentId: intent.id, outcome: "ERROR", transactionId: transactionHash, error: error instanceof Error ? error.message : "UNKNOWN_ERROR" });
     }
