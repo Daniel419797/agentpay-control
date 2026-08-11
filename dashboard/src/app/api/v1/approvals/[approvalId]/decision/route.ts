@@ -28,33 +28,49 @@ export async function POST(request: Request, { params }: { params: Promise<{ app
       if (!approval) return { kind: "NOT_FOUND" as const };
       if (approval.status !== "PENDING" || approval.expiresAt <= new Date()) return { kind: "NOT_PENDING" as const };
 
-      if (input.decision === "APPROVE") {
-        const selfInitiated = await tx.auditEvent.findFirst({
-          where: {
+      const initiators = await tx.auditEvent.findMany({
+        where: {
+          organizationId: workspace.organization.id,
+          action: "PAYMENT_REQUEST_INITIATED",
+          targetType: "PAYMENT_INTENT",
+          targetId: approval.paymentIntentId,
+          result: "SUCCESS",
+        },
+        orderBy: { occurredAt: "asc" },
+        take: 2,
+        select: { actorType: true, actorId: true },
+      });
+      if (initiators.length !== 1 || !initiators[0]?.actorId) {
+        await tx.auditEvent.create({
+          data: {
             organizationId: workspace.organization.id,
             actorType: "USER",
             actorId: workspace.user.id,
-            action: "PAYMENT_REQUEST_INITIATED",
-            targetType: "PAYMENT_INTENT",
-            targetId: approval.paymentIntentId,
+            action: "PAYMENT_APPROVAL_INITIATOR_EVIDENCE_DENIED",
+            targetType: "APPROVAL_REQUEST",
+            targetId: approval.id,
+            result: "DENIED",
+            metadata: { paymentIntentId: approval.paymentIntentId, initiatorEvidenceCount: initiators.length },
           },
-          select: { id: true },
         });
-        if (selfInitiated) {
-          await tx.auditEvent.create({
-            data: {
-              organizationId: workspace.organization.id,
-              actorType: "USER",
-              actorId: workspace.user.id,
-              action: "PAYMENT_APPROVAL_SELF_DENIED",
-              targetType: "APPROVAL_REQUEST",
-              targetId: approval.id,
-              result: "DENIED",
-              metadata: { paymentIntentId: approval.paymentIntentId },
-            },
-          });
-          return { kind: "SELF_APPROVAL_FORBIDDEN" as const };
-        }
+        return { kind: "INITIATOR_EVIDENCE_MISSING" as const };
+      }
+
+      const initiator = initiators[0];
+      if (input.decision === "APPROVE" && initiator.actorType === "USER" && initiator.actorId === workspace.user.id) {
+        await tx.auditEvent.create({
+          data: {
+            organizationId: workspace.organization.id,
+            actorType: "USER",
+            actorId: workspace.user.id,
+            action: "PAYMENT_APPROVAL_SELF_DENIED",
+            targetType: "APPROVAL_REQUEST",
+            targetId: approval.id,
+            result: "DENIED",
+            metadata: { paymentIntentId: approval.paymentIntentId },
+          },
+        });
+        return { kind: "SELF_APPROVAL_FORBIDDEN" as const };
       }
 
       await tx.approvalDecision.create({
@@ -99,6 +115,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ app
 
     if (result.kind === "NOT_FOUND") return problem(404, "APPROVAL_NOT_FOUND", "Approval not found.");
     if (result.kind === "NOT_PENDING") return problem(409, "APPROVAL_NOT_PENDING", "Approval is no longer pending.");
+    if (result.kind === "INITIATOR_EVIDENCE_MISSING") return problem(409, "APPROVAL_INITIATOR_EVIDENCE_MISSING", "This approval cannot be decided because its immutable initiator evidence is missing or inconsistent. Cancel and recreate the payment request.");
     if (result.kind === "SELF_APPROVAL_FORBIDDEN") return problem(403, "APPROVAL_SEPARATION_REQUIRED", "The operator who initiated this payment cannot approve it. A different Owner or Approver must review the request.");
     if (result.status === "CONSUMED") return ok(await executeAuthorizedIntent(result.paymentIntentId));
     return ok(result);
