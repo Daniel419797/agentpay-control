@@ -42,11 +42,19 @@ describe("Hedera facilitator production environment", () => {
     }))).toThrow(/settlement and managed payer keys must be distinct/);
   });
 
-  it("rejects equivalent ECDSA keys with different serialized prefixes", () => {
+  it("requires an explicit algorithm for raw 64-hex private keys", () => {
+    const key = "a".repeat(64);
+    expect(() => parseHederaEnv(productionEnv({ HEDERA_OPERATOR_KEY: key }))).toThrow(/HEDERA_OPERATOR_KEY_TYPE is required/);
+    expect(parseHederaEnv(productionEnv({ HEDERA_OPERATOR_KEY: key, HEDERA_OPERATOR_KEY_TYPE: "ED25519" })).HEDERA_OPERATOR_KEY_TYPE).toBe("ED25519");
+  });
+
+  it("rejects equivalent raw chain keys with different serialized prefixes", () => {
     const key = "a".repeat(64);
     expect(() => parseHederaEnv(productionEnv({
       HEDERA_OPERATOR_KEY: `0x${key}`,
+      HEDERA_OPERATOR_KEY_TYPE: "ECDSA",
       HEDERA_PAYER_KEY: key,
+      HEDERA_PAYER_KEY_TYPE: "ECDSA",
     }))).toThrow(/settlement and managed payer keys must be distinct/);
   });
 });
