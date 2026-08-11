@@ -28,6 +28,35 @@ export async function POST(request: Request, { params }: { params: Promise<{ app
       if (!approval) return { kind: "NOT_FOUND" as const };
       if (approval.status !== "PENDING" || approval.expiresAt <= new Date()) return { kind: "NOT_PENDING" as const };
 
+      if (input.decision === "APPROVE") {
+        const selfInitiated = await tx.auditEvent.findFirst({
+          where: {
+            organizationId: workspace.organization.id,
+            actorType: "USER",
+            actorId: workspace.user.id,
+            action: "PAYMENT_REQUEST_INITIATED",
+            targetType: "PAYMENT_INTENT",
+            targetId: approval.paymentIntentId,
+          },
+          select: { id: true },
+        });
+        if (selfInitiated) {
+          await tx.auditEvent.create({
+            data: {
+              organizationId: workspace.organization.id,
+              actorType: "USER",
+              actorId: workspace.user.id,
+              action: "PAYMENT_APPROVAL_SELF_DENIED",
+              targetType: "APPROVAL_REQUEST",
+              targetId: approval.id,
+              result: "DENIED",
+              metadata: { paymentIntentId: approval.paymentIntentId },
+            },
+          });
+          return { kind: "SELF_APPROVAL_FORBIDDEN" as const };
+        }
+      }
+
       await tx.approvalDecision.create({
         data: { approvalRequestId: approval.id, userId: workspace.user.id, decision: input.decision, note: input.note },
       });
@@ -70,6 +99,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ app
 
     if (result.kind === "NOT_FOUND") return problem(404, "APPROVAL_NOT_FOUND", "Approval not found.");
     if (result.kind === "NOT_PENDING") return problem(409, "APPROVAL_NOT_PENDING", "Approval is no longer pending.");
+    if (result.kind === "SELF_APPROVAL_FORBIDDEN") return problem(403, "APPROVAL_SEPARATION_REQUIRED", "The operator who initiated this payment cannot approve it. A different Owner or Approver must review the request.");
     if (result.status === "CONSUMED") return ok(await executeAuthorizedIntent(result.paymentIntentId));
     return ok(result);
   } catch (error) {
