@@ -48,6 +48,7 @@ export class EvmFacilitator {
   private readonly payerAccount: ReturnType<typeof privateKeyToAccount>;
   private readonly relayerAccount: ReturnType<typeof privateKeyToAccount>;
   private readonly contractAccount: ReturnType<typeof privateKeyToAccount>;
+  private lastSettlementTransactionHash: Hex | undefined;
   readonly walletClient: WalletClient;
   private readonly contractWalletClient: WalletClient;
   readonly publicClient: PublicClient;
@@ -87,8 +88,16 @@ export class EvmFacilitator {
     const evmSigner = {
       address: this.relayerAccount.address,
       readContract: (args: any) => this.publicClient.readContract(args),
-      sendTransaction: (args: any) => this.walletClient.sendTransaction({ ...args, account: this.relayerAccount, chain: this.walletClient.chain }),
-      writeContract: (args: any) => this.walletClient.writeContract({ ...args, account: this.relayerAccount, chain: this.walletClient.chain }),
+      sendTransaction: async (args: any) => {
+        const transactionHash = await this.walletClient.sendTransaction({ ...args, account: this.relayerAccount, chain: this.walletClient.chain });
+        this.lastSettlementTransactionHash = transactionHash;
+        return transactionHash;
+      },
+      writeContract: async (args: any) => {
+        const transactionHash = await this.walletClient.writeContract({ ...args, account: this.relayerAccount, chain: this.walletClient.chain });
+        this.lastSettlementTransactionHash = transactionHash;
+        return transactionHash;
+      },
       waitForTransactionReceipt: (args: any) => this.publicClient.waitForTransactionReceipt(args),
       getCode: (args: any) => this.publicClient.getCode(args),
       verifyTypedData: (args: any) => verifyTypedDataSignature(evmSigner as any, args),
@@ -97,6 +106,14 @@ export class EvmFacilitator {
     this.scheme = new ExactEvmScheme(signer);
     this.clientScheme = new ExactEvmClientScheme(this.payerAccount, { rpcUrl: config.ARC_RPC_URL });
     this.network = `eip155:${chain.id}`;
+  }
+
+  beginSettlementEvidenceCapture() {
+    this.lastSettlementTransactionHash = undefined;
+  }
+
+  get settlementTransactionCandidate(): Hex | undefined {
+    return this.lastSettlementTransactionHash;
   }
 
   get providerAddress(): string {
