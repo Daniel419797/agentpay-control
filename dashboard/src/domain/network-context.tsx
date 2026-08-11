@@ -2,23 +2,24 @@
 
 import { createContext, useContext, useCallback, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 
-export type NetworkId = "hedera:testnet" | "hedera:mainnet";
+export type NetworkId = "hedera:testnet" | "hedera:mainnet" | "eip155:5042002";
 
 const NETWORK_STORAGE_KEY = "agentpay:network";
 
+function isNetworkId(value: string | null): value is NetworkId {
+  return value === "hedera:testnet" || value === "hedera:mainnet" || value === "eip155:5042002";
+}
+
 function getNetworkFromUrl(): NetworkId | null {
   if (typeof window === "undefined") return null;
-  const params = new URLSearchParams(window.location.search);
-  const value = params.get("network");
-  if (value === "hedera:testnet" || value === "hedera:mainnet") return value;
-  return null;
+  const value = new URLSearchParams(window.location.search).get("network");
+  return isNetworkId(value) ? value : null;
 }
 
 function getNetworkFromStorage(): NetworkId {
   if (typeof window === "undefined") return "hedera:testnet";
   const stored = localStorage.getItem(NETWORK_STORAGE_KEY);
-  if (stored === "hedera:testnet" || stored === "hedera:mainnet") return stored;
-  return "hedera:testnet";
+  return isNetworkId(stored) ? stored : "hedera:testnet";
 }
 
 function resolveNetwork(): NetworkId {
@@ -54,22 +55,25 @@ function getServerSnapshot(): NetworkId {
   return "hedera:testnet";
 }
 
+export type NetworkOption = { id: NetworkId; label: string; testnet: boolean; family: "HEDERA" | "EVM" };
+
 const NetworkContext = createContext<{
   network: NetworkId;
   setNetwork: (value: NetworkId) => void;
-  networks: { id: NetworkId; label: string; testnet: boolean }[];
+  networks: NetworkOption[];
 }>({
   network: "hedera:testnet",
   setNetwork: () => {},
-  networks: [{ id: "hedera:testnet", label: "Hedera Testnet", testnet: true }],
+  networks: [{ id: "hedera:testnet", label: "Hedera Testnet", testnet: true, family: "HEDERA" }],
 });
 
-export function NetworkProvider({ children, mainnetEnabled = true }: { children: ReactNode; mainnetEnabled?: boolean }) {
+export function NetworkProvider({ children, mainnetEnabled = true, arcEnabled = false }: { children: ReactNode; mainnetEnabled?: boolean; arcEnabled?: boolean }) {
   const network = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  const networks = useMemo(() => [
-    { id: "hedera:testnet" as const, label: "Hedera Testnet", testnet: true },
-    ...(mainnetEnabled ? [{ id: "hedera:mainnet" as const, label: "Hedera Mainnet", testnet: false }] : []),
-  ], [mainnetEnabled]);
+  const networks = useMemo<NetworkOption[]>(() => [
+    { id: "hedera:testnet", label: "Hedera Testnet", testnet: true, family: "HEDERA" },
+    ...(mainnetEnabled ? [{ id: "hedera:mainnet" as const, label: "Hedera Mainnet", testnet: false, family: "HEDERA" as const }] : []),
+    ...(arcEnabled ? [{ id: "eip155:5042002" as const, label: "Arc Testnet", testnet: true, family: "EVM" as const }] : []),
+  ], [arcEnabled, mainnetEnabled]);
 
   useEffect(() => {
     const resolved = resolveNetwork();
