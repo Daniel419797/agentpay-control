@@ -7,15 +7,16 @@ export function isRetryableFiatSubmission(status: string, externalTransferId: st
 }
 
 /**
- * A provider 4xx response proves the request was rejected before a successful
- * submission. Network errors, malformed successful responses, and provider 5xx
- * responses remain ambiguous and must be reconciled with the same idempotency key.
+ * Only responses that prove the provider could not have accepted the operation
+ * are terminal. Validation, idempotency, throttling, provider, malformed-success,
+ * and network failures remain ambiguous and are reconciled with the same key.
  */
 export function fiatSubmissionFailureStatus(error: unknown): "FAILED" | "SUBMISSION_UNKNOWN" {
   if (!(error instanceof Error)) return "SUBMISSION_UNKNOWN";
-  const match = /^FIAT_PROVIDER_ERROR:(\d{3}):/.exec(error.message);
-  const status = match ? Number(match[1]) : 0;
-  return status >= 400 && status < 500 ? "FAILED" : "SUBMISSION_UNKNOWN";
+  const match = /^FIAT_PROVIDER_ERROR:(\d{3}):([^:]+)$/.exec(error.message);
+  if (!match) return "SUBMISSION_UNKNOWN";
+  const status = Number(match[1]);
+  return [401, 403, 404].includes(status) ? "FAILED" : "SUBMISSION_UNKNOWN";
 }
 
 export async function reconcileUnknownFiatTransfers(limit = 25, now = new Date()) {
