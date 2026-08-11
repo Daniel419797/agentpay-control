@@ -30,8 +30,9 @@ const navigation: Array<{ label: string; href: Route; icon: typeof LayoutDashboa
   { label: "Settings", href: "/app/settings", icon: Settings }
 ];
 
-function SignerControl() {
+function SignerControl({ emergencyStop }: { emergencyStop: boolean }) {
   const { network } = useNetwork();
+  if (emergencyStop) return <span className="account-chip" title="New payment signing is disabled while the emergency stop is active">Signing disabled</span>;
   if (network === "eip155:5042002") {
     return <span className="account-chip" title="Arc payments are signed by the isolated AgentPay facilitator">Arc managed signer</span>;
   }
@@ -43,21 +44,24 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const [navOpen, setNavOpen] = useState(false);
   const [operatorEmail, setOperatorEmail] = useState("Loading operator…");
   const [roles, setRoles] = useState<string[]>([]);
+  const [emergencyStop, setEmergencyStop] = useState(false);
 
   useEffect(() => {
     void fetch("/api/v1/session", { cache: "no-store" })
       .then((response) => response.ok ? response.json() : null)
-      .then((body: { data?: { user?: { email?: string }; roles?: string[] } } | null) => {
+      .then((body: { data?: { user?: { email?: string }; roles?: string[]; activeOrganization?: { killSwitchEnabled?: boolean } } } | null) => {
         setOperatorEmail(body?.data?.user?.email ?? "Signed-in operator");
         setRoles(body?.data?.roles ?? []);
+        setEmergencyStop(Boolean(body?.data?.activeOrganization?.killSwitchEnabled));
       })
       .catch(() => {
         setOperatorEmail("Signed-in operator");
         setRoles([]);
+        setEmergencyStop(false);
       });
   }, []);
 
-  const canCreateAgent = roles.includes("OWNER") || roles.includes("OPERATOR");
+  const canCreateAgent = !emergencyStop && (roles.includes("OWNER") || roles.includes("OPERATOR"));
 
   return (
     <div className="app-shell">
@@ -87,10 +91,11 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           </div>
           <div className="topbar-actions">
             <NetworkSwitcher />
-            <SignerControl />
+            <SignerControl emergencyStop={emergencyStop} />
             {canCreateAgent && <Link className="primary-button" href="/app/agents/new"><Plus size={16} /><span>Create agent</span></Link>}
           </div>
         </header>
+        {emergencyStop && <div className="form-error" role="status" style={{ margin: "16px 24px 0" }}><strong>Emergency stop active.</strong> New payment signing, card/fiat provisioning, cross-chain preparation, credentials, and automation side effects are disabled. Reconciliation and defensive actions remain available.</div>}
         {children}
       </main>
     </div>
