@@ -4,6 +4,7 @@ import { getConfig } from "@/lib/config";
 import { evaluatePolicy, policyScheduleViolation } from "@/domain/policy";
 import { paymentFingerprint } from "@/domain/fingerprint";
 import { managedPayerMatches, paymentAccountForNetwork, providerPayeeForNetwork, x402AssetIdentifier } from "@/domain/payment-routing";
+import { getNetworkRouter } from "@/domain/network-router";
 import { createManagedPaymentPayload, discoverX402, fulfillX402Resource, parsePaymentRequired, selectRequirement, X402SubmissionUnknownError } from "@/domain/x402-client";
 import { assertSafeResourceUrl } from "@/lib/safe-url";
 import { retrySerializable } from "@/lib/retry";
@@ -13,6 +14,11 @@ export type PaidRequestInput = { resourceUrl: string; purpose?: string; maxAmoun
 export type PaidRequestContext = { initiatedByUserId?: string };
 
 function hash(value: unknown) { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
+
+function isManagedSigningAccount(account: { custodyType: string; signingMode: string }) {
+  return (account.custodyType === "PLATFORM_MANAGED_TESTNET" && account.signingMode === "AUTONOMOUS_MANAGED")
+    || (account.custodyType === "EXTERNAL_DELEGATED" && account.signingMode === "BOUNDED_DELEGATION");
+}
 
 async function failBeforeSigning(intentId: string, organizationId: string, code: string) {
   const status = ["PAYMENT_QUOTE_EXPIRED", "POLICY_EXPIRED", "SPEND_RESERVATION_INVALID"].includes(code) ? "EXPIRED" : "FAILED_BEFORE_SUBMISSION";
@@ -34,11 +40,7 @@ async function markSubmissionUnknown(
   await db.$transaction([
     db.paymentAttempt.update({
       where: { id: attemptId },
-      data: {
-        status: "UNKNOWN",
-        errorCode: code,
-        ...(candidateTransactionId ? { candidateTransactionId } : {}),
-      },
+      data: { status: "UNKNOWN", errorCode: code, ...(candidateTransactionId ? { candidateTransactionId } : {}) },
     }),
     db.paymentIntent.update({ where: { id: intent.id }, data: { status: "SUBMISSION_UNKNOWN" } }),
     db.resourceFulfillment.upsert({
@@ -102,16 +104,11 @@ export async function executeAuthorizedIntent(intentId: string) {
   }
 
   const account = paymentAccountForNetwork(intent.agent.accounts, intent.quote!.network);
-  if (account.custodyType !== "PLATFORM_MANAGED_TESTNET" || account.signingMode !== "AUTONOMOUS_MANAGED") throw new Error("MANAGED_SIGNER_REQUIRED");
+  if (!isManagedSigningAccount(account)) throw new Error("MANAGED_SIGNER_REQUIRED");
   const config = getConfig();
   if (!managedPayerMatches(account, config)) throw new Error("MANAGED_PAYER_MISMATCH");
-  if (account.network === "eip155:5042002") {
-    if (!config.ARC_FACILITATOR_URL || !config.ARC_FACILITATOR_SIGNING_API_KEY) throw new Error("LIVE_FACILITATOR_REQUIRED");
-  } else if (account.network === "hedera:testnet") {
-    if (!config.FACILITATOR_URL || !config.FACILITATOR_SIGNING_API_KEY) throw new Error("LIVE_FACILITATOR_REQUIRED");
-  } else {
-    throw new Error("MANAGED_SIGNER_NETWORK_UNSUPPORTED");
-  }
+  const route = getNetworkRouter().getRoute(account.network);
+  if (config.APP_ENV === "production" && !route.facilitatorApiKey) throw new Error("LIVE_FACILITATOR_REQUIRED");
 
   const required = parsePaymentRequired(intent.quote!.rawChallenge);
   const requirement = selectRequirement(required, {
@@ -134,11 +131,7 @@ export async function executeAuthorizedIntent(intentId: string) {
     const fulfillment = await fulfillX402Resource(intent.resourceUrl, requirement, signed.paymentPayload, config.APP_ENV === "production");
     confirmedSettlement = { transactionId: fulfillment.transactionId, network: fulfillment.network };
 
-    await db.paymentAttempt.update({
-      where: { id: attempt.id },
-      data: { status: "SUBMITTED", candidateTransactionId: fulfillment.transactionId },
-    });
-
+    await db.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "SUBMITTED", candidateTransactionId: fulfillment.transactionId } });
     if (fulfillment.network !== requirement.network) throw new Error("SETTLEMENT_NETWORK_MISMATCH");
 
     return db.$transaction(async (tx) => {
@@ -153,15 +146,8 @@ export async function executeAuthorizedIntent(intentId: string) {
   } catch (error) {
     const errorCode = error instanceof Error ? error.message.slice(0, 120) : "PAYMENT_FAILED";
     if (error instanceof X402SubmissionUnknownError || confirmedSettlement) {
-      const candidateTransactionId = confirmedSettlement?.transactionId
-        ?? (error instanceof X402SubmissionUnknownError ? error.candidateTransactionId : undefined);
-      return markSubmissionUnknown(
-        intent,
-        attempt.id,
-        requirement.network,
-        confirmedSettlement ? `POST_SETTLEMENT_${errorCode}` : errorCode,
-        candidateTransactionId,
-      );
+      const candidateTransactionId = confirmedSettlement?.transactionId ?? (error instanceof X402SubmissionUnknownError ? error.candidateTransactionId : undefined);
+      return markSubmissionUnknown(intent, attempt.id, requirement.network, confirmedSettlement ? `POST_SETTLEMENT_${errorCode}` : errorCode, candidateTransactionId);
     }
 
     await db.$transaction([
@@ -207,7 +193,7 @@ export async function createPaidRequest(
     if (input.maxAmountAtomic && BigInt(amountAtomic) > BigInt(input.maxAmountAtomic)) throw new Error("MAX_AMOUNT_EXCEEDED");
 
     const account = paymentAccountForNetwork(agent.accounts, requirement.network);
-    if (account.custodyType !== "PLATFORM_MANAGED_TESTNET" || account.signingMode !== "AUTONOMOUS_MANAGED") throw new Error("MANAGED_SIGNER_REQUIRED");
+    if (!isManagedSigningAccount(account)) throw new Error("MANAGED_SIGNER_REQUIRED");
 
     const now = new Date();
     const balanceSnapshot = account.balances[0];
@@ -216,7 +202,7 @@ export async function createPaidRequest(
     const dayStart = new Date(now); dayStart.setUTCHours(0, 0, 0, 0);
     const hourStart = new Date(now); hourStart.setUTCMinutes(0, 0, 0);
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-    const sharedTreasury = account.custodyType === "PLATFORM_MANAGED_TESTNET";
+    const sharedTreasury = isManagedSigningAccount(account);
     const scope = sharedTreasury ? { agent: { organizationId: agent.organizationId } } : { agentId };
     const spentStatuses = ["ACTIVE", "CONSUMED", "SETTLED"] as const;
     const [daily, hourly, monthly, balanceCommitted, lastReservation] = await Promise.all([
