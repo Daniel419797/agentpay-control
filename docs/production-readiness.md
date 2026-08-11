@@ -1,142 +1,275 @@
 # AgentPay production readiness
 
-This document separates **repository readiness** from **external launch readiness**. A green repository can prove that AgentPay fails closed, builds, tests, and enforces its documented trust boundaries. It cannot prove that a bank/card provider has approved an account, that a blockchain account is funded, that DNS is owned, or that an external KMS/HSM is configured.
+This document separates **repository readiness** from **external launch readiness**. A green repository can prove that AgentPay fails closed, builds, tests and enforces its documented trust boundaries. It cannot manufacture provider approval, funded wallets, DNS ownership, live credentials, remote signing custody, monitoring, restore evidence or an independent security assessment.
 
 ## Release decision
 
-A release is eligible for production only when every repository gate is green and every external gate required by the enabled feature set has recorded evidence against the exact release commit SHA.
+A release is eligible for production only when:
 
-### Repository gates
+1. every repository gate required by the enabled feature set is green on the exact immutable release SHA;
+2. every enabled public service is deployed from that SHA or an explicitly recorded image digest derived from it;
+3. every external gate required by the enabled feature set has recorded evidence against the same release SHA; and
+4. `/api/v1/ready` reports ready for that production profile.
 
-- `master` release candidate passes the main CI workflow: migrations, governance invariants, lint, typecheck, tests, production builds, Playwright smoke tests, and all production container builds.
-- CodeQL has no unresolved high/critical finding applicable to the release.
-- Dependency review has no newly introduced high/critical vulnerable dependency.
-- Sonar/quality analysis required by repository policy is green or every remaining issue has an explicit reviewed disposition.
-- Production configuration parses successfully; invalid or missing required values stop startup/readiness rather than falling back to development defaults.
-- `KEY_ENCRYPTION_MASTER_KEY` is the canonical unpadded base64url encoding of exactly 32 random bytes.
-- Dashboard production configuration contains no Hedera or Arc private keys.
-- The combined facilitator uses six unique API credentials: signing, settlement, and contract execution for Hedera, and the same three independently for Arc.
-- Hedera operator and managed payer private keys are not the same credential.
-- Arc payer, x402 relayer, and explicit contract-execution private keys are all present and distinct in production.
-- Agent API credentials issued in production use the `ap_live_` prefix; non-production credentials use `ap_test_`. New credentials use collision-resistant lookup prefixes while legacy shorter prefixes remain readable during migration.
-- OAuth uses PKCE plus one-time state bound to an HttpOnly host cookie.
-- Unsafe cookie-authenticated API mutations require the exact configured application origin.
-- An unconfigured Hedera mainnet is not advertised by the production network router or operator switcher; configuring its facilitator also requires a mainnet signing capability credential.
-- Arc appears in the operator network selector only when its facilitator, signing capability, and public managed payer address are configured. Arc browser-wallet/self-custody flows are not advertised as implemented.
-- Hedera contract automation is bound to the allowlisted `hedera:testnet` or `hedera:mainnet` route. The selected network ID is persisted before submission and is reused for reconciliation instead of being re-derived from mutable rule state.
-- Mainnet contract automation has its own facilitator contract capability credential and payer account ID; it never falls back to testnet contract credentials, payer identity, or mirror-node evidence.
-- x402 payment creation binds the exact registered resource endpoint, quoted network, network-matched payment account, payer identity, asset/token identifier, amount, and verified payee. Same-slug endpoint fallback is prohibited.
-- Current x402 V2 HTTP headers use Base64-encoded JSON for `PAYMENT-REQUIRED`, `PAYMENT-SIGNATURE`, and `PAYMENT-RESPONSE`. Temporary raw-JSON decoding is compatibility-only and is not emitted by AgentPay.
-- The bundled resource server advertises all fully configured enabled payment rails in one x402 challenge; callers do not need a private network-selection header before receiving a 402 challenge.
-- After signing, ambiguous settlement outcomes never become safe-to-retry pre-submission failures. Network errors, facilitator 5xx/unknown settlement, malformed success evidence, oversized responses, or missing transaction evidence leave the payment `SUBMISSION_UNKNOWN` and keep spend reserved.
-- When the Arc facilitator broadcasts an EIP-3009 transfer but confirmation becomes uncertain, it retains and returns the exact transaction hash as **candidate evidence**, never as proof of success. The resource server and dashboard preserve that candidate for reconciliation.
-- Hedera `SUBMISSION_UNKNOWN` payments with a pre-recorded candidate transaction ID are reconciled automatically from the correct mirror node against the exact payer, payee, asset/token ID, and atomic amount. Proven failures release spend; successful transfer mismatches/replays retain spend and open an urgent incident.
-- Arc `SUBMISSION_UNKNOWN` payments with an exact broadcast transaction hash are reconciled from the configured Arc RPC only after required confirmations. Confirmation requires a successful receipt plus an exact USDC `Transfer` from the managed payer to the quoted payee for the quoted atomic amount. Reverts release spend; transfer mismatches/replays retain spend and open an urgent incident. Ambiguous Arc payments without a recoverable hash remain held for investigation and are never blindly resubmitted.
-- A confirmed chain settlement whose paid-resource response could not be recovered remains `SETTLED`; fulfillment is marked unavailable and an operational support case is opened instead of pretending the purchase never happened.
-- Human operator-initiated payments that require approval enforce four-eyes review: the same user who initiated the payment cannot cast an approving vote. Rejection by the initiator remains allowed. Agent-credential-initiated payments do not fabricate a human initiator.
-- Organization emergency stop blocks new autonomous x402 signing, cross-chain quote/signature preparation, fiat transfer submission, cardholder/card/fiat-account provisioning, card reactivation, agent credential creation, and new automation side effects. Defensive card freeze/cancel, evidence ingestion, and reconciliation remain available.
-- Automation activation requires Owner access plus recent authentication. Scheduled/event workers skip emergency-stopped organizations rather than failing the whole maintenance cycle, while already-submitted contract reconciliation continues.
-- Organization-owned marketplace providers currently publish paid resources only on verified Hedera testnet settlement. Arc/mainnet third-party settlement remains disabled until a network-specific provider settlement-account model and ownership verification exist. Platform-owned bundled resources may use deployment-configured payees on enabled rails.
-- Enabled resource-server networks have explicit HTTPS facilitator URLs, settlement credentials, provider/payee identifiers, and payment asset identifiers.
-- Dashboard readiness validates PostgreSQL migration state plus the exact x402 network advertised by every configured facilitator.
-- Hedera account snapshots store the selected asset balance: native HBAR uses tinybar balance and token assets use the selected token relationship. Arc managed agents store the configured USDC contract balance.
-- Payment authorization subtracts unresolved reservations and settlements newer than the last chain balance snapshot, preventing stale balance snapshots from reopening already-spent funds.
-- Card authorization spend windows are serialized and period-bounded; equal provider timestamps cannot bypass cumulative limits.
-- Definitive fiat-provider 4xx rejection is terminal `FAILED`; only network/5xx/malformed-submission uncertainty becomes `SUBMISSION_UNKNOWN` and is reconciled with the same idempotency key.
-- Notification webhook signing secrets are encrypted at rest and only returned at creation/rotation. Slack and generic webhook destination URLs are treated as credentials and are redacted from browser/API read responses and server-rendered settings HTML.
-- Automation action ciphertext and webhook secret hashes are not returned in normal browser/API reads.
-- Unsafe request bodies are size-bounded for JSON, URL-encoded, and multipart form submissions.
-- Outbound user-configurable resource fetches reject private/link-local/multicast addresses and use DNS-pinned connections in production.
-- Audit events remain immutable and hash-chain continuous. Retention maintenance may redact fulfillment bodies and delete eligible notification deliveries but does not delete audit-chain rows until a checkpointed externally verifiable archival protocol exists.
-- Runtime containers execute as an unprivileged user.
-- Operator UI hides write actions when the active membership lacks the required role; server-rendered settings reads apply the same role boundary instead of bypassing API authorization.
-- Overview accounting never sums atomic amounts across different assets/decimal scales; settled spend and budget utilization are asset/network aware and explorer links follow the actual settlement rail.
+An older green preview or canary is not evidence for a newer commit.
 
-### External launch gates
+## Repository gates
 
-These cannot be completed by source-code changes alone:
+The exact release candidate must pass:
 
-- Production domain/DNS and TLS are active for every public service.
-- Production database uses managed backups and point-in-time recovery; a restore drill is recorded.
-- Production secrets are stored in the deployment platform secret manager and have a documented rotation owner.
-- Hedera production signing material is moved to a KMS/HSM or external signing service where supported; application services do not persist raw production keys.
-- Arc/EVM payer, relayer, and contract-execution signing material have equivalent managed-key custody before real-value operation.
-- Stripe Issuing and any required money-management/fiat products are approved before `VIRTUAL_CARDS_ENABLED=true`; a low-value card and fiat canary succeeds.
-- LI.FI routes are exercised with funded test/production-approved accounts for every enabled source/destination token pair, including failure/refund reconciliation.
-- Supabase production redirect URLs and email delivery are configured and verified.
-- Error tracking, metrics, paging, and an on-call owner are configured; maintenance and notification workers are monitored for staleness/dead letters.
-- Incident-response and credential-rotation exercises have been run.
-- An independent security assessment has no unresolved release-blocking finding.
-- A low-value production x402 payment is verified independently in the relevant explorer and recorded against the release SHA.
+- forward-only PostgreSQL migrations and migration-state verification;
+- resource endpoint/canonicalization invariants;
+- governance invariants;
+- dashboard lint, typecheck, unit tests and production build;
+- Playwright/browser smoke tests required by the release workflow;
+- Hedera, Arc, Cardano facilitator tests/builds;
+- Cardano signer syntax/tests/image build;
+- resource-server tests/build/image build;
+- CodeQL and dependency review with no unresolved release-blocking finding;
+- repository quality/Sonar policy or explicit reviewed dispositions;
+- fresh code review on the stabilized final head.
 
-## Environment rules
+A workflow that exits before executable steps are created is **not a pass**.
 
-### Dashboard (Vercel)
+## Common control-plane invariants
 
-The dashboard is deployed separately from the Render blueprint. At minimum production requires:
+Production configuration must fail closed. In particular:
 
-- `APP_ENV=production`
-- HTTPS `NEXT_PUBLIC_APP_URL`
-- managed `DATABASE_URL`
-- unique `AUTH_SECRET` and `CRON_SECRET`
-- canonical unpadded base64url `KEY_ENCRYPTION_MASTER_KEY` representing exactly 32 random bytes
-- `SUPABASE_URL` and `SUPABASE_ANON_KEY`
-- Hedera testnet facilitator URL plus signing, settlement, and contract capability keys
-- `HEDERA_PAYER_ACCOUNT_ID` for the public managed Hedera payer identity
-- `HEDERA_PROVIDER_ACCOUNT_ID` for platform-owned Hedera testnet resources
-- if `HEDERA_MAINNET_FACILITATOR_URL` is configured, `HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY` is also required
-- if Hedera mainnet platform resources are enabled, `HEDERA_MAINNET_PROVIDER_ACCOUNT_ID` must identify their payee
-- if mainnet contract automation is enabled, `HEDERA_MAINNET_FACILITATOR_CONTRACT_API_KEY` and `HEDERA_MAINNET_PAYER_ACCOUNT_ID` are required and must remain independent from testnet capabilities
-- Arc facilitator URL plus signing and contract capability keys, Arc RPC URL/provider address, public `ARC_PAYER_ADDRESS`, and configured `ARC_USDC_ADDRESS`
-- when production seed data for the bundled fixture provider is installed, HTTPS `RESOURCE_SERVER_URL` pointing to the deployed resource server
+- HTTPS is required for production public/payment service URLs.
+- `KEY_ENCRYPTION_MASTER_KEY` must be the canonical unpadded base64url encoding of exactly 32 random bytes.
+- production dashboard configuration must not contain Hedera, Arc or Cardano raw private signing material.
+- payment, settlement, contract-execution, claim-store and signer capabilities remain independently scoped where applicable.
+- OAuth uses PKCE and one-time state; unsafe cookie-authenticated mutations require the configured application origin.
+- agent API credentials are scoped, revocable and environment-prefixed.
+- user-controlled outbound resource fetches are body-bounded and SSRF-protected.
+- sensitive notification destinations, webhook secrets, encrypted automation payloads and signing credentials are not returned by ordinary read APIs.
+- audit rows remain immutable/hash-chain protected; retention does not silently delete chain evidence.
+- containers run as an unprivileged user.
+- emergency stop blocks new risky side effects while preserving defensive card actions, evidence ingestion and reconciliation.
+- stale balance snapshots cannot reopen spend already represented by active/consumed/recently settled reservations.
+- ambiguous post-sign/submission outcomes remain held for reconciliation rather than being converted into a retryable pre-submission failure.
 
-Do not place `HEDERA_OPERATOR_KEY`, `HEDERA_PAYER_KEY`, `ARC_PAYER_PRIVATE_KEY`, `ARC_RELAYER_PRIVATE_KEY`, or `ARC_CONTRACT_EXECUTION_PRIVATE_KEY` in Vercel.
+## Cardano direct x402 invariants
 
-### Combined facilitator (Render)
+For an enabled Cardano rail:
 
-Production requires the Hedera and Arc chain credentials needed by their respective facilitators plus the six generated network-scoped API capability keys defined in `render.yaml`. Generic `MANAGED_SIGNING_API_KEY`, `SETTLEMENT_API_KEY`, and `CONTRACT_EXECUTION_API_KEY` are local-development compatibility variables only.
+- x402 scheme is `exact` and the CAIP-2 network is exact (`cardano:preprod` or `cardano:mainnet`).
+- ADA is `lovelace`; optional native-token support is limited to the explicitly configured unit.
+- the x402 requirement includes a SHA-256 `resourceBinding` of the canonical paid-resource URL.
+- the durable settlement claim binds the transaction hash to the complete resource-bound requirement, payer and UTxO nonce.
+- same-resource retry remains idempotent; a different paid resource produces a different durable binding even if price/payee/asset match.
+- the obsolete one-shot confirmed-claim trigger is removed by forward migration; already legacy-sealed claims remain fail-closed.
+- the signer builds only the deliberately narrow supported phase-1 payment shape.
+- production raw signing seeds are rejected.
+- the signer sends only the transaction-body hash to the remote Ed25519/HSM-style signing boundary and verifies the returned signature against the configured public key.
+- the facilitator independently parses signed CBOR and verifies witness, exact payer inputs, exact payee, exact amount, supported asset set, conservation, payer-only change, fee ceiling, TTL/network, resource binding and nonce before submission.
+- scripts, minting, certificates, withdrawals, collateral, bootstrap witnesses, auxiliary data and unrelated third-party outputs are rejected by the supported Cardano payment profile.
+- a possible submission records durable submission state before network submission so a timeout cannot trigger blind resubmission.
+- confirmation and mismatch/replay decisions use independent Blockfrost evidence and configured confirmation depth.
 
-Arc production requires three independent chain credentials:
+### Cardano service topology
 
-- `ARC_PAYER_PRIVATE_KEY` for managed payer signatures;
-- `ARC_RELAYER_PRIVATE_KEY` for the x402 facilitator/relayer signer;
-- `ARC_CONTRACT_EXECUTION_PRIVATE_KEY` for allowlisted explicit contract calls.
+Root `render.yaml` declares three Preprod services:
 
-Do not reuse those values. Move them to KMS/HSM/external signing before real-value launch where supported. Expose only the payer's public address to the dashboard as `ARC_PAYER_ADDRESS`.
+- `agentpay-cardano-signer-preprod`;
+- `agentpay-facilitator`;
+- `agentpay-resource-server`.
 
-A Hedera mainnet facilitator is deployed separately from the default testnet Render service. If mainnet contract automation is used, expose that instance to the dashboard with its mainnet contract capability key and the public payer account ID used to pre-record transaction identity. The raw mainnet payer private key remains only in the mainnet facilitator.
+The combined facilitator has both explicit `/hedera`, `/arc`, `/cardano` mounts and a root `/verify` + `/settle` dispatcher. Root dispatch requires `paymentRequirements.network` to exactly equal `paymentPayload.accepted.network` before selecting a rail. This allows Render to wire one `RENDER_EXTERNAL_URL` into the resource server without trusting an unbound route-selection header.
 
-### Resource server (Render)
+The signer gateway remains a separate process/trust boundary even when declared in the same Blueprint. The actual remote Ed25519 custody endpoint is still external to the gateway.
 
-The production start command runs a preflight before starting the HTTP server. Every network listed in `ENABLED_NETWORKS` must have an explicit HTTPS facilitator URL, settlement capability key, payee/provider identifier, and token identifier where applicable. The default blueprint enables Hedera testnet and Arc testnet, so `PROVIDER_ACCOUNT_ID`, Hedera `USDC_TOKEN_ID`, and `ARC_PROVIDER_ADDRESS`/`ARC_USDC_ADDRESS` must be supplied for those advertised requirements.
+`render-cardano-signer.yaml` remains available for an independently managed signer deployment. Cardano Mainnet must use separately scoped custody/deployment credentials from Preprod.
 
-The resource server emits current x402 V2 Base64 payment headers and advertises every fully configured enabled rail in its 402 challenge. Legacy raw-JSON payment-signature input is accepted only as a migration compatibility path.
+## Cardano USDCx/native-token profile
 
-The bundled `/v1/*` market, file, inference, and research resources are explicitly synthetic integration fixtures. Production seeding uses `RESOURCE_SERVER_URL`; localhost endpoints are prohibited when `APP_ENV=production`. These fixtures must not be marketed or exposed as live market data, real model inference, or live web research without replacing the fixture implementations with production providers and appropriate provider-level monitoring/SLOs.
+- only the configured policy-id + asset-name unit is supported in addition to lovelace;
+- Mainnet USDCx identity is pinned by production preflight to the canonical configured Circle xReserve Cardano asset identity;
+- Preprod token configuration is deployment-specific and may not be represented as Mainnet USDCx;
+- token-bearing inputs may contain only lovelace plus the allowed unit;
+- exact token conservation is required;
+- the payee receives exactly the quoted token amount;
+- token/ADA change may return only to the payer;
+- the root Render Blueprint leaves Preprod token advertisement disabled until the exact asset unit, funded payer and canary are verified.
+
+## Pyth policy profile
+
+When `PYTH_POLICY_ENABLED=true`:
+
+- the selected asset must have a complete configured feed;
+- an observation must be positive, not from the future, within configured freshness and confidence bounds;
+- USD valuation uses the upper edge of the confidence interval and rounds upward;
+- per-transaction/hour/day/month USD limits can only make the base atomic policy more restrictive;
+- oracle failure/staleness/uncertainty cannot degrade into an ALLOW decision;
+- USD valuation/reservation evidence is persisted for audit/reconciliation.
+
+## Masumi registry/direct-payee trust
+
+When `MASUMI_POLICY_ENABLED=true`:
+
+- resource binding is allowed only for an eligible verified provider and requires recent authentication for mutation;
+- AgentPay verifies the exact Masumi network, agent identifier, trusted registry policy, API base URL, online/capability facts and seller wallet/payment information;
+- the seller payment key/address evidence must match the resource trust binding;
+- direct Cardano x402 payee must equal the verified seller address when Masumi direct-payee trust is required;
+- stale/expired registry evidence is refreshed according to policy; missing or inconsistent evidence fails closed.
+
+## Masumi escrow/refund/result/reputation profile
+
+When `MASUMI_ESCROW_ENABLED=true`:
+
+- escrow is a separate settlement workflow from direct x402;
+- scoped `payments:create` agents or recently authenticated Owner/Operator users can initiate buyer-side escrow under the same immutable spending policy;
+- purchase input is encrypted at rest and purged after terminal completion/refund according to the implemented lifecycle;
+- purchase creation, job start and provider evidence are idempotent/ambiguity-aware;
+- lifecycle is reconciled through Masumi evidence instead of inferred from one HTTP response;
+- supported lifecycle includes `FundsLockingRequested`, `FundsLocked`, `ResultSubmitted`, `Completed`, `RefundRequested`, `RefundAuthorized` and `Disputed`;
+- completed reputation credit requires result-hash verification against the exact returned result string;
+- buyer refund requests require Owner/Operator plus recent authentication;
+- seller refund authorization is restricted to the organization that owns the resource provider, requires Owner/Provider Admin plus recent authentication and only applies after `RefundRequested`;
+- seller worklists are visible to the provider workspace rather than only the buyer workspace;
+- pending/ambiguous escrow work is included in maintenance reconciliation;
+- authorized refunds release reserved spend according to the reservation invariant; disputes do not pretend spend was safely returned;
+- a published policy may require a minimum count of AgentPay-observed verified completions and/or a minimum settlement-derived reputation score before new escrow spend is authorized.
+
+No source or UI may describe a direct x402 payment as a Masumi escrow purchase.
+
+## Veridian / KERI / ACDC profile
+
+When `VERIDIAN_IDENTITY_ENABLED=true`:
+
+- cryptographic KERI/ACDC verification is delegated to the configured KERIA authority; AgentPay does not implement its own CESR verifier;
+- production KERIA URL must be HTTPS;
+- deployment-level trusted issuer AIDs and allowed schema SAIDs must be nonempty;
+- a resource credential can be bound only after the resource has a verified Masumi identity;
+- the credential must contain a Masumi-agent identifier claim matching that binding;
+- verifier evidence for revocation/expiry is enforced;
+- persisted binding includes credential SAID, subject AID, issuer AID, schema SAID, claims hash, verification time and expiry;
+- a published policy may further narrow issuer/schema sets and set a maximum verification age;
+- stale, expired, revoked, untrusted or identity-mismatched credentials fail closed before protected escrow spend.
+
+## Dune observability profile
+
+Dune is never part of authorization/signing/settlement availability. When enabled for release evidence:
+
+- checked-in SQL uses public Cardano chain data only;
+- private organization/user/prompt/policy/job-input/signing data is not published;
+- publication scripts create/update the configured queries and dashboard from real credentials/IDs;
+- readiness requires publication evidence and a sample transaction independently cross-checked against chain evidence;
+- a Dune outage cannot relax payment policy or prevent reconciliation.
+
+## Organization data lifecycle
+
+- Settings exposes Owner-only redacted organization export.
+- export requires recent authentication and excludes/redacts credential-bearing destinations and secret/ciphertext fields according to the API contract.
+- workspace deletion requires Owner, recent authentication, exact workspace slug and exact confirmation phrase.
+- a deletion request immediately applies containment controls implemented by the deletion saga instead of waiting for final erase.
+- REQUESTED deletion can be canceled; PROCESSING cannot be falsely canceled from the UI.
+- final completion is not reported before required external card/provider cleanup succeeds.
+- canceling deletion does not falsely reconstruct revoked credentials or automatically reactivate paused notification destinations.
+
+## Mobile/operator usability gate
+
+Production operator pages must remain usable at narrow viewport widths. Generic `.data-table` content is not removed on mobile; the later accessibility stylesheet restores semantic tables inside `.table-wrap` and makes them horizontally scrollable where no purpose-built mobile replacement exists.
+
+## External launch gates
+
+These cannot be completed by source-code changes alone. Record evidence against the exact release SHA for every applicable enabled feature:
+
+### Common platform
+
+- production DNS/TLS for every public service;
+- deployment secret manager with credential rotation owner;
+- monitoring, error tracking, metrics, paging and named on-call;
+- managed database PITR plus a recorded restore drill;
+- production Supabase redirect/email verification;
+- incident-response and credential-rotation exercise;
+- independent security assessment with no unresolved release blocker.
+
+### Cardano
+
+- real Blockfrost credential and production-approved rate capacity;
+- funded payer with appropriate UTxOs;
+- reviewed remote Ed25519/KMS/HSM custody and public verification key;
+- independently explorer-verified low-value Preprod canary for every enabled asset;
+- separate Mainnet signer/custody/deployment and Mainnet canary before Mainnet enablement.
+
+### Pyth
+
+- real production Hermes/feed access;
+- verified feed IDs for enabled assets;
+- success plus stale/future/wide-confidence failure drills.
+
+### Masumi
+
+- real Registry/Payment Service access;
+- real verified seller/resource identity;
+- a real completed low-value escrow purchase;
+- independently recorded result-hash verification;
+- buyer refund + seller authorization drill;
+- failure/dispute drill where applicable.
+
+### Veridian/KERI
+
+- live reviewed KERIA/Veridian verifier;
+- real production credential/schema/issuer evidence;
+- revoked/expired/untrusted/mismatched negative cases.
+
+### Dune
+
+- real write/read credentials as applicable;
+- published query/visualization/dashboard identifiers;
+- public dashboard URL;
+- at least one known Cardano transaction sample independently cross-checked.
+
+### Other enabled rails/providers
+
+- Stripe Issuing/fiat approvals and low-value card/fiat canaries before those live features are enabled;
+- funded/approved LI.FI routes plus failure/refund drill for every enabled source/destination pair;
+- Hedera/Arc production signing material moved to reviewed managed/external custody for real-value use where supported;
+- low-value x402 canary for each production-enabled non-Cardano rail.
+
+## Dashboard (Vercel) environment rules
+
+At minimum production requires:
+
+- `APP_ENV=production`;
+- HTTPS `NEXT_PUBLIC_APP_URL`;
+- managed `DATABASE_URL`;
+- unique `AUTH_SECRET` and `CRON_SECRET`;
+- canonical `KEY_ENCRYPTION_MASTER_KEY`;
+- production Supabase configuration;
+- exact enabled rail facilitator URLs/capabilities/public payer/payee/asset identifiers;
+- Cardano Blockfrost + claim-store + signer-related public configuration when Cardano is enabled;
+- Pyth feed/config when Pyth policy is enabled;
+- Masumi registry/payment-node config when those features are enabled;
+- KERIA verifier + deployment issuer/schema trust config when Veridian/KERI is enabled;
+- Dune query/read configuration only when Dune analytics is enabled.
+
+Do not put raw production rail private keys, HSM signing credentials or raw Cardano signing seed in Vercel.
 
 ## Operational reconciliation
 
-- Run `POST /api/v1/internal/maintenance` on the documented schedule with the internal service credential.
-- Hedera unknown x402 submissions are reconciled from mirror-node evidence before unresolved-submission incident escalation.
-- Arc unknown x402 submissions with a captured transaction hash are reconciled from exact Arc receipt/log evidence before incident escalation. Unknown Arc submissions without a recoverable hash stay held and incident-driven; do not retry settlement blindly.
-- Fiat ambiguous submissions are retried only through the provider's stable idempotency key.
-- Hedera contract unknown submissions reconcile against the network ID persisted before submission.
-- A confirmed payment whose paid resource response was lost is recorded as settled, keeps spend settled, marks fulfillment unavailable, and opens an operational support case rather than pretending the purchase never happened.
-- A successful chain transaction whose transfer evidence does not match the signed quote is a settlement mismatch: spend remains consumed and an urgent incident is opened.
-- Emergency stop does not disable reconciliation. Operators must be able to account for transactions that may have been submitted before the stop became active.
+- run the authenticated internal maintenance endpoint on the documented schedule;
+- reconciliation continues while emergency stop is active;
+- unknown Hedera/Cardano/Arc submissions are resolved only from exact network evidence appropriate to the rail;
+- fiat ambiguous submissions reuse the provider idempotency key;
+- pending Masumi escrows are reconciled from purchase/job evidence;
+- a chain-confirmed payment whose paid-resource response was lost remains settled and opens an operational fulfillment incident rather than being retried as unpaid;
+- settlement mismatch/replay keeps spend consumed/held and creates an urgent incident;
+- dead letters, unknown submissions, stale maintenance and external dependency failures must page an accountable operator in production.
 
 ## Release procedure
 
-1. Open a release/hardening pull request against `master` and let every required check finish.
-2. Resolve all security, dependency, build, migration, type, unit, browser, container, and quality-gate failures before merge.
-3. Merge an immutable reviewed SHA.
-4. Apply database migrations before shifting production traffic.
-5. Deploy facilitator and verify `/health` and each mounted `/supported` endpoint.
-6. Deploy the dashboard and require `/api/v1/ready` to return ready.
-7. Deploy the resource server and verify `/health` plus the standard x402 402/payment flow on each enabled network.
-8. Run maintenance once, inspect dead-letter/unknown-submission/reconciliation queues, and verify monitoring.
-9. Run low-value canaries for each production-enabled rail.
-10. Record explorer/provider evidence and the exact release SHA.
+1. Stabilize the release/hardening PR and record the exact head SHA.
+2. Run every required repository check on that exact head; repair infrastructure that prevents checks from executing.
+3. Obtain fresh review/security/dependency/quality results.
+4. Deploy candidate dashboard and enabled signer/facilitator/resource services from the exact SHA/image digest.
+5. Apply forward-only database migrations.
+6. Verify service `/health`, combined `/supported`, and `/api/v1/ready`.
+7. Record external release evidence for every enabled dependency/custody/canary/drill.
+8. Run low-value canaries and independently verify chain/provider evidence.
+9. Verify monitoring, maintenance, dead-letter and reconciliation operation.
+10. Merge/release only after the repository and applicable external gates are complete.
 
 ## Rollback rule
 
