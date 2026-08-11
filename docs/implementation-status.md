@@ -26,7 +26,7 @@ This document is the release traceability map for AgentPay. **Implemented in cod
 
 - Arc testnet managed agent provisioning, x402 routing and contract automation are implemented when configured.
 - Private keys remain in the facilitator boundary.
-- Ambiguous x402 submission remains incident-driven until deterministic recoverable chain evidence is available.
+- Ambiguous x402 submissions with a pre-recorded candidate transaction hash are reconciled from exact Arc RPC receipt/log evidence after configured confirmation depth; missing, replayed, failed or mismatched evidence fails closed and remains incident-driven.
 - Production self-custody cross-chain transaction export is intentionally disabled because AgentPay cannot revoke an already exported wallet payload after emergency stop.
 
 ### Cardano direct x402
@@ -97,7 +97,7 @@ This document is the release traceability map for AgentPay. **Implemented in cod
 ### Veridian / KERI / ACDC identity
 
 - A provider resource may bind an independently verified KERI/ACDC credential to the same Masumi agent identifier.
-- Cryptographic KERI/ACDC verification is delegated to a configured reviewed KERIA verification endpoint; AgentPay does not implement its own KERI/CESR crypto.
+- Cryptographic KERI/ACDC verification is delegated to a configured reviewed verification adapter; AgentPay does not implement its own KERI/CESR crypto, and HTTP success is accepted only when the adapter returns an explicit `verified: true` verdict.
 - Production requires HTTPS, trusted issuer AIDs and allowed schema SAIDs.
 - The resource binding stores credential SAID, subject/agent AID, issuer AID, schema SAID, claims hash, verification time, expiry and verifier evidence.
 - Policy can require KERI trust and maximum verification age in addition to Masumi identity.
