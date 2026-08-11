@@ -1,0 +1,78 @@
+import { z } from "zod";
+import { parseEnabledNetworks, requiresNetwork } from "./network-selection.js";
+
+const hederaId = /^0\.0\.\d+$/;
+const evmAddress = /^0x[0-9a-fA-F]{40}$/;
+
+const schema = z.object({
+  APP_ENV: z.enum(["development", "test", "production"]).default("development"),
+  ENABLED_NETWORKS: z.string().default("hedera:testnet,eip155:5042002"),
+  FACILITATOR_URL: z.string().url().optional(),
+  HEDERA_MAINNET_FACILITATOR_URL: z.string().url().optional(),
+  ARC_FACILITATOR_URL: z.string().url().optional(),
+  PROVIDER_ACCOUNT_ID: z.string().optional(),
+  HEDERA_MAINNET_PROVIDER_ACCOUNT_ID: z.string().optional(),
+  USDC_TOKEN_ID: z.string().optional(),
+  HEDERA_MAINNET_USDC_TOKEN_ID: z.string().optional(),
+  ARC_PROVIDER_ADDRESS: z.string().optional(),
+  ARC_USDC_ADDRESS: z.string().optional(),
+  FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
+  HEDERA_MAINNET_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
+  ARC_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
+});
+
+function requireHttps(name: string, value: string | undefined, errors: string[]) {
+  if (!value) {
+    errors.push(name);
+    return;
+  }
+  if (new URL(value).protocol !== "https:") errors.push(`${name} must use HTTPS`);
+}
+
+function requireMatch(name: string, value: string | undefined, pattern: RegExp, errors: string[]) {
+  if (!value || !pattern.test(value)) errors.push(name);
+}
+
+export function productionPreflightErrors(input: unknown = process.env): string[] {
+  const parsed = schema.safeParse(input);
+  if (!parsed.success) {
+    return parsed.error.issues.map((issue) => `${issue.path.join(".") || "environment"}: ${issue.message}`);
+  }
+  const env = parsed.data;
+  if (env.APP_ENV !== "production") return [];
+
+  const enabled = parseEnabledNetworks(env.ENABLED_NETWORKS);
+  const errors: string[] = [];
+
+  if (requiresNetwork(enabled, "hedera:testnet")) {
+    requireHttps("FACILITATOR_URL", env.FACILITATOR_URL, errors);
+    requireMatch("PROVIDER_ACCOUNT_ID", env.PROVIDER_ACCOUNT_ID, hederaId, errors);
+    requireMatch("USDC_TOKEN_ID", env.USDC_TOKEN_ID, hederaId, errors);
+    if (!env.FACILITATOR_SETTLEMENT_API_KEY) errors.push("FACILITATOR_SETTLEMENT_API_KEY");
+  }
+
+  if (requiresNetwork(enabled, "hedera:mainnet")) {
+    requireHttps("HEDERA_MAINNET_FACILITATOR_URL", env.HEDERA_MAINNET_FACILITATOR_URL, errors);
+    requireMatch("HEDERA_MAINNET_PROVIDER_ACCOUNT_ID", env.HEDERA_MAINNET_PROVIDER_ACCOUNT_ID, hederaId, errors);
+    requireMatch("HEDERA_MAINNET_USDC_TOKEN_ID", env.HEDERA_MAINNET_USDC_TOKEN_ID, hederaId, errors);
+    if (!env.HEDERA_MAINNET_FACILITATOR_SETTLEMENT_API_KEY) errors.push("HEDERA_MAINNET_FACILITATOR_SETTLEMENT_API_KEY");
+  }
+
+  if (requiresNetwork(enabled, "eip155:5042002")) {
+    requireHttps("ARC_FACILITATOR_URL", env.ARC_FACILITATOR_URL, errors);
+    requireMatch("ARC_PROVIDER_ADDRESS", env.ARC_PROVIDER_ADDRESS, evmAddress, errors);
+    requireMatch("ARC_USDC_ADDRESS", env.ARC_USDC_ADDRESS, evmAddress, errors);
+    if (!env.ARC_FACILITATOR_SETTLEMENT_API_KEY) errors.push("ARC_FACILITATOR_SETTLEMENT_API_KEY");
+  }
+
+  return errors;
+}
+
+export function assertProductionPreflight(input: unknown = process.env): void {
+  const errors = productionPreflightErrors(input);
+  if (errors.length) {
+    throw new Error(`Invalid production resource-server configuration: ${errors.join(", ")}`);
+  }
+}
+
+assertProductionPreflight();
