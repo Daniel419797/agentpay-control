@@ -13,8 +13,18 @@ const triggerConfig = z.discriminatedUnion("type", [
 ]);
 const schema = z.object({ agentId: z.string().uuid(), name: z.string().min(2).max(120), description: z.string().max(1_000).optional(), trigger: triggerConfig, actionType: z.enum(["CONTRACT_CALL", "X402_PAYMENT", "CREATE_INVOICE"]), action: z.unknown(), approvalThreshold: z.number().int().min(0).max(20).default(0), maxExecutionsPerDay: z.number().int().min(1).max(1_000).default(24) });
 
+function safeTriggerConfig(triggerType: string, value: unknown) {
+  if (triggerType === "WEBHOOK") return { type: "WEBHOOK", secretConfigured: true };
+  return value;
+}
+
 export async function GET(request: Request) {
-  try { const workspace = await workspaceFromRequest(request); if (!workspace) return problem(401, "AUTH_REQUIRED", "Sign in before viewing automations."); const rules = await db.automationRule.findMany({ where: { organizationId: workspace.organization.id }, select: { id: true, agentId: true, name: true, description: true, status: true, triggerType: true, triggerConfig: true, actionType: true, approvalThreshold: true, maxExecutionsPerDay: true, nextRunAt: true, version: true, createdAt: true, updatedAt: true, _count: { select: { executions: true } } }, orderBy: { createdAt: "desc" } }); return ok(rules); } catch (error) { return handleApiError(error); }
+  try {
+    const workspace = await workspaceFromRequest(request);
+    if (!workspace) return problem(401, "AUTH_REQUIRED", "Sign in before viewing automations.");
+    const rules = await db.automationRule.findMany({ where: { organizationId: workspace.organization.id }, select: { id: true, agentId: true, name: true, description: true, status: true, triggerType: true, triggerConfig: true, actionType: true, approvalThreshold: true, maxExecutionsPerDay: true, nextRunAt: true, version: true, createdAt: true, updatedAt: true, _count: { select: { executions: true } } }, orderBy: { createdAt: "desc" } });
+    return ok(rules.map((rule) => ({ ...rule, triggerConfig: safeTriggerConfig(rule.triggerType, rule.triggerConfig) })));
+  } catch (error) { return handleApiError(error); }
 }
 
 export async function POST(request: Request) {
@@ -34,6 +44,6 @@ export async function POST(request: Request) {
       return created;
     });
     const { actionConfigEncrypted: _action, ...safe } = rule; void _action;
-    return ok({ ...safe, webhookSecret }, { status: 201 });
+    return ok({ ...safe, triggerConfig: safeTriggerConfig(rule.triggerType, rule.triggerConfig), webhookSecret }, { status: 201 });
   } catch (error) { return handleApiError(error); }
 }
