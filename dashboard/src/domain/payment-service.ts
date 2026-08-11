@@ -155,12 +155,14 @@ export async function executeAuthorizedIntent(intentId: string) {
   } catch (error) {
     const errorCode = error instanceof Error ? error.message.slice(0, 120) : "PAYMENT_FAILED";
     if (error instanceof X402SubmissionUnknownError || confirmedSettlement) {
+      const candidateTransactionId = confirmedSettlement?.transactionId
+        ?? (error instanceof X402SubmissionUnknownError ? error.candidateTransactionId : undefined);
       return markSubmissionUnknown(
         intent,
         attempt.id,
         requirement.network,
         confirmedSettlement ? `POST_SETTLEMENT_${errorCode}` : errorCode,
-        confirmedSettlement?.transactionId,
+        candidateTransactionId,
       );
     }
 
