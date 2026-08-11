@@ -2,12 +2,12 @@
 
 import { createContext, useContext, useCallback, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 
-export type NetworkId = "hedera:testnet" | "hedera:mainnet" | "eip155:5042002";
+export type NetworkId = "hedera:testnet" | "hedera:mainnet" | "eip155:5042002" | "cardano:preprod" | "cardano:mainnet";
 
 const NETWORK_STORAGE_KEY = "agentpay:network";
 
 function isNetworkId(value: string | null): value is NetworkId {
-  return value === "hedera:testnet" || value === "hedera:mainnet" || value === "eip155:5042002";
+  return value === "hedera:testnet" || value === "hedera:mainnet" || value === "eip155:5042002" || value === "cardano:preprod" || value === "cardano:mainnet";
 }
 
 function getNetworkFromUrl(): NetworkId | null {
@@ -55,7 +55,7 @@ function getServerSnapshot(): NetworkId {
   return "hedera:testnet";
 }
 
-export type NetworkOption = { id: NetworkId; label: string; testnet: boolean; family: "HEDERA" | "EVM" };
+export type NetworkOption = { id: NetworkId; label: string; testnet: boolean; family: "HEDERA" | "EVM" | "CARDANO" };
 
 const NetworkContext = createContext<{
   network: NetworkId;
@@ -67,13 +67,27 @@ const NetworkContext = createContext<{
   networks: [{ id: "hedera:testnet", label: "Hedera Testnet", testnet: true, family: "HEDERA" }],
 });
 
-export function NetworkProvider({ children, mainnetEnabled = true, arcEnabled = false }: { children: ReactNode; mainnetEnabled?: boolean; arcEnabled?: boolean }) {
+export function NetworkProvider({
+  children,
+  mainnetEnabled = true,
+  arcEnabled = false,
+  cardanoPreprodEnabled = false,
+  cardanoMainnetEnabled = false,
+}: {
+  children: ReactNode;
+  mainnetEnabled?: boolean;
+  arcEnabled?: boolean;
+  cardanoPreprodEnabled?: boolean;
+  cardanoMainnetEnabled?: boolean;
+}) {
   const network = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const networks = useMemo<NetworkOption[]>(() => [
     { id: "hedera:testnet", label: "Hedera Testnet", testnet: true, family: "HEDERA" },
     ...(mainnetEnabled ? [{ id: "hedera:mainnet" as const, label: "Hedera Mainnet", testnet: false, family: "HEDERA" as const }] : []),
     ...(arcEnabled ? [{ id: "eip155:5042002" as const, label: "Arc Testnet", testnet: true, family: "EVM" as const }] : []),
-  ], [arcEnabled, mainnetEnabled]);
+    ...(cardanoPreprodEnabled ? [{ id: "cardano:preprod" as const, label: "Cardano Preprod", testnet: true, family: "CARDANO" as const }] : []),
+    ...(cardanoMainnetEnabled ? [{ id: "cardano:mainnet" as const, label: "Cardano Mainnet", testnet: false, family: "CARDANO" as const }] : []),
+  ], [arcEnabled, cardanoMainnetEnabled, cardanoPreprodEnabled, mainnetEnabled]);
 
   useEffect(() => {
     const resolved = resolveNetwork();
