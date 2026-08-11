@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getCardProvider } from "@/domain/card-provider";
 import { boundedJson, handleApiError, ok, problem } from "@/lib/api";
 import { db } from "@/lib/db";
+import { hasRecentAuthentication } from "@/lib/session";
 import { workspaceFromRequest, workspaceHasRole } from "@/lib/workspace";
 
 const schema = z.object({ status: z.enum(["ACTIVE", "FROZEN", "CANCELED"]), expectedVersion: z.number().int().positive() });
@@ -14,6 +15,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ cardI
     if (!workspaceHasRole(workspace, ["OWNER", "OPERATOR"])) return problem(403, "ROLE_REQUIRED", "Owner or operator access is required.");
     const { cardId } = await context.params;
     const input = schema.parse(await boundedJson(request));
+    if (input.status === "ACTIVE" && !hasRecentAuthentication(workspace.session)) return problem(428, "STEP_UP_REQUIRED", "Sign in again before reactivating a virtual card.");
     if (input.status === "ACTIVE" && workspace.organization.killSwitchEnabled) return problem(409, "ORGANIZATION_KILL_SWITCH_ENABLED", "The organization emergency stop is active. Cards may be frozen or canceled, but not activated.");
     const provider = getCardProvider();
     const updated = await db.$transaction(async (tx) => {
