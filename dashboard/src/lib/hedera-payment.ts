@@ -41,25 +41,25 @@ export function formatTinybarsAsHbar(amountTinybar: number): string {
 
 export function parseMirrorNodeJson(text: string): unknown {
   if (text.length > 1_000_000) throw new Error("MIRROR_RESPONSE_TOO_LARGE");
-  // Mirror Node represents atomic transfer values as JSON integers. Quote those
-  // integer tokens before JSON.parse so values beyond Number.MAX_SAFE_INTEGER
-  // retain their exact decimal representation for BigInt verification.
-  const losslessAmounts = text.replace(/("amount"\s*:\s*)(-?\d+)(?=\s*[,}])/g, "$1\"$2\"");
-  return JSON.parse(losslessAmounts) as unknown;
+  // Mirror Node uses JSON integer tokens for both transfer amounts and account
+  // balances. Quote those fields before JSON.parse so values beyond the JS safe
+  // integer range remain exact decimal strings for BigInt verification.
+  const losslessAtomicValues = text.replace(/("(?:amount|balance)"\s*:\s*)(-?\d+)(?=\s*[,}])/g, "$1\"$2\"");
+  return JSON.parse(losslessAtomicValues) as unknown;
 }
 
-function atomic(value: MirrorAtomicAmount): bigint {
+export function mirrorAtomic(value: MirrorAtomicAmount): bigint {
   if (typeof value === "number") {
-    if (!Number.isSafeInteger(value)) throw new Error("MIRROR_TRANSFER_AMOUNT_UNSAFE");
+    if (!Number.isSafeInteger(value)) throw new Error("MIRROR_ATOMIC_VALUE_UNSAFE");
     return BigInt(value);
   }
-  if (!/^-?\d+$/.test(value)) throw new Error("MIRROR_TRANSFER_AMOUNT_INVALID");
+  if (!/^-?\d+$/.test(value)) throw new Error("MIRROR_ATOMIC_VALUE_INVALID");
   return BigInt(value);
 }
 
 function transferTotals(transfers: Array<{ account: string; amount: MirrorAtomicAmount }>, payerAccountId: string, payeeAccountId: string) {
-  const payerDebit = transfers.filter((transfer) => transfer.account === payerAccountId).reduce((total, transfer) => total + atomic(transfer.amount), 0n);
-  const payeeCredit = transfers.filter((transfer) => transfer.account === payeeAccountId).reduce((total, transfer) => total + atomic(transfer.amount), 0n);
+  const payerDebit = transfers.filter((transfer) => transfer.account === payerAccountId).reduce((total, transfer) => total + mirrorAtomic(transfer.amount), 0n);
+  const payeeCredit = transfers.filter((transfer) => transfer.account === payeeAccountId).reduce((total, transfer) => total + mirrorAtomic(transfer.amount), 0n);
   return { payerDebit, payeeCredit };
 }
 
