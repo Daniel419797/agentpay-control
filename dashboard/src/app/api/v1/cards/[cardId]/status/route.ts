@@ -14,9 +14,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ cardI
     if (!workspaceHasRole(workspace, ["OWNER", "OPERATOR"])) return problem(403, "ROLE_REQUIRED", "Owner or operator access is required.");
     const { cardId } = await context.params;
     const input = schema.parse(await boundedJson(request));
+    if (input.status === "ACTIVE" && workspace.organization.killSwitchEnabled) return problem(409, "ORGANIZATION_KILL_SWITCH_ENABLED", "The organization emergency stop is active. Cards may be frozen or canceled, but not activated.");
     const provider = getCardProvider();
     const updated = await db.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`card-status:${cardId}`}, 0))`;
+      if (input.status === "ACTIVE") {
+        const organization = await tx.organization.findUnique({ where: { id: workspace.organization.id }, select: { status: true, killSwitchEnabled: true } });
+        if (!organization || organization.status !== "ACTIVE") throw new Error("ORGANIZATION_NOT_ACTIVE");
+        if (organization.killSwitchEnabled) throw new Error("ORGANIZATION_KILL_SWITCH_ENABLED");
+      }
       const card = await tx.virtualCard.findFirst({ where: { id: cardId, organizationId: workspace.organization.id } });
       if (!card) throw new Error("CARD_NOT_FOUND");
       if (card.status === "CANCELED") throw new Error("CARD_CANCELED");
