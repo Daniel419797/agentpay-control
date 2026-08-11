@@ -14,6 +14,10 @@ function productionEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
     ARC_MANAGED_SIGNING_API_KEY: "a-signing-secret-abcdefghijklmnopqrstuvwxyz",
     ARC_SETTLEMENT_API_KEY: "a-settlement-secret-abcdefghijklmnopqrstuvwxyz",
     ARC_CONTRACT_EXECUTION_API_KEY: "a-contract-secret-abcdefghijklmnopqrstuvwxyz",
+    CARDANO_MANAGED_SIGNING_API_KEY: "c-signing-secret-abcdefghijklmnopqrstuvwxyz",
+    CARDANO_SETTLEMENT_API_KEY: "c-settlement-secret-abcdefghijklmnopqrstuvwxyz",
+    CARDANO_SIGNER_API_KEY: "c-custody-secret-abcdefghijklmnopqrstuvwxyz",
+    CARDANO_SETTLEMENT_STORE_API_KEY: "c-store-secret-abcdefghijklmnopqrstuvwxyz",
     ARC_PAYER_PRIVATE_KEY: PAYER,
     ARC_RELAYER_PRIVATE_KEY: RELAYER,
     ARC_CONTRACT_EXECUTION_PRIVATE_KEY: CONTRACT,
@@ -22,13 +26,13 @@ function productionEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
 }
 
 describe("combined facilitator environment", () => {
-  it("requires six independent production capability credentials", () => {
+  it("requires independent production capability and Cardano custody/store credentials", () => {
     expect(parseCombinedEnv(productionEnv()).APP_ENV).toBe("production");
     const duplicate = "duplicate-network-secret-abcdefghijklmnopqrstuvwxyz";
-    expect(() => parseCombinedEnv(productionEnv({
-      HEDERA_SETTLEMENT_API_KEY: duplicate,
-      ARC_SETTLEMENT_API_KEY: duplicate,
-    }))).toThrow(/must all be distinct/);
+    expect(() => parseCombinedEnv(productionEnv({ HEDERA_SETTLEMENT_API_KEY: duplicate, CARDANO_SETTLEMENT_API_KEY: duplicate }))).toThrow(/must all be distinct/);
+    const missing = productionEnv();
+    delete missing.CARDANO_SETTLEMENT_STORE_API_KEY;
+    expect(() => parseCombinedEnv(missing)).toThrow(/requires network-scoped capability and Cardano custody\/store API keys/);
   });
 
   it("requires independent Arc payer, relayer, and contract keys", () => {
@@ -43,9 +47,14 @@ describe("combined facilitator environment", () => {
     const env = parseCombinedEnv(input);
     expect(networkEnv(input, env, "hedera").SETTLEMENT_API_KEY).toBe(input.HEDERA_SETTLEMENT_API_KEY);
     expect(networkEnv(input, env, "arc").SETTLEMENT_API_KEY).toBe(input.ARC_SETTLEMENT_API_KEY);
+    const cardano = networkEnv(input, env, "cardano");
+    expect(cardano.SETTLEMENT_API_KEY).toBe(input.CARDANO_SETTLEMENT_API_KEY);
+    expect(cardano.MANAGED_SIGNING_API_KEY).toBe(input.CARDANO_MANAGED_SIGNING_API_KEY);
+    expect(cardano.CARDANO_SIGNER_API_KEY).toBe(input.CARDANO_SIGNER_API_KEY);
+    expect(cardano.CARDANO_SETTLEMENT_STORE_API_KEY).toBe(input.CARDANO_SETTLEMENT_STORE_API_KEY);
   });
 
-  it("rejects overlapping mount paths", () => {
-    expect(() => parseCombinedEnv(productionEnv({ HEDERA_BASE_PATH: "/pay", ARC_BASE_PATH: "/pay" }))).toThrow(/base paths must be distinct/);
+  it("rejects any overlapping mount paths", () => {
+    expect(() => parseCombinedEnv(productionEnv({ HEDERA_BASE_PATH: "/pay", CARDANO_BASE_PATH: "/pay" }))).toThrow(/base paths must be distinct/);
   });
 });
