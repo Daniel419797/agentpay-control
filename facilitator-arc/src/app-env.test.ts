@@ -21,6 +21,18 @@ describe("Arc facilitator production environment", () => {
     expect(parseArcEnv(productionEnv()).APP_ENV).toBe("production");
   });
 
+  it("allows blank optional role keys in local development so payer fallback can apply", () => {
+    const parsed = parseArcEnv({
+      APP_ENV: "development",
+      ARC_PAYER_PRIVATE_KEY: "1".repeat(64),
+      ARC_RELAYER_PRIVATE_KEY: "",
+      ARC_CONTRACT_EXECUTION_PRIVATE_KEY: "",
+      ARC_PROVIDER_ADDRESS: "0x1111111111111111111111111111111111111111",
+    });
+    expect(parsed.ARC_RELAYER_PRIVATE_KEY).toBeUndefined();
+    expect(parsed.ARC_CONTRACT_EXECUTION_PRIVATE_KEY).toBeUndefined();
+  });
+
   it("rejects missing capability-specific credentials", () => {
     const env = productionEnv();
     delete (env as Record<string, string>).CONTRACT_EXECUTION_API_KEY;
@@ -39,6 +51,10 @@ describe("Arc facilitator production environment", () => {
     const env = productionEnv();
     delete (env as Record<string, string>).ARC_RELAYER_PRIVATE_KEY;
     expect(() => parseArcEnv(env)).toThrow(/relayer and contract-execution private keys are required/);
+  });
+
+  it("rejects blank relayer or contract-execution private keys in production", () => {
+    expect(() => parseArcEnv(productionEnv({ ARC_RELAYER_PRIVATE_KEY: "" }))).toThrow(/relayer and contract-execution private keys are required/);
   });
 
   it("rejects private-key reuse across payer relayer and contract execution", () => {
