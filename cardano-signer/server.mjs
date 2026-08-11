@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
-import { buildSignedCardanoTransaction, parseAssetUnit, publicKeyFromSeed, signHashWithSeed, verifyEd25519 } from "./cardano.mjs";
+import { blake2b, buildSignedCardanoTransaction, parseAssetUnit, paymentCredential, publicKeyFromSeed, signHashWithSeed, verifyEd25519 } from "./cardano.mjs";
 
 const MAX_BODY_BYTES = 64 * 1024;
 
@@ -30,6 +30,8 @@ function configFromEnv(){
   } else if(!cfg.seedHex&&!cfg.remoteSignerUrl){throw new Error("CARDANO_LOCAL_OR_REMOTE_SIGNER_REQUIRED");}
   if(cfg.seedHex&&!/^[0-9a-fA-F]{64}$/.test(cfg.seedHex))throw new Error("CARDANO_SIGNING_SEED_INVALID");
   if(cfg.publicKeyHex&&!/^[0-9a-fA-F]{64}$/.test(cfg.publicKeyHex))throw new Error("CARDANO_PAYMENT_PUBLIC_KEY_INVALID");
+  const startupKey=cfg.publicKeyHex?Buffer.from(cfg.publicKeyHex,"hex"):(cfg.seedHex?publicKeyFromSeed(cfg.seedHex):null);
+  if(startupKey&&!blake2b(startupKey,28).equals(paymentCredential(cfg.payerAddress,cfg.network)))throw new Error("CARDANO_PAYER_KEY_MISMATCH");
   return cfg;
 }
 
