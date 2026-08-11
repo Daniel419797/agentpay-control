@@ -15,10 +15,9 @@ export default function SignInPage() {
             height={38}
             priority
           />
-          {/* <span>Control</span> */}
         </div>
         <h1>Operator sign in</h1>
-        <p>Manage agent policy, approvals, and Hedera settlements. A wallet is optional and connected separately after sign-in.</p>
+        <p>Manage agent policies, approvals, and x402 payment operations across the configured Hedera and Arc rails. Hedera wallets are connected separately after sign-in when required.</p>
         <SignInForm googleEnabled={Boolean(config.SUPABASE_URL && config.SUPABASE_ANON_KEY)} />
       </section>
     </main>
