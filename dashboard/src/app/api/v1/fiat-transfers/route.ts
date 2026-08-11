@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { getCardProvider } from "@/domain/card-provider";
-import { isRetryableFiatSubmission } from "@/domain/fiat-reconciliation-service";
+import { fiatSubmissionFailureStatus, isRetryableFiatSubmission } from "@/domain/fiat-reconciliation-service";
 import { boundedJson, handleApiError, ok, problem } from "@/lib/api";
 import { getConfig } from "@/lib/config";
 import { db } from "@/lib/db";
@@ -80,7 +80,9 @@ export async function POST(request: Request) {
       });
       return ok(safeTransfer(completed), { status: 202 });
     } catch (error) {
-      await db.fiatTransfer.update({ where: { id: transfer.id }, data: { status: "SUBMISSION_UNKNOWN", failureCode: error instanceof Error ? error.message.slice(0, 120) : "PROVIDER_SUBMISSION_UNKNOWN" } });
+      const failureStatus = fiatSubmissionFailureStatus(error);
+      await db.fiatTransfer.update({ where: { id: transfer.id }, data: { status: failureStatus, failureCode: error instanceof Error ? error.message.slice(0, 120) : "PROVIDER_SUBMISSION_UNKNOWN" } });
+      if (failureStatus === "FAILED") return problem(422, "FIAT_PROVIDER_REJECTED", "The fiat provider rejected the transfer before submission.");
       throw error;
     }
   } catch (error) {
