@@ -31,6 +31,7 @@ const rpcReceiptSchema = z.object({ transactionHash: hex, status: hex, blockNumb
 const rpcTransactionSchema = z.object({ hash: hex, from: z.string(), to: z.string().nullable(), value: hex, input: z.string().regex(/^0x[0-9a-fA-F]*$/) });
 const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 const NATIVE_TOKEN = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+const MIN_EXPORT_LIFETIME_MS = 15_000;
 type DestinationReceipt = z.infer<typeof rpcReceiptSchema>;
 type DestinationTransaction = z.infer<typeof rpcTransactionSchema>;
 
@@ -122,7 +123,7 @@ export async function createCrossChainQuote(organizationId: string, input: Cross
   return db.crossChainRouteQuote.create({ data: { organizationId, agentId: agent.id, sourceNetworkId: source.id, destinationNetworkId: destination.id, sourceToken: input.sourceToken, destinationToken: input.destinationToken, sourceAddress: input.sourceAddress, destinationAddress: input.destinationAddress, inputAmountAtomic: input.inputAmountAtomic, estimatedOutputAtomic: quote.estimate.toAmount, minimumOutputAtomic: quote.estimate.toAmountMin, provider: "LIFI", externalQuoteId: quote.id, tool: quote.tool, feeSummary: JSON.parse(JSON.stringify({ feeCosts: quote.estimate.feeCosts ?? [], gasCosts: quote.estimate.gasCosts ?? [] })), transactionRequestEncrypted: encryptSecret(JSON.stringify(quote.transactionRequest)), requestHash, expiresAt: new Date(Date.now() + 60_000) } });
 }
 
-export async function prepareCrossChainTransfer(quoteId: string, organizationId: string, idempotencyKey: string) {
+export async function prepareCrossChainTransfer(quoteId: string, organizationId: string, idempotencyKey: string, initiatedByUserId: string) {
   return db.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${quoteId}, 0))`;
     const organization = await tx.organization.findUnique({ where: { id: organizationId }, select: { status: true, killSwitchEnabled: true } });
@@ -130,11 +131,33 @@ export async function prepareCrossChainTransfer(quoteId: string, organizationId:
     if (organization.killSwitchEnabled) throw new Error("ORGANIZATION_KILL_SWITCH_ENABLED");
     const quote = await tx.crossChainRouteQuote.findFirst({ where: { id: quoteId, organizationId } });
     if (!quote || quote.status !== "ACTIVE" || quote.expiresAt <= new Date()) throw new Error("CROSS_CHAIN_QUOTE_EXPIRED");
+    if (quote.expiresAt.getTime() - Date.now() < MIN_EXPORT_LIFETIME_MS) throw new Error("CROSS_CHAIN_QUOTE_TOO_CLOSE_TO_EXPIRY");
     const existing = await tx.crossChainTransfer.findUnique({ where: { organizationId_idempotencyKey: { organizationId, idempotencyKey } } });
     if (existing && existing.quoteId !== quote.id) throw new Error("IDEMPOTENCY_CONFLICT");
     const transfer = existing ?? await tx.crossChainTransfer.create({ data: { organizationId, agentId: quote.agentId, quoteId: quote.id, idempotencyKey, status: "AWAITING_SIGNATURE" } });
-    return { transfer, transactionRequest: transactionRequestSchema.parse(JSON.parse(decryptSecret(quote.transactionRequestEncrypted))), expiresAt: quote.expiresAt };
-  });
+    const transactionRequest = transactionRequestSchema.parse(JSON.parse(decryptSecret(quote.transactionRequestEncrypted)));
+    if (!existing) {
+      await tx.auditEvent.create({
+        data: {
+          organizationId,
+          actorType: "USER",
+          actorId: initiatedByUserId,
+          action: "CROSS_CHAIN_TRANSACTION_EXPORTED",
+          targetType: "CROSS_CHAIN_TRANSFER",
+          targetId: transfer.id,
+          result: "SUCCESS",
+          metadata: { quoteId: quote.id, sourceNetworkId: quote.sourceNetworkId, destinationNetworkId: quote.destinationNetworkId, expiresAt: quote.expiresAt.toISOString(), externalWalletControl: true },
+        },
+      });
+    }
+    return {
+      transfer,
+      transactionRequest,
+      expiresAt: quote.expiresAt,
+      externalWalletControl: true as const,
+      emergencyStopBoundary: "AgentPay can block new transaction exports, but cannot revoke a transaction payload already exported to an external self-custody wallet.",
+    };
+  }, { isolationLevel: "Serializable" });
 }
 
 export async function recordCrossChainSubmission(transferId: string, organizationId: string, sourceTransactionHash: string) {
@@ -176,10 +199,24 @@ export async function reconcileCrossChainTransfers(limit = 50) {
     const destinationHash = status.data.receiving?.txHash;
     if (status.data.status === "DONE" && destinationHash) {
       try { await verifyDestinationReceipt(transfer.quote, destinationHash); mapped = "DESTINATION_CONFIRMED"; }
-      catch (error) { if (!(error instanceof Error) || !["DESTINATION_RECEIPT_UNAVAILABLE", "DESTINATION_CONFIRMATIONS_PENDING"].includes(error.message)) logError("cross_chain_destination_verification_failed", error, { transferId: transfer.id }); }
+      catch (error) {
+        const code = error instanceof Error ? error.message : "DESTINATION_VERIFICATION_FAILED";
+        if (code === "DESTINATION_RECEIPT_UNAVAILABLE" || code === "DESTINATION_CONFIRMATIONS_PENDING" || code.startsWith("DESTINATION_RPC_")) continue;
+        mapped = "FAILED";
+      }
     }
-    await db.crossChainTransfer.update({ where: { id: transfer.id }, data: { status: mapped, providerStatus: status.data.substatus ?? status.data.status, destinationTransactionHash: destinationHash, completedAt: ["DESTINATION_CONFIRMED", "FAILED", "REFUNDED"].includes(mapped) ? new Date() : null } });
+    await db.crossChainTransfer.update({ where: { id: transfer.id }, data: { status: mapped, destinationTransactionHash: destinationHash ?? transfer.destinationTransactionHash, completedAt: ["DESTINATION_CONFIRMED", "FAILED", "REFUNDED"].includes(mapped) ? new Date() : null, errorCode: mapped === "FAILED" ? status.data.substatus ?? "ROUTE_FAILED" : null } });
     updated += 1;
   }
   return { scanned: transfers.length, updated };
+}
+
+export async function reconcileCrossChainTransfer(transferId: string) {
+  try {
+    await reconcileCrossChainTransfers(100);
+    return db.crossChainTransfer.findUnique({ where: { id: transferId }, include: { quote: true } });
+  } catch (error) {
+    logError("cross_chain_reconcile_failed", error, { transferId });
+    throw error;
+  }
 }
