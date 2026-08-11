@@ -7,15 +7,17 @@ type Member = { id: string; email: string | null; displayName: string; roles: st
 type Endpoint = { id: string; name: string; type: string; destination: string; status: string };
 type Retention = { auditDays: number; financialRecordDays: number; fulfillmentBodyDays: number; notificationDays: number };
 type Permissions = { isOwner: boolean; canViewMembers: boolean; canViewEndpoints: boolean };
+type ApiEnvelope<T = unknown> = { data?: T; detail?: string };
 
-async function request(path: string, method: string, body?: unknown) {
+async function request<T = unknown>(path: string, method: string, body?: unknown): Promise<T | undefined> {
   const response = await fetch(path, {
     method,
     headers: body === undefined ? undefined : { "content-type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const payload = await response.json() as { detail?: string };
+  const payload = await response.json().catch(() => ({})) as ApiEnvelope<T>;
   if (!response.ok) throw new Error(payload.detail ?? "The request could not be completed.");
+  return payload.data;
 }
 
 export function SettingsOperations({
@@ -49,6 +51,26 @@ export function SettingsOperations({
     }
   }
 
+  async function toggleKillSwitch() {
+    setBusy("kill-switch"); setError(""); setMessage("");
+    const enabling = !organization.killSwitchEnabled;
+    try {
+      const result = await request<{ providerSyncFailures?: number; cardsFrozen?: number; providerSyncStatus?: string }>("/api/v1/organization/kill-switch", "POST", { enabled: enabling, reason: enabling ? "Owner initiated emergency stop" : "Owner restored operations" });
+      if (enabling && (result?.providerSyncFailures ?? 0) > 0) {
+        setError(`Emergency stop is active locally, but ${result!.providerSyncFailures} provider card freeze operation(s) require immediate manual containment. An urgent incident has been opened.`);
+      } else if (enabling) {
+        setMessage(`Emergency stop activated${result?.cardsFrozen ? `; ${result.cardsFrozen} card(s) frozen locally and provider synchronization completed` : ""}.`);
+      } else {
+        setMessage("Emergency stop disabled. Previously frozen cards and revoked credentials remain disabled until explicitly reactivated or reissued.");
+      }
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The emergency-stop operation could not be completed.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return <div className="settings-stack">
     {error && <div className="form-error" role="alert">{error}</div>}
     {message && <div className="form-success" role="status">{message}</div>}
@@ -57,7 +79,7 @@ export function SettingsOperations({
       {permissions.isOwner ? <form className="panel app-form" onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        void run("organization", () => request("/api/v1/organization", "PATCH", { name: String(form.get("name")).trim(), timezone: String(form.get("timezone")).trim() }), "Organization updated.");
+        void run("organization", async () => { await request("/api/v1/organization", "PATCH", { name: String(form.get("name")).trim(), timezone: String(form.get("timezone")).trim() }); }, "Organization updated.");
       }}>
         <h2 className="panel-title">Organization</h2>
         <label>Name<input name="name" defaultValue={organization.name} minLength={2} maxLength={100} required /></label>
@@ -77,7 +99,7 @@ export function SettingsOperations({
       {permissions.isOwner ? <form className="panel app-form" onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        void run("member", () => request("/api/v1/members", "POST", { email: String(form.get("email")).trim(), roles: [String(form.get("role"))] }), "Member invitation queued.");
+        void run("member", async () => { await request("/api/v1/members", "POST", { email: String(form.get("email")).trim(), roles: [String(form.get("role"))] }); }, "Member invitation queued.");
       }}>
         <h2 className="panel-title">Invite member</h2>
         <label>Email<input name="email" type="email" required /></label>
@@ -91,14 +113,14 @@ export function SettingsOperations({
 
     {permissions.canViewMembers && <section className="panel">
       <div className="panel-header"><h2 className="panel-title">Members</h2></div>
-      <div className="record-list">{members.map((member) => <div className="record-row" key={member.id}><div><div className="record-title">{member.displayName}</div><div className="record-subtitle">{member.email ?? "Wallet operator"} · {member.roles.join(", ")}</div></div><div className="rule-actions"><span className="status-badge status-settled">{member.status}</span>{permissions.isOwner && member.status === "ACTIVE" && <button className="danger-button" type="button" disabled={Boolean(busy)} onClick={() => void run(`member:${member.id}`, () => request(`/api/v1/members/${member.id}`, "PATCH", { status: "SUSPENDED" }), "Member suspended.")}>Suspend</button>}</div></div>)}</div>
+      <div className="record-list">{members.map((member) => <div className="record-row" key={member.id}><div><div className="record-title">{member.displayName}</div><div className="record-subtitle">{member.email ?? "Wallet operator"} · {member.roles.join(", ")}</div></div><div className="rule-actions"><span className="status-badge status-settled">{member.status}</span>{permissions.isOwner && member.status === "ACTIVE" && <button className="danger-button" type="button" disabled={Boolean(busy)} onClick={() => void run(`member:${member.id}`, async () => { await request(`/api/v1/members/${member.id}`, "PATCH", { status: "SUSPENDED" }); }, "Member suspended.")}>Suspend</button>}</div></div>)}</div>
     </section>}
 
     <div className="page-grid">
       {permissions.isOwner ? <form className="panel app-form" onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        void run("endpoint", () => request("/api/v1/notification-endpoints", "POST", { name: String(form.get("name")).trim(), type: String(form.get("type")), destination: String(form.get("destination")).trim(), eventTypes: String(form.get("eventTypes")).split(",").map((value) => value.trim()).filter(Boolean) }), "Notification endpoint created.");
+        void run("endpoint", async () => { await request("/api/v1/notification-endpoints", "POST", { name: String(form.get("name")).trim(), type: String(form.get("type")), destination: String(form.get("destination")).trim(), eventTypes: String(form.get("eventTypes")).split(",").map((value) => value.trim()).filter(Boolean) }); }, "Notification endpoint created.");
       }}>
         <h2 className="panel-title">Notification endpoint</h2>
         <label>Name<input name="name" minLength={2} required /></label>
@@ -116,7 +138,7 @@ export function SettingsOperations({
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         const number = (name: string) => Number(form.get(name));
-        void run("retention", () => request("/api/v1/organization/retention", "PUT", { auditDays: number("auditDays"), financialRecordDays: number("financialRecordDays"), fulfillmentBodyDays: number("fulfillmentBodyDays"), notificationDays: number("notificationDays") }), "Retention policy updated.");
+        void run("retention", async () => { await request("/api/v1/organization/retention", "PUT", { auditDays: number("auditDays"), financialRecordDays: number("financialRecordDays"), fulfillmentBodyDays: number("fulfillmentBodyDays"), notificationDays: number("notificationDays") }); }, "Retention policy updated.");
       }}>
         <h2 className="panel-title">Data retention</h2>
         <div className="form-grid">
@@ -125,6 +147,7 @@ export function SettingsOperations({
           <label>Fulfillment body days<input name="fulfillmentBodyDays" type="number" min={0} max={365} defaultValue={retention.fulfillmentBodyDays} required /></label>
           <label>Notification days<input name="notificationDays" type="number" min={7} max={365} defaultValue={retention.notificationDays} required /></label>
         </div>
+        <p className="form-help">Changing retention rules requires recent authentication. Immutable audit-chain records are retained even when payload retention windows expire.</p>
         <button className="secondary-button" disabled={Boolean(busy)}>{busy === "retention" ? "Saving…" : "Save retention"}</button>
       </form> : <section className="panel">
         <h2 className="panel-title">Data retention</h2>
@@ -138,8 +161,8 @@ export function SettingsOperations({
     </div>
 
     <section className="panel danger-zone">
-      <div><h2 className="panel-title">Emergency controls</h2><p className="panel-description">The emergency stop blocks new autonomous payments, cross-chain signing, fiat transfers, card issuance/reactivation, and automation side effects while reconciliation remains active.</p></div>
-      {permissions.isOwner ? <button className={organization.killSwitchEnabled ? "secondary-button" : "danger-button"} type="button" disabled={Boolean(busy)} onClick={() => void run("kill-switch", () => request("/api/v1/organization/kill-switch", "POST", { enabled: !organization.killSwitchEnabled, reason: organization.killSwitchEnabled ? "Owner restored operations" : "Owner initiated emergency stop" }), organization.killSwitchEnabled ? "Operations restored." : "Emergency stop activated.")}>{organization.killSwitchEnabled ? "Restore operations" : "Activate kill switch"}</button> : <span className={`status-badge ${organization.killSwitchEnabled ? "status-error" : "status-settled"}`}>{organization.killSwitchEnabled ? "STOP ACTIVE" : "OPERATING"}</span>}
+      <div><h2 className="panel-title">Emergency controls</h2><p className="panel-description">The emergency stop blocks new autonomous payments, cross-chain transaction exports, fiat transfers, card issuance/reactivation, and automation side effects while reconciliation remains active. Provider containment failures are escalated and must be handled immediately.</p></div>
+      {permissions.isOwner ? <button className={organization.killSwitchEnabled ? "secondary-button" : "danger-button"} type="button" disabled={Boolean(busy)} onClick={() => void toggleKillSwitch()}>{busy === "kill-switch" ? "Applying…" : organization.killSwitchEnabled ? "Disable emergency stop" : "Activate emergency stop"}</button> : <span className={`status-badge ${organization.killSwitchEnabled ? "status-error" : "status-settled"}`}>{organization.killSwitchEnabled ? "STOP ACTIVE" : "OPERATING"}</span>}
     </section>
 
     {permissions.canViewEndpoints && <section className="panel">
