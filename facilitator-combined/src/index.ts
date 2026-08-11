@@ -4,7 +4,7 @@ import { createHederaApp, parseHederaEnv } from "@agentpay/hedera-facilitator/ap
 import { createArcApp, parseArcEnv } from "@agentpay/arc-facilitator/app";
 import { createCardanoNativeApp, parseCardanoNativeEnv } from "./cardano-native.js";
 import { networkEnv, parseCombinedEnv } from "./env.js";
-import { paymentNetworkFromJson, ROOT_DISPATCH_BODY_LIMIT, targetForNetwork } from "./root-dispatch.js";
+import { boundedRequestText, paymentNetworkFromJson, targetForNetwork } from "./root-dispatch.js";
 
 const env = parseCombinedEnv();
 
@@ -17,9 +17,7 @@ const targets = { hedera, arc, cardano };
 const networks = { hedera: hedera.network, arc: arc.network, cardano: cardano.network };
 
 async function requestNetwork(request: Request) {
-  const declared = Number(request.headers.get("content-length") ?? "0");
-  if (Number.isFinite(declared) && declared > ROOT_DISPATCH_BODY_LIMIT) throw new Error("REQUEST_BODY_TOO_LARGE");
-  const text = await request.clone().text();
+  const text = await boundedRequestText(request.clone());
   return paymentNetworkFromJson(text);
 }
 
