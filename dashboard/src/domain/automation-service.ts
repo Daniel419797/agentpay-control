@@ -5,7 +5,7 @@ import { AccountId, TransactionId } from "@hiero-ledger/sdk";
 
 import { createInvoice, sendInvoice } from "@/domain/invoice-service";
 import { createPaidRequest } from "@/domain/payment-service";
-import { getConfig } from "@/lib/config";
+import { hederaContractRoute } from "@/domain/hedera-contract-route";
 import { db } from "@/lib/db";
 import { decryptSecret, encryptSecret } from "@/lib/secret-box";
 import { normalizeTransactionId } from "@/lib/hedera-payment";
@@ -51,10 +51,12 @@ export async function validateAutomationAction(organizationId: string, actionTyp
     if (!parsed.calldata.toLowerCase().startsWith(parsed.functionSelector.toLowerCase())) throw new Error("CONTRACT_SELECTOR_CALLDATA_MISMATCH");
     const entry = await db.contractAllowlistEntry.findFirst({ where: { id: parsed.allowlistEntryId, organizationId, active: true }, include: { network: true } });
     if (!entry || entry.network.family !== "HEDERA" || !entry.network.enabled || !entry.network.supportsContracts) throw new Error("CONTRACT_NOT_ALLOWLISTED");
+    const route = hederaContractRoute(entry.network.id);
     if (!entry.allowedFunctionSelectors.map((selector) => selector.toLowerCase()).includes(parsed.functionSelector.toLowerCase())) throw new Error("CONTRACT_FUNCTION_NOT_ALLOWLISTED");
     if (parsed.gas > entry.maxGas || BigInt(parsed.payableAtomic) > BigInt(entry.maxPayableAtomic.toString())) throw new Error("CONTRACT_CALL_LIMIT_EXCEEDED");
     if (entry.expectedCodeHash) {
-      const response = await fetch(`${getConfig().HEDERA_MIRROR_NODE_URL}/api/v1/contracts/${encodeURIComponent(entry.contractAddress)}`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
+      const url = new URL(`/api/v1/contracts/${encodeURIComponent(entry.contractAddress)}`, route.mirrorNodeUrl);
+      const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
       if (!response.ok) throw new Error("CONTRACT_CODE_UNAVAILABLE");
       const contract = z.object({ bytecode: z.string().regex(/^0x[0-9a-fA-F]*$/) }).parse(await response.json());
       if (!contractCodeHashMatches(contract.bytecode, entry.expectedCodeHash)) throw new Error("CONTRACT_CODE_HASH_MISMATCH");
@@ -75,17 +77,16 @@ export async function executeAutomation(executionId: string) {
     let transactionId: string | undefined;
     if (execution.rule.actionType === "CONTRACT_CALL") {
       const call = contractActionSchema.parse(action);
-      const entry = await db.contractAllowlistEntry.findUniqueOrThrow({ where: { id: call.allowlistEntryId } });
-      const config = getConfig();
-      const contractApiKey = config.FACILITATOR_CONTRACT_API_KEY ?? config.FACILITATOR_API_KEY;
-      if (!config.FACILITATOR_URL || !contractApiKey || !config.HEDERA_PAYER_ACCOUNT_ID) throw new Error("FACILITATOR_UNAVAILABLE");
-      const candidateTransactionId = execution.transactionId ?? TransactionId.generate(AccountId.fromString(config.HEDERA_PAYER_ACCOUNT_ID)).toString();
-      if (!execution.transactionId) {
-        await db.automationExecution.update({ where: { id: execution.id }, data: { transactionId: candidateTransactionId } });
-      }
+      const entry = await db.contractAllowlistEntry.findUniqueOrThrow({ where: { id: call.allowlistEntryId }, include: { network: true } });
+      const route = hederaContractRoute(entry.network.id);
+      const candidateTransactionId = execution.transactionId ?? TransactionId.generate(AccountId.fromString(route.payerAccountId)).toString();
+      await db.automationExecution.update({
+        where: { id: execution.id },
+        data: { transactionId: candidateTransactionId, result: { networkId: route.networkId } },
+      });
       let response: Response;
       try {
-        response = await fetch(`${config.FACILITATOR_URL}/contract-execute`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${contractApiKey}`, "idempotency-key": execution.id }, body: JSON.stringify({ contractId: entry.contractAddress, functionSelector: call.functionSelector, calldata: call.calldata, gas: call.gas, payableAtomic: call.payableAtomic, transactionId: candidateTransactionId }), signal: AbortSignal.timeout(30_000) });
+        response = await fetch(`${route.facilitatorUrl}/contract-execute`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${route.contractApiKey}`, "idempotency-key": execution.id }, body: JSON.stringify({ contractId: entry.contractAddress, functionSelector: call.functionSelector, calldata: call.calldata, gas: call.gas, payableAtomic: call.payableAtomic, transactionId: candidateTransactionId }), signal: AbortSignal.timeout(30_000) });
       } catch {
         throw new ContractSubmissionUnknownError();
       }
@@ -100,7 +101,7 @@ export async function executeAutomation(executionId: string) {
       if (!response.ok || !payload.success || !payload.transactionId) throw new Error(payload.error ?? `CONTRACT_EXECUTION_${response.status}`);
       if (normalizeTransactionId(payload.transactionId) !== normalizeTransactionId(candidateTransactionId)) throw new Error("CONTRACT_TRANSACTION_ID_MISMATCH");
       transactionId = payload.transactionId;
-      result = { status: payload.status ?? "SUCCESS" };
+      result = { status: payload.status ?? "SUCCESS", networkId: route.networkId };
     } else if (execution.rule.actionType === "X402_PAYMENT") {
       const payment = paymentActionSchema.parse(action);
       const intent = await createPaidRequest(execution.rule.agentId, `automation:${execution.id}`, payment);
@@ -148,7 +149,7 @@ export async function executeAutomation(executionId: string) {
 export async function reconcileUnknownContractExecutions(limit = 25, now = new Date()) {
   const executions = await db.automationExecution.findMany({
     where: { status: "SUBMISSION_UNKNOWN", transactionId: { not: null }, rule: { actionType: "CONTRACT_CALL" } },
-    select: { id: true, organizationId: true, ruleId: true, transactionId: true, startedAt: true },
+    select: { id: true, organizationId: true, ruleId: true, transactionId: true, startedAt: true, result: true },
     orderBy: { updatedAt: "asc" },
     take: limit,
   });
@@ -156,7 +157,10 @@ export async function reconcileUnknownContractExecutions(limit = 25, now = new D
   for (const execution of executions) {
     const transactionId = execution.transactionId!;
     try {
-      const url = new URL(`/api/v1/transactions/${encodeURIComponent(normalizeTransactionId(transactionId))}`, getConfig().HEDERA_MIRROR_NODE_URL);
+      const evidence = z.object({ networkId: z.enum(["hedera:testnet", "hedera:mainnet"]) }).safeParse(execution.result);
+      if (!evidence.success) throw new Error("CONTRACT_NETWORK_EVIDENCE_MISSING");
+      const route = hederaContractRoute(evidence.data.networkId);
+      const url = new URL(`/api/v1/transactions/${encodeURIComponent(normalizeTransactionId(transactionId))}`, route.mirrorNodeUrl);
       const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
       if (!response.ok && response.status !== 404) throw new Error(`MIRROR_NODE_${response.status}`);
       const body = response.ok ? z.object({ transactions: z.array(z.object({ transaction_id: z.string(), result: z.string() })).default([]) }).parse(await response.json()) : { transactions: [] };
@@ -171,10 +175,10 @@ export async function reconcileUnknownContractExecutions(limit = 25, now = new D
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`automation-execution:${execution.id}`}, 0))`;
         const updated = await tx.automationExecution.updateMany({
           where: { id: execution.id, status: "SUBMISSION_UNKNOWN" },
-          data: { status: finalStatus, errorCode, result: outcome === "SUCCEEDED" ? { status: "SUCCESS", reconciled: true } : undefined, completedAt: now },
+          data: { status: finalStatus, errorCode, result: outcome === "SUCCEEDED" ? { status: "SUCCESS", reconciled: true, networkId: evidence.data.networkId } : undefined, completedAt: now },
         });
         if (updated.count !== 1) return false;
-        await tx.outboxEvent.create({ data: { organizationId: execution.organizationId, eventType: outcome === "SUCCEEDED" ? "AUTOMATION_EXECUTION_SUCCEEDED" : "AUTOMATION_EXECUTION_FAILED", aggregateType: "AUTOMATION_EXECUTION", aggregateId: execution.id, payload: { ruleId: execution.ruleId, transactionId, reconciled: true, errorCode } } });
+        await tx.outboxEvent.create({ data: { organizationId: execution.organizationId, eventType: outcome === "SUCCEEDED" ? "AUTOMATION_EXECUTION_SUCCEEDED" : "AUTOMATION_EXECUTION_FAILED", aggregateType: "AUTOMATION_EXECUTION", aggregateId: execution.id, payload: { ruleId: execution.ruleId, transactionId, networkId: evidence.data.networkId, reconciled: true, errorCode } } });
         return true;
       });
       results.push({ executionId: execution.id, outcome: changed ? outcome : "ALREADY_RECONCILED" });
