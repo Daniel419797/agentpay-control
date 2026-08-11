@@ -18,6 +18,11 @@ export function isHederaMainnetEnabled(config: AppConfig): boolean {
   return Boolean(config.HEDERA_MAINNET_FACILITATOR_URL && config.HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY);
 }
 
+export function isManagedArcEnabled(config: AppConfig): boolean {
+  const signingKey = config.ARC_FACILITATOR_SIGNING_API_KEY ?? (config.APP_ENV === "production" ? undefined : config.ARC_FACILITATOR_API_KEY);
+  return Boolean(config.ARC_FACILITATOR_URL && signingKey && config.ARC_PAYER_ADDRESS);
+}
+
 class DefaultNetworkRouter implements NetworkRouter {
   private readonly routes: Record<string, NetworkRoute> = {};
 
@@ -41,12 +46,14 @@ class DefaultNetworkRouter implements NetworkRouter {
       };
     }
 
-    this.routes["eip155:5042002"] = {
-      facilitatorUrl: config.ARC_FACILITATOR_URL ?? "http://localhost:8788",
-      facilitatorApiKey: config.ARC_FACILITATOR_SIGNING_API_KEY ?? (production ? undefined : config.ARC_FACILITATOR_API_KEY),
-      explorerUrl: "https://testnet.arcscan.app/tx",
-      nativeAsset: "0x3600000000000000000000000000000000000000",
-    };
+    if (config.ARC_FACILITATOR_URL || !production) {
+      this.routes["eip155:5042002"] = {
+        facilitatorUrl: config.ARC_FACILITATOR_URL ?? "http://localhost:8788",
+        facilitatorApiKey: config.ARC_FACILITATOR_SIGNING_API_KEY ?? (production ? undefined : config.ARC_FACILITATOR_API_KEY),
+        explorerUrl: "https://testnet.arcscan.app/tx",
+        nativeAsset: config.ARC_USDC_ADDRESS,
+      };
+    }
   }
 
   getRoute(network: string): NetworkRoute {
