@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const optionalUrl = z.string().url().optional().or(z.literal(""));
+const hederaAccountId = /^0\.0\.\d+$/;
 
 const envSchema = z.object({
   APP_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -10,7 +11,7 @@ const envSchema = z.object({
   HEDERA_NETWORK: z.enum(["testnet", "mainnet"]).default("testnet"),
   HEDERA_OPERATOR_ID: z.string().optional(),
   HEDERA_OPERATOR_KEY: z.string().optional(),
-  HEDERA_PAYER_ACCOUNT_ID: z.string().optional(),
+  HEDERA_PAYER_ACCOUNT_ID: z.string().regex(hederaAccountId).optional(),
   HEDERA_PROVIDER_ACCOUNT_ID: z.string().default("0.0.98765"),
   HEDERA_USDC_TOKEN_ID: z.string().optional(),
   HEDERA_MIRROR_NODE_URL: optionalUrl.default("https://testnet.mirrornode.hedera.com"),
@@ -22,6 +23,8 @@ const envSchema = z.object({
   HEDERA_MAINNET_FACILITATOR_URL: optionalUrl,
   HEDERA_MAINNET_FACILITATOR_API_KEY: z.string().min(32).optional(),
   HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY: z.string().min(32).optional(),
+  HEDERA_MAINNET_FACILITATOR_CONTRACT_API_KEY: z.string().min(32).optional(),
+  HEDERA_MAINNET_PAYER_ACCOUNT_ID: z.string().regex(hederaAccountId).optional(),
   HEDERA_MAINNET_MIRROR_NODE_URL: optionalUrl.default("https://mainnet-public.mirrornode.hedera.com"),
   ARC_FACILITATOR_URL: optionalUrl,
   ARC_FACILITATOR_API_KEY: z.string().min(32).optional(),
@@ -105,6 +108,12 @@ export function productionConfigErrors(config: AppConfig): string[] {
   if (!config.FACILITATOR_SETTLEMENT_API_KEY) errors.push("FACILITATOR_SETTLEMENT_API_KEY");
   if (!config.FACILITATOR_CONTRACT_API_KEY) errors.push("FACILITATOR_CONTRACT_API_KEY");
   if (config.HEDERA_MAINNET_FACILITATOR_URL && !config.HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY) errors.push("HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY");
+  const mainnetContractRoutingRequested = Boolean(config.HEDERA_MAINNET_FACILITATOR_CONTRACT_API_KEY || config.HEDERA_MAINNET_PAYER_ACCOUNT_ID);
+  if (mainnetContractRoutingRequested) {
+    if (!config.HEDERA_MAINNET_FACILITATOR_URL) errors.push("HEDERA_MAINNET_FACILITATOR_URL");
+    if (!config.HEDERA_MAINNET_FACILITATOR_CONTRACT_API_KEY) errors.push("HEDERA_MAINNET_FACILITATOR_CONTRACT_API_KEY");
+    if (!config.HEDERA_MAINNET_PAYER_ACCOUNT_ID) errors.push("HEDERA_MAINNET_PAYER_ACCOUNT_ID");
+  }
   if (!config.ARC_FACILITATOR_URL) errors.push("ARC_FACILITATOR_URL");
   if (!config.ARC_FACILITATOR_SIGNING_API_KEY) errors.push("ARC_FACILITATOR_SIGNING_API_KEY");
   if (!config.ARC_FACILITATOR_CONTRACT_API_KEY) errors.push("ARC_FACILITATOR_CONTRACT_API_KEY");
@@ -120,6 +129,7 @@ export function productionConfigErrors(config: AppConfig): string[] {
     ["FACILITATOR_SETTLEMENT_API_KEY", config.FACILITATOR_SETTLEMENT_API_KEY],
     ["FACILITATOR_CONTRACT_API_KEY", config.FACILITATOR_CONTRACT_API_KEY],
     ["HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY", config.HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY],
+    ["HEDERA_MAINNET_FACILITATOR_CONTRACT_API_KEY", config.HEDERA_MAINNET_FACILITATOR_CONTRACT_API_KEY],
     ["ARC_FACILITATOR_SIGNING_API_KEY", config.ARC_FACILITATOR_SIGNING_API_KEY],
     ["ARC_FACILITATOR_CONTRACT_API_KEY", config.ARC_FACILITATOR_CONTRACT_API_KEY],
   ], errors);
