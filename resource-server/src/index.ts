@@ -201,7 +201,9 @@ async function handlePaidRequest(c: Context, category: string, resourceId: strin
     const parsedSettlement = settlementResponseSchema.safeParse(rawSettlement);
     if (!settleRes.ok || !parsedSettlement.success || parsedSettlement.data.success !== true) {
       const errorReason = parsedSettlement.success ? parsedSettlement.data.errorReason : undefined;
-      const transactionCandidate = parsedSettlement.success ? (parsedSettlement.data.transactionId ?? parsedSettlement.data.transaction || undefined) : undefined;
+      const transactionCandidate = parsedSettlement.success
+        ? ((parsedSettlement.data.transactionId ?? parsedSettlement.data.transaction) || undefined)
+        : undefined;
       if (settleRes.status >= 500 || errorReason === "settlement_unknown") {
         return c.json({
           code: "SETTLEMENT_UNKNOWN",
