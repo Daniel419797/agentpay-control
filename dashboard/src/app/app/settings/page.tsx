@@ -1,3 +1,4 @@
+import { OrganizationDataControls } from "@/components/organization-data-controls";
 import { SettingsOperations } from "@/components/settings-operations";
 import { db } from "@/lib/db";
 import { notificationDestinationDisplay } from "@/lib/notification-destination";
@@ -23,7 +24,7 @@ export default async function SettingsPage() {
   ]);
 
   return <div className="page">
-    <div className="page-heading"><div><h1>Organization settings</h1><p>Membership, notifications, retention, and emergency operating controls.</p></div></div>
+    <div className="page-heading"><div><h1>Organization settings</h1><p>Membership, notifications, retention, emergency controls, export, and data lifecycle.</p></div></div>
     <SettingsOperations
       organization={{ name: workspace.organization.name, timezone: workspace.organization.timezone, slug: workspace.organization.slug, killSwitchEnabled: workspace.organization.killSwitchEnabled }}
       permissions={{ isOwner, canViewMembers, canViewEndpoints }}
@@ -31,5 +32,6 @@ export default async function SettingsPage() {
       endpoints={endpoints.map((endpoint) => ({ id: endpoint.id, name: endpoint.name, type: endpoint.type, destination: notificationDestinationDisplay(endpoint.type, endpoint.destination), status: endpoint.status }))}
       retention={{ auditDays: retention.auditDays, financialRecordDays: retention.financialRecordDays, fulfillmentBodyDays: retention.fulfillmentBodyDays, notificationDays: retention.notificationDays }}
     />
+    <OrganizationDataControls organizationSlug={workspace.organization.slug} isOwner={isOwner} />
   </div>;
 }
