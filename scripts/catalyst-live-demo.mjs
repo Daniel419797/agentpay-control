@@ -10,24 +10,22 @@ function stableHash(value) { return createHash("sha256").update(JSON.stringify(v
 
 async function requestJson(url, init = {}) {
   const response = await fetch(url, { ...init, redirect: "error", signal: AbortSignal.timeout(90_000), headers: { accept: "application/json", ...(init.body ? { "content-type": "application/json" } : {}), ...(init.headers ?? {}) } });
-  const text = await response.text();
-  let body; try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text.slice(0, 1000) }; }
+  const text = await response.text(); let body;
+  try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text.slice(0, 1000) }; }
   if (!response.ok) throw new Error(`HTTP_${response.status}:${JSON.stringify(body).slice(0, 1000)}`);
   return body?.data ?? body;
 }
 
 async function attest(body) {
-  return requestJson(appUrl("/api/v1/organization/release-evidence"), {
-    method: "POST",
-    headers: { authorization: `Bearer ${required("RELEASE_EVIDENCE_API_KEY")}` },
-    body: JSON.stringify({ releaseSha: required("RELEASE_SHA"), ...body }),
-  });
+  return requestJson(appUrl("/api/v1/organization/release-evidence"), { method: "POST", headers: { authorization: `Bearer ${required("RELEASE_EVIDENCE_API_KEY")}` }, body: JSON.stringify({ releaseSha: required("RELEASE_SHA"), ...body }) });
 }
 
-async function verifyCanaryEvidence(name, evidenceType, network, asset) {
-  const transactionId = required(name).toLowerCase();
-  if (!/^[0-9a-f]{64}$/.test(transactionId)) throw new Error(`${name}_INVALID`);
-  await attest({ evidenceType, network, asset, transactionId, evidence: { source: "operator-executed-canary", transactionId, operatorEvidenceUrl: process.env[`${name}_EVIDENCE_URL`] || null, recordedAt: new Date().toISOString() } });
+async function verifyCanaryEvidence(prefix, evidenceType, network, asset) {
+  const transactionId = required(`${prefix}_TX`).toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(transactionId)) throw new Error(`${prefix}_TX_INVALID`);
+  const paymentFacts = { payerAddress: required(`${prefix}_PAYER_ADDRESS`), payeeAddress: required(`${prefix}_PAYEE_ADDRESS`), amountAtomic: required(`${prefix}_AMOUNT_ATOMIC`) };
+  if (!/^[1-9]\d*$/.test(paymentFacts.amountAtomic)) throw new Error(`${prefix}_AMOUNT_ATOMIC_INVALID`);
+  await attest({ evidenceType, network, asset, transactionId, evidence: { source: "operator-executed-canary", transactionId, ...paymentFacts, operatorEvidenceUrl: process.env[`${prefix}_EVIDENCE_URL`] || null, recordedAt: new Date().toISOString() } });
   return { evidenceType, transactionId };
 }
 
@@ -57,9 +55,9 @@ if (new URL(required("CATALYST_APP_URL")).protocol !== "https:") throw new Error
 if (!/^[0-9a-f]{40}$/.test(required("RELEASE_SHA"))) throw new Error("RELEASE_SHA_INVALID");
 
 const results = [];
-results.push(await verifyCanaryEvidence("CATALYST_PREPROD_ADA_TX", "CARDANO_PREPROD_ADA_CANARY", "cardano:preprod", "lovelace"));
-results.push(await verifyCanaryEvidence("CATALYST_PREPROD_TOKEN_TX", "CARDANO_PREPROD_TOKEN_CANARY", "cardano:preprod", required("CARDANO_PREPROD_USDCX_ASSET_ID")));
-results.push(await verifyCanaryEvidence("CATALYST_MAINNET_USDCX_TX", "CARDANO_MAINNET_USDCX_CANARY", "cardano:mainnet", required("CARDANO_MAINNET_USDCX_ASSET_ID")));
+results.push(await verifyCanaryEvidence("CATALYST_PREPROD_ADA", "CARDANO_PREPROD_ADA_CANARY", "cardano:preprod", "lovelace"));
+results.push(await verifyCanaryEvidence("CATALYST_PREPROD_TOKEN", "CARDANO_PREPROD_TOKEN_CANARY", "cardano:preprod", required("CARDANO_PREPROD_USDCX_ASSET_ID")));
+results.push(await verifyCanaryEvidence("CATALYST_MAINNET_USDCX", "CARDANO_MAINNET_USDCX_CANARY", "cardano:mainnet", required("CARDANO_MAINNET_USDCX_ASSET_ID")));
 results.push({ masumi: await masumiEvidence() });
 results.push({ dependencies: await dependencyEvidence() });
 console.log(JSON.stringify({ releaseSha: process.env.RELEASE_SHA, results }, null, 2));
