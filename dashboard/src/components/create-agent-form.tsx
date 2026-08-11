@@ -5,13 +5,15 @@ import { useState } from "react";
 
 type AgentNetwork = "hedera:testnet" | "hedera:mainnet" | "eip155:5042002" | "cardano:preprod" | "cardano:mainnet";
 type Custody = "PLATFORM_MANAGED_TESTNET" | "SELF_CUSTODY" | "EXTERNAL_DELEGATED";
-type Asset = "HBAR" | "USDC" | "ADA";
+type Asset = "HBAR" | "USDC" | "ADA" | "USDCX";
 
 type Props = {
   mainnetEnabled: boolean;
   arcEnabled: boolean;
   cardanoPreprodEnabled: boolean;
   cardanoMainnetEnabled: boolean;
+  cardanoPreprodUsdcxEnabled: boolean;
+  cardanoMainnetUsdcxEnabled: boolean;
 };
 
 function defaultsForNetwork(network: AgentNetwork): { custody: Custody; asset: Asset } {
@@ -22,7 +24,14 @@ function defaultsForNetwork(network: AgentNetwork): { custody: Custody; asset: A
   return { custody: "PLATFORM_MANAGED_TESTNET", asset: "HBAR" };
 }
 
-export function CreateAgentForm({ mainnetEnabled, arcEnabled, cardanoPreprodEnabled, cardanoMainnetEnabled }: Props) {
+export function CreateAgentForm({
+  mainnetEnabled,
+  arcEnabled,
+  cardanoPreprodEnabled,
+  cardanoMainnetEnabled,
+  cardanoPreprodUsdcxEnabled,
+  cardanoMainnetUsdcxEnabled,
+}: Props) {
   const router = useRouter();
   const [network, setNetwork] = useState<AgentNetwork>("hedera:testnet");
   const [custody, setCustody] = useState<Custody>("PLATFORM_MANAGED_TESTNET");
@@ -66,6 +75,7 @@ export function CreateAgentForm({ mainnetEnabled, arcEnabled, cardanoPreprodEnab
   }
 
   const cardano = network.startsWith("cardano:");
+  const usdcxEnabled = network === "cardano:preprod" ? cardanoPreprodUsdcxEnabled : network === "cardano:mainnet" ? cardanoMainnetUsdcxEnabled : false;
 
   return <form className="app-form" onSubmit={submit}>
     {error && <div className="form-error" role="alert">{error}</div>}
@@ -85,17 +95,18 @@ export function CreateAgentForm({ mainnetEnabled, arcEnabled, cardanoPreprodEnab
       {network === "cardano:preprod" && <option value="PLATFORM_MANAGED_TESTNET">Managed Cardano Preprod signer · autonomous</option>}
       {network === "cardano:mainnet" && <option value="EXTERNAL_DELEGATED">Delegated production signer · autonomous</option>}
     </select></label>
-    <label>Default asset<select name="asset" value={asset} onChange={(event) => setAsset(event.target.value as Asset)} disabled={network === "eip155:5042002" || cardano}>
+    <label>Default asset<select name="asset" value={asset} onChange={(event) => setAsset(event.target.value as Asset)} disabled={network === "eip155:5042002" || (cardano && !usdcxEnabled)}>
       {network.startsWith("hedera:") && <option value="HBAR">HBAR</option>}
       {network.startsWith("hedera:") && <option value="USDC">USDC</option>}
       {network === "eip155:5042002" && <option value="USDC">USDC</option>}
       {cardano && <option value="ADA">ADA</option>}
+      {cardano && usdcxEnabled && <option value="USDCX">USDCx</option>}
     </select></label>
     {network === "hedera:testnet" && custody === "PLATFORM_MANAGED_TESTNET" && <p className="form-help">The account is assigned from the isolated managed payer configured for the Hedera testnet facilitator. The dashboard never receives its private key.</p>}
     {network === "hedera:mainnet" && <p className="form-help">Hedera Mainnet requires a previously verified wallet identity and explicit wallet confirmation for payments.</p>}
     {network === "eip155:5042002" && <p className="form-help">Arc Testnet uses the isolated managed EVM signer and configured USDC contract.</p>}
-    {network === "cardano:preprod" && <p className="form-help">Cardano Preprod uses x402 exact with signed eUTxO transactions. The managed signer builds the signed transaction outside the dashboard; AgentPay verifies settlement against Cardano chain evidence.</p>}
-    {network === "cardano:mainnet" && <p className="form-help">Cardano Mainnet is shown only when a separately configured delegated production signer, provider address, and chain-evidence credentials are complete. AgentPay does not store the signing secret in the dashboard.</p>}
+    {network === "cardano:preprod" && <p className="form-help">Cardano Preprod uses x402 exact with signed eUTxO transactions. ADA is always available; USDCx appears only when an exact verified asset unit is configured for this deployment.</p>}
+    {network === "cardano:mainnet" && <p className="form-help">Cardano Mainnet is shown only when a separately configured delegated production signer, provider address, and chain-evidence credentials are complete. USDCx is exposed only from the network-specific asset whitelist.</p>}
     <p className="form-help">Provisioning requires recent authentication and is blocked while the organization emergency stop is active.</p>
     <button className="primary-button" type="submit" disabled={busy}>{busy ? "Creating…" : "Create agent"}</button>
   </form>;
