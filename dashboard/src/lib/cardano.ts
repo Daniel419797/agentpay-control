@@ -40,10 +40,23 @@ async function request(network: CardanoNetwork, path: string, allowNotFound = fa
   return response.json();
 }
 
-export async function cardanoAddressLovelaceBalance(network: CardanoNetwork, address: string) {
+function uniqueAmounts(amounts: Array<{ unit: string; quantity: string }>) {
+  const result = new Map<string, bigint>();
+  for (const amount of amounts) {
+    if (result.has(amount.unit)) return null;
+    result.set(amount.unit, BigInt(amount.quantity));
+  }
+  return result;
+}
+
+export async function cardanoAddressAssetBalance(network: CardanoNetwork, address: string, asset: string) {
   const payload = addressSchema.parse(await request(network, `/addresses/${encodeURIComponent(address)}`));
   if (payload.address !== address) throw new Error("CARDANO_ADDRESS_EVIDENCE_MISMATCH");
-  return payload.amount.find((entry) => entry.unit === "lovelace")?.quantity ?? "0";
+  return payload.amount.find((entry) => entry.unit.toLowerCase() === asset.toLowerCase())?.quantity ?? "0";
+}
+
+export async function cardanoAddressLovelaceBalance(network: CardanoNetwork, address: string) {
+  return cardanoAddressAssetBalance(network, address, "lovelace");
 }
 
 export type CardanoTransactionEvidence = {
@@ -77,7 +90,15 @@ export async function cardanoTransactionEvidence(network: CardanoNetwork, transa
 }
 
 function isAdaOnly(amounts: Array<{ unit: string; quantity: string }>) {
-  return amounts.length > 0 && amounts.every((amount) => amount.unit === "lovelace");
+  const parsed = uniqueAmounts(amounts);
+  return Boolean(parsed && parsed.size === 1 && parsed.has("lovelace"));
+}
+
+function strictWhitelistedValue(amounts: Array<{ unit: string; quantity: string }>, asset: string) {
+  const parsed = uniqueAmounts(amounts);
+  if (!parsed || !parsed.has("lovelace")) return null;
+  for (const unit of parsed.keys()) if (unit !== "lovelace" && unit.toLowerCase() !== asset.toLowerCase()) return null;
+  return { lovelace: parsed.get("lovelace") ?? 0n, token: parsed.get(asset) ?? parsed.get(asset.toLowerCase()) ?? 0n };
 }
 
 export function cardanoExactPaymentMatches(
@@ -87,14 +108,42 @@ export function cardanoExactPaymentMatches(
   asset: string,
   amountAtomic: string,
 ) {
-  if (!evidence.validContract || asset !== "lovelace") return false;
-  if (evidence.inputs.length === 0 || evidence.inputs.some((input) => input.address !== payerAddress || !isAdaOnly(input.amount))) return false;
-  let paid = 0n;
-  for (const output of evidence.outputs) {
-    if (!isAdaOnly(output.amount)) return false;
-    if (output.address !== payeeAddress && output.address !== payerAddress) return false;
-    if (output.address !== payeeAddress) continue;
-    for (const amount of output.amount) paid += BigInt(amount.quantity);
+  if (!evidence.validContract || evidence.inputs.length === 0) return false;
+
+  if (asset === "lovelace") {
+    if (evidence.inputs.some((input) => input.address !== payerAddress || !isAdaOnly(input.amount))) return false;
+    let paid = 0n;
+    for (const output of evidence.outputs) {
+      if (!isAdaOnly(output.amount)) return false;
+      if (output.address !== payeeAddress && output.address !== payerAddress) return false;
+      if (output.address !== payeeAddress) continue;
+      const parsed = uniqueAmounts(output.amount);
+      paid += parsed?.get("lovelace") ?? 0n;
+    }
+    return paid === BigInt(amountAtomic);
   }
-  return paid === BigInt(amountAtomic);
+
+  let inputToken = 0n;
+  for (const input of evidence.inputs) {
+    if (input.address !== payerAddress) return false;
+    const value = strictWhitelistedValue(input.amount, asset);
+    if (!value) return false;
+    inputToken += value.token;
+  }
+
+  let outputToken = 0n;
+  let paidToken = 0n;
+  let payeeLovelace = 0n;
+  for (const output of evidence.outputs) {
+    if (output.address !== payeeAddress && output.address !== payerAddress) return false;
+    const value = strictWhitelistedValue(output.amount, asset);
+    if (!value) return false;
+    outputToken += value.token;
+    if (output.address === payeeAddress) {
+      paidToken += value.token;
+      payeeLovelace += value.lovelace;
+    }
+  }
+
+  return paidToken === BigInt(amountAtomic) && payeeLovelace > 0n && inputToken === outputToken;
 }
