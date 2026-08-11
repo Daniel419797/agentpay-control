@@ -3,6 +3,7 @@ import { reconcileUnknownHederaPayments } from "@/domain/payment-reconciliation-
 import { reconcileUnknownArcPayments } from "@/domain/arc-payment-reconciliation-service";
 import { reconcileUnknownCardanoPayments } from "@/domain/cardano-payment-reconciliation-service";
 import { reconcilePendingMasumiEscrows } from "@/domain/masumi-escrow-service";
+import { reconcilePendingMasumiRefundMutations } from "@/domain/masumi-refund-mutation-service";
 import { runResourceHealthChecks } from "@/domain/resource-health-service";
 import { markOverdueInvoices } from "@/domain/invoice-service";
 import { reconcileCrossChainTransfers } from "@/domain/cross-chain-service";
@@ -15,12 +16,13 @@ import { authorizeInternalRequest } from "@/lib/internal-auth";
 export async function POST(request: Request) {
   try {
     if (!authorizeInternalRequest(request)) return problem(401, "UNAUTHORIZED", "A valid maintenance service credential is required.");
-    const [payments, hederaPaymentReconciliation, arcPaymentReconciliation, cardanoPaymentReconciliation, masumiEscrowReconciliation, retention, deletions, resourceHealth, invoices, crossChain, fiat, scheduledAutomations, eventAutomations, deferredAutomations, contractReconciliation, intelligence] = await Promise.all([
+    const [payments, hederaPaymentReconciliation, arcPaymentReconciliation, cardanoPaymentReconciliation, masumiEscrowReconciliation, masumiRefundMutationReconciliation, retention, deletions, resourceHealth, invoices, crossChain, fiat, scheduledAutomations, eventAutomations, deferredAutomations, contractReconciliation, intelligence] = await Promise.all([
       runPaymentMaintenance(),
       reconcileUnknownHederaPayments(),
       reconcileUnknownArcPayments(),
       reconcileUnknownCardanoPayments(),
       reconcilePendingMasumiEscrows(),
+      reconcilePendingMasumiRefundMutations(),
       runRetentionMaintenance(),
       finalizeDeletionRequests(),
       runResourceHealthChecks(),
@@ -36,7 +38,7 @@ export async function POST(request: Request) {
     const incidents = await openUnresolvedSubmissionIncidents();
     return ok({
       payments,
-      paymentReconciliation: { hedera: hederaPaymentReconciliation, arc: arcPaymentReconciliation, cardano: cardanoPaymentReconciliation, masumiEscrow: masumiEscrowReconciliation },
+      paymentReconciliation: { hedera: hederaPaymentReconciliation, arc: arcPaymentReconciliation, cardano: cardanoPaymentReconciliation, masumiEscrow: masumiEscrowReconciliation, masumiRefundMutations: masumiRefundMutationReconciliation },
       retention,
       deletions,
       resourceHealth,
