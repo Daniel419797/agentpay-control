@@ -32,7 +32,7 @@ The dashboard is **not** provisioned by `render.yaml`; it is deployed separately
 | Hedera Mainnet | `hedera:mainnet` | production-capable Hedera route when separately configured |
 | Arc Testnet | `eip155:5042002` | EVM x402 and contract automation test rail |
 
-The dashboard network switcher controls the selected Hedera network for supported operator flows. Arc routes are available to the payment/domain integrations that explicitly select Arc.
+The dashboard network switcher controls the selected Hedera network for supported operator flows. In production, mainnet is shown only when a mainnet facilitator is configured. Arc routes are available to payment/domain integrations that explicitly select Arc.
 
 ## Production safety model
 
@@ -47,7 +47,7 @@ The combined facilitator uses **network-scoped, capability-scoped credentials**.
 - Arc settlement
 - Arc contract execution
 
-Do not reuse these values. Hedera operator and managed payer private keys must also be separate.
+Do not reuse these values. Hedera operator and managed payer private keys must also be separate. Arc production additionally requires three distinct chain credentials: `ARC_PAYER_PRIVATE_KEY`, `ARC_RELAYER_PRIVATE_KEY`, and `ARC_CONTRACT_EXECUTION_PRIVATE_KEY`.
 
 The dashboard never needs Hedera/Arc private keys. Production private keys belong in the facilitator boundary and should ultimately be held by a KMS/HSM or external signing service where supported.
 
@@ -63,7 +63,7 @@ Deploy the `dashboard` application to Vercel and configure its production enviro
 - HTTPS `NEXT_PUBLIC_APP_URL`
 - managed PostgreSQL `DATABASE_URL`
 - unique `AUTH_SECRET` and `CRON_SECRET`
-- exactly 32 random bytes encoded as base64url for `KEY_ENCRYPTION_MASTER_KEY`
+- exactly 32 random bytes encoded as unpadded base64url for `KEY_ENCRYPTION_MASTER_KEY`
 - production Supabase configuration
 - facilitator URLs and capability-specific API keys
 - no Hedera or Arc private keys in the dashboard environment
@@ -82,7 +82,7 @@ https://<facilitator-host>/arc
 https://<facilitator-host>/health
 ```
 
-Supply the chain credentials requested by Render. The blueprint generates the six network/capability API credentials and wires the appropriate **settlement-only** credentials into the resource server.
+Supply the chain credentials requested by Render. The blueprint generates the six network/capability API credentials and wires the appropriate **settlement-only** credentials into the resource server. Arc requires three separate chain private keys in production so payer signing, x402 relaying, and explicit contract execution do not share one credential.
 
 For the resource server, also set:
 
@@ -99,7 +99,7 @@ Hedera mainnet should use a separately configured production facilitator instanc
 
 ```bash
 # PostgreSQL
-Docker compose up -d
+docker compose up -d
 
 # Dashboard
 cd dashboard
@@ -128,7 +128,7 @@ npm install
 npm run dev
 ```
 
-Use `facilitator-combined/.env.example` for local combined-facilitator configuration. Generic shared capability keys remain available for local development only; production uses the network-scoped keys documented in that file.
+Use `facilitator-combined/.env.example` for local combined-facilitator configuration. Generic shared capability keys and Arc chain-key fallback remain available for local development only; production uses the isolated credentials documented in that file.
 
 ## Verification
 
