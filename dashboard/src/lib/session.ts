@@ -5,6 +5,7 @@ import { getConfig } from "@/lib/config";
 export const SESSION_COOKIE = process.env.APP_ENV === "production" ? "__Host-agentpay_session" : "agentpay_session";
 const SESSION_ISSUER = "agentpay-control";
 const SESSION_AUDIENCE = "agentpay-operator";
+const SESSION_REVOCATION_PREFIX = "session-revocation:";
 export type OperatorSession = {
   sub: string;
   email: string | null;
@@ -17,11 +18,14 @@ export type OperatorSession = {
 export const STEP_UP_MAX_AGE_SECONDS = 10 * 60;
 
 function key() { return new TextEncoder().encode(getConfig().AUTH_SECRET); }
+function revocationKey(userId: string) { return `${SESSION_REVOCATION_PREFIX}${userId}`; }
 
 async function currentSessionVersion(userId: string) {
-  const user = await db.user.findUnique({ where: { id: userId }, select: { updatedAt: true } });
-  if (!user) throw new Error("SESSION_USER_NOT_FOUND");
-  return user.updatedAt.getTime();
+  const state = await db.rateLimitBucket.findUnique({
+    where: { key: revocationKey(userId) },
+    select: { count: true },
+  });
+  return state?.count ?? 0;
 }
 
 export async function createOperatorSession(session: Omit<OperatorSession, "authenticatedAt" | "sessionVersion">) {
@@ -38,7 +42,7 @@ export async function createOperatorSession(session: Omit<OperatorSession, "auth
 
 export async function verifyOperatorSession(token: string): Promise<OperatorSession> {
   const { payload } = await jwtVerify(token, key(), { algorithms: ["HS256"], issuer: SESSION_ISSUER, audience: SESSION_AUDIENCE });
-  if (!payload.sub || typeof payload.name !== "string" || typeof payload.iat !== "number" || typeof payload.sv !== "number" || !["supabase", "wallet"].includes(payload.mode as string)) throw new Error("INVALID_SESSION");
+  if (!payload.sub || typeof payload.name !== "string" || typeof payload.iat !== "number" || typeof payload.sv !== "number" || !Number.isSafeInteger(payload.sv) || payload.sv < 0 || !["supabase", "wallet"].includes(payload.mode as string)) throw new Error("INVALID_SESSION");
   const sessionVersion = await currentSessionVersion(payload.sub);
   if (sessionVersion !== payload.sv) throw new Error("SESSION_REVOKED");
   return { sub: payload.sub, email: (payload.email as string) ?? null, name: payload.name, mode: payload.mode as "supabase" | "wallet", authenticatedAt: payload.iat, sessionVersion };
@@ -59,7 +63,13 @@ export async function sessionFromRequest(request: Request) {
 }
 
 export async function revokeOperatorSessions(userId: string) {
-  await db.user.update({ where: { id: userId }, data: { updatedAt: new Date() } });
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 10 * 365 * 24 * 60 * 60 * 1000);
+  await db.rateLimitBucket.upsert({
+    where: { key: revocationKey(userId) },
+    create: { key: revocationKey(userId), count: 1, windowStart: now, expiresAt },
+    update: { count: { increment: 1 }, windowStart: now, expiresAt },
+  });
 }
 
 export async function provisionSupabaseOperator(user: { id: string; email?: string; user_metadata?: { name?: string; full_name?: string } }) {
