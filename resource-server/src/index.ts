@@ -14,6 +14,8 @@ const env = z.object({
   FACILITATOR_URL: z.string().default("http://localhost:8787"),
   HEDERA_MAINNET_FACILITATOR_URL: z.string().default("http://localhost:8787"),
   ARC_FACILITATOR_URL: z.string().default("http://localhost:8788"),
+  CARDANO_PREPROD_FACILITATOR_URL: z.string().default("http://localhost:8790"),
+  CARDANO_MAINNET_FACILITATOR_URL: z.string().default("http://localhost:8790"),
   PORT: z.coerce.number().default(3200),
   NETWORK: z.string().default("hedera:testnet"),
   PROVIDER_ACCOUNT_ID: z.string().optional(),
@@ -25,8 +27,12 @@ const env = z.object({
   FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
   HEDERA_MAINNET_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
   ARC_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
+  CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
+  CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
   ARC_PROVIDER_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   ARC_USDC_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
+  CARDANO_PREPROD_PROVIDER_ADDRESS: z.string().regex(/^addr_test1[0-9a-z]+$/).optional(),
+  CARDANO_MAINNET_PROVIDER_ADDRESS: z.string().regex(/^addr1[0-9a-z]+$/).optional(),
 }).parse(process.env);
 
 const enabledNetworks = parseEnabledNetworks(env.ENABLED_NETWORKS);
@@ -34,35 +40,23 @@ if (env.APP_ENV === "production") {
   if (requiresNetwork(enabledNetworks, "hedera:testnet") && !env.FACILITATOR_SETTLEMENT_API_KEY) throw new Error("Production Hedera testnet settlement API key is required");
   if (requiresNetwork(enabledNetworks, "hedera:mainnet") && !env.HEDERA_MAINNET_FACILITATOR_SETTLEMENT_API_KEY) throw new Error("Production Hedera mainnet settlement API key is required");
   if (requiresNetwork(enabledNetworks, "eip155:5042002") && !env.ARC_FACILITATOR_SETTLEMENT_API_KEY) throw new Error("Production Arc settlement API key is required");
+  if (requiresNetwork(enabledNetworks, "cardano:preprod") && !env.CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY) throw new Error("Production Cardano Preprod settlement API key is required");
+  if (requiresNetwork(enabledNetworks, "cardano:mainnet") && !env.CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY) throw new Error("Production Cardano Mainnet settlement API key is required");
 }
 
-const ARCTestnet = {
-  caip2: "eip155:5042002",
-  usdcAddress: env.ARC_USDC_ADDRESS ?? "0x3600000000000000000000000000000000000000",
-  providerAddress: env.ARC_PROVIDER_ADDRESS ?? "",
-  explorerUrl: "https://testnet.arcscan.app/tx",
-  facilitatorUrl: env.ARC_FACILITATOR_URL,
-};
-const HederaTestnet = {
-  caip2: "hedera:testnet",
-  usdcTokenId: env.USDC_TOKEN_ID ?? "",
-  providerAccountId: env.PROVIDER_ACCOUNT_ID ?? "",
-  explorerUrl: "https://hashscan.io/testnet/transaction",
-  facilitatorUrl: env.FACILITATOR_URL,
-};
-const HederaMainnet = {
-  caip2: "hedera:mainnet",
-  usdcTokenId: env.HEDERA_MAINNET_USDC_TOKEN_ID ?? "",
-  providerAccountId: env.HEDERA_MAINNET_PROVIDER_ACCOUNT_ID ?? "",
-  explorerUrl: "https://hashscan.io/mainnet/transaction",
-  facilitatorUrl: env.HEDERA_MAINNET_FACILITATOR_URL,
-};
+const ARCTestnet = { caip2: "eip155:5042002", usdcAddress: env.ARC_USDC_ADDRESS ?? "0x3600000000000000000000000000000000000000", providerAddress: env.ARC_PROVIDER_ADDRESS ?? "", explorerUrl: "https://testnet.arcscan.app/tx", facilitatorUrl: env.ARC_FACILITATOR_URL };
+const HederaTestnet = { caip2: "hedera:testnet", usdcTokenId: env.USDC_TOKEN_ID ?? "", providerAccountId: env.PROVIDER_ACCOUNT_ID ?? "", explorerUrl: "https://hashscan.io/testnet/transaction", facilitatorUrl: env.FACILITATOR_URL };
+const HederaMainnet = { caip2: "hedera:mainnet", usdcTokenId: env.HEDERA_MAINNET_USDC_TOKEN_ID ?? "", providerAccountId: env.HEDERA_MAINNET_PROVIDER_ACCOUNT_ID ?? "", explorerUrl: "https://hashscan.io/mainnet/transaction", facilitatorUrl: env.HEDERA_MAINNET_FACILITATOR_URL };
+const CardanoPreprod = { caip2: "cardano:preprod", providerAddress: env.CARDANO_PREPROD_PROVIDER_ADDRESS ?? "", explorerUrl: "https://preprod.cardanoscan.io/transaction", facilitatorUrl: env.CARDANO_PREPROD_FACILITATOR_URL };
+const CardanoMainnet = { caip2: "cardano:mainnet", providerAddress: env.CARDANO_MAINNET_PROVIDER_ADDRESS ?? "", explorerUrl: "https://cardanoscan.io/transaction", facilitatorUrl: env.CARDANO_MAINNET_FACILITATOR_URL };
 
 type NetworkConfig = { caip2: string; facilitatorUrl: string; explorerUrl: string };
 const configuredNetworks: Record<string, NetworkConfig> = {
   [HederaTestnet.caip2]: HederaTestnet,
   [HederaMainnet.caip2]: HederaMainnet,
   [ARCTestnet.caip2]: ARCTestnet,
+  [CardanoPreprod.caip2]: CardanoPreprod,
+  [CardanoMainnet.caip2]: CardanoMainnet,
 };
 const networks = Object.fromEntries(Object.entries(configuredNetworks).filter(([network]) => enabledNetworks.has(network as never))) as Record<string, NetworkConfig>;
 
@@ -72,14 +66,7 @@ const requirementSchema = z.object({
 });
 const paymentPayloadSchema = z.object({ x402Version: z.literal(2), accepted: requirementSchema, payload: z.record(z.string(), z.unknown()) }).passthrough();
 const settlementResponseSchema = z.object({
-  success: z.boolean(),
-  errorReason: z.string().optional(),
-  payer: z.string().optional(),
-  transaction: z.string(),
-  transactionId: z.string().optional(),
-  network: z.string(),
-  amount: z.string().optional(),
-  extensions: z.record(z.string(), z.unknown()).optional(),
+  success: z.boolean(), errorReason: z.string().optional(), payer: z.string().optional(), transaction: z.string(), transactionId: z.string().optional(), network: z.string(), amount: z.string().optional(), extensions: z.record(z.string(), z.unknown()).optional(),
 });
 
 const arcPrices: Record<string, AssetPrice> = { usdc: { type: "TOKEN", amount: "1000000", assetId: ARCTestnet.usdcAddress, decimals: 6, symbol: "USDC" } };
@@ -91,25 +78,35 @@ const hederaMainnetPrices: Record<string, AssetPrice> = {
   hbar: { type: "NATIVE", amount: "5000000", assetId: "0.0.0", decimals: 8, symbol: "HBAR" },
   usdc: { type: "TOKEN", amount: "1000000", assetId: HederaMainnet.usdcTokenId, decimals: 6, symbol: "USDC" },
 };
+const cardanoPrices: Record<string, AssetPrice> = { ada: { type: "NATIVE", amount: "1000000", assetId: "lovelace", decimals: 6, symbol: "ADA" } };
 
 function getNetworkConfig(network: string): NetworkConfig | undefined { return networks[network]; }
 function pricesForNetwork(network: string): Record<string, AssetPrice> {
   if (network === ARCTestnet.caip2) return arcPrices;
   if (network === HederaMainnet.caip2) return hederaMainnetPrices;
+  if (network === CardanoPreprod.caip2 || network === CardanoMainnet.caip2) return cardanoPrices;
   return hederaTestnetPrices;
 }
 function payeeForNetwork(network: string): string {
   if (network === ARCTestnet.caip2) return ARCTestnet.providerAddress;
   if (network === HederaMainnet.caip2) return HederaMainnet.providerAccountId;
+  if (network === CardanoPreprod.caip2) return CardanoPreprod.providerAddress;
+  if (network === CardanoMainnet.caip2) return CardanoMainnet.providerAddress;
   return HederaTestnet.providerAccountId;
 }
 function requirementsForNetwork(network: string) {
   const isArc = network === ARCTestnet.caip2;
-  const networkComplete = isArc || Boolean(env.FACILITATOR_FEE_PAYER_ID);
+  const isCardano = network === CardanoPreprod.caip2 || network === CardanoMainnet.caip2;
+  const networkComplete = isArc || isCardano || Boolean(env.FACILITATOR_FEE_PAYER_ID);
   if (!networkComplete) return [];
+  const extra = isArc
+    ? { name: "USD Coin", version: "2", assetTransferMethod: "eip3009" }
+    : isCardano
+      ? { assetTransferMethod: "default", submissionPolicy: "server", confirmationPolicy: { l1Confirmations: 1 }, areFeesSponsored: false }
+      : { feePayer: env.FACILITATOR_FEE_PAYER_ID! };
   return Object.values(pricesForNetwork(network))
     .filter((price) => price.assetId.length > 0 && payeeForNetwork(network).length > 0)
-    .map((price) => ({ scheme: "exact" as const, network, amount: price.amount, payTo: payeeForNetwork(network), asset: price.assetId, maxTimeoutSeconds: 900, extra: isArc ? { name: "USD Coin", version: "2", assetTransferMethod: "eip3009" } : { feePayer: env.FACILITATOR_FEE_PAYER_ID! } }));
+    .map((price) => ({ scheme: "exact" as const, network, amount: price.amount, payTo: payeeForNetwork(network), asset: price.assetId, maxTimeoutSeconds: 900, extra }));
 }
 function paymentRequirements(resourceUrl: string) {
   const accepts = Object.keys(networks).flatMap(requirementsForNetwork);
@@ -123,7 +120,9 @@ const sharedPrices = [
   { asset: "HBAR", atomicAmount: hederaMainnetPrices.hbar.amount, network: HederaMainnet.caip2, assetId: hederaMainnetPrices.hbar.assetId },
   { asset: "USDC", atomicAmount: hederaMainnetPrices.usdc.amount, network: HederaMainnet.caip2, assetId: hederaMainnetPrices.usdc.assetId },
   { asset: "USDC", atomicAmount: arcPrices.usdc.amount, network: ARCTestnet.caip2, assetId: arcPrices.usdc.assetId },
-].filter((price) => enabledNetworks.has(price.network as never) && price.assetId.length > 0 && (!price.network.startsWith("hedera:") || Boolean(env.FACILITATOR_FEE_PAYER_ID))).map(({ assetId: _assetId, ...price }) => price);
+  { asset: "ADA", atomicAmount: cardanoPrices.ada.amount, network: CardanoPreprod.caip2, assetId: cardanoPrices.ada.assetId },
+  { asset: "ADA", atomicAmount: cardanoPrices.ada.amount, network: CardanoMainnet.caip2, assetId: cardanoPrices.ada.assetId },
+].filter((price) => enabledNetworks.has(price.network as never) && price.assetId.length > 0 && (!price.network.startsWith("hedera:") || Boolean(env.FACILITATOR_FEE_PAYER_ID)) && payeeForNetwork(price.network).length > 0).map(({ assetId: _assetId, ...price }) => price);
 const hederaCatalogPrices = sharedPrices.filter((price) => price.network.startsWith("hedera:"));
 
 const catalog = {
@@ -146,15 +145,12 @@ const marketData: Record<string, { price: string; change: string; high: string; 
 };
 
 function generateResourceId(): string { return createHash("sha256").update(randomUUID()).digest("hex").slice(0, 16); }
-function getFacilitatorForNetwork(network: string): string | undefined {
-  if (network === ARCTestnet.caip2) return ARCTestnet.facilitatorUrl;
-  if (network === HederaTestnet.caip2) return HederaTestnet.facilitatorUrl;
-  if (network === HederaMainnet.caip2) return HederaMainnet.facilitatorUrl;
-  return undefined;
-}
+function getFacilitatorForNetwork(network: string): string | undefined { return getNetworkConfig(network)?.facilitatorUrl; }
 function getSettlementApiKey(network: string): string | undefined {
   if (network === ARCTestnet.caip2) return env.ARC_FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_API_KEY;
   if (network === HederaMainnet.caip2) return env.HEDERA_MAINNET_FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_API_KEY;
+  if (network === CardanoPreprod.caip2) return env.CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_API_KEY;
+  if (network === CardanoMainnet.caip2) return env.CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_API_KEY;
   return env.FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_API_KEY;
 }
 
@@ -203,9 +199,7 @@ async function handlePaidRequest(c: Context, category: string, resourceId: strin
     const parsedSettlement = settlementResponseSchema.safeParse(rawSettlement);
 
     if (!parsedSettlement.success) {
-      if (settleRes.ok || settleRes.status >= 500) {
-        return c.json({ code: "SETTLEMENT_UNKNOWN", message: "Settlement may have been submitted but the facilitator response could not be verified.", network }, 503);
-      }
+      if (settleRes.ok || settleRes.status >= 500) return c.json({ code: "SETTLEMENT_UNKNOWN", message: "Settlement may have been submitted but the facilitator response could not be verified.", network }, 503);
       return c.json({ code: "SETTLEMENT_FAILED", message: "Settlement failed before verifiable submission evidence was returned." }, 422);
     }
 
@@ -213,26 +207,14 @@ async function handlePaidRequest(c: Context, category: string, resourceId: strin
     const transactionCandidate = (settleResult.transactionId ?? settleResult.transaction) || undefined;
     if (!settleRes.ok || settleResult.success !== true) {
       if (settleRes.status >= 500 || settleResult.errorReason === "settlement_unknown" || transactionCandidate) {
-        return c.json({
-          code: "SETTLEMENT_UNKNOWN",
-          message: "Settlement may have been submitted but could not be confirmed.",
-          network,
-          ...(transactionCandidate ? { transactionId: transactionCandidate } : {}),
-        }, 503);
+        return c.json({ code: "SETTLEMENT_UNKNOWN", message: "Settlement may have been submitted but could not be confirmed.", network, ...(transactionCandidate ? { transactionId: transactionCandidate } : {}) }, 503);
       }
       return c.json({ code: "SETTLEMENT_FAILED", message: settleResult.errorReason || "Settlement failed" }, 422);
     }
     if (settleResult.network !== network) return c.json({ code: "SETTLEMENT_NETWORK_MISMATCH", message: "Facilitator settlement evidence returned a different network." }, 502);
     if (!settleResult.transaction) return c.json({ code: "SETTLEMENT_EVIDENCE_MISSING", message: "Facilitator did not return a transaction ID" }, 502);
 
-    const paymentResponse = {
-      success: true,
-      transaction: settleResult.transaction,
-      network: settleResult.network,
-      ...(settleResult.payer ? { payer: settleResult.payer } : {}),
-      amount: settleResult.amount ?? matchingCanonical.amount,
-      ...(settleResult.extensions ? { extensions: settleResult.extensions } : {}),
-    };
+    const paymentResponse = { success: true, transaction: settleResult.transaction, network: settleResult.network, ...(settleResult.payer ? { payer: settleResult.payer } : {}), amount: settleResult.amount ?? matchingCanonical.amount, ...(settleResult.extensions ? { extensions: settleResult.extensions } : {}) };
     c.header("PAYMENT-RESPONSE", encodeX402Header(paymentResponse));
     const networkConfig = getNetworkConfig(network);
     const explorerUrl = networkConfig ? `${networkConfig.explorerUrl}/${settleResult.transaction}` : undefined;
