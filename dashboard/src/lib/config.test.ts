@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { parseEnv } from "@/lib/config";
 
+const CARDANO_PREPROD_PAYER = "addr_test1qzjeazrvkpc3twtg9xu7na0dw5zshqwwh354gmh0626gv4r9vh67k4754l9ugvw5uex30x4u6lyfvr0a34vynjmk2nzq7hqhjn";
+const CARDANO_PREPROD_PROVIDER = "addr_test1vr8nl3s7rk0tqn4rd9u49s0k52f9sezrt98rs4cnpfj47wggeuy4d";
+
 function productionEnv(overrides: Record<string, string> = {}) {
   return {
     APP_ENV: "production",
@@ -59,15 +62,8 @@ describe("production configuration", () => {
 
   it("rejects capability-secret reuse within and across networks", () => {
     const duplicate = "duplicate-capability-secret-abcdefghijklmnopqrstuvwxyz";
-    expect(() => parseEnv(productionEnv({
-      FACILITATOR_SIGNING_API_KEY: duplicate,
-      FACILITATOR_SETTLEMENT_API_KEY: duplicate,
-    }))).toThrow(/must use distinct secrets/);
-
-    expect(() => parseEnv(productionEnv({
-      FACILITATOR_SIGNING_API_KEY: duplicate,
-      ARC_FACILITATOR_SIGNING_API_KEY: duplicate,
-    }))).toThrow(/must use distinct secrets/);
+    expect(() => parseEnv(productionEnv({ FACILITATOR_SIGNING_API_KEY: duplicate, FACILITATOR_SETTLEMENT_API_KEY: duplicate }))).toThrow(/must use distinct secrets/);
+    expect(() => parseEnv(productionEnv({ FACILITATOR_SIGNING_API_KEY: duplicate, ARC_FACILITATOR_SIGNING_API_KEY: duplicate }))).toThrow(/must use distinct secrets/);
   });
 
   it("requires canonical unpadded base64url for the 32-byte encryption key", () => {
@@ -76,13 +72,37 @@ describe("production configuration", () => {
   });
 
   it("requires a mainnet signing credential when mainnet is configured", () => {
-    expect(() => parseEnv(productionEnv({
-      HEDERA_MAINNET_FACILITATOR_URL: "https://mainnet-facilitator.agentpay.example/hedera",
-    }))).toThrow(/HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY/);
+    expect(() => parseEnv(productionEnv({ HEDERA_MAINNET_FACILITATOR_URL: "https://mainnet-facilitator.agentpay.example/hedera" }))).toThrow(/HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY/);
+    expect(parseEnv(productionEnv({ HEDERA_MAINNET_FACILITATOR_URL: "https://mainnet-facilitator.agentpay.example/hedera", HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY: "mainnet-signing-secret-abcdefghijklmnopqrstuvwxyz" })).HEDERA_MAINNET_FACILITATOR_URL).toContain("mainnet-facilitator");
+  });
 
-    expect(parseEnv(productionEnv({
-      HEDERA_MAINNET_FACILITATOR_URL: "https://mainnet-facilitator.agentpay.example/hedera",
-      HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY: "mainnet-signing-secret-abcdefghijklmnopqrstuvwxyz",
-    })).HEDERA_MAINNET_FACILITATOR_URL).toContain("mainnet-facilitator");
+  it("keeps Cardano disabled when no Cardano rail is requested", () => {
+    const env = parseEnv(productionEnv());
+    expect(env.CARDANO_PREPROD_FACILITATOR_URL).toBeUndefined();
+    expect(env.CARDANO_MAINNET_FACILITATOR_URL).toBeUndefined();
+  });
+
+  it("requires every Cardano Preprod signer, payee, and evidence dependency once the rail is requested", () => {
+    expect(() => parseEnv(productionEnv({ CARDANO_PREPROD_FACILITATOR_URL: "https://facilitator.agentpay.example/cardano" }))).toThrow(/Cardano Preprod/);
+    const env = parseEnv(productionEnv({
+      CARDANO_PREPROD_FACILITATOR_URL: "https://facilitator.agentpay.example/cardano",
+      CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY: "cardano-preprod-signing-abcdefghijklmnopqrstuvwxyz",
+      CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY: "cardano-preprod-settlement-abcdefghijklmnopqrstuvwxyz",
+      CARDANO_PREPROD_PAYER_ADDRESS: CARDANO_PREPROD_PAYER,
+      CARDANO_PREPROD_PROVIDER_ADDRESS: CARDANO_PREPROD_PROVIDER,
+      CARDANO_PREPROD_BLOCKFROST_PROJECT_ID: "preprod-project-id-abcdefghijklmnopqrstuvwxyz",
+    }));
+    expect(env.CARDANO_PREPROD_PAYER_ADDRESS).toBe(CARDANO_PREPROD_PAYER);
+  });
+
+  it("requires HTTPS for Cardano production facilitator and Blockfrost endpoints", () => {
+    expect(() => parseEnv(productionEnv({
+      CARDANO_PREPROD_FACILITATOR_URL: "http://facilitator.agentpay.example/cardano",
+      CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY: "cardano-preprod-signing-abcdefghijklmnopqrstuvwxyz",
+      CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY: "cardano-preprod-settlement-abcdefghijklmnopqrstuvwxyz",
+      CARDANO_PREPROD_PAYER_ADDRESS: CARDANO_PREPROD_PAYER,
+      CARDANO_PREPROD_PROVIDER_ADDRESS: CARDANO_PREPROD_PROVIDER,
+      CARDANO_PREPROD_BLOCKFROST_PROJECT_ID: "preprod-project-id-abcdefghijklmnopqrstuvwxyz",
+    }))).toThrow(/CARDANO_PREPROD_FACILITATOR_URL must use HTTPS/);
   });
 });
