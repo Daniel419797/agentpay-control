@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { PageHeader } from "@/components/page-header";
-
 type Purchase = {
   id: string;
   agentId: string;
@@ -77,11 +75,11 @@ export default function AgentCommercePage() {
 
   return (
     <section className="content-stack">
-      <PageHeader
-        eyebrow="Agent-to-agent commerce"
-        title="Masumi escrow operations"
-        description="Track policy-controlled agent purchases, independently reconcile provider state, and perform buyer or provider refund actions. Direct x402 and Masumi escrow remain separate settlement paths."
-      />
+      <header style={{ display: "grid", gap: 6 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Agent-to-agent commerce</span>
+        <h1 style={{ margin: 0 }}>Masumi escrow operations</h1>
+        <p style={{ margin: 0, maxWidth: 760, opacity: .75 }}>Track policy-controlled agent purchases, independently reconcile provider state, and perform buyer or provider refund actions. Direct x402 and Masumi escrow remain separate settlement paths.</p>
+      </header>
 
       {error && <div className="form-error" role="alert">{error}</div>}
 
@@ -112,7 +110,7 @@ export default function AgentCommercePage() {
                 const canReconcile = !terminal(purchase.state);
                 return (
                   <tr key={purchase.id}>
-                    <td><strong>{purchase.resourceName ?? "Masumi resource"}</strong><br /><span className="muted">{short(purchase.blockchainIdentifier, 10, 8)}</span></td>
+                    <td><strong>{purchase.resourceName ?? "Masumi resource"}</strong><br /><span style={{ opacity: .65 }}>{short(purchase.blockchainIdentifier, 10, 8)}</span></td>
                     <td>{purchase.workspaceRole}</td>
                     <td>{purchase.network}</td>
                     <td>{purchase.state}</td>
