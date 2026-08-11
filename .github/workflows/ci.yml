@@ -44,6 +44,9 @@ jobs:
       - name: Apply database migrations
         working-directory: dashboard
         run: npm run db:deploy
+      - name: Verify resource endpoint invariants
+        working-directory: dashboard
+        run: npm run db:resources:check
       - name: Verify governance invariants
         working-directory: dashboard
         run: npm run verify:governance
@@ -57,7 +60,7 @@ jobs:
         working-directory: facilitator-arc
         run: npm run build && npm run typecheck && npm test
       - name: Verify combined facilitator
-        run: npm run build --workspace=@agentpay/hedera-facilitator && npm run build --workspace=@agentpay/arc-facilitator && npm run typecheck --workspace=@agentpay/combined-facilitator && npm run build --workspace=@agentpay/combined-facilitator
+        run: npm run build --workspace=@agentpay/hedera-facilitator && npm run build --workspace=@agentpay/arc-facilitator && npm run typecheck --workspace=@agentpay/combined-facilitator && npm test --workspace=@agentpay/combined-facilitator && npm run build --workspace=@agentpay/combined-facilitator
       - name: Verify resource server
         working-directory: resource-server
         run: npm run build && npm run typecheck && npm test
