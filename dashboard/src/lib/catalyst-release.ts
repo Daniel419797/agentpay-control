@@ -6,6 +6,7 @@ import { fetchAgentPayDuneAnalytics, duneReadinessErrors } from "@/lib/dune";
 import { masumiReadinessErrors } from "@/lib/masumi";
 import { masumiPaymentReadinessErrors } from "@/lib/masumi-payment";
 import { assertPythObservation, fetchPythPrice, pythReadinessErrors } from "@/lib/pyth";
+import { releaseEvidenceAuthErrors } from "@/lib/release-evidence-auth";
 import { veridianReadinessErrors } from "@/lib/veridian-keri";
 
 export const catalystEvidenceTypes = [
@@ -55,6 +56,7 @@ export function catalystProductionConfigErrors(env: NodeJS.ProcessEnv = process.
     ...masumiPaymentReadinessErrors(env),
     ...veridianReadinessErrors(env),
     ...duneReadinessErrors(env),
+    ...releaseEvidenceAuthErrors(env),
   ];
   if (!env.CARDANO_PREPROD_FACILITATOR_URL) errors.push("CARDANO_PREPROD_FACILITATOR_URL");
   if (!env.CARDANO_PREPROD_USDCX_ASSET_ID) errors.push("CARDANO_PREPROD_USDCX_ASSET_ID");
@@ -66,11 +68,7 @@ export function catalystProductionConfigErrors(env: NodeJS.ProcessEnv = process.
 }
 
 export async function liveCatalystDependencyChecks() {
-  const [ada, usdcx, dune] = await Promise.all([
-    fetchPythPrice("ADA"),
-    fetchPythPrice("USDCX"),
-    fetchAgentPayDuneAnalytics(),
-  ]);
+  const [ada, usdcx, dune] = await Promise.all([fetchPythPrice("ADA"), fetchPythPrice("USDCX"), fetchAgentPayDuneAnalytics()]);
   assertPythObservation(ada, { maxAgeSeconds: 60, maxConfidenceBps: 1000 });
   assertPythObservation(usdcx, { maxAgeSeconds: 60, maxConfidenceBps: 1000 });
   if (!dune.overview.rows.length) throw new Error("DUNE_OVERVIEW_EMPTY");
