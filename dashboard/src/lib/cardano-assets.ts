@@ -1,5 +1,13 @@
 const CARDANO_ASSET_UNIT = /^[0-9a-f]{56}(?:[0-9a-f]{2}){0,32}$/;
 
+/**
+ * Circle xReserve USDCx on Cardano Mainnet. Treat this identity as protocol
+ * configuration, not an operator-supplied label: a different policy+asset
+ * name is a different Cardano native asset even if somebody calls it USDCx.
+ */
+export const CARDANO_MAINNET_USDCX_ASSET_ID =
+  "1f3aec8bfe7ea4fe14c5f121e2a92e301afe414147860d557cac7e345553444378";
+
 export type CardanoAssetConfig = {
   preprodUsdcxAssetId?: string;
   mainnetUsdcxAssetId?: string;
@@ -13,10 +21,12 @@ function optionalAssetUnit(name: string, value: string | undefined): string | un
 }
 
 export function cardanoAssetConfigFromEnv(env: NodeJS.ProcessEnv = process.env): CardanoAssetConfig {
-  return {
-    preprodUsdcxAssetId: optionalAssetUnit("CARDANO_PREPROD_USDCX_ASSET_ID", env.CARDANO_PREPROD_USDCX_ASSET_ID),
-    mainnetUsdcxAssetId: optionalAssetUnit("CARDANO_MAINNET_USDCX_ASSET_ID", env.CARDANO_MAINNET_USDCX_ASSET_ID),
-  };
+  const preprodUsdcxAssetId = optionalAssetUnit("CARDANO_PREPROD_USDCX_ASSET_ID", env.CARDANO_PREPROD_USDCX_ASSET_ID);
+  const mainnetUsdcxAssetId = optionalAssetUnit("CARDANO_MAINNET_USDCX_ASSET_ID", env.CARDANO_MAINNET_USDCX_ASSET_ID);
+  if (mainnetUsdcxAssetId && mainnetUsdcxAssetId !== CARDANO_MAINNET_USDCX_ASSET_ID) {
+    throw new Error("CARDANO_MAINNET_USDCX_ASSET_ID_MISMATCH");
+  }
+  return { preprodUsdcxAssetId, mainnetUsdcxAssetId };
 }
 
 export function cardanoAssetIdentifier(
@@ -30,6 +40,7 @@ export function cardanoAssetIdentifier(
   if (asset.type === "TOKEN" && symbol === "USDCX") {
     const assetId = network === "cardano:mainnet" ? config.mainnetUsdcxAssetId : config.preprodUsdcxAssetId;
     if (!assetId) throw new Error(network === "cardano:mainnet" ? "CARDANO_MAINNET_USDCX_ASSET_ID_REQUIRED" : "CARDANO_PREPROD_USDCX_ASSET_ID_REQUIRED");
+    if (network === "cardano:mainnet" && assetId !== CARDANO_MAINNET_USDCX_ASSET_ID) throw new Error("CARDANO_MAINNET_USDCX_ASSET_ID_MISMATCH");
     return assetId;
   }
   throw new Error("CARDANO_ASSET_UNSUPPORTED");
@@ -42,6 +53,7 @@ export function cardanoAssetReadinessErrors(env: NodeJS.ProcessEnv = process.env
     if (env.CARDANO_USDCX_ENABLED === "true") {
       if (env.CARDANO_PREPROD_ENABLED === "true" && !config.preprodUsdcxAssetId) errors.push("CARDANO_PREPROD_USDCX_ASSET_ID");
       if (env.CARDANO_MAINNET_ENABLED === "true" && !config.mainnetUsdcxAssetId) errors.push("CARDANO_MAINNET_USDCX_ASSET_ID");
+      if (env.CARDANO_MAINNET_ENABLED === "true" && config.mainnetUsdcxAssetId !== CARDANO_MAINNET_USDCX_ASSET_ID) errors.push("CARDANO_MAINNET_USDCX_ASSET_ID_MISMATCH");
     }
   } catch (error) {
     errors.push(error instanceof Error ? error.message : "CARDANO_ASSET_CONFIG_INVALID");
