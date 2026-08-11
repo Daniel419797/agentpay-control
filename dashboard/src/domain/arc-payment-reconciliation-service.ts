@@ -5,10 +5,6 @@ import { getConfig } from "@/lib/config";
 import { db } from "@/lib/db";
 
 const ARC_NETWORK = "eip155:5042002";
-const TRANSFER_TOPIC = "0xddf252ad1be2c068fc378daa952ba7f163c4a11628f55a4df523b3ef";
-
-// ERC-20 Transfer(address,address,uint256). Keep the canonical topic literal
-// separate from the historical typo guard below so tests catch accidental edits.
 const ERC20_TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
 const hex = z.string().regex(/^0x[0-9a-fA-F]+$/);
@@ -23,7 +19,7 @@ const receiptSchema = z.object({
   })),
 });
 
-type ArcReceipt = z.infer<typeof receiptSchema>;
+export type ArcReceipt = z.infer<typeof receiptSchema>;
 export type ArcPaymentReconciliationOutcome = "CONFIRMED" | "FAILED" | "MISMATCH";
 
 function addressTopic(address: string) {
@@ -77,7 +73,6 @@ async function ensureIncident(organizationId: string, paymentIntentId: string, t
 }
 
 export async function reconcileUnknownArcPayments(limit = 25, now = new Date()) {
-  void TRANSFER_TOPIC;
   const config = getConfig();
   const candidates = await db.paymentIntent.findMany({
     where: { status: "SUBMISSION_UNKNOWN", attempts: { some: { status: "UNKNOWN", candidateTransactionId: { not: null } } } },
