@@ -18,13 +18,20 @@ export const hederaEnvSchema = z.object({APP_ENV:z.enum(["development","test","p
 
 export type HederaFacilitatorEnv = z.infer<typeof hederaEnvSchema>;
 
+function canonicalPrivateKeyInput(value: string) {
+  const normalized = value.replace(/^0x/i, "");
+  return /^[0-9a-fA-F]{64}$/.test(normalized) ? normalized.toLowerCase() : value;
+}
+
 export function parseHederaEnv(input: unknown = process.env): HederaFacilitatorEnv {
   const env = hederaEnvSchema.parse(input);
   if (env.APP_ENV === "production") {
     const capabilityKeys = [env.MANAGED_SIGNING_API_KEY, env.SETTLEMENT_API_KEY, env.CONTRACT_EXECUTION_API_KEY];
     if (capabilityKeys.some((key) => !key)) throw new Error("Production capability-specific facilitator API keys are required");
     if (new Set(capabilityKeys).size !== capabilityKeys.length) throw new Error("Production capability-specific facilitator API keys must be distinct");
-    if (env.HEDERA_OPERATOR_KEY === env.HEDERA_PAYER_KEY) throw new Error("Production settlement and managed payer keys must be distinct");
+    if (canonicalPrivateKeyInput(env.HEDERA_OPERATOR_KEY) === canonicalPrivateKeyInput(env.HEDERA_PAYER_KEY)) {
+      throw new Error("Production settlement and managed payer keys must be distinct");
+    }
   }
   if (env.APP_ENV !== "production" && env.HEDERA_NETWORK === "mainnet") throw new Error("Mainnet is prohibited outside production");
   return env;
@@ -35,8 +42,8 @@ export function createHederaApp(env: HederaFacilitatorEnv): { app: Hono; network
     return capabilityAuthorizationMatches(capabilityKey, env.FACILITATOR_API_KEY, value);
   }
   function parsePrivateKey(value: string) {
-    const normalized = value.startsWith("0x") ? value.slice(2) : value;
-    return normalized.length === 64 ? PrivateKey.fromStringECDSA(normalized) : PrivateKey.fromString(value);
+    const normalized = value.replace(/^0x/i, "");
+    return /^[0-9a-fA-F]{64}$/.test(normalized) ? PrivateKey.fromStringECDSA(normalized) : PrivateKey.fromString(value);
   }
   const client = env.HEDERA_NETWORK === "mainnet" ? Client.forMainnet() : Client.forTestnet();
   const operatorKey = parsePrivateKey(env.HEDERA_OPERATOR_KEY);
