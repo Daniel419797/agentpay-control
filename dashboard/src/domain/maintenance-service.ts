@@ -97,8 +97,6 @@ async function prepareDeletionRequest(requestId: string, now: Date) {
     await tx.automationRule.updateMany({ where: { organizationId: request.organizationId, status: { in: ["DRAFT", "ACTIVE", "PAUSED"] } }, data: { status: "ARCHIVED", version: { increment: 1 }, nextRunAt: null } });
     await tx.automationExecution.updateMany({ where: { organizationId: request.organizationId, status: { in: ["PENDING", "AWAITING_APPROVAL"] } }, data: { status: "CANCELED", completedAt: now, errorCode: "ORGANIZATION_DELETED" } });
     await tx.crossChainRouteQuote.updateMany({ where: { organizationId: request.organizationId, status: "ACTIVE" }, data: { status: "CANCELED" } });
-    // Already exported self-custody transactions are intentionally not marked safe/canceled here.
-    // Evidence ingestion/reconciliation must remain available if the external wallet broadcasts later.
     await tx.agentInvoice.updateMany({ where: { issuerOrganizationId: request.organizationId, status: { in: ["DRAFT", "SENT", "VIEWED", "APPROVAL_PENDING", "PAYMENT_PENDING", "OVERDUE"] } }, data: { status: "VOID", voidedAt: now } });
     await tx.fiatAccount.updateMany({ where: { organizationId: request.organizationId, status: { in: ["PENDING", "ACTIVE"] } }, data: { status: "RESTRICTED" } });
     await tx.notificationEndpoint.updateMany({ where: { organizationId: request.organizationId }, data: { status: "PAUSED" } });
@@ -135,7 +133,7 @@ async function completeDeletionRequest(requestId: string, now: Date) {
     }
     await tx.auditEvent.create({ data: { organizationId: request.organizationId, actorType: "SYSTEM", actorId: null, action: "ORGANIZATION_DELETION_COMPLETED", targetType: "ORGANIZATION", targetId: request.organizationId, result: "SUCCESS", metadata: { retainedFinancialRecords: true, providerCardsTerminated: true } } });
     await tx.deletionRequest.update({ where: { id: request.id }, data: { status: "COMPLETED", completedAt: now } });
-    await tx.supportCase.updateMany({ where: { organizationId: request.organizationId, sourceType: "DELETION_REQUEST", sourceId: request.id, status: { in: ["OPEN", "IN_PROGRESS", "WAITING_ON_CUSTOMER"] } }, data: { status: "RESOLVED", resolvedAt: now } });
+    await tx.supportCase.updateMany({ where: { organizationId: request.organizationId, sourceType: "DELETION_REQUEST", sourceId: request.id, status: { in: ["OPEN", "IN_PROGRESS", "WAITING_ON_CUSTOMER"] } }, data: { status: "RESOLVED" } });
     return true;
   }, { isolationLevel: "Serializable" });
 }
@@ -146,7 +144,6 @@ export async function finalizeDeletionRequests(limit = 10, now = new Date()) {
   for (const request of requests) {
     const cards = await prepareDeletionRequest(request.id, now);
     if (cards === null) continue;
-
     const stripeCards = cards.filter((card) => card.provider === "STRIPE");
     if (stripeCards.length) {
       const provider = getCardProvider();
@@ -161,7 +158,6 @@ export async function finalizeDeletionRequests(limit = 10, now = new Date()) {
         continue;
       }
     }
-
     if (await completeDeletionRequest(request.id, now)) completed.push(request.id);
   }
   return { scanned: requests.length, completed };
