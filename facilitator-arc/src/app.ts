@@ -76,11 +76,35 @@ export function createArcApp(env: ArcFacilitatorEnv): { app: Hono; network: stri
       const failure = publicFailure(error, "INVALID_REQUEST", 400);
       return c.json({ success: false, errorReason: "invalid_request", errorMessage: failure.code }, failure.status);
     }
+
+    facilitator.beginSettlementEvidenceCapture();
     try {
-      return c.json(await facilitator.scheme.settle(body.paymentPayload, body.paymentRequirements));
+      const result = await facilitator.scheme.settle(body.paymentPayload, body.paymentRequirements);
+      const submittedTransaction = facilitator.settlementTransactionCandidate;
+      if (!result.success && !result.transaction && submittedTransaction) {
+        logFailure("settlement_confirmation_unknown", new Error(result.errorReason ?? "SETTLEMENT_CONFIRMATION_UNKNOWN"));
+        return c.json({
+          ...result,
+          success: false,
+          transaction: submittedTransaction,
+          transactionId: submittedTransaction,
+          errorReason: "settlement_unknown",
+          errorMessage: result.errorMessage ?? "SETTLEMENT_CONFIRMATION_UNKNOWN",
+          network: facilitator.network,
+        }, 503);
+      }
+      return c.json(result);
     } catch (error) {
+      const submittedTransaction = facilitator.settlementTransactionCandidate;
       logFailure("settlement_submission_unknown", error);
-      return c.json({ success: false, errorReason: "settlement_unknown", errorMessage: "SETTLEMENT_SUBMISSION_UNKNOWN" }, 503);
+      return c.json({
+        success: false,
+        transaction: submittedTransaction ?? "",
+        ...(submittedTransaction ? { transactionId: submittedTransaction } : {}),
+        network: facilitator.network,
+        errorReason: "settlement_unknown",
+        errorMessage: "SETTLEMENT_SUBMISSION_UNKNOWN",
+      }, 503);
     }
   });
 
