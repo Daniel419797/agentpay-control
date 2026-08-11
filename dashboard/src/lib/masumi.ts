@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 
+const registryPolicyId = z.string().regex(/^[0-9a-fA-F]{56,64}$/);
+const sellerPaymentKeyHash = z.string().regex(/^[0-9a-fA-F]{56}$/);
+
 const entrySchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -11,7 +14,7 @@ const entrySchema = z.object({
   paymentType: z.string().optional().nullable(),
   agentIdentifier: z.string().min(57).max(250),
   RegistrySource: z.object({
-    policyId: z.string(),
+    policyId: registryPolicyId,
     url: z.string().url().optional().nullable(),
   }),
   Capability: z.object({ name: z.string(), version: z.string().optional().nullable() }).optional().nullable(),
@@ -23,7 +26,7 @@ const entrySchema = z.object({
 const paymentInformationEntrySchema = entrySchema.extend({
   sellerWallet: z.object({
     address: z.string().regex(/^addr(_test)?1[0-9a-z]+$/),
-    vkey: z.string().min(1),
+    vkey: sellerPaymentKeyHash,
   }),
 });
 
@@ -45,17 +48,26 @@ export type MasumiConfig = {
   baseUrl: string;
   apiKey?: string;
   requestTimeoutMs: number;
+  trustedRegistryPolicyIds: string[];
 };
+
+function parseTrustedPolicies(value: string | undefined) {
+  const values = [...new Set((value ?? "").split(",").map((item) => item.trim().toLowerCase()).filter(Boolean))];
+  for (const item of values) if (!/^[0-9a-f]{56,64}$/.test(item)) throw new Error("MASUMI_TRUSTED_REGISTRY_POLICY_IDS_INVALID");
+  return values;
+}
 
 export function masumiConfigFromEnv(env: NodeJS.ProcessEnv = process.env): MasumiConfig {
   const baseUrl = (env.MASUMI_REGISTRY_URL || "https://registry.masumi.network/api/v1").replace(/\/$/, "");
   const requestTimeoutMs = Number(env.MASUMI_REQUEST_TIMEOUT_MS || "7000");
   if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs < 500 || requestTimeoutMs > 15000) throw new Error("MASUMI_REQUEST_TIMEOUT_INVALID");
+  const trustedRegistryPolicyIds = parseTrustedPolicies(env.MASUMI_TRUSTED_REGISTRY_POLICY_IDS);
   if (env.APP_ENV === "production") {
     if (new URL(baseUrl).protocol !== "https:") throw new Error("MASUMI_HTTPS_REQUIRED");
     if (!env.MASUMI_REGISTRY_API_KEY || env.MASUMI_REGISTRY_API_KEY.length < 20) throw new Error("MASUMI_REGISTRY_API_KEY_REQUIRED");
+    if (!trustedRegistryPolicyIds.length) throw new Error("MASUMI_TRUSTED_REGISTRY_POLICY_IDS_REQUIRED");
   }
-  return { baseUrl, apiKey: env.MASUMI_REGISTRY_API_KEY, requestTimeoutMs };
+  return { baseUrl, apiKey: env.MASUMI_REGISTRY_API_KEY, requestTimeoutMs, trustedRegistryPolicyIds };
 }
 
 function stable(value: unknown): string {
@@ -84,6 +96,10 @@ function headers(config: MasumiConfig) {
   const result: Record<string, string> = { accept: "application/json" };
   if (config.apiKey) result.token = config.apiKey;
   return result;
+}
+
+function assertTrustedRegistry(policyId: string, config: MasumiConfig) {
+  if (config.trustedRegistryPolicyIds.length && !config.trustedRegistryPolicyIds.includes(policyId.toLowerCase())) throw new Error("MASUMI_REGISTRY_POLICY_NOT_TRUSTED");
 }
 
 async function queryRegistry(body: unknown, config: MasumiConfig): Promise<MasumiEntry[]> {
@@ -131,10 +147,12 @@ export async function fetchMasumiAgent(
   const exact = entries.filter((entry) => entry.agentIdentifier.toLowerCase() === agentIdentifier.toLowerCase());
   if (exact.length !== 1) throw new Error(exact.length ? "MASUMI_AGENT_AMBIGUOUS" : "MASUMI_AGENT_NOT_VERIFIED");
   if (exact[0].status !== "Online") throw new Error("MASUMI_AGENT_OFFLINE");
+  assertTrustedRegistry(exact[0].RegistrySource.policyId, config);
 
   const payment = await paymentInformation(agentIdentifier, config);
   if (payment.agentIdentifier.toLowerCase() !== exact[0].agentIdentifier.toLowerCase()) throw new Error("MASUMI_PAYMENT_INFORMATION_IDENTITY_MISMATCH");
   if (payment.RegistrySource.policyId !== exact[0].RegistrySource.policyId) throw new Error("MASUMI_PAYMENT_INFORMATION_REGISTRY_MISMATCH");
+  assertTrustedRegistry(payment.RegistrySource.policyId, config);
   if (new URL(payment.apiBaseUrl).toString() !== new URL(exact[0].apiBaseUrl).toString()) throw new Error("MASUMI_PAYMENT_INFORMATION_URL_MISMATCH");
   if (payment.status !== "Online") throw new Error("MASUMI_AGENT_OFFLINE");
   const expectedPrefix = network === "Mainnet" ? "addr1" : "addr_test1";
@@ -147,7 +165,7 @@ export async function discoverMasumiAgents(
   config: MasumiConfig = masumiConfigFromEnv(),
 ): Promise<MasumiEntry[]> {
   const limit = Math.max(1, Math.min(input.limit ?? 20, 50));
-  return queryRegistry({
+  const entries = await queryRegistry({
     network: input.network,
     limit,
     filter: {
@@ -156,6 +174,7 @@ export async function discoverMasumiAgents(
       ...(input.capabilityName ? { capability: { name: input.capabilityName, ...(input.capabilityVersion ? { version: input.capabilityVersion } : {}) } } : {}),
     },
   }, config);
+  return entries.filter((entry) => !config.trustedRegistryPolicyIds.length || config.trustedRegistryPolicyIds.includes(entry.RegistrySource.policyId.toLowerCase()));
 }
 
 export function assertMasumiEntryMatches(
