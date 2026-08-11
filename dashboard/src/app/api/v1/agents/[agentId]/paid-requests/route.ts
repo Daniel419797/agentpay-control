@@ -1,18 +1,51 @@
 import { z } from "zod";
+
 import { createPaidRequest } from "@/domain/payment-service";
 import { authorizeAgentRequest, boundedJson, handleApiError, ok, problem, rateLimitProblem } from "@/lib/api";
+import { db } from "@/lib/db";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { workspaceFromRequest, workspaceHasRole } from "@/lib/workspace";
 
-const schema = z.object({ resourceUrl: z.string().url(), purpose: z.string().max(300).optional(), maxAmountAtomic: z.string().regex(/^\d+$/).optional() });
+const schema = z.object({
+  resourceUrl: z.string().url(),
+  purpose: z.string().max(300).optional(),
+  maxAmountAtomic: z.string().regex(/^\d+$/).optional(),
+});
+
+async function authorizeCaller(request: Request, agentId: string) {
+  if (await authorizeAgentRequest(request, agentId, "payments:create")) {
+    return { authorized: true as const, rateSubject: `agent:${agentId}` };
+  }
+
+  const workspace = await workspaceFromRequest(request);
+  if (!workspace) return { authorized: false as const, response: problem(401, "UNAUTHORIZED", "A valid agent credential or signed-in operator is required.") };
+  if (!workspaceHasRole(workspace, ["OWNER", "OPERATOR"])) {
+    return { authorized: false as const, response: problem(403, "ROLE_REQUIRED", "Owner or Operator access is required to initiate a paid request.") };
+  }
+
+  const ownedAgent = await db.agent.findFirst({
+    where: { id: agentId, organizationId: workspace.organization.id, status: { not: "ARCHIVED" } },
+    select: { id: true },
+  });
+  if (!ownedAgent) return { authorized: false as const, response: problem(404, "AGENT_NOT_FOUND", "Agent not found in the active workspace.") };
+
+  return { authorized: true as const, rateSubject: `operator:${workspace.user.id}:${agentId}` };
+}
 
 export async function POST(request: Request, { params }: { params: Promise<{ agentId: string }> }) {
   const key = request.headers.get("idempotency-key");
-  if (!key) return problem(400, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key is required.");
+  if (!key || key.length < 8 || key.length > 100) {
+    return problem(400, "IDEMPOTENCY_KEY_REQUIRED", "Provide an Idempotency-Key header between 8 and 100 characters.");
+  }
+
   try {
     const { agentId } = await params;
-    if (!await authorizeAgentRequest(request, agentId, "payments:create")) return problem(401, "UNAUTHORIZED", "A valid agent credential with payments:create is required.");
-    const rate = await enforceRateLimit(request, { scope: "agent-paid-request", subject: agentId, limit: 60, windowMs: 60_000 });
+    const caller = await authorizeCaller(request, agentId);
+    if (!caller.authorized) return caller.response;
+
+    const rate = await enforceRateLimit(request, { scope: "agent-paid-request", subject: caller.rateSubject, limit: 60, windowMs: 60_000 });
     if (!rate.allowed) return rateLimitProblem(rate.retryAfterSeconds);
+
     const result = await createPaidRequest(agentId, key, schema.parse(await boundedJson(request)));
     return ok(result, { status: result.status === "APPROVAL_PENDING" ? 202 : 200 });
   } catch (error) {
