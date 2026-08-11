@@ -205,21 +205,33 @@ export async function createPaidRequest(agentId: string, idempotencyKey: string,
     if (account.custodyType !== "PLATFORM_MANAGED_TESTNET" || account.signingMode !== "AUTONOMOUS_MANAGED") throw new Error("MANAGED_SIGNER_REQUIRED");
 
     const now = new Date();
-    const rawBalanceAtomic = account.balances[0]?.spendableAtomic.toString() ?? "0";
+    const balanceSnapshot = account.balances[0];
+    const rawBalanceAtomic = balanceSnapshot?.spendableAtomic.toString() ?? "0";
+    const balanceAsOf = balanceSnapshot?.asOf ?? new Date(0);
     const dayStart = new Date(now); dayStart.setUTCHours(0, 0, 0, 0);
     const hourStart = new Date(now); hourStart.setUTCMinutes(0, 0, 0);
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     const sharedTreasury = account.custodyType === "PLATFORM_MANAGED_TESTNET";
     const scope = sharedTreasury ? { agent: { organizationId: agent.organizationId } } : { agentId };
     const spentStatuses = ["ACTIVE", "CONSUMED", "SETTLED"] as const;
-    const [daily, hourly, monthly, active, lastReservation] = await Promise.all([
+    const [daily, hourly, monthly, balanceCommitted, lastReservation] = await Promise.all([
       tx.spendReservation.aggregate({ where: { ...scope, assetId: policy.assetId, createdAt: { gte: dayStart }, status: { in: [...spentStatuses] } }, _sum: { amountAtomic: true } }),
       tx.spendReservation.aggregate({ where: { ...scope, assetId: policy.assetId, createdAt: { gte: hourStart }, status: { in: [...spentStatuses] } }, _sum: { amountAtomic: true }, _count: { _all: true } }),
       tx.spendReservation.aggregate({ where: { ...scope, assetId: policy.assetId, createdAt: { gte: monthStart }, status: { in: [...spentStatuses] } }, _sum: { amountAtomic: true } }),
-      tx.spendReservation.aggregate({ where: { ...scope, assetId: policy.assetId, status: "ACTIVE", expiresAt: { gt: now } }, _sum: { amountAtomic: true } }),
+      tx.spendReservation.aggregate({
+        where: {
+          ...scope,
+          assetId: policy.assetId,
+          OR: [
+            { status: { in: ["ACTIVE", "CONSUMED"] } },
+            { status: "SETTLED", updatedAt: { gt: balanceAsOf } },
+          ],
+        },
+        _sum: { amountAtomic: true },
+      }),
       tx.spendReservation.findFirst({ where: { ...scope, assetId: policy.assetId, status: { in: [...spentStatuses] } }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }),
     ]);
-    const availableBalance = BigInt(rawBalanceAtomic) - BigInt(active._sum.amountAtomic?.toString() ?? "0");
+    const availableBalance = BigInt(rawBalanceAtomic) - BigInt(balanceCommitted._sum.amountAtomic?.toString() ?? "0");
     const balanceAtomic = (availableBalance > 0n ? availableBalance : 0n).toString();
     const decision = evaluatePolicy({
       agentStatus: agent.status,
@@ -270,7 +282,7 @@ export async function createPaidRequest(agentId: string, idempotencyKey: string,
         purpose: input.purpose,
         status,
         quote: { create: { x402Version: 2, scheme: requirement.scheme, network: requirement.network, resourceDescription: required.resource.description ?? listing.description, payToAccountId: requirement.payTo, assetId: policy.assetId, amountAtomic, validUntil, fingerprint, rawChallenge } },
-        decisions: { create: { policyVersionId: policy.id, outcome: decision.decision, reasonCodes: decision.reasonCodes, factsHash: hash({ canonical, amountAtomic, balanceAtomic, network: requirement.network, payerAccountId: account.accountId, payeeAccountId: requirement.payTo, policyVersionId: policy.id }), spendBeforeAtomic: daily._sum.amountAtomic ?? 0, reservedBeforeAtomic: active._sum.amountAtomic ?? 0, projectedAtomic: decision.projectedSpendAtomic } },
+        decisions: { create: { policyVersionId: policy.id, outcome: decision.decision, reasonCodes: decision.reasonCodes, factsHash: hash({ canonical, amountAtomic, balanceAtomic, network: requirement.network, payerAccountId: account.accountId, payeeAccountId: requirement.payTo, policyVersionId: policy.id }), spendBeforeAtomic: daily._sum.amountAtomic ?? 0, reservedBeforeAtomic: balanceCommitted._sum.amountAtomic ?? 0, projectedAtomic: decision.projectedSpendAtomic } },
         reservation: decision.decision === "DENY" ? undefined : { create: { agentId, assetId: policy.assetId, amountAtomic, windowStart: dayStart, windowEnd: new Date(dayStart.getTime() + 86_400_000), expiresAt: validUntil } },
         approval: decision.decision === "REQUIRE_APPROVAL" ? { create: { requestPurpose: input.purpose, expiresAt: validUntil, requiredApprovals: policy.approvalThreshold, requiredRejections: policy.rejectionThreshold } } : undefined,
       },
