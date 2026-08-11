@@ -17,6 +17,7 @@ function productionEnv(overrides: Record<string, string> = {}) {
     ARC_FACILITATOR_CONTRACT_API_KEY: "arc-contract-secret-abcdefghijklmnopqrstuvwxyz",
     ARC_RPC_URL: "https://rpc.testnet.arc.network",
     ARC_PROVIDER_ADDRESS: "0x1111111111111111111111111111111111111111",
+    ARC_PAYER_ADDRESS: "0x2222222222222222222222222222222222222222",
     HEDERA_PAYER_ACCOUNT_ID: "0.0.12345",
     KEY_ENCRYPTION_MASTER_KEY: Buffer.alloc(32, 7).toString("base64url"),
     SUPABASE_URL: "https://example.supabase.co",
@@ -32,6 +33,10 @@ describe("production configuration", () => {
     expect(parseEnv(productionEnv()).APP_ENV).toBe("production");
   });
 
+  it("fails closed on an invalid explicit APP_ENV instead of using development defaults", () => {
+    expect(() => parseEnv({ APP_ENV: "prodution", AUTH_SECRET: "short" })).toThrow(/Invalid APP_ENV: prodution/);
+  });
+
   it("fails closed on schema-invalid production values", () => {
     expect(() => parseEnv(productionEnv({ AUTH_SECRET: "short" }))).toThrow("Invalid production environment");
   });
@@ -40,6 +45,12 @@ describe("production configuration", () => {
     const input = productionEnv();
     delete (input as Record<string, string>).FACILITATOR_URL;
     expect(() => parseEnv(input)).toThrow(/FACILITATOR_URL/);
+  });
+
+  it("requires a managed Arc payer identity in production", () => {
+    const input = productionEnv();
+    delete (input as Record<string, string>).ARC_PAYER_ADDRESS;
+    expect(() => parseEnv(input)).toThrow(/ARC_PAYER_ADDRESS/);
   });
 
   it("requires HTTPS for production service endpoints", () => {
