@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isAmbiguousMasumiRefundError, masumiRefundTargetReached, masumiRefundTerminallyPrecluded } from "@/domain/masumi-refund-mutation";
+import { classifyMasumiRefundProviderState, isAmbiguousMasumiRefundError, masumiRefundTargetReached, masumiRefundTerminallyPrecluded } from "@/domain/masumi-refund-mutation";
 
 describe("Masumi refund mutation safety", () => {
   it("recognizes only provider-confirmed target states", () => {
@@ -11,10 +11,19 @@ describe("Masumi refund mutation safety", () => {
     expect(masumiRefundTargetReached("AUTHORIZE_REFUND", "RefundRequested")).toBe(false);
   });
 
+  it("never treats an asynchronous provider acknowledgement as completed refund work", () => {
+    expect(classifyMasumiRefundProviderState("REQUEST_REFUND", "FundsLocked")).toBe("SUBMISSION_UNKNOWN");
+    expect(classifyMasumiRefundProviderState("REQUEST_REFUND", "RefundRequested")).toBe("CONFIRMED");
+    expect(classifyMasumiRefundProviderState("AUTHORIZE_REFUND", "RefundRequested")).toBe("SUBMISSION_UNKNOWN");
+    expect(classifyMasumiRefundProviderState("AUTHORIZE_REFUND", "RefundAuthorized")).toBe("CONFIRMED");
+  });
+
   it("treats incompatible terminal provider states as conclusive failures", () => {
     expect(masumiRefundTerminallyPrecluded("REQUEST_REFUND", "Completed")).toBe(true);
     expect(masumiRefundTerminallyPrecluded("AUTHORIZE_REFUND", "Disputed")).toBe(true);
     expect(masumiRefundTerminallyPrecluded("REQUEST_REFUND", "RefundAuthorized")).toBe(false);
+    expect(classifyMasumiRefundProviderState("REQUEST_REFUND", "Completed")).toBe("FAILED");
+    expect(classifyMasumiRefundProviderState("AUTHORIZE_REFUND", "Disputed")).toBe("FAILED");
   });
 
   it("never blindly retries ambiguous transport or provider outcomes", () => {
