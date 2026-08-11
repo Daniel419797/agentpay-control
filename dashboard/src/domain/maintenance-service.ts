@@ -76,52 +76,93 @@ export async function runRetentionMaintenance(now = new Date()) {
     redactedFulfillments += (await db.resourceFulfillment.updateMany({ where: { paymentIntent: { organizationId: policy.organizationId }, fulfilledAt: { lt: fulfillmentCutoff }, responseBody: { not: Prisma.DbNull } }, data: { responseBody: Prisma.DbNull } })).count;
     deletedNotificationDeliveries += (await db.notificationDelivery.deleteMany({ where: { outboxEvent: { organizationId: policy.organizationId }, status: { in: ["DELIVERED", "DEAD_LETTER"] }, updatedAt: { lt: notificationCutoff } } })).count;
   }
-  // AuditEvent is database-enforced immutable and hash-chained. Deleting historical
-  // rows would destroy independently verifiable chain continuity. Keep them until
-  // a checkpointed, externally verifiable archival protocol is implemented.
   return { organizations: policies.length, redactedFulfillments, deletedAuditEvents: 0, auditEventsRetainedForChainIntegrity: true, deletedNotificationDeliveries };
 }
 
+type DeletionCard = { id: string; provider: "SANDBOX" | "STRIPE"; externalCardId: string };
+
+async function prepareDeletionRequest(requestId: string, now: Date) {
+  let cards: DeletionCard[] = [];
+  const prepared = await db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`deletion-finalize:${requestId}`}, 0))`;
+    const request = await tx.deletionRequest.findUnique({ where: { id: requestId } });
+    if (!request || !["REQUESTED", "PROCESSING"].includes(request.status) || request.scheduledFor > now) return false;
+    if (request.status === "REQUESTED") await tx.deletionRequest.update({ where: { id: request.id }, data: { status: "PROCESSING" } });
+
+    await tx.organization.update({ where: { id: request.organizationId }, data: { status: "SUSPENDED", killSwitchEnabled: true } });
+    await tx.agent.updateMany({ where: { organizationId: request.organizationId, status: { not: "ARCHIVED" } }, data: { status: "ARCHIVED" } });
+    await tx.agentCredential.updateMany({ where: { agent: { organizationId: request.organizationId }, status: "ACTIVE" }, data: { status: "REVOKED", revokedAt: now } });
+    cards = await tx.virtualCard.findMany({ where: { organizationId: request.organizationId, status: { not: "CANCELED" } }, select: { id: true, provider: true, externalCardId: true } });
+    if (cards.length) await tx.virtualCard.updateMany({ where: { id: { in: cards.map((card) => card.id) }, status: { not: "CANCELED" } }, data: { status: "FROZEN", version: { increment: 1 } } });
+    await tx.automationRule.updateMany({ where: { organizationId: request.organizationId, status: { in: ["DRAFT", "ACTIVE", "PAUSED"] } }, data: { status: "ARCHIVED", version: { increment: 1 }, nextRunAt: null } });
+    await tx.automationExecution.updateMany({ where: { organizationId: request.organizationId, status: { in: ["PENDING", "AWAITING_APPROVAL"] } }, data: { status: "CANCELED", completedAt: now, errorCode: "ORGANIZATION_DELETED" } });
+    await tx.crossChainRouteQuote.updateMany({ where: { organizationId: request.organizationId, status: "ACTIVE" }, data: { status: "CANCELED" } });
+    // Already exported self-custody transactions are intentionally not marked safe/canceled here.
+    // Evidence ingestion/reconciliation must remain available if the external wallet broadcasts later.
+    await tx.agentInvoice.updateMany({ where: { issuerOrganizationId: request.organizationId, status: { in: ["DRAFT", "SENT", "VIEWED", "APPROVAL_PENDING", "PAYMENT_PENDING", "OVERDUE"] } }, data: { status: "VOID", voidedAt: now } });
+    await tx.fiatAccount.updateMany({ where: { organizationId: request.organizationId, status: { in: ["PENDING", "ACTIVE"] } }, data: { status: "RESTRICTED" } });
+    await tx.notificationEndpoint.updateMany({ where: { organizationId: request.organizationId }, data: { status: "PAUSED" } });
+    await tx.membership.updateMany({ where: { organizationId: request.organizationId }, data: { status: "SUSPENDED", suspendedAt: now } });
+    return true;
+  }, { isolationLevel: "Serializable" });
+  return prepared ? cards : null;
+}
+
+async function recordDeletionProviderFailure(request: { id: string; organizationId: string }, failedCards: number, reason: string) {
+  await db.$transaction(async (tx) => {
+    await tx.auditEvent.create({ data: { organizationId: request.organizationId, actorType: "SYSTEM", action: "DELETION_CARD_PROVIDER_SYNC_FAILED", targetType: "DELETION_REQUEST", targetId: request.id, result: "FAILURE", metadata: { failedCards, reason } } });
+    await tx.supportCase.upsert({
+      where: { organizationId_sourceType_sourceId: { organizationId: request.organizationId, sourceType: "DELETION_REQUEST", sourceId: request.id } },
+      create: { organizationId: request.organizationId, createdBy: null, sourceType: "DELETION_REQUEST", sourceId: request.id, title: "Workspace deletion waiting on card-provider termination", description: `AgentPay locally suspended the workspace, but ${failedCards} external card termination operation(s) remain unresolved. Reason: ${reason}.`, category: "DELETION_PROVIDER_SYNC", severity: "URGENT" },
+      update: { status: "OPEN", severity: "URGENT", description: `AgentPay locally suspended the workspace, but ${failedCards} external card termination operation(s) remain unresolved. Reason: ${reason}.` },
+    });
+  });
+}
+
+async function completeDeletionRequest(requestId: string, now: Date) {
+  return db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`deletion-finalize:${requestId}`}, 0))`;
+    const request = await tx.deletionRequest.findUnique({ where: { id: requestId } });
+    if (!request || request.status !== "PROCESSING") return false;
+    const memberships = await tx.membership.findMany({ where: { organizationId: request.organizationId }, select: { userId: true } });
+    await tx.virtualCard.updateMany({ where: { organizationId: request.organizationId, status: { not: "CANCELED" } }, data: { status: "CANCELED", version: { increment: 1 } } });
+    for (const membership of memberships) {
+      const otherMemberships = await tx.membership.count({ where: { userId: membership.userId, organizationId: { not: request.organizationId }, status: { in: ["ACTIVE", "INVITED"] } } });
+      if (otherMemberships === 0) {
+        await tx.walletIdentity.deleteMany({ where: { userId: membership.userId } });
+        await tx.user.update({ where: { id: membership.userId }, data: { email: null, displayName: `Deleted user ${membership.userId.slice(0, 8)}` } });
+      }
+    }
+    await tx.auditEvent.create({ data: { organizationId: request.organizationId, actorType: "SYSTEM", actorId: null, action: "ORGANIZATION_DELETION_COMPLETED", targetType: "ORGANIZATION", targetId: request.organizationId, result: "SUCCESS", metadata: { retainedFinancialRecords: true, providerCardsTerminated: true } } });
+    await tx.deletionRequest.update({ where: { id: request.id }, data: { status: "COMPLETED", completedAt: now } });
+    await tx.supportCase.updateMany({ where: { organizationId: request.organizationId, sourceType: "DELETION_REQUEST", sourceId: request.id, status: { in: ["OPEN", "IN_PROGRESS", "WAITING_ON_CUSTOMER"] } }, data: { status: "RESOLVED", resolvedAt: now } });
+    return true;
+  }, { isolationLevel: "Serializable" });
+}
+
 export async function finalizeDeletionRequests(limit = 10, now = new Date()) {
-  const requests = await db.deletionRequest.findMany({ where: { status: "REQUESTED", scheduledFor: { lte: now } }, orderBy: { scheduledFor: "asc" }, take: limit });
+  const requests = await db.deletionRequest.findMany({ where: { status: { in: ["REQUESTED", "PROCESSING"] }, scheduledFor: { lte: now } }, orderBy: { scheduledFor: "asc" }, take: limit });
   const completed: string[] = [];
   for (const request of requests) {
-    let cardsToCancel: Array<{ id: string; provider: "SANDBOX" | "STRIPE"; externalCardId: string; version: number }> = [];
-    await db.$transaction(async (tx) => {
-      const claimed = await tx.deletionRequest.updateMany({ where: { id: request.id, status: "REQUESTED" }, data: { status: "PROCESSING" } });
-      if (claimed.count !== 1) return;
-      const memberships = await tx.membership.findMany({ where: { organizationId: request.organizationId }, select: { userId: true } });
-      await tx.auditEvent.create({ data: { organizationId: request.organizationId, actorType: "SYSTEM", actorId: null, action: "ORGANIZATION_DELETION_COMPLETED", targetType: "ORGANIZATION", targetId: request.organizationId, result: "SUCCESS", metadata: { retainedFinancialRecords: true } } });
-      await tx.organization.update({ where: { id: request.organizationId }, data: { status: "SUSPENDED", killSwitchEnabled: true } });
-      await tx.agent.updateMany({ where: { organizationId: request.organizationId, status: { not: "ARCHIVED" } }, data: { status: "ARCHIVED" } });
-      await tx.agentCredential.updateMany({ where: { agent: { organizationId: request.organizationId }, status: "ACTIVE" }, data: { status: "REVOKED", revokedAt: now } });
-      cardsToCancel = await tx.virtualCard.findMany({ where: { organizationId: request.organizationId, status: { not: "CANCELED" } }, select: { id: true, provider: true, externalCardId: true, version: true } });
-      if (cardsToCancel.length) await tx.virtualCard.updateMany({ where: { id: { in: cardsToCancel.map((card) => card.id) } }, data: { status: "CANCELED", version: { increment: 1 } } });
-      await tx.automationRule.updateMany({ where: { organizationId: request.organizationId, status: { in: ["DRAFT", "ACTIVE", "PAUSED"] } }, data: { status: "ARCHIVED", version: { increment: 1 }, nextRunAt: null } });
-      await tx.automationExecution.updateMany({ where: { organizationId: request.organizationId, status: { in: ["PENDING", "AWAITING_APPROVAL"] } }, data: { status: "CANCELED", completedAt: now, errorCode: "ORGANIZATION_DELETED" } });
-      await tx.crossChainRouteQuote.updateMany({ where: { organizationId: request.organizationId, status: "ACTIVE" }, data: { status: "CANCELED" } });
-      await tx.crossChainTransfer.updateMany({ where: { organizationId: request.organizationId, status: { in: ["QUOTED", "AWAITING_SIGNATURE"] } }, data: { status: "CANCELED", errorCode: "ORGANIZATION_DELETED", completedAt: now } });
-      await tx.agentInvoice.updateMany({ where: { issuerOrganizationId: request.organizationId, status: { in: ["DRAFT", "SENT", "VIEWED", "APPROVAL_PENDING", "PAYMENT_PENDING", "OVERDUE"] } }, data: { status: "VOID", voidedAt: now } });
-      await tx.fiatAccount.updateMany({ where: { organizationId: request.organizationId, status: { in: ["PENDING", "ACTIVE"] } }, data: { status: "RESTRICTED" } });
-      await tx.notificationEndpoint.updateMany({ where: { organizationId: request.organizationId }, data: { status: "PAUSED" } });
-      await tx.membership.updateMany({ where: { organizationId: request.organizationId }, data: { status: "SUSPENDED", suspendedAt: now } });
-      for (const membership of memberships) {
-        const otherMemberships = await tx.membership.count({ where: { userId: membership.userId, organizationId: { not: request.organizationId }, status: { in: ["ACTIVE", "INVITED"] } } });
-        if (otherMemberships === 0) {
-          await tx.walletIdentity.deleteMany({ where: { userId: membership.userId } });
-          await tx.user.update({ where: { id: membership.userId }, data: { email: null, displayName: `Deleted user ${membership.userId.slice(0, 8)}` } });
-        }
-      }
-      await tx.deletionRequest.update({ where: { id: request.id }, data: { status: "COMPLETED", completedAt: now } });
-      completed.push(request.id);
-    });
-    if (cardsToCancel.length && completed.includes(request.id)) {
+    const cards = await prepareDeletionRequest(request.id, now);
+    if (cards === null) continue;
+
+    const stripeCards = cards.filter((card) => card.provider === "STRIPE");
+    if (stripeCards.length) {
       const provider = getCardProvider();
-      const owned = cardsToCancel.filter((card) => card.provider === provider.name);
-      const results = await Promise.allSettled(owned.map((card) => provider.updateCardStatus(card.externalCardId, "CANCELED", `org-delete:${request.id}:${card.id}:${card.version}`)));
-      const failures = results.filter((result) => result.status === "rejected").length + (cardsToCancel.length - owned.length);
-      if (failures) await db.auditEvent.create({ data: { organizationId: request.organizationId, actorType: "SYSTEM", action: "DELETION_CARD_PROVIDER_SYNC_FAILED", targetType: "DELETION_REQUEST", targetId: request.id, result: "FAILURE", metadata: { failedCards: failures } } });
+      if (provider.name !== "STRIPE") {
+        await recordDeletionProviderFailure(request, stripeCards.length, "STRIPE_PROVIDER_NOT_CONFIGURED");
+        continue;
+      }
+      const results = await Promise.allSettled(stripeCards.map((card) => provider.updateCardStatus(card.externalCardId, "CANCELED", `org-delete:${request.id}:${card.id}`)));
+      const failures = results.filter((result) => result.status === "rejected").length;
+      if (failures) {
+        await recordDeletionProviderFailure(request, failures, "STRIPE_CARD_CANCELLATION_FAILED");
+        continue;
+      }
     }
+
+    if (await completeDeletionRequest(request.id, now)) completed.push(request.id);
   }
   return { scanned: requests.length, completed };
 }
