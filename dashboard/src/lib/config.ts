@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const optionalUrl = z.string().url().optional().or(z.literal(""));
 const hederaAccountId = /^0\.0\.\d+$/;
+const evmAddress = /^0x[0-9a-fA-F]{40}$/;
 
 const envSchema = z.object({
   APP_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -12,7 +13,8 @@ const envSchema = z.object({
   HEDERA_OPERATOR_ID: z.string().optional(),
   HEDERA_OPERATOR_KEY: z.string().optional(),
   HEDERA_PAYER_ACCOUNT_ID: z.string().regex(hederaAccountId).optional(),
-  HEDERA_PROVIDER_ACCOUNT_ID: z.string().default("0.0.98765"),
+  HEDERA_PROVIDER_ACCOUNT_ID: z.string().regex(hederaAccountId).default("0.0.98765"),
+  HEDERA_MAINNET_PROVIDER_ACCOUNT_ID: z.string().regex(hederaAccountId).optional(),
   HEDERA_USDC_TOKEN_ID: z.string().optional(),
   HEDERA_MIRROR_NODE_URL: optionalUrl.default("https://testnet.mirrornode.hedera.com"),
   FACILITATOR_URL: optionalUrl,
@@ -31,7 +33,9 @@ const envSchema = z.object({
   ARC_FACILITATOR_SIGNING_API_KEY: z.string().min(32).optional(),
   ARC_FACILITATOR_CONTRACT_API_KEY: z.string().min(32).optional(),
   ARC_RPC_URL: z.string().url().optional(),
-  ARC_PROVIDER_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
+  ARC_PROVIDER_ADDRESS: z.string().regex(evmAddress).transform((value) => value.toLowerCase()).optional(),
+  ARC_PAYER_ADDRESS: z.string().regex(evmAddress).transform((value) => value.toLowerCase()).optional(),
+  ARC_USDC_ADDRESS: z.string().regex(evmAddress).transform((value) => value.toLowerCase()).default("0x3600000000000000000000000000000000000000"),
   X402_NETWORK: z.string().default("hedera:testnet"),
   KEY_ENCRYPTION_MASTER_KEY: z.string().min(32).optional(),
   RESEND_API_KEY: z.string().optional(),
