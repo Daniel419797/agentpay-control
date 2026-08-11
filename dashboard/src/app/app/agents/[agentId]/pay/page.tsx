@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { FormPage } from "@/components/workspace-page";
+import { MasumiEscrowPanel } from "@/components/masumi-escrow-panel";
 import { PaidRequestForm } from "@/components/paid-request-form";
 import { db } from "@/lib/db";
 import { currentWorkspace } from "@/lib/workspace";
@@ -30,10 +31,20 @@ export default async function PaidRequestPage({ params }: { params: Promise<{ ag
     },
     orderBy: { createdAt: "desc" },
   });
+  const roles = workspace.membership.roles;
 
   return (
-    <FormPage title="Send paid request" description={`Create a policy-controlled x402 request from ${agent.name}.`}>
-      <PaidRequestForm agents={agents} defaultAgentId={agentId} />
+    <FormPage title="Send paid request" description={`Create a policy-controlled payment from ${agent.name}.`}>
+      <section className="workspace-section">
+        <div className="section-heading"><div><h3>Direct x402</h3><p>Pay a registered x402 resource directly under the agent's active policy.</p></div></div>
+        <PaidRequestForm agents={agents} defaultAgentId={agentId} />
+      </section>
+      {process.env.MASUMI_ESCROW_ENABLED === "true" && <MasumiEscrowPanel
+        agents={agents.map(({ id, name, status, network }) => ({ id, name, status, network }))}
+        defaultAgentId={agentId}
+        canOperate={roles.includes("OWNER") || roles.includes("OPERATOR")}
+        canAuthorizeRefund={roles.includes("OWNER") || roles.includes("PROVIDER_ADMIN")}
+      />}
     </FormPage>
   );
 }
