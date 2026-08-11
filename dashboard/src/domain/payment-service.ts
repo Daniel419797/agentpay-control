@@ -198,24 +198,8 @@ export async function createPaidRequest(
     include: { provider: true, prices: { where: { assetId: preflightPolicy.assetId }, take: 1 } },
   });
   if (!preflightListing?.prices[0]) throw new Error("RESOURCE_PRICE_NOT_FOUND");
-  const preflightPayee = providerPayeeForNetwork(preflightListing.provider, preflightAgent.network, config);
-  const preflightRequirement = selectRequirement(required, {
-    network: preflightAgent.network,
-    asset: x402AssetIdentifier(preflightPolicy.asset, preflightAgent.network, config),
-    amount: preflightListing.prices[0].atomicAmount.toString(),
-    payTo: preflightPayee,
-    resourceUrl: canonical.resourceUrl,
-  });
+
   const catalyst = await loadCatalystPolicyContext(preflightPolicy.id);
-  let oracleValuation: OracleValuation | null = null;
-  if (catalyst.oracle) {
-    oracleValuation = await valueWithPyth({
-      oracle: catalyst.oracle,
-      assetSymbol: preflightPolicy.asset.symbol,
-      assetDecimals: preflightPolicy.asset.decimals,
-      amountAtomic: preflightRequirement.amount,
-    });
-  }
   let masumiBinding: MasumiResourceBinding | null = null;
   if (catalyst.masumi?.required) {
     masumiBinding = await verifyMasumiTrust({
@@ -223,6 +207,27 @@ export async function createPaidRequest(
       resourceListingId: preflightListing.id,
       resourceUrl: canonical.resourceUrl,
       cardanoNetwork: preflightAgent.network,
+    });
+    if (!masumiBinding.settlementAddress) throw new Error("MASUMI_SETTLEMENT_ADDRESS_REQUIRED");
+  }
+
+  const preflightPayee = masumiBinding?.settlementAddress
+    ?? providerPayeeForNetwork(preflightListing.provider, preflightAgent.network, config);
+  const preflightRequirement = selectRequirement(required, {
+    network: preflightAgent.network,
+    asset: x402AssetIdentifier(preflightPolicy.asset, preflightAgent.network, config),
+    amount: preflightListing.prices[0].atomicAmount.toString(),
+    payTo: preflightPayee,
+    resourceUrl: canonical.resourceUrl,
+  });
+
+  let oracleValuation: OracleValuation | null = null;
+  if (catalyst.oracle) {
+    oracleValuation = await valueWithPyth({
+      oracle: catalyst.oracle,
+      assetSymbol: preflightPolicy.asset.symbol,
+      assetDecimals: preflightPolicy.asset.decimals,
+      amountAtomic: preflightRequirement.amount,
     });
   }
 
@@ -242,22 +247,32 @@ export async function createPaidRequest(
     if (!listing?.prices[0]) throw new Error("RESOURCE_PRICE_NOT_FOUND");
     if (listing.id !== preflightListing.id || listing.prices[0].atomicAmount.toString() !== preflightRequirement.amount) throw new Error("PAYMENT_CONTEXT_CHANGED_RETRY");
 
-    const expectedPayee = providerPayeeForNetwork(listing.provider, agent.network, config);
+    const expectedPayee = catalyst.masumi?.required
+      ? masumiBinding?.settlementAddress
+      : providerPayeeForNetwork(listing.provider, agent.network, config);
+    if (!expectedPayee) throw new Error("MASUMI_SETTLEMENT_ADDRESS_REQUIRED");
     const requirement = selectRequirement(required, { network: agent.network, asset: x402AssetIdentifier(policy.asset, agent.network, config), amount: listing.prices[0].atomicAmount.toString(), payTo: expectedPayee, resourceUrl: canonical.resourceUrl });
     const amountAtomic = requirement.amount;
     if (requirement.asset !== preflightRequirement.asset || requirement.payTo !== preflightRequirement.payTo || requirement.network !== preflightRequirement.network) throw new Error("PAYMENT_CONTEXT_CHANGED_RETRY");
     if (input.maxAmountAtomic && BigInt(amountAtomic) > BigInt(input.maxAmountAtomic)) throw new Error("MAX_AMOUNT_EXCEEDED");
 
     if (catalyst.masumi?.required) {
-      if (!masumiBinding) throw new Error("MASUMI_RESOURCE_NOT_BOUND");
-      const bindingRows = await tx.$queryRaw<Array<{ metadataHash: string; agentIdentifier: string; expiresAt: Date }>>`
-        SELECT "metadataHash", "agentIdentifier", "expiresAt"
+      if (!masumiBinding?.settlementAddress) throw new Error("MASUMI_RESOURCE_NOT_BOUND");
+      const bindingRows = await tx.$queryRaw<Array<{ metadataHash: string; agentIdentifier: string; settlementAddress: string | null; expiresAt: Date }>>`
+        SELECT "metadataHash", "agentIdentifier", "settlementAddress", "expiresAt"
         FROM "MasumiResourceBinding"
         WHERE "resourceListingId" = ${listing.id}::uuid
         LIMIT 1
       `;
       const stored = bindingRows[0];
-      if (!stored || stored.metadataHash !== masumiBinding.metadataHash || stored.agentIdentifier.toLowerCase() !== masumiBinding.agentIdentifier.toLowerCase() || new Date(stored.expiresAt).getTime() <= Date.now()) {
+      if (
+        !stored ||
+        stored.metadataHash !== masumiBinding.metadataHash ||
+        stored.agentIdentifier.toLowerCase() !== masumiBinding.agentIdentifier.toLowerCase() ||
+        stored.settlementAddress !== masumiBinding.settlementAddress ||
+        stored.settlementAddress !== requirement.payTo ||
+        new Date(stored.expiresAt).getTime() <= Date.now()
+      ) {
         throw new Error("MASUMI_BINDING_CHANGED_RETRY");
       }
     }
@@ -395,6 +410,8 @@ export async function createPaidRequest(
       masumi: masumiBinding ? {
         agentIdentifier: masumiBinding.agentIdentifier,
         registryPolicyId: masumiBinding.registryPolicyId,
+        settlementAddress: masumiBinding.settlementAddress,
+        paymentType: masumiBinding.paymentType,
         metadataHash: masumiBinding.metadataHash,
         capabilityName: masumiBinding.capabilityName,
         verifiedAt: masumiBinding.verifiedAt.toISOString(),
@@ -451,7 +468,11 @@ export async function createPaidRequest(
           amountAtomic,
           policyReasons: combined.reasonCodes,
           oracle: usdFacts,
-          masumi: masumiBinding ? { agentIdentifier: masumiBinding.agentIdentifier, metadataHash: masumiBinding.metadataHash } : null,
+          masumi: masumiBinding ? {
+            agentIdentifier: masumiBinding.agentIdentifier,
+            settlementAddress: masumiBinding.settlementAddress,
+            metadataHash: masumiBinding.metadataHash,
+          } : null,
           initiatorType: context.initiatedByUserId ? "USER" : "AGENT",
         },
       },
