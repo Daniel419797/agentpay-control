@@ -29,6 +29,6 @@ describe("Masumi escrow client", () => {
   it("requires the documented seller refund-authorization transition", () => {
     const purchase = { NextAction: { requestedAction: "RefundAuthorized" } } as MasumiPurchase;
     expect(() => assertMasumiRefundTransition(purchase, "RefundAuthorized")).not.toThrow();
-    expect(() => assertMasumiRefundTransition({ NextAction: { requestedAction: "RefundRequested" } } as MasumiPurchase, "RefundAuthorized")).toThrow("MASUMI_REFUND_AUTH_RESPONSE_INVALID");
+    expect(() => assertMasumiRefundTransition({ NextAction: { requestedAction: "RefundRequested" } } as MasumiPurchase, "RefundAuthorized")).toThrow("MASUMI_REFUND_AUTH_STATE_INVALID");
   });
 });
