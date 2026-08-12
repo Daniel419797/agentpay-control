@@ -42,7 +42,18 @@ export function OrganizationDataControls({ organizationSlug, isOwner }: { organi
     }
   }
 
-  useEffect(() => { void refreshDeletion(); }, [isOwner]);
+  useEffect(() => {
+    if (!isOwner) return;
+    let active = true;
+    void api<DeletionRequest | null>("/api/v1/organization/deletion")
+      .then((row) => {
+        if (active) setDeletion(row ?? null);
+      })
+      .catch((cause) => {
+        if (active) setError(cause instanceof Error ? cause.message : "Could not load workspace deletion status.");
+      });
+    return () => { active = false; };
+  }, [isOwner]);
 
   async function downloadExport() {
     setBusy("export"); setError(""); setMessage("");
