@@ -1,6 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { logError } from "@/lib/logger";
 
+type LoggedPayload = {
+  authorization?: string;
+  nested?: {
+    apiKey?: string;
+    privateKey?: string;
+    transactionId?: string;
+    endpoint?: string;
+  };
+  atomicAmount?: string;
+  error?: { message?: string };
+};
+
 describe("structured logger redaction", () => {
   afterEach(() => vi.restoreAllMocks());
 
@@ -17,14 +29,14 @@ describe("structured logger redaction", () => {
       atomicAmount: 1000000n,
     });
 
-    const payload = JSON.parse(String(spy.mock.calls[0][0])) as Record<string, any>;
+    const payload = JSON.parse(String(spy.mock.calls[0][0])) as LoggedPayload;
     expect(payload.authorization).toBe("[REDACTED]");
-    expect(payload.nested.apiKey).toBe("[REDACTED]");
-    expect(payload.nested.privateKey).toBe("[REDACTED]");
-    expect(payload.nested.transactionId).toBe("a".repeat(64));
-    expect(payload.nested.endpoint).not.toContain("sensitive");
+    expect(payload.nested?.apiKey).toBe("[REDACTED]");
+    expect(payload.nested?.privateKey).toBe("[REDACTED]");
+    expect(payload.nested?.transactionId).toBe("a".repeat(64));
+    expect(payload.nested?.endpoint).not.toContain("sensitive");
     expect(payload.atomicAmount).toBe("1000000");
-    expect(payload.error.message).not.toContain("top-secret-token");
+    expect(payload.error?.message).not.toContain("top-secret-token");
   });
 
   it("handles circular structures instead of crashing error reporting", () => {
