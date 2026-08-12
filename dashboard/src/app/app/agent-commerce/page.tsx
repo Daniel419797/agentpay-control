@@ -58,7 +58,22 @@ export default function AgentCommercePage() {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let active = true;
+    void jsonRequest("/api/v1/masumi/purchases", { cache: "no-store" })
+      .then((rows) => {
+        if (!active) return;
+        setError(null);
+        setPurchases(Array.isArray(rows) ? rows : []);
+      })
+      .catch((cause) => {
+        if (active) setError(cause instanceof Error ? cause.message : "Could not load agent commerce activity.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   async function action(purchase: Purchase, endpoint: "reconcile" | "refund" | "authorize-refund") {
     setBusy(`${purchase.id}:${endpoint}`);
