@@ -47,9 +47,10 @@ describe("production financial security invariants", () => {
     expect(isRetryableFiatSubmission("SUBMISSION_UNKNOWN", "obt_live_123")).toBe(false);
   });
 
-  it("does not retry confirmed provider 4xx rejection as an ambiguous fiat submission", () => {
-    expect(fiatSubmissionFailureStatus(new Error("FIAT_PROVIDER_ERROR:400:invalid_request"))).toBe("FAILED");
-    expect(fiatSubmissionFailureStatus(new Error("FIAT_PROVIDER_ERROR:429:rate_limited"))).toBe("FAILED");
+  it("keeps fiat submissions ambiguous unless the provider response proves non-acceptance", () => {
+    expect(fiatSubmissionFailureStatus(new Error("FIAT_PROVIDER_ERROR:401:unauthorized"))).toBe("FAILED");
+    expect(fiatSubmissionFailureStatus(new Error("FIAT_PROVIDER_ERROR:400:invalid_request"))).toBe("SUBMISSION_UNKNOWN");
+    expect(fiatSubmissionFailureStatus(new Error("FIAT_PROVIDER_ERROR:429:rate_limited"))).toBe("SUBMISSION_UNKNOWN");
     expect(fiatSubmissionFailureStatus(new Error("FIAT_PROVIDER_ERROR:500:provider_error"))).toBe("SUBMISSION_UNKNOWN");
     expect(fiatSubmissionFailureStatus(new TypeError("network timeout"))).toBe("SUBMISSION_UNKNOWN");
   });
