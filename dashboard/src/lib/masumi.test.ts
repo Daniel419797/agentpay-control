@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { assertMasumiEntryMatches, masumiConfigFromEnv, masumiMetadataHash, type MasumiEntry } from "@/lib/masumi";
 
 const TRUSTED_POLICY = "b".repeat(56);
+const TEST_ENV = { NODE_ENV: "test" as const };
 const entry: MasumiEntry = {
   id: "entry-1",
   name: "Research Agent",
@@ -20,14 +21,14 @@ const entry: MasumiEntry = {
 describe("Masumi registry trust", () => {
   it("requires HTTPS, a scoped key, and explicit registry-policy trust in production", () => {
     const base = { MASUMI_REGISTRY_API_KEY: "x".repeat(32), MASUMI_TRUSTED_REGISTRY_POLICY_IDS: TRUSTED_POLICY };
-    expect(() => masumiConfigFromEnv({ APP_ENV: "production", ...base, MASUMI_REGISTRY_URL: "http://registry.example.com/api/v1" })).toThrow("MASUMI_HTTPS_REQUIRED");
-    expect(() => masumiConfigFromEnv({ APP_ENV: "production", MASUMI_REGISTRY_URL: "https://registry.example.com/api/v1", MASUMI_TRUSTED_REGISTRY_POLICY_IDS: TRUSTED_POLICY })).toThrow("MASUMI_REGISTRY_API_KEY_REQUIRED");
-    expect(() => masumiConfigFromEnv({ APP_ENV: "production", MASUMI_REGISTRY_URL: "https://registry.example.com/api/v1", MASUMI_REGISTRY_API_KEY: "x".repeat(32) })).toThrow("MASUMI_TRUSTED_REGISTRY_POLICY_IDS_REQUIRED");
-    expect(masumiConfigFromEnv({ APP_ENV: "production", ...base, MASUMI_REGISTRY_URL: "https://registry.example.com/api/v1" }).trustedRegistryPolicyIds).toEqual([TRUSTED_POLICY]);
+    expect(() => masumiConfigFromEnv({ ...TEST_ENV, APP_ENV: "production", ...base, MASUMI_REGISTRY_URL: "http://registry.example.com/api/v1" })).toThrow("MASUMI_HTTPS_REQUIRED");
+    expect(() => masumiConfigFromEnv({ ...TEST_ENV, APP_ENV: "production", MASUMI_REGISTRY_URL: "https://registry.example.com/api/v1", MASUMI_TRUSTED_REGISTRY_POLICY_IDS: TRUSTED_POLICY })).toThrow("MASUMI_REGISTRY_API_KEY_REQUIRED");
+    expect(() => masumiConfigFromEnv({ ...TEST_ENV, APP_ENV: "production", MASUMI_REGISTRY_URL: "https://registry.example.com/api/v1", MASUMI_REGISTRY_API_KEY: "x".repeat(32) })).toThrow("MASUMI_TRUSTED_REGISTRY_POLICY_IDS_REQUIRED");
+    expect(masumiConfigFromEnv({ ...TEST_ENV, APP_ENV: "production", ...base, MASUMI_REGISTRY_URL: "https://registry.example.com/api/v1" }).trustedRegistryPolicyIds).toEqual([TRUSTED_POLICY]);
   });
 
   it("rejects malformed registry policy trust configuration", () => {
-    expect(() => masumiConfigFromEnv({ MASUMI_TRUSTED_REGISTRY_POLICY_IDS: "not-a-policy" })).toThrow("MASUMI_TRUSTED_REGISTRY_POLICY_IDS_INVALID");
+    expect(() => masumiConfigFromEnv({ ...TEST_ENV, MASUMI_TRUSTED_REGISTRY_POLICY_IDS: "not-a-policy" })).toThrow("MASUMI_TRUSTED_REGISTRY_POLICY_IDS_INVALID");
   });
 
   it("binds an online registry identity to the paid resource URL and capability", () => {
