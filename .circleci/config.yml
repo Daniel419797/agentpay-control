@@ -4,7 +4,7 @@ executors:
   node-postgres:
     docker:
       - image: cimg/node:22.22-browsers
-      - image: cimg/postgres:17.5.0
+      - image: cimg/postgres:17.10
         environment:
           POSTGRES_USER: agentpay
           POSTGRES_PASSWORD: agentpay
