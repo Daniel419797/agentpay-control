@@ -8,6 +8,7 @@ const session = {
   name: "Owner",
   mode: "supabase" as const,
   authenticatedAt: 1_000,
+  sessionVersion: 0,
 };
 
 describe("step-up authentication", () => {
