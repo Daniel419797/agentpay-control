@@ -11,21 +11,28 @@ CODEQL_CACHE_ROOT="${CODEQL_CACHE_ROOT:-$HOME/.cache/agentpay-codeql}"
 CODEQL_HOME="$CODEQL_CACHE_ROOT/$CODEQL_BUNDLE_VERSION"
 CODEQL_BIN="$CODEQL_HOME/codeql/codeql"
 BUNDLE_URL="https://github.com/github/codeql-action/releases/download/codeql-bundle-v${CODEQL_BUNDLE_VERSION}/codeql-bundle-linux64.tar.gz"
+TMP_BUNDLE=""
+DB_DIR=""
+
+cleanup() {
+  [[ -z "$TMP_BUNDLE" ]] || rm -f "$TMP_BUNDLE"
+  [[ -z "$DB_DIR" ]] || rm -rf "$DB_DIR"
+}
+trap cleanup EXIT
 
 if [[ ! -x "$CODEQL_BIN" ]]; then
   mkdir -p "$CODEQL_HOME"
   TMP_BUNDLE="$(mktemp)"
-  trap 'rm -f "$TMP_BUNDLE"' EXIT
   curl --fail --location --retry 3 --retry-all-errors "$BUNDLE_URL" --output "$TMP_BUNDLE"
   printf '%s  %s\n' "$CODEQL_BUNDLE_SHA256" "$TMP_BUNDLE" | sha256sum --check --strict
   tar -xzf "$TMP_BUNDLE" -C "$CODEQL_HOME"
+  rm -f "$TMP_BUNDLE"
+  TMP_BUNDLE=""
 fi
 
 "$CODEQL_BIN" version > "$OUT_DIR/codeql-version.txt"
 
 DB_DIR="$(mktemp -d)"
-trap 'rm -rf "$DB_DIR"' EXIT
-
 cd "$ROOT_DIR"
 "$CODEQL_BIN" database create "$DB_DIR/db" \
   --language=javascript-typescript \
@@ -39,10 +46,21 @@ cd "$ROOT_DIR"
   --output="$OUT_DIR/codeql.sarif" \
   --threads=0
 
-# External CI does not rely on GitHub's code-scanning UI to decide whether a
-# release is allowed. Any CodeQL code-scanning result blocks this gate and the
-# SARIF remains available as immutable review evidence.
-RESULT_COUNT="$(jq '[.runs[]?.results[]?] | length' "$OUT_DIR/codeql.sarif")"
+# The external CI gate does not depend on GitHub's code-scanning UI. Parse the
+# SARIF locally and fail closed if the code-scanning query suite reports any
+# result. Python 3 is part of the CircleCI Ubuntu machine image contract used by
+# this job; verify it explicitly rather than assuming jq is installed.
+python3 --version > "$OUT_DIR/python-version.txt"
+RESULT_COUNT="$(python3 - "$OUT_DIR/codeql.sarif" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    sarif = json.load(handle)
+
+print(sum(len(run.get("results", [])) for run in sarif.get("runs", [])))
+PY
+)"
 printf 'codeql_results=%s\n' "$RESULT_COUNT" > "$OUT_DIR/codeql-summary.txt"
 if [[ "$RESULT_COUNT" -ne 0 ]]; then
   printf 'CodeQL reported %s result(s); refusing release.\n' "$RESULT_COUNT" >&2
