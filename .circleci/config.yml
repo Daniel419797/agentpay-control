@@ -23,6 +23,9 @@ jobs:
     steps:
       - checkout
       - run:
+          name: Validate CI and deployment shell syntax
+          command: bash -n scripts/ci/*.sh scripts/render/*.sh
+      - run:
           name: Pin repository npm version
           command: npm install --global npm@11.11.1
       - restore_cache:
