@@ -10,6 +10,7 @@ prisma/dev.db
 playwright-report/
 test-results/
 tmp/
+artifacts/
 dashboard/.next/
 dashboard/coverage/
 dashboard/playwright-report/

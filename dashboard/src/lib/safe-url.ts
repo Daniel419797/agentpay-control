@@ -5,20 +5,23 @@ import { Agent, fetch as pinnedFetch, type Dispatcher, type RequestInit as Undic
 function isPrivateIpv4(address: string) {
   const parts = address.split(".").map(Number);
   if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return true;
-  const [a, b] = parts;
+  const [a, b, c] = parts;
   return a === 0 || a === 10 || a === 127 || a >= 224 ||
     (a === 100 && b >= 64 && b <= 127) ||
     (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b <= 31) ||
     (a === 192 && b === 168) ||
+    (a === 192 && b === 0 && c === 0) ||
     (a === 198 && (b === 18 || b === 19));
 }
 
 function isPrivateIpv6(address: string) {
   const normalized = address.toLowerCase();
-  return normalized === "::" || normalized === "::1" || normalized.startsWith("fc") ||
-    normalized.startsWith("fd") || normalized.startsWith("fe8") || normalized.startsWith("fe9") ||
-    normalized.startsWith("fea") || normalized.startsWith("feb");
+  return normalized === "::" || normalized === "::1" ||
+    normalized.startsWith("::ffff:") || normalized.startsWith("0:0:0:0:0:ffff:") ||
+    normalized.startsWith("fc") || normalized.startsWith("fd") ||
+    normalized.startsWith("fe") ||
+    normalized.startsWith("ff");
 }
 
 export function isPrivateAddress(address: string) {

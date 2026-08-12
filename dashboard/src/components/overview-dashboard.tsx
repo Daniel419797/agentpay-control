@@ -6,14 +6,14 @@ import { useCallback, useEffect, useState } from "react";
 
 type OverviewData = {
   metrics: {
-    settledHbar: number;
+    settledSpend: Array<{ assetId: string; symbol: string; network: string; amount: string }>;
     activeAgents: number;
     pausedAgents: number;
     pendingApprovals: number;
     activeResources: number;
-    remainingDailyBudget: string;
-    dailyBudgetSymbol: string;
-    dailySpentPercent: number;
+    trackedPolicies: number;
+    highestDailyBudgetUsePercent: number;
+    mostConstrainedBudget: { agentId: string; agent: string; symbol: string; network: string; remaining: string; usedPercent: number } | null;
   };
   recent: Array<{
     id: string;
@@ -24,18 +24,27 @@ type OverviewData = {
     payee: string;
     amount: string;
     asset: string;
+    network: string;
     status: string;
     transactionId: string | null;
-    hashscanUrl: string | null;
+    explorerUrl: string | null;
+    explorerLabel: string | null;
   }>;
   approvals: Array<{ id: string; agent: string; resource: string; amount: string; asset: string; reason: string }>;
-  agents: Array<{ id: string; name: string; status: string; accountId: string | null }>;
+  agents: Array<{ id: string; name: string; status: string; network: string; accountId: string | null }>;
 };
 
 function statusClass(status: string) {
   if (status === "SETTLED" || status === "ACTIVE") return "status-settled";
-  if (status === "APPROVAL_PENDING" || status === "PENDING" || status === "PAUSED") return "status-approval";
+  if (["APPROVAL_PENDING", "PENDING", "PAUSED", "SUBMISSION_UNKNOWN"].includes(status)) return "status-approval";
   return "status-error";
+}
+
+function networkLabel(network: string) {
+  if (network === "hedera:mainnet") return "Hedera Mainnet";
+  if (network === "hedera:testnet") return "Hedera Testnet";
+  if (network === "eip155:5042002") return "Arc Testnet";
+  return network || "Unknown rail";
 }
 
 function AgentAvatar() {
@@ -47,10 +56,7 @@ export function OverviewDashboard() {
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     const response = await fetch("/api/v1/overview", { cache: "no-store" });
-    if (!response.ok) {
-      setError("Payment operations could not be loaded.");
-      return;
-    }
+    if (!response.ok) { setError("Payment operations could not be loaded."); return; }
     const body = await response.json() as { data: OverviewData };
     setData(body.data);
     setError("");
@@ -62,32 +68,53 @@ export function OverviewDashboard() {
     return () => window.removeEventListener("agentpay:payment-settled", load);
   }, [load]);
 
-  if (error) return <div className="page"><div className="empty-state"><strong>Unable to load operations</strong><p>{error}</p><button className="secondary-button" onClick={() => void load()}>Retry</button></div></div>;
-  if (!data) return <div className="page"><div className="empty-state"><strong>Loading payment operations…</strong><p>Reading current records from the workspace.</p></div></div>;
+  if (error) return <div className="page"><div className="empty-state" role="alert"><strong>Unable to load operations</strong><p>{error}</p><button className="secondary-button" onClick={() => void load()}>Retry</button></div></div>;
+  if (!data) return <div className="page"><div className="empty-state" aria-live="polite"><strong>Loading payment operations…</strong><p>Reading current records from the workspace.</p></div></div>;
+
+  const settledSummary = data.metrics.settledSpend.length
+    ? data.metrics.settledSpend.slice(0, 2).map((item) => `${item.amount} ${item.symbol}`).join(" · ")
+    : "—";
+  const constrained = data.metrics.mostConstrainedBudget;
 
   return (
     <div className="page">
-      <div className="page-heading"><div><h1>Overview</h1><p>Live policy-controlled activity and Hedera testnet settlement records.</p></div></div>
+      <div className="page-heading"><div><h1>Overview</h1><p>Live policy-controlled activity across configured x402 payment rails.</p></div></div>
       <section className="metrics" aria-label="Payment metrics">
-        <div className="metric"><div className="metric-label">Settled spend</div><div className="metric-value">{data.metrics.settledHbar.toFixed(4)} HBAR</div><div className="metric-detail">Verified wallet payments</div></div>
-        <div className="metric"><div className="metric-label">Remaining daily budget</div><div className="metric-value">{data.metrics.remainingDailyBudget} {data.metrics.dailyBudgetSymbol}</div><div className="metric-detail">{data.metrics.dailySpentPercent}% used today</div></div>
+        <div className="metric"><div className="metric-label">Agent settled spend</div><div className="metric-value">{settledSummary}</div><div className="metric-detail">Confirmed on-chain settlements, grouped by asset</div></div>
+        <div className="metric"><div className="metric-label">Highest daily budget use</div><div className="metric-value">{data.metrics.trackedPolicies ? `${data.metrics.highestDailyBudgetUsePercent}%` : "—"}</div><div className="metric-detail">{constrained ? `${constrained.agent}: ${constrained.remaining} ${constrained.symbol} remaining` : "No active published policy"}</div></div>
         <div className="metric"><div className="metric-label">Active agents</div><div className="metric-value">{data.metrics.activeAgents}</div><div className="metric-detail">{data.metrics.pausedAgents} paused</div></div>
         <div className="metric"><div className="metric-label">Pending approvals</div><div className="metric-value metric-alert">{data.metrics.pendingApprovals}</div><div className="metric-detail">{data.metrics.pendingApprovals ? "Awaiting operator review" : "Queue is clear"}</div></div>
-        <div className="metric"><div className="metric-label">Active resources</div><div className="metric-value">{data.metrics.activeResources}</div><div className="metric-detail">Registered x402 endpoints</div></div>
+        <div className="metric"><div className="metric-label">Active resources</div><div className="metric-value">{data.metrics.activeResources}</div><div className="metric-detail">Organization marketplace listings</div></div>
       </section>
       <div className="operations-grid">
         <section className="panel">
           <header className="panel-header"><h2 className="panel-title">Recent transactions</h2><Link className="ghost-link" href="/app/transactions">View all</Link></header>
-          {data.recent.length === 0 ? <div className="empty-state"><strong>No transactions yet</strong><p>Real Hedera payments and x402 requests will appear here.</p></div> : <div className="table-wrap">
-            <table className="data-table"><thead><tr><th>Time</th><th>Agent</th><th>Resource / payee</th><th>Amount</th><th>Status</th><th>Receipt</th></tr></thead><tbody>{data.recent.map((transaction) => <tr key={transaction.id}>
-              <td>{new Date(transaction.createdAt).toLocaleString()}</td>
-              <td><div className="agent-cell"><AgentAvatar /><div><div className="cell-primary">{transaction.agent}</div><div className="cell-secondary">{transaction.payer || "Policy workflow"}</div></div></div></td>
-              <td><div className="cell-primary">{transaction.resource}</div><div className="cell-secondary">{transaction.payee}</div></td>
-              <td>{transaction.amount} {transaction.asset}</td>
-              <td><span className={`status-badge ${statusClass(transaction.status)}`}>{transaction.status.replaceAll("_", " ")}</span></td>
-              <td>{transaction.hashscanUrl ? <a className="ghost-link" href={transaction.hashscanUrl} target="_blank" rel="noreferrer">HashScan</a> : <span className="cell-secondary">Pending</span>}</td>
-            </tr>)}</tbody></table>
-          </div>}
+          {data.recent.length === 0 ? <div className="empty-state"><strong>No transactions yet</strong><p>Verified wallet payments and x402 agent settlements will appear here.</p></div> : <>
+            <div className="table-wrap">
+              <table className="data-table"><thead><tr><th>Time</th><th>Agent</th><th>Resource / payee</th><th>Amount</th><th>Rail</th><th>Status</th><th>Receipt</th></tr></thead><tbody>{data.recent.map((transaction) => <tr key={transaction.id}>
+                <td>{new Date(transaction.createdAt).toLocaleString()}</td>
+                <td><div className="agent-cell"><AgentAvatar /><div><div className="cell-primary">{transaction.agent}</div><div className="cell-secondary">{transaction.payer || "Policy workflow"}</div></div></div></td>
+                <td><div className="cell-primary">{transaction.resource}</div><div className="cell-secondary">{transaction.payee}</div></td>
+                <td>{transaction.amount} {transaction.asset}</td>
+                <td><span className="cell-secondary">{networkLabel(transaction.network)}</span></td>
+                <td><span className={`status-badge ${statusClass(transaction.status)}`}>{transaction.status.replaceAll("_", " ")}</span></td>
+                <td>{transaction.explorerUrl ? <a className="ghost-link" href={transaction.explorerUrl} target="_blank" rel="noreferrer">{transaction.explorerLabel ?? "Explorer"}</a> : <span className="cell-secondary">Pending</span>}</td>
+              </tr>)}</tbody></table>
+            </div>
+            <div className="transaction-mobile" aria-label="Recent transactions">
+              {data.recent.map((transaction) => <article className="transaction-card" key={`mobile-${transaction.id}`}>
+                <div className="transaction-top">
+                  <div><div className="transaction-resource">{transaction.resource}</div><div className="transaction-meta">{transaction.agent} · {networkLabel(transaction.network)}</div></div>
+                  <div className="transaction-amount">{transaction.amount} {transaction.asset}</div>
+                </div>
+                <div className="transaction-bottom">
+                  <span className={`status-badge ${statusClass(transaction.status)}`}>{transaction.status.replaceAll("_", " ")}</span>
+                  {transaction.explorerUrl ? <a className="ghost-link" href={transaction.explorerUrl} target="_blank" rel="noreferrer">{transaction.explorerLabel ?? "Explorer"}</a> : <span className="cell-secondary">Receipt pending</span>}
+                </div>
+                <div className="transaction-meta">{new Date(transaction.createdAt).toLocaleString()} · Payee {transaction.payee}</div>
+              </article>)}
+            </div>
+          </>}
         </section>
         <div className="right-rail">
           <section className="panel">
@@ -96,7 +123,7 @@ export function OverviewDashboard() {
           </section>
           <section className="panel" style={{ marginTop: 18 }}>
             <header className="panel-header"><h2 className="panel-title">Agents</h2><Link className="ghost-link" href="/app/agents">View all</Link></header>
-            {data.agents.length === 0 ? <div className="empty-state"><strong>No agents yet</strong><p>Create an agent backed by your connected Hedera wallet.</p></div> : <div className="agent-list">{data.agents.map((agent) => <div className="agent-row" key={agent.id}><div className="agent-identity"><AgentAvatar /><div><div className="agent-name">{agent.name}</div><div className="agent-state"><span className="status-dot" />{agent.status}</div></div></div><div className="agent-balance"><small>{agent.accountId ?? "No account"}</small></div></div>)}</div>}
+            {data.agents.length === 0 ? <div className="empty-state"><strong>No agents yet</strong><p>Create an agent on one of the configured payment rails.</p></div> : <div className="agent-list">{data.agents.map((agent) => <div className="agent-row" key={agent.id}><div className="agent-identity"><AgentAvatar /><div><div className="agent-name">{agent.name}</div><div className="agent-state"><span className="status-dot" aria-hidden="true" />{agent.status} · {networkLabel(agent.network)}</div></div></div><div className="agent-balance"><small>{agent.accountId ?? "No account"}</small></div></div>)}</div>}
           </section>
         </div>
       </div>

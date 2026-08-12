@@ -4,40 +4,69 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { db } from "@/lib/db";
 import { logError } from "@/lib/logger";
 
+const operationalErrorStatus: Record<string, number> = {
+  ORGANIZATION_KILL_SWITCH_ENABLED: 409,
+  ORGANIZATION_NOT_ACTIVE: 409,
+  AGENT_NOT_FOUND: 404,
+  AGENT_NOT_ACTIVE: 409,
+  IDEMPOTENCY_CONFLICT: 409,
+  CROSS_CHAIN_NETWORK_UNAVAILABLE: 409,
+  ROUTE_PROVIDER_NETWORK_UNSUPPORTED: 409,
+  SOURCE_ADDRESS_NOT_OWNED_BY_AGENT: 409,
+  CROSS_CHAIN_QUOTE_EXPIRED: 409,
+  CROSS_CHAIN_TRANSFER_NOT_FOUND: 404,
+  CROSS_CHAIN_TRANSFER_NOT_SUBMITTABLE: 409,
+  SOURCE_TRANSACTION_CONFLICT: 409,
+  FIAT_ACCOUNT_NOT_FOUND: 404,
+  FIAT_ACCOUNT_NOT_ACTIVE: 409,
+  FIAT_PROVIDER_MISMATCH: 409,
+  FIAT_CURRENCY_MISMATCH: 409,
+  INSUFFICIENT_FUNDS: 409,
+};
+
 export function ok<T>(data: T, init?: ResponseInit) { return NextResponse.json({ data }, init); }
 export function problem(status: number, code: string, detail: string, meta?: unknown) { return NextResponse.json({ type: `https://agentpay.dev/problems/${code.toLowerCase()}`, title: code.replaceAll("_", " "), status, detail, code, meta }, { status }); }
 export function rateLimitProblem(retryAfterSeconds: number) {
-  return NextResponse.json({
-    type: "https://agentpay.dev/problems/rate-limited",
-    title: "RATE LIMITED",
-    status: 429,
-    detail: "Too many requests. Try again after the indicated delay.",
-    code: "RATE_LIMITED",
-  }, { status: 429, headers: { "retry-after": String(retryAfterSeconds) } });
+  return NextResponse.json({ type: "https://agentpay.dev/problems/rate-limited", title: "RATE LIMITED", status: 429, detail: "Too many requests. Try again after the indicated delay.", code: "RATE_LIMITED" }, { status: 429, headers: { "retry-after": String(retryAfterSeconds) } });
 }
 export function handleApiError(error: unknown) {
   if (error instanceof ZodError) return problem(422, "VALIDATION_ERROR", "The request did not pass validation.", error.flatten());
   if (error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE") return problem(413, "REQUEST_BODY_TOO_LARGE", "The request body exceeds the allowed size.");
+  if (error instanceof Error && error.message === "UNSUPPORTED_MEDIA_TYPE") return problem(415, "UNSUPPORTED_MEDIA_TYPE", "The request Content-Type is not supported.");
+  if (error instanceof Error && error.message === "INVALID_MULTIPART") return problem(400, "INVALID_MULTIPART", "The multipart request body is malformed.");
   if (error instanceof SyntaxError) return problem(400, "INVALID_JSON", "The request body is not valid JSON.");
+  if (error instanceof Error && operationalErrorStatus[error.message]) {
+    return problem(operationalErrorStatus[error.message]!, error.message, error.message.replaceAll("_", " ").toLowerCase());
+  }
   logError("api_request_failed", error);
   return problem(500, "INTERNAL_ERROR", "The request could not be completed.");
 }
 
-export async function requestBody(request: Request): Promise<unknown> {
+export async function requestBody(request: Request, maxBytes = 64 * 1024): Promise<unknown> {
   const contentType = request.headers.get("content-type") ?? "";
-  if (contentType.includes("application/json")) return boundedJson(request);
-  const form = await request.formData();
-  return Object.fromEntries(form.entries());
+  if (contentType.includes("application/json")) return boundedJson(request, maxBytes);
+  if (contentType.includes("application/x-www-form-urlencoded")) return Object.fromEntries(new URLSearchParams(await boundedText(request, maxBytes)).entries());
+  if (!contentType.includes("multipart/form-data")) throw new Error("UNSUPPORTED_MEDIA_TYPE");
+  const bytes = await boundedBytes(request, maxBytes);
+  const headers = new Headers(request.headers);
+  headers.delete("content-length");
+  const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  const boundedRequest = new Request(request.url, { method: request.method, headers, body });
+  try {
+    const form = await boundedRequest.formData();
+    return Object.fromEntries(form.entries());
+  } catch {
+    throw new Error("INVALID_MULTIPART");
+  }
 }
 
-export async function boundedJson(request: Request, maxBytes = 64 * 1024): Promise<unknown> {
-  return JSON.parse(await boundedText(request, maxBytes));
-}
+export async function boundedJson(request: Request, maxBytes = 64 * 1024): Promise<unknown> { return JSON.parse(await boundedText(request, maxBytes)); }
+export async function boundedText(request: Request, maxBytes = 64 * 1024): Promise<string> { return new TextDecoder().decode(await boundedBytes(request, maxBytes)); }
 
-export async function boundedText(request: Request, maxBytes = 64 * 1024): Promise<string> {
+export async function boundedBytes(request: Request, maxBytes = 64 * 1024): Promise<Uint8Array> {
   const declared = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(declared) && declared > maxBytes) throw new Error("REQUEST_BODY_TOO_LARGE");
-  if (!request.body) return "";
+  if (!request.body) return new Uint8Array();
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -45,27 +74,21 @@ export async function boundedText(request: Request, maxBytes = 64 * 1024): Promi
     const { done, value } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > maxBytes) {
-      await reader.cancel();
-      throw new Error("REQUEST_BODY_TOO_LARGE");
-    }
+    if (size > maxBytes) { await reader.cancel(); throw new Error("REQUEST_BODY_TOO_LARGE"); }
     chunks.push(value);
   }
   const bytes = new Uint8Array(size);
   let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return new TextDecoder().decode(bytes);
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  return bytes;
 }
 
 export async function authorizeAgentRequest(request: Request, agentId: string, scope: string) {
   const authorization = request.headers.get("authorization");
   if (!authorization?.startsWith("Bearer ")) return false;
   const secret = authorization.slice(7);
-  const prefix = secret.slice(0, 14);
-  const credential = await db.agentCredential.findUnique({ where: { prefix } });
+  const candidatePrefixes = [...new Set([secret.slice(0, 24), secret.slice(0, 14)])].filter(Boolean);
+  const credential = await db.agentCredential.findFirst({ where: { prefix: { in: candidatePrefixes } } });
   if (!credential || credential.agentId !== agentId || credential.status !== "ACTIVE" || credential.revokedAt || (credential.expiresAt && credential.expiresAt <= new Date()) || !credential.scopes.includes(scope)) return false;
   const actual = Buffer.from(createHash("sha256").update(secret).digest("hex"));
   const expected = Buffer.from(credential.secretHash);

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { boundedJson, handleApiError, ok, problem } from "@/lib/api";
 import { db } from "@/lib/db";
+import { hasRecentAuthentication } from "@/lib/session";
 import { workspaceFromRequest, workspaceHasRole } from "@/lib/workspace";
 
 const schema = z.object({
@@ -23,6 +24,7 @@ export async function PUT(request: Request) {
     const workspace = await workspaceFromRequest(request);
     if (!workspace) return problem(401, "AUTH_REQUIRED", "Sign in before changing retention settings.");
     if (!workspaceHasRole(workspace, ["OWNER"])) return problem(403, "ROLE_REQUIRED", "Owner access is required.");
+    if (!hasRecentAuthentication(workspace.session)) return problem(428, "STEP_UP_REQUIRED", "Sign in again before changing data-retention rules.");
     const input = schema.parse(await boundedJson(request));
     const policy = await db.$transaction(async (tx) => {
       const row = await tx.dataRetentionPolicy.upsert({ where: { organizationId: workspace.organization.id }, update: input, create: { organizationId: workspace.organization.id, ...input } });

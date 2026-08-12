@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { automationApproverIsIndependent, automationPaymentOutcome, contractCodeHashMatches, contractMirrorOutcome } from "./automation-service";
+import { automationApproverIsIndependent, automationOrganizationError, automationPaymentOutcome, contractCodeHashMatches, contractMirrorOutcome } from "./automation-service";
 import { keccak256 } from "ethers";
 import { destinationTransferMatches, sourceTransactionMatches } from "./cross-chain-service";
-import { isRetryableFiatSubmission } from "./fiat-reconciliation-service";
+import { fiatSubmissionFailureStatus, isRetryableFiatSubmission } from "./fiat-reconciliation-service";
 
 const transferTopic = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 const address = "0x1111111111111111111111111111111111111111";
@@ -12,6 +12,13 @@ describe("production financial security invariants", () => {
     expect(automationApproverIsIndependent("creator", null, "creator")).toBe(false);
     expect(automationApproverIsIndependent("creator", "trigger", "trigger")).toBe(false);
     expect(automationApproverIsIndependent("creator", "trigger", "approver")).toBe(true);
+  });
+
+  it("blocks new automation side effects when the organization is stopped", () => {
+    expect(automationOrganizationError("ACTIVE", false)).toBeNull();
+    expect(automationOrganizationError("ACTIVE", true)).toBe("ORGANIZATION_KILL_SWITCH_ENABLED");
+    expect(automationOrganizationError("SUSPENDED", false)).toBe("ORGANIZATION_NOT_ACTIVE");
+    expect(automationOrganizationError(undefined, undefined)).toBe("ORGANIZATION_NOT_ACTIVE");
   });
 
   it("defers an automation payment while policy approval is pending", () => {
@@ -38,6 +45,13 @@ describe("production financial security invariants", () => {
     expect(isRetryableFiatSubmission("PENDING", "pending_123")).toBe(true);
     expect(isRetryableFiatSubmission("SUCCEEDED", "pending_123")).toBe(false);
     expect(isRetryableFiatSubmission("SUBMISSION_UNKNOWN", "obt_live_123")).toBe(false);
+  });
+
+  it("does not retry confirmed provider 4xx rejection as an ambiguous fiat submission", () => {
+    expect(fiatSubmissionFailureStatus(new Error("FIAT_PROVIDER_ERROR:400:invalid_request"))).toBe("FAILED");
+    expect(fiatSubmissionFailureStatus(new Error("FIAT_PROVIDER_ERROR:429:rate_limited"))).toBe("FAILED");
+    expect(fiatSubmissionFailureStatus(new Error("FIAT_PROVIDER_ERROR:500:provider_error"))).toBe("SUBMISSION_UNKNOWN");
+    expect(fiatSubmissionFailureStatus(new TypeError("network timeout"))).toBe("SUBMISSION_UNKNOWN");
   });
 
   it("requires an exact ERC-20 transfer recipient, token, and minimum amount", () => {

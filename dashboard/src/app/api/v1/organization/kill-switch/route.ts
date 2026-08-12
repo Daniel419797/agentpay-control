@@ -37,9 +37,19 @@ export async function POST(request: Request) {
       const owned = cardsToFreeze.filter((card) => card.provider === provider.name);
       const results = await Promise.allSettled(owned.map((card) => provider.updateCardStatus(card.externalCardId, "INACTIVE", `kill-switch:${workspace.organization.id}:${card.id}:${card.version}`)));
       providerSyncFailures = results.filter((result) => result.status === "rejected").length + (cardsToFreeze.length - owned.length);
-      if (providerSyncFailures) await db.auditEvent.create({ data: { organizationId: workspace.organization.id, actorType: "SYSTEM", action: "KILL_SWITCH_CARD_PROVIDER_SYNC_FAILED", targetType: "ORGANIZATION", targetId: workspace.organization.id, result: "FAILURE", metadata: { failedCards: providerSyncFailures } } });
+      if (providerSyncFailures) {
+        await db.$transaction(async (tx) => {
+          await tx.auditEvent.create({ data: { organizationId: workspace.organization.id, actorType: "SYSTEM", action: "KILL_SWITCH_CARD_PROVIDER_SYNC_FAILED", targetType: "ORGANIZATION", targetId: workspace.organization.id, result: "FAILURE", metadata: { failedCards: providerSyncFailures } } });
+          const incident = await tx.supportCase.upsert({
+            where: { organizationId_sourceType_sourceId: { organizationId: workspace.organization.id, sourceType: "ORGANIZATION_KILL_SWITCH", sourceId: workspace.organization.id } },
+            create: { organizationId: workspace.organization.id, createdBy: workspace.user.id, sourceType: "ORGANIZATION_KILL_SWITCH", sourceId: workspace.organization.id, category: "KILL_SWITCH_PROVIDER_SYNC", severity: "URGENT", title: "Emergency stop requires provider-side card containment", description: `${providerSyncFailures} card provider freeze operation(s) did not complete. AgentPay remains stopped locally; verify and freeze/cancel the affected provider cards immediately.` },
+            update: { status: "OPEN", severity: "URGENT", description: `${providerSyncFailures} card provider freeze operation(s) did not complete. AgentPay remains stopped locally; verify and freeze/cancel the affected provider cards immediately.` },
+          });
+          await tx.outboxEvent.create({ data: { organizationId: workspace.organization.id, eventType: "KILL_SWITCH_PROVIDER_SYNC_FAILED", aggregateType: "SUPPORT_CASE", aggregateId: incident.id, payload: { failedCards: providerSyncFailures, severity: "URGENT" } } });
+        });
+      }
     }
-    return ok({ ...organization, cardsFrozen: cardsToFreeze.length, providerSyncFailures, reactivationRequired: !input.enabled });
+    return ok({ ...organization, cardsFrozen: cardsToFreeze.length, providerSyncFailures, providerSyncStatus: providerSyncFailures ? "ATTENTION_REQUIRED" : "SYNCHRONIZED", reactivationRequired: !input.enabled });
   } catch (error) {
     return handleApiError(error);
   }

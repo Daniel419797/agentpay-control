@@ -45,6 +45,23 @@ function intervalStart(interval: string | null, now: Date) {
   return new Date(0);
 }
 
+function intervalEnd(interval: string | null, now: Date) {
+  if (interval === "daily") return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  if (interval === "weekly") {
+    const start = intervalStart(interval, now);
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 7);
+    return end;
+  }
+  if (interval === "monthly") return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  if (interval === "yearly") return new Date(Date.UTC(now.getUTCFullYear() + 1, 0, 1));
+  return new Date(8_640_000_000_000_000);
+}
+
+export function spendingWindow(interval: string | null, at: Date) {
+  return { start: intervalStart(interval, at), end: intervalEnd(interval, at) };
+}
+
 export type RecordCardAuthorizationInput = {
   provider: "SANDBOX" | "STRIPE";
   externalAuthorizationId: string;
@@ -67,9 +84,15 @@ export async function recordCardAuthorization(input: RecordCardAuthorizationInpu
       include: { organization: true },
     });
     if (!card) throw new Error("CARD_NOT_FOUND");
-    const start = intervalStart(card.spendingInterval, input.requestedAt);
+    const window = spendingWindow(card.spendingInterval, input.requestedAt);
     const prior = card.spendingInterval === "per_authorization" ? [] : await tx.cardAuthorization.findMany({
-      where: { virtualCardId: card.id, approved: true, status: { in: ["PENDING", "APPROVED", "CLOSED"] }, requestedAt: { gte: start, lt: input.requestedAt }, externalAuthorizationId: { not: input.externalAuthorizationId } },
+      where: {
+        virtualCardId: card.id,
+        approved: true,
+        status: { in: ["PENDING", "APPROVED", "CLOSED"] },
+        requestedAt: { gte: window.start, lt: window.end },
+        externalAuthorizationId: { not: input.externalAuthorizationId },
+      },
       select: { amountMinor: true },
     });
     const spentMinor = prior.reduce((sum, item) => sum + BigInt(item.amountMinor.toString()), 0n);

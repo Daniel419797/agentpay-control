@@ -6,6 +6,19 @@ export function isRetryableFiatSubmission(status: string, externalTransferId: st
   return ["PENDING", "SUBMISSION_UNKNOWN"].includes(status) && externalTransferId.startsWith("pending_");
 }
 
+/**
+ * Only responses that prove the provider could not have accepted the operation
+ * are terminal. Validation, idempotency, throttling, provider, malformed-success,
+ * and network failures remain ambiguous and are reconciled with the same key.
+ */
+export function fiatSubmissionFailureStatus(error: unknown): "FAILED" | "SUBMISSION_UNKNOWN" {
+  if (!(error instanceof Error)) return "SUBMISSION_UNKNOWN";
+  const match = /^FIAT_PROVIDER_ERROR:(\d{3}):([^:]+)$/.exec(error.message);
+  if (!match) return "SUBMISSION_UNKNOWN";
+  const status = Number(match[1]);
+  return [401, 403, 404].includes(status) ? "FAILED" : "SUBMISSION_UNKNOWN";
+}
+
 export async function reconcileUnknownFiatTransfers(limit = 25, now = new Date()) {
   const provider = getCardProvider();
   const transfers = await db.fiatTransfer.findMany({
@@ -46,7 +59,13 @@ export async function reconcileUnknownFiatTransfers(limit = 25, now = new Date()
       });
       if (changed) reconciled += 1;
     } catch (error) {
-      await db.fiatTransfer.update({ where: { id: transfer.id }, data: { status: "SUBMISSION_UNKNOWN", failureCode: error instanceof Error ? error.message.slice(0, 120) : "RECONCILIATION_FAILED" } });
+      await db.fiatTransfer.update({
+        where: { id: transfer.id },
+        data: {
+          status: fiatSubmissionFailureStatus(error),
+          failureCode: error instanceof Error ? error.message.slice(0, 120) : "RECONCILIATION_FAILED",
+        },
+      });
     }
   }
   return { scanned: transfers.length, reconciled };

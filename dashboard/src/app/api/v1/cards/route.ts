@@ -4,6 +4,7 @@ import { getCardProvider } from "@/domain/card-provider";
 import { boundedJson, handleApiError, ok, problem } from "@/lib/api";
 import { getConfig } from "@/lib/config";
 import { db } from "@/lib/db";
+import { hasRecentAuthentication } from "@/lib/session";
 import { workspaceFromRequest, workspaceHasRole } from "@/lib/workspace";
 
 const interval = z.enum(["per_authorization", "daily", "weekly", "monthly", "yearly", "all_time"]);
@@ -44,6 +45,8 @@ export async function POST(request: Request) {
     const workspace = await workspaceFromRequest(request);
     if (!workspace) return problem(401, "AUTH_REQUIRED", "Sign in before issuing a card.");
     if (!workspaceHasRole(workspace, ["OWNER", "OPERATOR"])) return problem(403, "ROLE_REQUIRED", "Owner or operator access is required.");
+    if (!hasRecentAuthentication(workspace.session)) return problem(428, "STEP_UP_REQUIRED", "Sign in again before issuing a virtual card.");
+    if (workspace.organization.killSwitchEnabled) return problem(409, "ORGANIZATION_KILL_SWITCH_ENABLED", "The organization emergency stop is active. New card issuance is disabled.");
     const idempotencyKey = request.headers.get("idempotency-key");
     if (!idempotencyKey || idempotencyKey.length < 8 || idempotencyKey.length > 100) return problem(400, "IDEMPOTENCY_KEY_REQUIRED", "Provide an Idempotency-Key header between 8 and 100 characters.");
     const input = createSchema.parse(await boundedJson(request));
@@ -56,6 +59,11 @@ export async function POST(request: Request) {
     if (new Set(input.allowedCategories).size !== input.allowedCategories.length || new Set(input.blockedCategories).size !== input.blockedCategories.length || new Set(input.allowedCountries).size !== input.allowedCountries.length) return problem(422, "DUPLICATE_CONTROL", "Spending-control entries must be unique.");
     const provider = getCardProvider();
     if (provider.name !== cardholder.provider) return problem(409, "CARD_PROVIDER_MISMATCH", "The cardholder belongs to a different configured provider.");
+
+    const operationState = await db.organization.findUnique({ where: { id: workspace.organization.id }, select: { status: true, killSwitchEnabled: true } });
+    if (!operationState || operationState.status !== "ACTIVE") return problem(409, "ORGANIZATION_NOT_ACTIVE", "The organization is not active.");
+    if (operationState.killSwitchEnabled) return problem(409, "ORGANIZATION_KILL_SWITCH_ENABLED", "The organization emergency stop is active. New card issuance is disabled.");
+
     const external = await provider.issueVirtualCard({ cardholderId: cardholder.externalCardholderId, currency: input.currency, spendingLimitMinor: input.spendingLimitMinor, spendingInterval: input.spendingInterval, allowedCategories: input.allowedCategories, blockedCategories: input.blockedCategories, allowedCountries: input.allowedCountries, idempotencyKey: `card:${workspace.organization.id}:${idempotencyKey}` });
     const card = await db.$transaction(async (tx) => {
       const record = await tx.virtualCard.upsert({

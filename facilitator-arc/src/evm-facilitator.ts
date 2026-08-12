@@ -1,9 +1,16 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { ExactEvmScheme } from "@x402/evm/exact/facilitator";
 import { ExactEvmScheme as ExactEvmClientScheme } from "@x402/evm/exact/client";
 import { toFacilitatorEvmSigner, verifyTypedDataSignature } from "@x402/evm";
 import { createWalletClient, createPublicClient, http, defineChain, type WalletClient, type PublicClient, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { z } from "zod";
+
+const privateKeySchema = z.string().regex(/^(0x)?[0-9a-fA-F]{64}$/, "Must be a 64-char hex private key");
+const optionalPrivateKeySchema = z.preprocess(
+  (value) => value === "" ? undefined : value,
+  privateKeySchema.optional(),
+);
 
 const arcTestnet = defineChain({
   id: 5042002,
@@ -16,7 +23,9 @@ const arcTestnet = defineChain({
 
 export const envSchema = z.object({
   APP_ENV: z.enum(["development", "test", "production"]).default("development"),
-  ARC_PAYER_PRIVATE_KEY: z.string().regex(/^(0x)?[0-9a-fA-F]{64}$/, "Must be a 64-char hex private key"),
+  ARC_PAYER_PRIVATE_KEY: privateKeySchema,
+  ARC_RELAYER_PRIVATE_KEY: optionalPrivateKeySchema,
+  ARC_CONTRACT_EXECUTION_PRIVATE_KEY: optionalPrivateKeySchema,
   ARC_RPC_URL: z.string().url().default("https://rpc.testnet.arc.network"),
   ARC_USDC_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).default("0x3600000000000000000000000000000000000000"),
   ARC_PROVIDER_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
@@ -30,10 +39,44 @@ export const envSchema = z.object({
 
 export type ArcConfig = z.infer<typeof envSchema>;
 
+type SettlementEvidence = { transactionId?: Hex };
+export type SettlementCapture<T> =
+  | { result: T; error?: never; transactionId?: Hex }
+  | { result?: never; error: unknown; transactionId?: Hex };
+
+export class SettlementEvidenceScope {
+  private readonly storage = new AsyncLocalStorage<SettlementEvidence>();
+
+  async capture<T>(operation: () => Promise<T>): Promise<SettlementCapture<T>> {
+    const evidence: SettlementEvidence = {};
+    return this.storage.run(evidence, async () => {
+      try {
+        return { result: await operation(), transactionId: evidence.transactionId };
+      } catch (error) {
+        return { error, transactionId: evidence.transactionId };
+      }
+    });
+  }
+
+  record(transactionId: Hex) {
+    const evidence = this.storage.getStore();
+    if (evidence && !evidence.transactionId) evidence.transactionId = transactionId;
+  }
+}
+
+function toAccount(value: string) {
+  const key = value.startsWith("0x") ? value as Hex : `0x${value}` as Hex;
+  return privateKeyToAccount(key);
+}
+
 export class EvmFacilitator {
   private readonly config: ArcConfig;
-  private readonly account: ReturnType<typeof privateKeyToAccount>;
+  private readonly payerAccount: ReturnType<typeof privateKeyToAccount>;
+  private readonly relayerAccount: ReturnType<typeof privateKeyToAccount>;
+  private readonly contractAccount: ReturnType<typeof privateKeyToAccount>;
+  private readonly settlementEvidence = new SettlementEvidenceScope();
   readonly walletClient: WalletClient;
+  private readonly contractWalletClient: WalletClient;
   readonly publicClient: PublicClient;
   readonly scheme: ExactEvmScheme;
   readonly clientScheme: ExactEvmClientScheme;
@@ -42,7 +85,9 @@ export class EvmFacilitator {
 
   constructor(config: ArcConfig) {
     this.config = config;
-    this.account = privateKeyToAccount(config.ARC_PAYER_PRIVATE_KEY.startsWith("0x") ? config.ARC_PAYER_PRIVATE_KEY as Hex : `0x${config.ARC_PAYER_PRIVATE_KEY}` as Hex);
+    this.payerAccount = toAccount(config.ARC_PAYER_PRIVATE_KEY);
+    this.relayerAccount = toAccount(config.ARC_RELAYER_PRIVATE_KEY ?? config.ARC_PAYER_PRIVATE_KEY);
+    this.contractAccount = toAccount(config.ARC_CONTRACT_EXECUTION_PRIVATE_KEY ?? config.ARC_PAYER_PRIVATE_KEY);
     this.usdcAddress = config.ARC_USDC_ADDRESS as Hex;
 
     const chain = defineChain({
@@ -51,7 +96,12 @@ export class EvmFacilitator {
     });
 
     this.walletClient = createWalletClient({
-      account: this.account,
+      account: this.relayerAccount,
+      chain,
+      transport: http(config.ARC_RPC_URL),
+    });
+    this.contractWalletClient = createWalletClient({
+      account: this.contractAccount,
       chain,
       transport: http(config.ARC_RPC_URL),
     });
@@ -62,18 +112,30 @@ export class EvmFacilitator {
     });
 
     const evmSigner = {
-      address: this.account.address,
+      address: this.relayerAccount.address,
       readContract: (args: any) => this.publicClient.readContract(args),
-      sendTransaction: (args: any) => this.walletClient.sendTransaction({ ...args, account: this.account, chain: this.walletClient.chain }),
-      writeContract: (args: any) => this.walletClient.writeContract({ ...args, account: this.account, chain: this.walletClient.chain }),
+      sendTransaction: async (args: any) => {
+        const transactionHash = await this.walletClient.sendTransaction({ ...args, account: this.relayerAccount, chain: this.walletClient.chain });
+        this.settlementEvidence.record(transactionHash);
+        return transactionHash;
+      },
+      writeContract: async (args: any) => {
+        const transactionHash = await this.walletClient.writeContract({ ...args, account: this.relayerAccount, chain: this.walletClient.chain });
+        this.settlementEvidence.record(transactionHash);
+        return transactionHash;
+      },
       waitForTransactionReceipt: (args: any) => this.publicClient.waitForTransactionReceipt(args),
       getCode: (args: any) => this.publicClient.getCode(args),
       verifyTypedData: (args: any) => verifyTypedDataSignature(evmSigner as any, args),
     };
     const signer = toFacilitatorEvmSigner(evmSigner);
     this.scheme = new ExactEvmScheme(signer);
-    this.clientScheme = new ExactEvmClientScheme(this.account, { rpcUrl: config.ARC_RPC_URL });
+    this.clientScheme = new ExactEvmClientScheme(this.payerAccount, { rpcUrl: config.ARC_RPC_URL });
     this.network = `eip155:${chain.id}`;
+  }
+
+  captureSettlementEvidence<T>(operation: () => Promise<T>) {
+    return this.settlementEvidence.capture(operation);
   }
 
   get providerAddress(): string {
@@ -111,9 +173,9 @@ export class EvmFacilitator {
     gas: number,
     payableAtomic: bigint,
   ) {
-    const tx = await this.walletClient.sendTransaction({
-      account: this.account,
-      chain: this.walletClient.chain,
+    const tx = await this.contractWalletClient.sendTransaction({
+      account: this.contractAccount,
+      chain: this.contractWalletClient.chain,
       to: contractAddress,
       data: calldata,
       gas: BigInt(Math.min(gas, 15_000_000)),

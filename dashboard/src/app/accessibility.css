@@ -1,0 +1,55 @@
+.primary-button:disabled,
+.secondary-button:disabled,
+.danger-button:disabled,
+.network-switcher-trigger:disabled,
+.wallet-trigger:disabled,
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+button:disabled:hover,
+.primary-button:disabled:hover,
+.secondary-button:disabled:hover,
+.danger-button:disabled:hover {
+  filter: none;
+}
+
+/* globals.css historically hid every generic data table below 600px even on
+   pages that do not provide an alternate card view. Preserve the semantic
+   table and let its existing .table-wrap scroll horizontally instead. */
+@media (max-width: 600px) {
+  .table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-wrap .data-table {
+    display: table;
+    min-width: 680px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .auth-spinner,
+  .wallet-spin {
+    animation: none !important;
+  }
+}

@@ -1,4 +1,11 @@
 import { AppShell } from "@/components/app-shell";
+import {
+  isHederaMainnetEnabled,
+  isManagedArcEnabled,
+  isManagedCardanoMainnetEnabled,
+  isManagedCardanoPreprodEnabled,
+} from "@/domain/network-router";
+import { getConfig } from "@/lib/config";
 
 // All routes in this segment are organization-scoped and read live data.
 // Build-time rendering would couple deployments to PostgreSQL and could cache
@@ -6,5 +13,15 @@ import { AppShell } from "@/components/app-shell";
 export const dynamic = "force-dynamic";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  return <AppShell>{children}</AppShell>;
+  const config = getConfig();
+  return (
+    <AppShell
+      mainnetEnabled={isHederaMainnetEnabled(config)}
+      arcEnabled={isManagedArcEnabled(config)}
+      cardanoPreprodEnabled={isManagedCardanoPreprodEnabled(config)}
+      cardanoMainnetEnabled={isManagedCardanoMainnetEnabled(config)}
+    >
+      {children}
+    </AppShell>
+  );
 }

@@ -4,6 +4,7 @@ import { getCardProvider } from "@/domain/card-provider";
 import { boundedJson, handleApiError, ok, problem } from "@/lib/api";
 import { getConfig } from "@/lib/config";
 import { db } from "@/lib/db";
+import { hasRecentAuthentication } from "@/lib/session";
 import { workspaceFromRequest, workspaceHasRole } from "@/lib/workspace";
 
 const schema = z.object({ currency: z.string().length(3).transform((value) => value.toUpperCase()), displayName: z.string().min(2).max(50) });
@@ -30,9 +31,14 @@ export async function POST(request: Request) {
     const workspace = await workspaceFromRequest(request);
     if (!workspace) return problem(401, "AUTH_REQUIRED", "Sign in before opening a fiat account.");
     if (!workspaceHasRole(workspace, ["OWNER"])) return problem(403, "ROLE_REQUIRED", "Owner access is required.");
+    if (!hasRecentAuthentication(workspace.session)) return problem(428, "STEP_UP_REQUIRED", "Sign in again before opening a fiat account.");
+    if (workspace.organization.killSwitchEnabled) return problem(409, "ORGANIZATION_KILL_SWITCH_ENABLED", "The organization emergency stop is active. New fiat accounts are disabled.");
     const idempotencyKey = request.headers.get("idempotency-key");
     if (!idempotencyKey || idempotencyKey.length < 8 || idempotencyKey.length > 100) return problem(400, "IDEMPOTENCY_KEY_REQUIRED", "Provide an Idempotency-Key header between 8 and 100 characters.");
     const input = schema.parse(await boundedJson(request));
+    const operationState = await db.organization.findUnique({ where: { id: workspace.organization.id }, select: { status: true, killSwitchEnabled: true } });
+    if (!operationState || operationState.status !== "ACTIVE") return problem(409, "ORGANIZATION_NOT_ACTIVE", "The organization is not active.");
+    if (operationState.killSwitchEnabled) return problem(409, "ORGANIZATION_KILL_SWITCH_ENABLED", "The organization emergency stop is active. New fiat accounts are disabled.");
     const provider = getCardProvider();
     const external = await provider.createFiatAccount(input, `fiat-account:${workspace.organization.id}:${idempotencyKey}`);
     const account = await db.$transaction(async (tx) => {

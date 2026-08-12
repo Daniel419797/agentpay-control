@@ -1,49 +1,101 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-type Agent = { id: string; name: string; status: string };
-type Resource = { url: string; label: string };
-
-const PRESET_RESOURCES: Resource[] = [
-  { url: "http://localhost:3200/v1/market-data/eth", label: "ETH Market Data" },
-  { url: "http://localhost:3200/v1/market-data/btc", label: "BTC Market Data" },
-  { url: "http://localhost:3200/v1/market-data/sol", label: "SOL Market Data" },
-  { url: "http://localhost:3200/v1/market-data/link", label: "LINK Market Data" },
-  { url: "http://localhost:3200/v1/files/q2-report", label: "Q2 Financial Report" },
-  { url: "http://localhost:3200/v1/files/whitepaper", label: "Whitepaper" },
-  { url: "http://localhost:3200/v1/inference/llama-3.2", label: "LLaMA 3.2 Inference" },
-  { url: "http://localhost:3200/v1/research", label: "Web Research" },
-];
+type AgentAccount = { network: string; custodyType: string; signingMode: string };
+type Agent = { id: string; name: string; status: string; network: string; accounts: AgentAccount[] };
+type Resource = {
+  id: string;
+  name: string;
+  endpoint: string;
+  status: string;
+  provider?: { name?: string };
+  prices?: Array<{ atomicAmount: string; asset?: { network?: string; symbol?: string; decimals?: number } }>;
+};
 
 type Result = {
   id: string;
   status: string;
   resourceUrl: string;
   transactionId?: string | null;
-  hashscanUrl?: string | null;
+  explorerUrl?: string | null;
   amount?: string;
-  asset?: string;
-  error?: string;
+  network?: string;
 };
+
+function formatAtomic(value: string, decimals: number, symbol: string) {
+  try {
+    const atomic = BigInt(value);
+    const divisor = 10n ** BigInt(Math.max(0, decimals));
+    const whole = atomic / divisor;
+    const fraction = (atomic % divisor).toString().padStart(decimals, "0").replace(/0+$/, "");
+    return `${whole.toString()}${fraction ? `.${fraction}` : ""} ${symbol}`.trim();
+  } catch {
+    return `${value} ${symbol}`.trim();
+  }
+}
+
+function explorerTransactionUrl(network: string | undefined, transactionId: string | null | undefined) {
+  if (!network || !transactionId) return null;
+  if (network === "hedera:testnet") return `https://hashscan.io/testnet/transaction/${encodeURIComponent(transactionId)}`;
+  if (network === "hedera:mainnet") return `https://hashscan.io/mainnet/transaction/${encodeURIComponent(transactionId)}`;
+  if (network === "eip155:5042002") return `https://testnet.arcscan.app/tx/${encodeURIComponent(transactionId)}`;
+  if (network === "cardano:preprod") return `https://preprod.cardanoscan.io/transaction/${encodeURIComponent(transactionId)}`;
+  if (network === "cardano:mainnet") return `https://cardanoscan.io/transaction/${encodeURIComponent(transactionId)}`;
+  return null;
+}
+
+function supportsManagedRequest(account: AgentAccount | undefined) {
+  if (!account) return false;
+  return (account.custodyType === "PLATFORM_MANAGED_TESTNET" && account.signingMode === "AUTONOMOUS_MANAGED")
+    || (account.custodyType === "EXTERNAL_DELEGATED" && account.signingMode === "BOUNDED_DELEGATION");
+}
 
 export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; defaultAgentId?: string }) {
   const [agentId, setAgentId] = useState(defaultAgentId ?? agents[0]?.id ?? "");
-  const [resourceUrl, setResourceUrl] = useState(PRESET_RESOURCES[0].url);
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [resourceUrl, setResourceUrl] = useState("");
   const [customUrl, setCustomUrl] = useState("");
   const [useCustom, setUseCustom] = useState(false);
   const [purpose, setPurpose] = useState("");
+  const [loadingResources, setLoadingResources] = useState(true);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState("");
 
-  const activeAgent = agents.find((a) => a.id === agentId);
+  const activeAgent = agents.find((agent) => agent.id === agentId);
+  const activeAccount = activeAgent?.accounts.find((account) => account.network === activeAgent.network) ?? activeAgent?.accounts[0];
   const isPaused = activeAgent?.status === "PAUSED";
+  const managedRequest = supportsManagedRequest(activeAccount);
+
+  const compatibleResources = useMemo(() => {
+    if (!activeAgent) return [];
+    return resources.filter((resource) => resource.status === "ACTIVE" && resource.prices?.some((price) => price.asset?.network === activeAgent.network));
+  }, [activeAgent, resources]);
+
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/v1/resources", { cache: "no-store" })
+      .then(async (response) => {
+        const body = await response.json().catch(() => null) as { data?: Resource[]; detail?: string } | null;
+        if (!response.ok) throw new Error(body?.detail ?? "Could not load registered resources.");
+        return body?.data ?? [];
+      })
+      .then((rows) => { if (active) setResources(rows); })
+      .catch((caught) => { if (active) setError(caught instanceof Error ? caught.message : "Could not load registered resources."); })
+      .finally(() => { if (active) setLoadingResources(false); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (useCustom) return;
+    if (!compatibleResources.some((resource) => resource.endpoint === resourceUrl)) setResourceUrl(compatibleResources[0]?.endpoint ?? "");
+  }, [compatibleResources, resourceUrl, useCustom]);
 
   async function submit() {
-    const url = useCustom ? customUrl : resourceUrl;
-    if (!agentId || !url) return;
+    const url = useCustom ? customUrl.trim() : resourceUrl;
+    if (!agentId || !url || !managedRequest) return;
     setLoading(true);
     setError("");
     setResult(null);
@@ -51,30 +103,24 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
       const idempotencyKey = crypto.randomUUID();
       const response = await fetch(`/api/v1/agents/${agentId}/paid-requests`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": idempotencyKey,
-        },
-        body: JSON.stringify({ resourceUrl: url, purpose: purpose || undefined }),
+        headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify({ resourceUrl: url, purpose: purpose.trim() || undefined }),
       });
-      const body = await response.json();
-      if (!response.ok) {
-        setError(body?.error?.message ?? `Request failed (${response.status})`);
+      const body = await response.json().catch(() => null) as { data?: any; detail?: string; error?: { message?: string } } | null;
+      if (!response.ok || !body?.data) {
+        setError(body?.detail ?? body?.error?.message ?? `Request failed (${response.status})`);
         return;
       }
       const data = body.data;
-      setResult({
-        id: data.id,
-        status: data.status,
-        resourceUrl: url,
-        transactionId: data.attempts?.[0]?.settlement?.transactionId ?? null,
-        hashscanUrl: data.attempts?.[0]?.settlement?.transactionId
-          ? `https://hashscan.io/testnet/transaction/${data.attempts[0].settlement.transactionId}`
-          : null,
-        amount: data.quote?.amountAtomic ? `${(Number(data.quote.amountAtomic) / Math.pow(10, data.quote.asset?.decimals ?? 8)).toFixed(4)} ${data.quote.asset?.symbol ?? ""}` : undefined,
-      });
+      const settlement = data.attempts?.find((attempt: any) => attempt.settlement)?.settlement;
+      const network = data.quote?.network as string | undefined;
+      const transactionId = settlement?.transactionId as string | null | undefined;
+      const amountAtomic = data.quote?.amountAtomic != null ? String(data.quote.amountAtomic) : undefined;
+      const decimals = Number(data.quote?.asset?.decimals ?? 0);
+      const symbol = String(data.quote?.asset?.symbol ?? "");
+      setResult({ id: data.id, status: data.status, resourceUrl: url, transactionId, explorerUrl: explorerTransactionUrl(network, transactionId), amount: amountAtomic ? formatAtomic(amountAtomic, decimals, symbol) : undefined, network });
     } catch {
-      setError("Network error. Please try again.");
+      setError("Network error. The request status is unknown; check Transactions before retrying.");
     } finally {
       setLoading(false);
     }
@@ -82,8 +128,8 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
 
   function statusColor(status: string) {
     if (status === "SETTLED") return "status-settled";
-    if (status === "APPROVAL_PENDING" || status === "PENDING") return "status-approval";
-    if (status === "DENIED" || status === "FAILED_BEFORE_SUBMISSION") return "status-error";
+    if (["APPROVAL_PENDING", "PENDING", "AUTHORIZED", "SUBMISSION_UNKNOWN"].includes(status)) return "status-approval";
+    if (["DENIED", "REJECTED", "FAILED_BEFORE_SUBMISSION", "SETTLEMENT_FAILED"].includes(status)) return "status-error";
     return "";
   }
 
@@ -91,47 +137,34 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <div>
         <label style={{ display: "block", fontSize: 13, marginBottom: 4 }}>Agent</label>
-        <select className="form-input" value={agentId} onChange={(e) => setAgentId(e.target.value)}>
-          {agents.map((a) => (
-            <option key={a.id} value={a.id}>{a.name} ({a.status})</option>
-          ))}
+        <select className="form-input" value={agentId} onChange={(event) => setAgentId(event.target.value)}>
+          {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name} ({agent.status})</option>)}
         </select>
         {isPaused && <div className="form-error" style={{ marginTop: 4 }}>Agent is paused. Resume it before sending requests.</div>}
+        {activeAgent && !managedRequest && <div className="form-help" style={{ marginTop: 6 }}>This account requires wallet confirmation. Autonomous x402 requests are available only for managed or explicitly delegated signer accounts.</div>}
       </div>
 
       <div>
         <label style={{ display: "block", fontSize: 13, marginBottom: 4 }}>Resource</label>
         <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
-            <input type="radio" checked={!useCustom} onChange={() => setUseCustom(false)} /> Preset
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
-            <input type="radio" checked={useCustom} onChange={() => setUseCustom(true)} /> Custom URL
-          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}><input type="radio" checked={!useCustom} onChange={() => setUseCustom(false)} /> Registered</label>
+          <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}><input type="radio" checked={useCustom} onChange={() => setUseCustom(true)} /> Registered URL</label>
         </div>
         {useCustom ? (
-          <input className="form-input" value={customUrl} onChange={(e) => setCustomUrl(e.target.value)} placeholder="http://localhost:3200/v1/market-data/eth" />
+          <input className="form-input" value={customUrl} onChange={(event) => setCustomUrl(event.target.value)} placeholder="https://provider.example/api/resource" inputMode="url" />
         ) : (
-          <select className="form-input" value={resourceUrl} onChange={(e) => setResourceUrl(e.target.value)}>
-            {PRESET_RESOURCES.map((r) => (
-              <option key={r.url} value={r.url}>{r.label}</option>
-            ))}
+          <select className="form-input" value={resourceUrl} onChange={(event) => setResourceUrl(event.target.value)} disabled={loadingResources || compatibleResources.length === 0}>
+            {loadingResources && <option value="">Loading resources…</option>}
+            {!loadingResources && compatibleResources.length === 0 && <option value="">No active resource priced for this network</option>}
+            {compatibleResources.map((resource) => <option key={resource.id} value={resource.endpoint}>{resource.name}{resource.provider?.name ? ` · ${resource.provider.name}` : ""}</option>)}
           </select>
         )}
+        <div className="form-help" style={{ marginTop: 6 }}>The endpoint must be an active AgentPay resource with a verified price and payee for the selected agent network.</div>
       </div>
 
-      <div>
-        <label style={{ display: "block", fontSize: 13, marginBottom: 4 }}>Purpose (optional)</label>
-        <input className="form-input" value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="e.g. Daily market analysis" />
-      </div>
-
-      {error && <div className="form-error">{error}</div>}
-
-      <div className="button-row">
-        <button className="primary-button" disabled={loading || !agentId || isPaused || (!useCustom && !resourceUrl) || (useCustom && !customUrl)} onClick={() => void submit()}>
-          {loading ? "Sending…" : "Send paid request"}
-        </button>
-      </div>
+      <div><label style={{ display: "block", fontSize: 13, marginBottom: 4 }}>Purpose (optional)</label><input className="form-input" value={purpose} onChange={(event) => setPurpose(event.target.value)} placeholder="e.g. Daily market analysis" /></div>
+      {error && <div className="form-error" role="alert">{error}</div>}
+      <div className="button-row"><button className="primary-button" type="button" disabled={loading || !agentId || isPaused || !managedRequest || (useCustom ? !customUrl.trim() : !resourceUrl)} onClick={() => void submit()}>{loading ? "Sending…" : "Send paid request"}</button></div>
 
       {result && (
         <div className="panel" style={{ borderRadius: 8, padding: 16 }}>
@@ -139,12 +172,13 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
           <div className="detail-grid">
             <div><span>Status</span><strong><span className={`status-badge ${statusColor(result.status)}`}>{result.status.replaceAll("_", " ")}</span></strong></div>
             <div><span>Resource</span><strong style={{ fontSize: 13 }}>{result.resourceUrl}</strong></div>
+            {result.network && <div><span>Network</span><strong>{result.network}</strong></div>}
             {result.amount && <div><span>Amount</span><strong>{result.amount}</strong></div>}
             {result.transactionId && <div><span>Transaction</span><strong style={{ fontFamily: "monospace", fontSize: 12 }}>{result.transactionId}</strong></div>}
           </div>
           <div className="button-row" style={{ marginTop: 12 }}>
             <Link className="secondary-button" href="/app/transactions">View all transactions</Link>
-            {result.hashscanUrl && <a className="secondary-button" href={result.hashscanUrl} target="_blank" rel="noreferrer">Open HashScan</a>}
+            {result.explorerUrl && <a className="secondary-button" href={result.explorerUrl} target="_blank" rel="noreferrer">Open explorer</a>}
           </div>
         </div>
       )}

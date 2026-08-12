@@ -1,24 +1,25 @@
 "use client";
 
-import { createContext, useContext, useCallback, useEffect, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useCallback, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 
-export type NetworkId = "hedera:testnet" | "hedera:mainnet";
+export type NetworkId = "hedera:testnet" | "hedera:mainnet" | "eip155:5042002" | "cardano:preprod" | "cardano:mainnet";
 
 const NETWORK_STORAGE_KEY = "agentpay:network";
 
+function isNetworkId(value: string | null): value is NetworkId {
+  return value === "hedera:testnet" || value === "hedera:mainnet" || value === "eip155:5042002" || value === "cardano:preprod" || value === "cardano:mainnet";
+}
+
 function getNetworkFromUrl(): NetworkId | null {
   if (typeof window === "undefined") return null;
-  const params = new URLSearchParams(window.location.search);
-  const value = params.get("network");
-  if (value === "hedera:testnet" || value === "hedera:mainnet") return value;
-  return null;
+  const value = new URLSearchParams(window.location.search).get("network");
+  return isNetworkId(value) ? value : null;
 }
 
 function getNetworkFromStorage(): NetworkId {
   if (typeof window === "undefined") return "hedera:testnet";
   const stored = localStorage.getItem(NETWORK_STORAGE_KEY);
-  if (stored === "hedera:testnet" || stored === "hedera:mainnet") return stored;
-  return "hedera:testnet";
+  return isNetworkId(stored) ? stored : "hedera:testnet";
 }
 
 function resolveNetwork(): NetworkId {
@@ -32,7 +33,7 @@ function notifyListeners() {
   for (const listener of listeners) listener();
 }
 
-function setNetwork(value: NetworkId) {
+function persistNetwork(value: NetworkId) {
   snapshot = value;
   localStorage.setItem(NETWORK_STORAGE_KEY, value);
   const url = new URL(window.location.href);
@@ -54,45 +55,55 @@ function getServerSnapshot(): NetworkId {
   return "hedera:testnet";
 }
 
+export type NetworkOption = { id: NetworkId; label: string; testnet: boolean; family: "HEDERA" | "EVM" | "CARDANO" };
+
 const NetworkContext = createContext<{
   network: NetworkId;
   setNetwork: (value: NetworkId) => void;
-  networks: { id: NetworkId; label: string; testnet: boolean }[];
+  networks: NetworkOption[];
 }>({
   network: "hedera:testnet",
   setNetwork: () => {},
-  networks: [
-    { id: "hedera:testnet", label: "Hedera Testnet", testnet: true },
-    { id: "hedera:mainnet", label: "Hedera Mainnet", testnet: false },
-  ],
+  networks: [{ id: "hedera:testnet", label: "Hedera Testnet", testnet: true, family: "HEDERA" }],
 });
 
-export function NetworkProvider({ children }: { children: ReactNode }) {
+export function NetworkProvider({
+  children,
+  mainnetEnabled = true,
+  arcEnabled = false,
+  cardanoPreprodEnabled = false,
+  cardanoMainnetEnabled = false,
+}: {
+  children: ReactNode;
+  mainnetEnabled?: boolean;
+  arcEnabled?: boolean;
+  cardanoPreprodEnabled?: boolean;
+  cardanoMainnetEnabled?: boolean;
+}) {
   const network = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const networks = useMemo<NetworkOption[]>(() => [
+    { id: "hedera:testnet", label: "Hedera Testnet", testnet: true, family: "HEDERA" },
+    ...(mainnetEnabled ? [{ id: "hedera:mainnet" as const, label: "Hedera Mainnet", testnet: false, family: "HEDERA" as const }] : []),
+    ...(arcEnabled ? [{ id: "eip155:5042002" as const, label: "Arc Testnet", testnet: true, family: "EVM" as const }] : []),
+    ...(cardanoPreprodEnabled ? [{ id: "cardano:preprod" as const, label: "Cardano Preprod", testnet: true, family: "CARDANO" as const }] : []),
+    ...(cardanoMainnetEnabled ? [{ id: "cardano:mainnet" as const, label: "Cardano Mainnet", testnet: false, family: "CARDANO" as const }] : []),
+  ], [arcEnabled, cardanoMainnetEnabled, cardanoPreprodEnabled, mainnetEnabled]);
 
   useEffect(() => {
     const resolved = resolveNetwork();
-    if (resolved !== snapshot) {
-      snapshot = resolved;
-      notifyListeners();
-    }
-  }, []);
+    const allowed = networks.some((candidate) => candidate.id === resolved) ? resolved : "hedera:testnet";
+    if (allowed !== snapshot || allowed !== resolved) persistNetwork(allowed);
+  }, [networks]);
 
   const handleSetNetwork = useCallback((value: NetworkId) => {
-    setNetwork(value);
-  }, []);
+    if (!networks.some((candidate) => candidate.id === value)) return;
+    persistNetwork(value);
+  }, [networks]);
+
+  const activeNetwork = networks.some((candidate) => candidate.id === network) ? network : "hedera:testnet";
 
   return (
-    <NetworkContext.Provider
-      value={{
-        network,
-        setNetwork: handleSetNetwork,
-        networks: [
-          { id: "hedera:testnet", label: "Hedera Testnet", testnet: true },
-          { id: "hedera:mainnet", label: "Hedera Mainnet", testnet: false },
-        ],
-      }}
-    >
+    <NetworkContext.Provider value={{ network: activeNetwork, setNetwork: handleSetNetwork, networks }}>
       {children}
     </NetworkContext.Provider>
   );

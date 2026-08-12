@@ -1,0 +1,10 @@
+FROM node:22-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+COPY cardano-signer/package.json ./package.json
+COPY cardano-signer/cardano.mjs ./cardano.mjs
+COPY cardano-signer/server.mjs ./server.mjs
+RUN addgroup -S agentpay && adduser -S -G agentpay agentpay && chown -R agentpay:agentpay /app
+USER agentpay
+EXPOSE 8791
+CMD ["node", "server.mjs"]

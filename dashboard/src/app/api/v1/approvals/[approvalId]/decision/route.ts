@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { executeAuthorizedIntent } from "@/domain/payment-service";
+import { executeAuthorizedPayment } from "@/domain/authorized-payment-executor";
 import { boundedJson, handleApiError, ok, problem } from "@/lib/api";
 import { db } from "@/lib/db";
 import { workspaceFromRequest, workspaceHasRole } from "@/lib/workspace";
@@ -28,14 +28,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ app
       if (!approval) return { kind: "NOT_FOUND" as const };
       if (approval.status !== "PENDING" || approval.expiresAt <= new Date()) return { kind: "NOT_PENDING" as const };
 
-      await tx.approvalDecision.create({
-        data: { approvalRequestId: approval.id, userId: workspace.user.id, decision: input.decision, note: input.note },
+      const initiators = await tx.auditEvent.findMany({
+        where: { organizationId: workspace.organization.id, action: "PAYMENT_REQUEST_INITIATED", targetType: "PAYMENT_INTENT", targetId: approval.paymentIntentId, result: "SUCCESS" },
+        orderBy: { occurredAt: "asc" }, take: 2, select: { actorType: true, actorId: true },
       });
-      const grouped = await tx.approvalDecision.groupBy({
-        by: ["decision"],
-        where: { approvalRequestId: approval.id },
-        _count: { _all: true },
-      });
+      if (initiators.length !== 1 || !initiators[0]?.actorId) {
+        await tx.auditEvent.create({ data: { organizationId: workspace.organization.id, actorType: "USER", actorId: workspace.user.id, action: "PAYMENT_APPROVAL_INITIATOR_EVIDENCE_DENIED", targetType: "APPROVAL_REQUEST", targetId: approval.id, result: "DENIED", metadata: { paymentIntentId: approval.paymentIntentId, initiatorEvidenceCount: initiators.length } } });
+        return { kind: "INITIATOR_EVIDENCE_MISSING" as const };
+      }
+
+      const initiator = initiators[0];
+      if (input.decision === "APPROVE" && initiator.actorType === "USER" && initiator.actorId === workspace.user.id) {
+        await tx.auditEvent.create({ data: { organizationId: workspace.organization.id, actorType: "USER", actorId: workspace.user.id, action: "PAYMENT_APPROVAL_SELF_DENIED", targetType: "APPROVAL_REQUEST", targetId: approval.id, result: "DENIED", metadata: { paymentIntentId: approval.paymentIntentId } } });
+        return { kind: "SELF_APPROVAL_FORBIDDEN" as const };
+      }
+
+      await tx.approvalDecision.create({ data: { approvalRequestId: approval.id, userId: workspace.user.id, decision: input.decision, note: input.note } });
+      const grouped = await tx.approvalDecision.groupBy({ by: ["decision"], where: { approvalRequestId: approval.id }, _count: { _all: true } });
       const approvals = grouped.find((row) => row.decision === "APPROVE")?._count._all ?? 0;
       const rejections = grouped.find((row) => row.decision === "REJECT")?._count._all ?? 0;
       let status: "PENDING" | "REJECTED" | "CONSUMED" = "PENDING";
@@ -53,30 +62,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ app
         status = "CONSUMED";
       }
 
-      await tx.auditEvent.create({
-        data: {
-          organizationId: workspace.organization.id,
-          actorType: "USER",
-          actorId: workspace.user.id,
-          action: `PAYMENT_APPROVAL_${input.decision}`,
-          targetType: "APPROVAL_REQUEST",
-          targetId: approval.id,
-          result: "SUCCESS",
-          metadata: { approvals, rejections, requiredApprovals: approval.requiredApprovals, requiredRejections: approval.requiredRejections, status },
-        },
-      });
+      await tx.auditEvent.create({ data: { organizationId: workspace.organization.id, actorType: "USER", actorId: workspace.user.id, action: `PAYMENT_APPROVAL_${input.decision}`, targetType: "APPROVAL_REQUEST", targetId: approval.id, result: "SUCCESS", metadata: { approvals, rejections, requiredApprovals: approval.requiredApprovals, requiredRejections: approval.requiredRejections, status } } });
       return { kind: "DECIDED" as const, paymentIntentId: approval.paymentIntentId, status, approvals, rejections, requiredApprovals: approval.requiredApprovals, requiredRejections: approval.requiredRejections };
     }, { isolationLevel: "Serializable" }));
 
     if (result.kind === "NOT_FOUND") return problem(404, "APPROVAL_NOT_FOUND", "Approval not found.");
     if (result.kind === "NOT_PENDING") return problem(409, "APPROVAL_NOT_PENDING", "Approval is no longer pending.");
-    if (result.status === "CONSUMED") return ok(await executeAuthorizedIntent(result.paymentIntentId));
+    if (result.kind === "INITIATOR_EVIDENCE_MISSING") return problem(409, "APPROVAL_INITIATOR_EVIDENCE_MISSING", "This approval cannot be decided because its immutable initiator evidence is missing or inconsistent. Cancel and recreate the payment request.");
+    if (result.kind === "SELF_APPROVAL_FORBIDDEN") return problem(403, "APPROVAL_SEPARATION_REQUIRED", "The operator who initiated this payment cannot approve it. A different Owner or Approver must review the request.");
+    if (result.status === "CONSUMED") return ok(await executeAuthorizedPayment(result.paymentIntentId));
     return ok(result);
   } catch (error) {
     if (errorCode(error) === "P2002") return problem(409, "APPROVAL_ALREADY_DECIDED", "You have already voted on this approval.");
     if (errorCode(error) === "P2034") return problem(409, "APPROVAL_CONCURRENT_UPDATE", "Another approval vote was recorded. Retry with the latest state.");
-    if (error instanceof Error && ["PAYMENT_QUOTE_EXPIRED", "SPEND_RESERVATION_INVALID", "POLICY_CHANGED", "POLICY_NOT_ACTIVE", "POLICY_EXPIRED", "OUTSIDE_POLICY_SCHEDULE"].includes(error.message)) {
-      return problem(409, error.message, error.message.replaceAll("_", " "));
+    if (error instanceof Error && ["PAYMENT_QUOTE_EXPIRED", "SPEND_RESERVATION_INVALID", "POLICY_CHANGED", "POLICY_NOT_ACTIVE", "POLICY_EXPIRED", "OUTSIDE_POLICY_SCHEDULE"].includes(error.message)) return problem(409, error.message, error.message.replaceAll("_", " "));
+    if (error instanceof Error && ["PYTH_VALUATION_INCREASED_AFTER_AUTHORIZATION", "PYTH_FEED_CHANGED_AFTER_AUTHORIZATION", "PYTH_AUTHORIZATION_SNAPSHOT_MISSING"].includes(error.message)) {
+      return problem(409, error.message, "The oracle-backed authorization is no longer valid. Recreate the payment request and obtain approval again.");
+    }
+    if (error instanceof Error && error.message.startsWith("PYTH_")) {
+      return problem(503, "PYTH_REVALIDATION_UNAVAILABLE", "The current oracle evidence could not safely revalidate this approved payment. No payment was submitted.");
     }
     return handleApiError(error);
   }

@@ -11,6 +11,7 @@ import { useNetwork } from "@/domain/network-context";
 type WalletIdentity = { id: string; accountId: string; network: string; walletProvider: string };
 type Challenge = { accountId: string; message: string; challengeToken: string };
 type PaymentReceipt = { transactionId: string; hashscanUrl: string };
+
 function networkToSignerPrefix(network: string) {
   return network === "hedera:mainnet" ? "hedera:mainnet" : "hedera:testnet";
 }
@@ -28,9 +29,20 @@ export function HederaWalletConnect() {
   const [purpose, setPurpose] = useState("");
 
   useEffect(() => {
-    void fetch("/api/v1/wallet").then((response) => response.ok ? response.json() : null)
-      .then((body: { data?: { identities?: WalletIdentity[] } } | null) => setIdentity(body?.data?.identities?.[0] ?? null));
-  }, []);
+    let active = true;
+    setReceipt(null);
+    setError(null);
+    void fetch("/api/v1/wallet", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((body: { data?: { identities?: WalletIdentity[] } } | null) => {
+        if (!active) return;
+        setIdentity(body?.data?.identities?.find((candidate) => candidate.network === network) ?? null);
+      })
+      .catch(() => {
+        if (active) setIdentity(null);
+      });
+    return () => { active = false; };
+  }, [network]);
 
   const openWalletSession = useCallback(async () => {
     if (!projectId) throw new Error("WalletConnect project ID is not configured yet.");
@@ -55,14 +67,17 @@ export function HederaWalletConnect() {
         params: { signerAccountId: `${networkToSignerPrefix(network)}:${accountId}`, message: challengeBody.data.message },
       }, network);
       const signatureMap = extractSignatureMap(signed);
-      if (!signatureMap) throw new Error("HashPack did not return a valid signature.");
+      if (!signatureMap) throw new Error("The connected wallet did not return a valid signature.");
       const linkResponse = await fetch("/api/v1/wallet", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ challengeToken: challengeBody.data.challengeToken, signatureMap, walletProvider: "HashPack via WalletConnect" })
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ challengeToken: challengeBody.data.challengeToken, signatureMap, walletProvider: "HashPack via WalletConnect" }),
       });
       const linkBody = await linkResponse.json();
       if (!linkResponse.ok) throw new Error(linkBody.detail ?? "Wallet verification failed.");
-      setIdentity(linkBody.data.identity as WalletIdentity);
+      const linked = linkBody.data.identity as WalletIdentity;
+      if (linked.network !== network) throw new Error("The verified wallet identity does not match the active network.");
+      setIdentity(linked);
       setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Wallet connection was cancelled.");
@@ -71,6 +86,7 @@ export function HederaWalletConnect() {
 
   async function sendPayment() {
     if (!projectId || !identity) return;
+    if (identity.network !== network) { setError("Reconnect the wallet for the active Hedera network."); return; }
     const amountTinybar = parseHbarToTinybars(amountHbar);
     if (!/^0\.0\.\d+$/.test(payeeAccountId)) { setError("Enter a valid Hedera account such as 0.0.1234."); return; }
     if (!amountTinybar) { setError("Enter an HBAR amount greater than zero with no more than 8 decimal places."); return; }
@@ -97,14 +113,14 @@ export function HederaWalletConnect() {
         },
       }, network);
       const transactionId = extractTransactionId(result);
-      if (!transactionId) throw new Error("HashPack did not return a Hedera transaction ID.");
+      if (!transactionId) throw new Error("The wallet did not return a Hedera transaction ID.");
 
       let response: Response | null = null;
       for (let attempt = 0; attempt < 5; attempt += 1) {
         response = await fetch("/api/v1/wallet/payments", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ transactionId, payeeAccountId, amountTinybar, purpose: purpose.trim() }),
+          body: JSON.stringify({ transactionId, payeeAccountId, amountTinybar, purpose: purpose.trim(), network }),
         });
         if (response.status !== 409) break;
         await new Promise((resolve) => setTimeout(resolve, 1_500));
@@ -125,6 +141,7 @@ export function HederaWalletConnect() {
       const response = await fetch(`/api/v1/wallet?network=${encodeURIComponent(network)}`, { method: "DELETE" });
       if (!response.ok) throw new Error("Could not unlink the wallet.");
       setIdentity(null);
+      setReceipt(null);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not unlink the wallet."); }
     finally { setBusy(false); }
   }
@@ -135,8 +152,8 @@ export function HederaWalletConnect() {
         <WalletCards size={16} />{identity ? identity.accountId : "Connect wallet"}
       </button>
       {open && <section className="wallet-popover" aria-label="Hedera wallet connection">
-        <div className="wallet-popover-heading"><div><strong>Hedera payment identity</strong><span>{networkToSignerPrefix(network) === "hedera:mainnet" ? "Self custody · Mainnet" : "Self custody · Testnet"}</span></div>{identity ? <CheckCircle2 size={18} className="wallet-ok" /> : <XCircle size={18} className="wallet-muted" />}</div>
-        {identity ? <div className="wallet-identity"><span>HashPack / WalletConnect</span><strong>{identity.accountId}</strong><small>Ownership signature verified</small></div> : <p>Connect HashPack through WalletConnect, then approve a message signature. This does not sign in to AgentPay or authorize a payment.</p>}
+        <div className="wallet-popover-heading"><div><strong>Hedera payment identity</strong><span>{network === "hedera:mainnet" ? "Self custody · Mainnet" : "Self custody · Testnet"}</span></div>{identity ? <CheckCircle2 size={18} className="wallet-ok" /> : <XCircle size={18} className="wallet-muted" />}</div>
+        {identity ? <div className="wallet-identity"><span>HashPack / WalletConnect</span><strong>{identity.accountId}</strong><small>Ownership signature verified for {network}</small></div> : <p>Connect HashPack through WalletConnect, then approve a message signature for the active network. This does not authorize a payment.</p>}
         {error && <div className="wallet-error" role="alert">{error}</div>}
         {receipt && <div className="wallet-receipt"><strong>Payment confirmed</strong><a href={receipt.hashscanUrl} target="_blank" rel="noreferrer">View on HashScan</a></div>}
         {identity

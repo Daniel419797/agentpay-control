@@ -3,8 +3,11 @@ import { serve } from "@hono/node-server";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { z } from "zod";
+import "./production-preflight.js";
 import { parseEnabledNetworks, requiresNetwork } from "./network-selection.js";
 import { boundedJson, sameRequirement } from "./security.js";
+import { decodeX402Header, encodeX402Header } from "./x402-headers.js";
+import { cardanoRequirementExtra, optionalCardanoAssetUnit } from "./cardano-requirements.js";
 
 const env = z.object({
   APP_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -12,9 +15,11 @@ const env = z.object({
   FACILITATOR_URL: z.string().default("http://localhost:8787"),
   HEDERA_MAINNET_FACILITATOR_URL: z.string().default("http://localhost:8787"),
   ARC_FACILITATOR_URL: z.string().default("http://localhost:8788"),
+  CARDANO_PREPROD_FACILITATOR_URL: z.string().default("http://localhost:8790"),
+  CARDANO_MAINNET_FACILITATOR_URL: z.string().default("http://localhost:8790"),
   PORT: z.coerce.number().default(3200),
   NETWORK: z.string().default("hedera:testnet"),
-  PROVIDER_ACCOUNT_ID: z.string(),
+  PROVIDER_ACCOUNT_ID: z.string().optional(),
   HEDERA_MAINNET_PROVIDER_ACCOUNT_ID: z.string().optional(),
   USDC_TOKEN_ID: z.string().optional(),
   HEDERA_MAINNET_USDC_TOKEN_ID: z.string().optional(),
@@ -23,150 +28,128 @@ const env = z.object({
   FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
   HEDERA_MAINNET_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
   ARC_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
+  CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
+  CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
   ARC_PROVIDER_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   ARC_USDC_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
+  CARDANO_PREPROD_PROVIDER_ADDRESS: z.string().regex(/^addr_test1[0-9a-z]+$/).optional(),
+  CARDANO_MAINNET_PROVIDER_ADDRESS: z.string().regex(/^addr1[0-9a-z]+$/).optional(),
+  CARDANO_PREPROD_USDCX_ASSET_ID: z.string().optional(),
+  CARDANO_MAINNET_USDCX_ASSET_ID: z.string().optional(),
+  CARDANO_USDCX_RESOURCE_PRICE_ATOMIC: z.string().regex(/^[1-9]\d*$/).default("1000000"),
 }).parse(process.env);
 
+const cardanoPreprodUsdcx = optionalCardanoAssetUnit("CARDANO_PREPROD_USDCX_ASSET_ID", env.CARDANO_PREPROD_USDCX_ASSET_ID);
+const cardanoMainnetUsdcx = optionalCardanoAssetUnit("CARDANO_MAINNET_USDCX_ASSET_ID", env.CARDANO_MAINNET_USDCX_ASSET_ID);
 const enabledNetworks = parseEnabledNetworks(env.ENABLED_NETWORKS);
 if (env.APP_ENV === "production") {
-  if (requiresNetwork(enabledNetworks, "hedera:testnet") && !env.FACILITATOR_SETTLEMENT_API_KEY) {
-    throw new Error("Production Hedera testnet settlement API key is required");
-  }
-  if (requiresNetwork(enabledNetworks, "hedera:mainnet") && !env.HEDERA_MAINNET_FACILITATOR_SETTLEMENT_API_KEY) {
-    throw new Error("Production Hedera mainnet settlement API key is required");
-  }
-  if (requiresNetwork(enabledNetworks, "eip155:5042002") && !env.ARC_FACILITATOR_SETTLEMENT_API_KEY) {
-    throw new Error("Production Arc settlement API key is required");
-  }
+  if (requiresNetwork(enabledNetworks, "hedera:testnet") && !env.FACILITATOR_SETTLEMENT_API_KEY) throw new Error("Production Hedera testnet settlement API key is required");
+  if (requiresNetwork(enabledNetworks, "hedera:mainnet") && !env.HEDERA_MAINNET_FACILITATOR_SETTLEMENT_API_KEY) throw new Error("Production Hedera mainnet settlement API key is required");
+  if (requiresNetwork(enabledNetworks, "eip155:5042002") && !env.ARC_FACILITATOR_SETTLEMENT_API_KEY) throw new Error("Production Arc settlement API key is required");
+  if (requiresNetwork(enabledNetworks, "cardano:preprod") && !env.CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY) throw new Error("Production Cardano Preprod settlement API key is required");
+  if (requiresNetwork(enabledNetworks, "cardano:mainnet") && !env.CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY) throw new Error("Production Cardano Mainnet settlement API key is required");
 }
 
-const ARCTestnet = {
-  caip2: "eip155:5042002",
-  usdcAddress: env.ARC_USDC_ADDRESS ?? "0x3600000000000000000000000000000000000000",
-  providerAddress: env.ARC_PROVIDER_ADDRESS ?? "",
-  explorerUrl: "https://testnet.arcscan.app/tx",
-  facilitatorUrl: env.ARC_FACILITATOR_URL,
-};
-
-const HederaTestnet = {
-  caip2: "hedera:testnet",
-  usdcTokenId: env.USDC_TOKEN_ID,
-  providerAccountId: env.PROVIDER_ACCOUNT_ID,
-  explorerUrl: "https://hashscan.io/testnet/transaction",
-  facilitatorUrl: env.FACILITATOR_URL,
-};
-
-const HederaMainnet = {
-  caip2: "hedera:mainnet",
-  usdcTokenId: env.HEDERA_MAINNET_USDC_TOKEN_ID,
-  providerAccountId: env.HEDERA_MAINNET_PROVIDER_ACCOUNT_ID ?? env.PROVIDER_ACCOUNT_ID,
-  explorerUrl: "https://hashscan.io/mainnet/transaction",
-  facilitatorUrl: env.HEDERA_MAINNET_FACILITATOR_URL,
-};
+const ARCTestnet = { caip2: "eip155:5042002", usdcAddress: env.ARC_USDC_ADDRESS ?? "0x3600000000000000000000000000000000000000", providerAddress: env.ARC_PROVIDER_ADDRESS ?? "", explorerUrl: "https://testnet.arcscan.app/tx", facilitatorUrl: env.ARC_FACILITATOR_URL };
+const HederaTestnet = { caip2: "hedera:testnet", usdcTokenId: env.USDC_TOKEN_ID ?? "", providerAccountId: env.PROVIDER_ACCOUNT_ID ?? "", explorerUrl: "https://hashscan.io/testnet/transaction", facilitatorUrl: env.FACILITATOR_URL };
+const HederaMainnet = { caip2: "hedera:mainnet", usdcTokenId: env.HEDERA_MAINNET_USDC_TOKEN_ID ?? "", providerAccountId: env.HEDERA_MAINNET_PROVIDER_ACCOUNT_ID ?? "", explorerUrl: "https://hashscan.io/mainnet/transaction", facilitatorUrl: env.HEDERA_MAINNET_FACILITATOR_URL };
+const CardanoPreprod = { caip2: "cardano:preprod", providerAddress: env.CARDANO_PREPROD_PROVIDER_ADDRESS ?? "", explorerUrl: "https://preprod.cardanoscan.io/transaction", facilitatorUrl: env.CARDANO_PREPROD_FACILITATOR_URL };
+const CardanoMainnet = { caip2: "cardano:mainnet", providerAddress: env.CARDANO_MAINNET_PROVIDER_ADDRESS ?? "", explorerUrl: "https://cardanoscan.io/transaction", facilitatorUrl: env.CARDANO_MAINNET_FACILITATOR_URL };
 
 type NetworkConfig = { caip2: string; facilitatorUrl: string; explorerUrl: string };
+type AssetPrice = { type: "NATIVE" | "TOKEN"; amount: string; assetId: string; decimals: number; symbol: string };
 const configuredNetworks: Record<string, NetworkConfig> = {
   [HederaTestnet.caip2]: HederaTestnet,
   [HederaMainnet.caip2]: HederaMainnet,
   [ARCTestnet.caip2]: ARCTestnet,
+  [CardanoPreprod.caip2]: CardanoPreprod,
+  [CardanoMainnet.caip2]: CardanoMainnet,
 };
-const networks = Object.fromEntries(
-  Object.entries(configuredNetworks).filter(([network]) => enabledNetworks.has(network as never)),
-) as Record<string, NetworkConfig>;
+const networks = Object.fromEntries(Object.entries(configuredNetworks).filter(([network]) => enabledNetworks.has(network as never))) as Record<string, NetworkConfig>;
 
-type AssetPrice = { type: "NATIVE" | "TOKEN"; amount: string; assetId: string; decimals: number; symbol: string };
 const requirementSchema = z.object({
-  scheme: z.literal("exact"),
-  network: z.string().min(1),
-  amount: z.string().regex(/^\d+$/),
-  payTo: z.string().min(1),
-  asset: z.string().min(1),
-  maxTimeoutSeconds: z.number().int().positive().max(3600),
-  extra: z.record(z.string(), z.unknown()).default({}),
+  scheme: z.literal("exact"), network: z.string().min(1), amount: z.string().regex(/^[1-9]\d*$/), payTo: z.string().min(1), asset: z.string().min(1), maxTimeoutSeconds: z.number().int().positive().max(3600), extra: z.record(z.string(), z.unknown()).default({}),
 });
-const paymentPayloadSchema = z.object({
-  x402Version: z.literal(2),
-  accepted: requirementSchema,
-  payload: z.record(z.string(), z.unknown()),
-}).passthrough();
+const paymentPayloadSchema = z.object({ x402Version: z.literal(2), accepted: requirementSchema, payload: z.record(z.string(), z.unknown()) }).passthrough();
+const settlementResponseSchema = z.object({
+  success: z.boolean(), errorReason: z.string().optional(), payer: z.string().optional(), transaction: z.string(), transactionId: z.string().optional(), network: z.string(), amount: z.string().optional(), extensions: z.record(z.string(), z.unknown()).optional(),
+});
 
-const arcPrices: Record<string, AssetPrice> = {
-  usdc: { type: "TOKEN", amount: "1000000", assetId: ARCTestnet.usdcAddress, decimals: 6, symbol: "USDC" },
-};
-const hederaPrices: Record<string, AssetPrice> = {
+const arcPrices: Record<string, AssetPrice> = { usdc: { type: "TOKEN", amount: "1000000", assetId: ARCTestnet.usdcAddress, decimals: 6, symbol: "USDC" } };
+const hederaTestnetPrices: Record<string, AssetPrice> = {
   hbar: { type: "NATIVE", amount: "5000000", assetId: "0.0.0", decimals: 8, symbol: "HBAR" },
-  usdc: { type: "TOKEN", amount: "1000000", assetId: HederaTestnet.usdcTokenId ?? "", decimals: 6, symbol: "USDC" },
+  usdc: { type: "TOKEN", amount: "1000000", assetId: HederaTestnet.usdcTokenId, decimals: 6, symbol: "USDC" },
+};
+const hederaMainnetPrices: Record<string, AssetPrice> = {
+  hbar: { type: "NATIVE", amount: "5000000", assetId: "0.0.0", decimals: 8, symbol: "HBAR" },
+  usdc: { type: "TOKEN", amount: "1000000", assetId: HederaMainnet.usdcTokenId, decimals: 6, symbol: "USDC" },
+};
+const cardanoPreprodPrices: Record<string, AssetPrice> = {
+  ada: { type: "NATIVE", amount: "1000000", assetId: "lovelace", decimals: 6, symbol: "ADA" },
+  ...(cardanoPreprodUsdcx ? { usdcx: { type: "TOKEN" as const, amount: env.CARDANO_USDCX_RESOURCE_PRICE_ATOMIC, assetId: cardanoPreprodUsdcx, decimals: 6, symbol: "USDCX" } } : {}),
+};
+const cardanoMainnetPrices: Record<string, AssetPrice> = {
+  ada: { type: "NATIVE", amount: "1000000", assetId: "lovelace", decimals: 6, symbol: "ADA" },
+  ...(cardanoMainnetUsdcx ? { usdcx: { type: "TOKEN" as const, amount: env.CARDANO_USDCX_RESOURCE_PRICE_ATOMIC, assetId: cardanoMainnetUsdcx, decimals: 6, symbol: "USDCX" } } : {}),
 };
 
-function getNetworkConfig(network: string): NetworkConfig | undefined {
-  return networks[network];
+function getNetworkConfig(network: string): NetworkConfig | undefined { return networks[network]; }
+function pricesForNetwork(network: string): Record<string, AssetPrice> {
+  if (network === ARCTestnet.caip2) return arcPrices;
+  if (network === HederaMainnet.caip2) return hederaMainnetPrices;
+  if (network === CardanoPreprod.caip2) return cardanoPreprodPrices;
+  if (network === CardanoMainnet.caip2) return cardanoMainnetPrices;
+  return hederaTestnetPrices;
 }
-
-function paymentRequirements(network: string, resourceUrl: string) {
+function payeeForNetwork(network: string): string {
+  if (network === ARCTestnet.caip2) return ARCTestnet.providerAddress;
+  if (network === HederaMainnet.caip2) return HederaMainnet.providerAccountId;
+  if (network === CardanoPreprod.caip2) return CardanoPreprod.providerAddress;
+  if (network === CardanoMainnet.caip2) return CardanoMainnet.providerAddress;
+  return HederaTestnet.providerAccountId;
+}
+function requirementsForNetwork(network: string, resourceUrl: string) {
   const isArc = network === ARCTestnet.caip2;
-  const isHederaMainnet = network === HederaMainnet.caip2;
-  const prices = isArc ? arcPrices : isHederaMainnet ? hederaPrices : hederaPrices;
-  const payTo = isArc
-    ? ARCTestnet.providerAddress
-    : isHederaMainnet
-      ? HederaMainnet.providerAccountId
-      : HederaTestnet.providerAccountId;
-  const accepts = Object.entries(prices).map(([key, p]) => ({
-    scheme: "exact" as const,
-    network,
-    amount: p.amount,
-    payTo,
-    asset: p.assetId,
-    maxTimeoutSeconds: 900,
-    extra: isArc ? { name: "USD Coin", version: "2", assetTransferMethod: "eip3009" } : { feePayer: env.FACILITATOR_FEE_PAYER_ID },
-  }));
-  return {
-    x402Version: 2,
-    accepts,
-    resource: {
-      url: resourceUrl,
-      description: "AgentPay protected resource",
-      mimeType: "application/json",
-      serviceName: "AgentPay Resource Server",
-    },
-  };
+  const isCardano = network === CardanoPreprod.caip2 || network === CardanoMainnet.caip2;
+  const networkComplete = isArc || isCardano || Boolean(env.FACILITATOR_FEE_PAYER_ID);
+  if (!networkComplete) return [];
+  const extra = isArc
+    ? { name: "USD Coin", version: "2", assetTransferMethod: "eip3009" }
+    : isCardano
+      ? cardanoRequirementExtra(resourceUrl)
+      : { feePayer: env.FACILITATOR_FEE_PAYER_ID! };
+  return Object.values(pricesForNetwork(network))
+    .filter((price) => price.assetId.length > 0 && payeeForNetwork(network).length > 0)
+    .map((price) => ({ scheme: "exact" as const, network, amount: price.amount, payTo: payeeForNetwork(network), asset: price.assetId, maxTimeoutSeconds: 900, extra }));
+}
+function paymentRequirements(resourceUrl: string) {
+  const accepts = Object.keys(networks).flatMap((network) => requirementsForNetwork(network, resourceUrl));
+  if (!accepts.length) throw new Error("PAYMENT_ASSET_NOT_CONFIGURED");
+  return { x402Version: 2, accepts, resource: { url: resourceUrl, description: "AgentPay x402 demonstration resource", mimeType: "application/json", serviceName: "AgentPay Resource Server" } };
 }
 
 const sharedPrices = [
-  { asset: "HBAR", atomicAmount: hederaPrices.hbar.amount, network: HederaTestnet.caip2 },
-  { asset: "USDC", atomicAmount: hederaPrices.usdc.amount, network: HederaTestnet.caip2 },
-  { asset: "HBAR", atomicAmount: hederaPrices.hbar.amount, network: HederaMainnet.caip2 },
-  { asset: "USDC", atomicAmount: hederaPrices.usdc.amount, network: HederaMainnet.caip2 },
-  { asset: "USDC", atomicAmount: arcPrices.usdc.amount, network: ARCTestnet.caip2 },
-].filter((price) => enabledNetworks.has(price.network as never));
+  { asset: "HBAR", atomicAmount: hederaTestnetPrices.hbar.amount, network: HederaTestnet.caip2, assetId: hederaTestnetPrices.hbar.assetId },
+  { asset: "USDC", atomicAmount: hederaTestnetPrices.usdc.amount, network: HederaTestnet.caip2, assetId: hederaTestnetPrices.usdc.assetId },
+  { asset: "HBAR", atomicAmount: hederaMainnetPrices.hbar.amount, network: HederaMainnet.caip2, assetId: hederaMainnetPrices.hbar.assetId },
+  { asset: "USDC", atomicAmount: hederaMainnetPrices.usdc.amount, network: HederaMainnet.caip2, assetId: hederaMainnetPrices.usdc.assetId },
+  { asset: "USDC", atomicAmount: arcPrices.usdc.amount, network: ARCTestnet.caip2, assetId: arcPrices.usdc.assetId },
+  { asset: "ADA", atomicAmount: cardanoPreprodPrices.ada.amount, network: CardanoPreprod.caip2, assetId: cardanoPreprodPrices.ada.assetId },
+  { asset: "ADA", atomicAmount: cardanoMainnetPrices.ada.amount, network: CardanoMainnet.caip2, assetId: cardanoMainnetPrices.ada.assetId },
+  ...(cardanoPreprodUsdcx ? [{ asset: "USDCX", atomicAmount: env.CARDANO_USDCX_RESOURCE_PRICE_ATOMIC, network: CardanoPreprod.caip2, assetId: cardanoPreprodUsdcx }] : []),
+  ...(cardanoMainnetUsdcx ? [{ asset: "USDCX", atomicAmount: env.CARDANO_USDCX_RESOURCE_PRICE_ATOMIC, network: CardanoMainnet.caip2, assetId: cardanoMainnetUsdcx }] : []),
+].filter((price) => enabledNetworks.has(price.network as never) && price.assetId.length > 0 && (!price.network.startsWith("hedera:") || Boolean(env.FACILITATOR_FEE_PAYER_ID)) && payeeForNetwork(price.network).length > 0).map(({ assetId: _assetId, ...price }) => price);
+const hederaCatalogPrices = sharedPrices.filter((price) => price.network.startsWith("hedera:"));
 
 const catalog = {
+  mode: "DEMO_SYNTHETIC",
+  notice: "Resource payloads are synthetic fixtures for x402 integration testing, not live market, AI, file, or research services.",
   resources: [
-    {
-      id: "market-data-eth", category: "MARKET_DATA", name: "ETH/USD Price",
-      description: "Latest Ethereum price with 24h change", endpoint: "/v1/market-data/ETH",
-      prices: sharedPrices,
-    },
-    {
-      id: "market-data-btc", category: "MARKET_DATA", name: "BTC/USD Price",
-      description: "Latest Bitcoin price with 24h change", endpoint: "/v1/market-data/BTC",
-      prices: sharedPrices,
-    },
-    {
-      id: "files-report", category: "FILE", name: "Q2 Market Report",
-      description: "Confidential Q2 market analysis report (PDF)", endpoint: "/v1/files/report-q2",
-      prices: [sharedPrices[0], sharedPrices[2]],
-    },
-    {
-      id: "inference-llama", category: "AI_INFERENCE", name: "LLaMA 3.2 Inference",
-      description: "Run inference on LLaMA 3.2 with custom prompt (max 1000 tokens)", endpoint: "/v1/inference/llama-3.2",
-      prices: sharedPrices,
-    },
-    {
-      id: "research-web", category: "WEB_RESEARCH", name: "Web Research Query",
-      description: "Bounded web research with source metadata", endpoint: "/v1/research",
-      prices: [sharedPrices[0], sharedPrices[2]],
-    },
+    { id: "market-data-eth", category: "MARKET_DATA", name: "ETH/USD Demo Snapshot", description: "Synthetic ETH/USD fixture for testing paid-resource flows; not live market data.", endpoint: "/v1/market-data/ETH", prices: sharedPrices },
+    { id: "market-data-btc", category: "MARKET_DATA", name: "BTC/USD Demo Snapshot", description: "Synthetic BTC/USD fixture for testing paid-resource flows; not live market data.", endpoint: "/v1/market-data/BTC", prices: sharedPrices },
+    { id: "files-report", category: "FILE", name: "Demo Market Report", description: "Synthetic document fixture used to demonstrate paid file access.", endpoint: "/v1/files/report-q2", prices: hederaCatalogPrices },
+    { id: "inference-llama", category: "AI_INFERENCE", name: "Simulated LLaMA Inference", description: "Simulated model output used to test metered x402 inference flows; no model is called.", endpoint: "/v1/inference/llama-3.2", prices: sharedPrices },
+    { id: "research-web", category: "WEB_RESEARCH", name: "Simulated Web Research", description: "Synthetic research results used to test paid research flows; no live web retrieval occurs.", endpoint: "/v1/research", prices: hederaCatalogPrices },
   ],
 };
 
@@ -177,114 +160,84 @@ const marketData: Record<string, { price: string; change: string; high: string; 
   LINK: { price: "14.25", change: "+5.2%", high: "14.50", low: "13.55" },
 };
 
-function generateResourceId(): string {
-  return createHash("sha256").update(randomUUID()).digest("hex").slice(0, 16);
-}
-
-function getFacilitatorForNetwork(network: string): string | undefined {
-  if (network === ARCTestnet.caip2) return ARCTestnet.facilitatorUrl;
-  if (network === HederaTestnet.caip2) return HederaTestnet.facilitatorUrl;
-  if (network === HederaMainnet.caip2) return HederaMainnet.facilitatorUrl;
-  return undefined;
-}
-
+function generateResourceId(): string { return createHash("sha256").update(randomUUID()).digest("hex").slice(0, 16); }
+function getFacilitatorForNetwork(network: string): string | undefined { return getNetworkConfig(network)?.facilitatorUrl; }
 function getSettlementApiKey(network: string): string | undefined {
-  if (network === ARCTestnet.caip2) return env.ARC_FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_API_KEY;
-  if (network === HederaMainnet.caip2) return env.HEDERA_MAINNET_FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_API_KEY;
+  if (network === ARCTestnet.caip2) return env.ARC_FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_API_KEY;
+  if (network === HederaMainnet.caip2) return env.HEDERA_MAINNET_FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_API_KEY;
+  if (network === CardanoPreprod.caip2) return env.CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_API_KEY;
+  if (network === CardanoMainnet.caip2) return env.CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_API_KEY;
   return env.FACILITATOR_SETTLEMENT_API_KEY ?? env.FACILITATOR_API_KEY;
 }
+function networkReady(network: string) { return payeeForNetwork(network).length > 0 && Object.values(pricesForNetwork(network)).some((price) => price.assetId.length > 0); }
 
 const app = new Hono();
-
-app.get("/health", (c: Context) => c.json({ status: "ok", networks: Object.keys(networks), provider: { testnet: env.PROVIDER_ACCOUNT_ID, mainnet: env.HEDERA_MAINNET_PROVIDER_ACCOUNT_ID ?? env.PROVIDER_ACCOUNT_ID } }));
-
+app.get("/health", (c: Context) => c.json({ status: "ok", networks: Object.keys(networks).filter(networkReady), resourceMode: "DEMO_SYNTHETIC", cardanoAssets: { preprod: Object.values(cardanoPreprodPrices).map((price) => price.symbol), mainnet: Object.values(cardanoMainnetPrices).map((price) => price.symbol) } }));
 app.get("/catalog", (c: Context) => c.json(catalog));
 
 async function handlePaidRequest(c: Context, category: string, resourceId: string, data: unknown) {
   const paymentSignature = c.req.header("PAYMENT-SIGNATURE");
-  const paymentRequirementsHeader = c.req.header("PAYMENT-REQUIREMENTS");
-  const acceptNetwork = c.req.header("ACCEPT-NETWORK") ?? HederaTestnet.caip2;
-  if (!getNetworkConfig(acceptNetwork)) {
-    return c.json({ code: "NETWORK_UNSUPPORTED", message: `Network ${acceptNetwork} is not enabled` }, 422);
-  }
-
-  const canonical = paymentRequirements(acceptNetwork, c.req.url);
-  const canonicalRequirement = requirementSchema.parse(canonical.accepts[0]);
+  let canonical: ReturnType<typeof paymentRequirements>;
+  try { canonical = paymentRequirements(c.req.url); }
+  catch { return c.json({ code: "PAYMENT_ASSET_NOT_CONFIGURED", message: "No enabled payment rail has a complete asset/payee configuration." }, 503); }
 
   if (!paymentSignature) {
-    c.header("PAYMENT-REQUIRED", JSON.stringify(canonical));
-    const firstPrice = acceptNetwork === ARCTestnet.caip2 ? arcPrices.usdc : hederaPrices.hbar;
-    return c.json({
-      code: "PAYMENT_REQUIRED",
-      message: `Pay ${firstPrice.amount} ${firstPrice.symbol} on ${acceptNetwork} to access this ${category} resource`,
-      paymentRequirements: canonical,
-    }, 402);
+    c.header("PAYMENT-REQUIRED", encodeX402Header(canonical));
+    return c.json({ code: "PAYMENT_REQUIRED", message: `Payment is required to access this ${category} resource`, paymentRequirements: canonical }, 402);
   }
-  if (paymentSignature.length > 128 * 1024 || !paymentRequirementsHeader || paymentRequirementsHeader.length > 64 * 1024) {
-    return c.json({ code: "PAYMENT_PAYLOAD_TOO_LARGE", message: "The payment headers exceed the allowed size." }, 413);
+
+  let payload: z.infer<typeof paymentPayloadSchema>;
+  try { payload = paymentPayloadSchema.parse(decodeX402Header(paymentSignature)); }
+  catch (error) {
+    const code = error instanceof Error && error.message === "PAYMENT_HEADER_TOO_LARGE" ? "PAYMENT_PAYLOAD_TOO_LARGE" : "PAYMENT_HEADER_INVALID";
+    return c.json({ code, message: "The payment signature header is invalid." }, code === "PAYMENT_PAYLOAD_TOO_LARGE" ? 413 : 400);
   }
+
+  const matchingCanonical = canonical.accepts.find((req) => sameRequirement(payload.accepted, req));
+  if (!matchingCanonical) return c.json({ code: "PAYMENT_REQUIREMENT_MISMATCH", message: "The signed payment does not match this exact resource, price, asset, and payee." }, 402);
+  const network = matchingCanonical.network;
+  const facilitatorUrl = getFacilitatorForNetwork(network);
+  if (!facilitatorUrl) return c.json({ code: "NETWORK_UNSUPPORTED", message: `Network ${network} is not supported` }, 422);
+  const settlementApiKey = getSettlementApiKey(network);
+  const verifyBody = { paymentPayload: payload, paymentRequirements: matchingCanonical };
+  const idempotencyKey = `resource:${resourceId}:${createHash("sha256").update(paymentSignature).digest("hex")}`;
 
   try {
-    const parsed = requirementSchema.parse(JSON.parse(paymentRequirementsHeader));
-    const payload = paymentPayloadSchema.parse(JSON.parse(paymentSignature));
-    const matchingCanonical = canonical.accepts.find((req) => sameRequirement(parsed, req));
-    if (!matchingCanonical || !sameRequirement(payload.accepted, matchingCanonical)) {
-      return c.json({ code: "PAYMENT_REQUIREMENT_MISMATCH", message: "The signed payment does not match this resource price and payee." }, 402);
-    }
-
-    const verifyBody = { paymentPayload: payload, paymentRequirements: matchingCanonical };
-    const idempotencyKey = `resource:${resourceId}:${createHash("sha256").update(paymentSignature).digest("hex")}`;
-    const facilitatorUrl = getFacilitatorForNetwork(parsed.network);
-    if (!facilitatorUrl) return c.json({ code: "NETWORK_UNSUPPORTED", message: `Network ${parsed.network} is not supported` }, 422);
-    const settlementApiKey = getSettlementApiKey(parsed.network);
-
-    const verifyRes = await fetch(`${facilitatorUrl}/verify`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(settlementApiKey ? { authorization: `Bearer ${settlementApiKey}` } : {}) },
-      body: JSON.stringify(verifyBody),
-      signal: AbortSignal.timeout(15_000),
+    const verifyRes = await fetch(`${facilitatorUrl.replace(/\/$/, "")}/verify`, {
+      method: "POST", headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(settlementApiKey ? { authorization: `Bearer ${settlementApiKey}` } : {}) }, body: JSON.stringify(verifyBody), signal: AbortSignal.timeout(15_000), redirect: "error",
     });
     const verifyResult = await verifyRes.json().catch(() => ({})) as { isValid?: boolean; invalidReason?: string };
-    if (!verifyRes.ok || verifyResult.isValid !== true) {
-      return c.json({ code: "PAYMENT_INVALID", message: verifyResult.invalidReason || "Payment verification failed" }, 402);
+    if (!verifyRes.ok || verifyResult.isValid !== true) return c.json({ code: "PAYMENT_INVALID", message: verifyResult.invalidReason || "Payment verification failed" }, 402);
+
+    const settleRes = await fetch(`${facilitatorUrl.replace(/\/$/, "")}/settle`, {
+      method: "POST", headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(settlementApiKey ? { authorization: `Bearer ${settlementApiKey}` } : {}) }, body: JSON.stringify(verifyBody), signal: AbortSignal.timeout(75_000), redirect: "error",
+    });
+    const rawSettlement = await settleRes.json().catch(() => ({}));
+    const parsedSettlement = settlementResponseSchema.safeParse(rawSettlement);
+
+    if (!parsedSettlement.success) {
+      if (settleRes.ok || settleRes.status >= 500) return c.json({ code: "SETTLEMENT_UNKNOWN", message: "Settlement may have been submitted but the facilitator response could not be verified.", network }, 503);
+      return c.json({ code: "SETTLEMENT_FAILED", message: "Settlement failed before verifiable submission evidence was returned." }, 422);
     }
 
-    const settleRes = await fetch(`${facilitatorUrl}/settle`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "idempotency-key": idempotencyKey, ...(settlementApiKey ? { authorization: `Bearer ${settlementApiKey}` } : {}) },
-      body: JSON.stringify(verifyBody),
-      signal: AbortSignal.timeout(30_000),
-    });
-    const settleResult = await settleRes.json().catch(() => ({})) as { success?: boolean; transaction?: string; transactionId?: string; errorReason?: string };
+    const settleResult = parsedSettlement.data;
+    const transactionCandidate = (settleResult.transactionId ?? settleResult.transaction) || undefined;
     if (!settleRes.ok || settleResult.success !== true) {
+      if (settleRes.status >= 500 || settleResult.errorReason === "settlement_unknown" || transactionCandidate) {
+        return c.json({ code: "SETTLEMENT_UNKNOWN", message: "Settlement may have been submitted but could not be confirmed.", network, ...(transactionCandidate ? { transactionId: transactionCandidate } : {}) }, 503);
+      }
       return c.json({ code: "SETTLEMENT_FAILED", message: settleResult.errorReason || "Settlement failed" }, 422);
     }
-    const transactionId = settleResult.transaction ?? settleResult.transactionId;
-    if (!transactionId) return c.json({ code: "SETTLEMENT_EVIDENCE_MISSING", message: "Facilitator did not return a transaction ID" }, 502);
+    if (settleResult.network !== network) return c.json({ code: "SETTLEMENT_NETWORK_MISMATCH", message: "Facilitator settlement evidence returned a different network." }, 502);
+    if (!settleResult.transaction) return c.json({ code: "SETTLEMENT_EVIDENCE_MISSING", message: "Facilitator did not return a transaction ID" }, 502);
 
-    const paymentResponse = {
-      x402Version: 2,
-      transactionId,
-      network: parsed.network,
-      settledAt: new Date().toISOString(),
-    };
-    c.header("PAYMENT-RESPONSE", JSON.stringify(paymentResponse));
-
-    const networkConfig = getNetworkConfig(parsed.network);
-    const explorerUrl = networkConfig ? `${networkConfig.explorerUrl}/${transactionId}` : `https://hashscan.io/testnet/transaction/${transactionId}`;
-
-    const response = {
-      resourceId: generateResourceId(),
-      category,
-      content: data,
-      settled: { transactionId, explorerUrl },
-    };
-    return c.json(response);
+    const paymentResponse = { success: true, transaction: settleResult.transaction, network: settleResult.network, ...(settleResult.payer ? { payer: settleResult.payer } : {}), amount: settleResult.amount ?? matchingCanonical.amount, ...(settleResult.extensions ? { extensions: settleResult.extensions } : {}) };
+    c.header("PAYMENT-RESPONSE", encodeX402Header(paymentResponse));
+    const networkConfig = getNetworkConfig(network);
+    const explorerUrl = networkConfig ? `${networkConfig.explorerUrl}/${settleResult.transaction}` : undefined;
+    return c.json({ resourceId: generateResourceId(), category, content: data, settled: { transactionId: settleResult.transaction, explorerUrl } });
   } catch (error) {
-    console.error(JSON.stringify({
-      event: "facilitator_request_failed",
-      errorType: error instanceof Error ? error.name : "UnknownError",
-    }));
+    console.error(JSON.stringify({ event: "facilitator_request_failed", errorType: error instanceof Error ? error.name : "UnknownError" }));
     return c.json({ code: "FACILITATOR_ERROR", message: "Facilitator communication failed" }, 502);
   }
 }
@@ -293,14 +246,14 @@ app.get("/v1/market-data/:symbol", async (c: Context) => {
   const symbol = (c.req.param("symbol") ?? "").toUpperCase();
   const data = marketData[symbol];
   if (!data) return c.json({ code: "NOT_FOUND", message: `Unknown symbol: ${symbol}` }, 404);
-  return handlePaidRequest(c, "MARKET_DATA", `market-data-${symbol}`, { symbol, ...data, timestamp: new Date().toISOString() });
+  return handlePaidRequest(c, "MARKET_DATA", `market-data-${symbol}`, { symbol, ...data, simulated: true, provenance: "STATIC_DEMO_FIXTURE", observedAt: null });
 });
 
 app.get("/v1/files/:fileId", async (c: Context) => {
   const fileId = c.req.param("fileId") ?? "";
-  const files: Record<string, { name: string; content: string }> = {
-    "report-q2": { name: "Q2-2026-Market-Report.pdf", content: "Executive Summary: Q2 2026 saw continued growth in decentralized finance...\n\nKey findings:\n- Total value locked increased 34% YoY\n- Institutional adoption reached 22% of surveyed funds\n- Regulatory clarity improved in 3 major jurisdictions" },
-    "whitepaper": { name: "AgentPay-Whitepaper.pdf", content: "AgentPay: A Policy-Controlled Payment Layer for Autonomous Software Agents\n\nAbstract: This paper describes a novel approach to machine-to-machine payments..." },
+  const files: Record<string, { name: string; content: string; simulated: true }> = {
+    "report-q2": { name: "Demo-Q2-Market-Report.txt", content: "Synthetic demonstration report. The figures and findings in this fixture are not real market research and must not be used for decisions.", simulated: true },
+    "whitepaper": { name: "AgentPay-Demo-Whitepaper.txt", content: "Synthetic demonstration document for exercising paid file delivery through x402.", simulated: true },
   };
   const file = files[fileId];
   if (!file) return c.json({ code: "NOT_FOUND", message: `Unknown file: ${fileId}` }, 404);
@@ -313,24 +266,15 @@ app.post("/v1/inference/:model", async (c: Context) => {
   try { body = await boundedJson(c.req.raw) as Record<string, unknown>; }
   catch (error) { return c.json({ code: error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE" ? "REQUEST_BODY_TOO_LARGE" : "INVALID_JSON" }, error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE" ? 413 : 400); }
   const prompt = String(body.prompt || "Explain the benefits of micropayments for autonomous agents.");
-  return handlePaidRequest(c, "AI_INFERENCE", `inference-${model}`, {
-    model, prompt,
-    response: `[Simulated ${model} response] Based on the provided context: ${prompt.slice(0, 100)}...\n\nKey points:\n1. Arc offers sub-second deterministic finality\n2. USDC is the native gas token, no separate ETH needed\n3. The x402 standard with EIP-3009 enables gasless payments\n4. Cross-chain USDC via CCTP maintains native fungibility`,
-    tokensUsed: prompt.length * 2, modelVersion: "3.2-4k",
-  });
+  return handlePaidRequest(c, "AI_INFERENCE", `inference-${model}`, { model, prompt, simulated: true, response: `[Simulated ${model} output] This endpoint is a fixture used to exercise x402 payment and fulfillment. No model provider was called.`, tokensUsed: null, modelVersion: null });
 });
 
 app.post("/v1/research", async (c: Context) => {
   let body: Record<string, unknown>;
   try { body = await boundedJson(c.req.raw) as Record<string, unknown>; }
   catch (error) { return c.json({ code: error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE" ? "REQUEST_BODY_TOO_LARGE" : "INVALID_JSON" }, error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE" ? 413 : 400); }
-  const query = String(body.query || "latest developments in decentralized AI");
-  return handlePaidRequest(c, "WEB_RESEARCH", "research-default", {
-    query, results: [
-      { title: "AgentPay Multi-Chain Expansion", url: "https://agentpay.dev/blog/multi-chain", snippet: "AgentPay now supports Arc blockchain for sub-second USDC settlements..." },
-      { title: "Arc Blockchain by Circle", url: "https://docs.arc.io", snippet: "A purpose-built L1 for stablecoin-native financial applications with USDC as gas..." },
-    ], fetchedAt: new Date().toISOString(), sourceCount: 8,
-  });
+  const query = String(body.query || "agent payment infrastructure");
+  return handlePaidRequest(c, "WEB_RESEARCH", "research-default", { query, simulated: true, results: [{ title: "Synthetic example result", url: null, snippet: "Fixture content used only to demonstrate paid research delivery." }], fetchedAt: null, sourceCount: 0, provenance: "STATIC_DEMO_FIXTURE" });
 });
 
 serve({ fetch: app.fetch, port: env.PORT });

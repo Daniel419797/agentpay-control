@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": false,
   "license": "MIT",
-  "description": "Policy-controlled payment OS for autonomous software agents using x402 standard on Hedera testnet",
+  "description": "Policy-controlled x402 payment OS for autonomous software agents across Hedera, Arc and Cardano",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Daniel419797/agentpay-control.git"
@@ -11,7 +11,8 @@
   "author": "Daniel <praisedaniel979@gmail.com>",
   "packageManager": "npm@11.11.1",
   "engines": {
-    "node": ">=22.0.0"
+    "node": "22.x",
+    "npm": "11.11.1"
   },
   "scripts": {
     "postinstall": "prisma generate",
@@ -27,6 +28,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "db:resources:check": "tsx scripts/canonicalize-resource-endpoints.ts",
+    "db:resources:canonicalize": "tsx scripts/canonicalize-resource-endpoints.ts --apply",
     "verify:governance": "tsx scripts/verify-governance.ts",
     "db:studio": "prisma studio",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build"
