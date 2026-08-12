@@ -30,17 +30,16 @@ export function HederaWalletConnect() {
 
   useEffect(() => {
     let active = true;
-    setReceipt(null);
-    setError(null);
-    void fetch("/api/v1/wallet", { cache: "no-store" })
-      .then((response) => response.ok ? response.json() : null)
-      .then((body: { data?: { identities?: WalletIdentity[] } } | null) => {
-        if (!active) return;
-        setIdentity(body?.data?.identities?.find((candidate) => candidate.network === network) ?? null);
-      })
-      .catch(() => {
-        if (active) setIdentity(null);
-      });
+    void (async () => {
+      const response = await fetch("/api/v1/wallet", { cache: "no-store" });
+      const body = response.ok ? await response.json() as { data?: { identities?: WalletIdentity[] } } : null;
+      if (!active) return;
+      setReceipt(null);
+      setError(null);
+      setIdentity(body?.data?.identities?.find((candidate) => candidate.network === network) ?? null);
+    })().catch(() => {
+      if (active) setIdentity(null);
+    });
     return () => { active = false; };
   }, [network]);
 
