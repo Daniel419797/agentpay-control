@@ -24,6 +24,17 @@ type Result = {
   network?: string;
 };
 
+type PaidRequestResponse = {
+  id: string;
+  status: string;
+  attempts?: Array<{ settlement?: { transactionId?: string | null } }>;
+  quote?: {
+    network?: string;
+    amountAtomic?: string | number | bigint;
+    asset?: { decimals?: number; symbol?: string };
+  };
+};
+
 function formatAtomic(value: string, decimals: number, symbol: string) {
   try {
     const atomic = BigInt(value);
@@ -73,6 +84,7 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
     if (!activeAgent) return [];
     return resources.filter((resource) => resource.status === "ACTIVE" && resource.prices?.some((price) => price.asset?.network === activeAgent.network));
   }, [activeAgent, resources]);
+  const selectedResourceUrl = compatibleResources.some((resource) => resource.endpoint === resourceUrl) ? resourceUrl : compatibleResources[0]?.endpoint ?? "";
 
   useEffect(() => {
     let active = true;
@@ -88,13 +100,8 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
     return () => { active = false; };
   }, []);
 
-  useEffect(() => {
-    if (useCustom) return;
-    if (!compatibleResources.some((resource) => resource.endpoint === resourceUrl)) setResourceUrl(compatibleResources[0]?.endpoint ?? "");
-  }, [compatibleResources, resourceUrl, useCustom]);
-
   async function submit() {
-    const url = useCustom ? customUrl.trim() : resourceUrl;
+    const url = useCustom ? customUrl.trim() : selectedResourceUrl;
     if (!agentId || !url || !managedRequest) return;
     setLoading(true);
     setError("");
@@ -106,15 +113,15 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
         headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
         body: JSON.stringify({ resourceUrl: url, purpose: purpose.trim() || undefined }),
       });
-      const body = await response.json().catch(() => null) as { data?: any; detail?: string; error?: { message?: string } } | null;
+      const body = await response.json().catch(() => null) as { data?: PaidRequestResponse; detail?: string; error?: { message?: string } } | null;
       if (!response.ok || !body?.data) {
         setError(body?.detail ?? body?.error?.message ?? `Request failed (${response.status})`);
         return;
       }
       const data = body.data;
-      const settlement = data.attempts?.find((attempt: any) => attempt.settlement)?.settlement;
-      const network = data.quote?.network as string | undefined;
-      const transactionId = settlement?.transactionId as string | null | undefined;
+      const settlement = data.attempts?.find((attempt) => attempt.settlement)?.settlement;
+      const network = data.quote?.network;
+      const transactionId = settlement?.transactionId;
       const amountAtomic = data.quote?.amountAtomic != null ? String(data.quote.amountAtomic) : undefined;
       const decimals = Number(data.quote?.asset?.decimals ?? 0);
       const symbol = String(data.quote?.asset?.symbol ?? "");
@@ -153,7 +160,7 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
         {useCustom ? (
           <input className="form-input" value={customUrl} onChange={(event) => setCustomUrl(event.target.value)} placeholder="https://provider.example/api/resource" inputMode="url" />
         ) : (
-          <select className="form-input" value={resourceUrl} onChange={(event) => setResourceUrl(event.target.value)} disabled={loadingResources || compatibleResources.length === 0}>
+          <select className="form-input" value={selectedResourceUrl} onChange={(event) => setResourceUrl(event.target.value)} disabled={loadingResources || compatibleResources.length === 0}>
             {loadingResources && <option value="">Loading resources…</option>}
             {!loadingResources && compatibleResources.length === 0 && <option value="">No active resource priced for this network</option>}
             {compatibleResources.map((resource) => <option key={resource.id} value={resource.endpoint}>{resource.name}{resource.provider?.name ? ` · ${resource.provider.name}` : ""}</option>)}
@@ -164,7 +171,7 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
 
       <div><label style={{ display: "block", fontSize: 13, marginBottom: 4 }}>Purpose (optional)</label><input className="form-input" value={purpose} onChange={(event) => setPurpose(event.target.value)} placeholder="e.g. Daily market analysis" /></div>
       {error && <div className="form-error" role="alert">{error}</div>}
-      <div className="button-row"><button className="primary-button" type="button" disabled={loading || !agentId || isPaused || !managedRequest || (useCustom ? !customUrl.trim() : !resourceUrl)} onClick={() => void submit()}>{loading ? "Sending…" : "Send paid request"}</button></div>
+      <div className="button-row"><button className="primary-button" type="button" disabled={loading || !agentId || isPaused || !managedRequest || (useCustom ? !customUrl.trim() : !selectedResourceUrl)} onClick={() => void submit()}>{loading ? "Sending…" : "Send paid request"}</button></div>
 
       {result && (
         <div className="panel" style={{ borderRadius: 8, padding: 16 }}>
