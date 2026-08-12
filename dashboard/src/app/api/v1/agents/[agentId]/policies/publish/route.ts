@@ -3,8 +3,10 @@ import { z } from "zod";
 import { boundedJson, handleApiError, ok, problem } from "@/lib/api";
 import { db } from "@/lib/db";
 import { masumiConfigFromEnv } from "@/lib/masumi";
+import { masumiPaymentConfigFromEnv } from "@/lib/masumi-payment";
 import { pythConfigFromEnv, pythFeedForSymbol } from "@/lib/pyth";
 import { hasRecentAuthentication } from "@/lib/session";
+import { veridianKeriConfigFromEnv } from "@/lib/veridian-keri";
 import { workspaceFromRequest, workspaceHasRole } from "@/lib/workspace";
 
 const usdMicros = z.string().regex(/^[1-9]\d*$/).max(24).nullable().optional();
@@ -26,6 +28,15 @@ const catalystSchema = z.object({
     allowedCapabilities: z.array(z.string().trim().min(1).max(100)).max(100).default([]),
     maxRegistryAgeSeconds: z.number().int().min(15).max(3600).default(120),
     requireOnline: z.boolean().default(true),
+    minimumReputationBps: z.number().int().min(0).max(10000).nullable().default(null),
+    minimumCompletedPurchases: z.number().int().min(0).max(1_000_000).default(0),
+  }).optional(),
+  keri: z.object({
+    enabled: z.boolean(),
+    required: z.boolean().default(true),
+    trustedIssuerAids: z.array(z.string().trim().min(20).max(200)).max(100).default([]),
+    allowedSchemaSaids: z.array(z.string().trim().min(20).max(200)).max(100).default([]),
+    maxVerificationAgeSeconds: z.number().int().min(15).max(86400).default(300),
   }).optional(),
 }).optional();
 
@@ -91,6 +102,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
       if (!expected || input.catalyst.masumi.network !== expected) return problem(422, "MASUMI_POLICY_NETWORK_MISMATCH", "Masumi trust must use the same Cardano network as the agent.");
       try { masumiConfigFromEnv(); }
       catch { return problem(503, "MASUMI_POLICY_NOT_CONFIGURED", "Masumi registry trust is not fully configured for this deployment."); }
+      if ((input.catalyst.masumi.minimumCompletedPurchases > 0 || input.catalyst.masumi.minimumReputationBps != null)) {
+        if (process.env.MASUMI_ESCROW_ENABLED !== "true") return problem(503, "MASUMI_REPUTATION_SOURCE_DISABLED", "Masumi escrow must be enabled before enforcing settlement-derived reputation.");
+        try { masumiPaymentConfigFromEnv(); }
+        catch { return problem(503, "MASUMI_ESCROW_NOT_CONFIGURED", "Masumi payment-node configuration is required for settlement-derived reputation."); }
+      }
+    }
+
+    if (input.catalyst?.keri?.enabled) {
+      if (!masumiNetworkForAgent(agent.network)) return problem(422, "VERIDIAN_CARDANO_POLICY_REQUIRED", "Veridian/KERI identity controls require a Cardano agent.");
+      if (process.env.VERIDIAN_IDENTITY_ENABLED !== "true") return problem(503, "VERIDIAN_IDENTITY_DISABLED", "Veridian/KERI identity controls are not enabled for this deployment.");
+      if (!input.catalyst.keri.trustedIssuerAids.length || !input.catalyst.keri.allowedSchemaSaids.length) return problem(422, "VERIDIAN_POLICY_ALLOWLIST_REQUIRED", "KERI policy enforcement requires at least one trusted issuer AID and allowed schema SAID.");
+      try {
+        const config = veridianKeriConfigFromEnv();
+        if (input.catalyst.keri.trustedIssuerAids.some((aid) => !config.trustedIssuerAids.includes(aid))) return problem(422, "VERIDIAN_ISSUER_NOT_DEPLOYMENT_TRUSTED", "Every policy issuer AID must also be trusted by the deployment.");
+        if (input.catalyst.keri.allowedSchemaSaids.some((said) => !config.allowedSchemaSaids.includes(said))) return problem(422, "VERIDIAN_SCHEMA_NOT_DEPLOYMENT_ALLOWED", "Every policy schema SAID must also be allowed by the deployment.");
+      } catch (error) {
+        if (error instanceof Response) return error;
+        return problem(503, "VERIDIAN_IDENTITY_NOT_CONFIGURED", "Veridian/KERIA verification is not fully configured for this deployment.");
+      }
     }
 
     const result = await db.$transaction(async (tx) => {
@@ -99,8 +129,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
       if (!policy) policy = await tx.policy.create({ data: { agentId, organizationId: workspace.organization.id } });
       const latest = await tx.policyVersion.aggregate({ where: { policyId: policy.id }, _max: { version: true } });
 
-      // Create as DRAFT first so database-enforced Catalyst extensions can be
-      // attached. The version is published only after every extension succeeds.
       const version = await tx.policyVersion.create({
         data: {
           policyId: policy.id,
@@ -145,18 +173,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
       if (input.catalyst?.masumi?.enabled) {
         const masumi = input.catalyst.masumi;
         const identifiers = masumi.allowedAgentIdentifiers.map((value) => value.toLowerCase());
-        await tx.$executeRawUnsafe(
-          `INSERT INTO "MasumiPolicyTrust" (
-             "policyVersionId", "required", "network", "allowedAgentIdentifiers", "allowedCapabilities", "maxRegistryAgeSeconds", "requireOnline", "createdAt", "updatedAt"
-           ) VALUES ($1::uuid, $2, $3, $4::text[], $5::text[], $6, $7, now(), now())`,
-          version.id,
-          masumi.required,
-          masumi.network,
-          identifiers,
-          masumi.allowedCapabilities,
-          masumi.maxRegistryAgeSeconds,
-          masumi.requireOnline,
-        );
+        await tx.$executeRaw`
+          INSERT INTO "MasumiPolicyTrust" (
+            "policyVersionId", "required", "network", "allowedAgentIdentifiers", "allowedCapabilities", "maxRegistryAgeSeconds", "requireOnline", "minimumReputationBps", "minimumCompletedPurchases", "createdAt", "updatedAt"
+          ) VALUES (
+            ${version.id}::uuid, ${masumi.required}, ${masumi.network}, ${identifiers}::text[], ${masumi.allowedCapabilities}::text[], ${masumi.maxRegistryAgeSeconds}, ${masumi.requireOnline}, ${masumi.minimumReputationBps}, ${masumi.minimumCompletedPurchases}, now(), now()
+          )
+        `;
+      }
+
+      if (input.catalyst?.keri?.enabled) {
+        const keri = input.catalyst.keri;
+        await tx.$executeRaw`
+          INSERT INTO "KeriPolicyTrust" (
+            "policyVersionId", "required", "trustedIssuerAids", "allowedSchemaSaids", "maxVerificationAgeSeconds", "createdAt", "updatedAt"
+          ) VALUES (
+            ${version.id}::uuid, ${keri.required}, ${keri.trustedIssuerAids}::text[], ${keri.allowedSchemaSaids}::text[], ${keri.maxVerificationAgeSeconds}, now(), now()
+          )
+        `;
       }
 
       await tx.policyVersion.updateMany({ where: { policyId: policy.id, status: "PUBLISHED" }, data: { status: "SUPERSEDED" } });
@@ -178,6 +212,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
             network: asset.network,
             pythUsdPolicy: input.catalyst?.oracle?.enabled === true,
             masumiTrust: input.catalyst?.masumi?.enabled === true,
+            masumiMinimumReputationBps: input.catalyst?.masumi?.enabled ? input.catalyst.masumi.minimumReputationBps : null,
+            masumiMinimumCompletedPurchases: input.catalyst?.masumi?.enabled ? input.catalyst.masumi.minimumCompletedPurchases : null,
+            keriTrust: input.catalyst?.keri?.enabled === true,
           },
         },
       });

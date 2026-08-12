@@ -20,6 +20,7 @@ const navigation: Array<{ label: string; href: Route; icon: typeof LayoutDashboa
   { label: "Agents", href: "/app/agents", icon: Bot },
   { label: "Approvals", href: "/app/approvals", icon: ClipboardCheck },
   { label: "Transactions", href: "/app/transactions", icon: ReceiptText },
+  { label: "Agent commerce", href: "/app/agent-commerce", icon: CircleDollarSign },
   { label: "Cards & fiat", href: "/app/cards", icon: CreditCard, group: "Money" },
   { label: "Invoices", href: "/app/invoices", icon: FileText },
   { label: "Cross-chain", href: "/app/cross-chain", icon: Repeat2 },
@@ -27,6 +28,7 @@ const navigation: Array<{ label: string; href: Route; icon: typeof LayoutDashboa
   { label: "Resources", href: "/app/resources", icon: Boxes },
   { label: "Automations", href: "/app/automations", icon: GitBranch },
   { label: "Intelligence", href: "/app/intelligence", icon: BrainCircuit, group: "Review" },
+  { label: "Cardano analytics", href: "/app/analytics/cardano", icon: Activity },
   { label: "Audit", href: "/app/audit", icon: FileClock },
   { label: "Settings", href: "/app/settings", icon: Settings }
 ];

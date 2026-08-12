@@ -1,4 +1,52 @@
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
+previews:
+  generation: off
+
 services:
+
+  - type: web
+    name: agentpay-cardano-signer-preprod
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    dockerContext: .
+    dockerfilePath: cardano-signer/Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: CARDANO_NETWORK
+        value: preprod
+      - key: CARDANO_PAYER_ADDRESS
+        sync: false
+      - key: CARDANO_USDCX_ASSET_ID
+        sync: false
+      - key: CARDANO_BLOCKFROST_URL
+        value: https://cardano-preprod.blockfrost.io/api/v0
+      - key: CARDANO_BLOCKFROST_PROJECT_ID
+        sync: false
+      # Gateway capability generated and kept by Render. The facilitator reads
+      # this exact value through fromService instead of copying it manually.
+      - key: CARDANO_SIGNER_API_KEY
+        generateValue: true
+      - key: CARDANO_PAYMENT_PUBLIC_KEY_HEX
+        sync: false
+      # Actual Ed25519 custody remains outside this web service. It receives
+      # only a 32-byte transaction-body hash and returns a signature.
+      - key: CARDANO_ED25519_SIGNER_URL
+        sync: false
+      - key: CARDANO_ED25519_SIGNER_API_KEY
+        sync: false
+      - key: CARDANO_MIN_OUTPUT_LOVELACE
+        value: "1000000"
+      - key: CARDANO_TOKEN_OUTPUT_LOVELACE
+        value: "2000000"
+      - key: CARDANO_MIN_CHANGE_LOVELACE
+        value: "2000000"
+      - key: CARDANO_MAX_INPUTS
+        value: "20"
 
   - type: web
     name: agentpay-facilitator
@@ -48,23 +96,46 @@ services:
       - key: CARDANO_NETWORK
         value: preprod
       - key: CARDANO_PAYER_ADDRESS
-        sync: false
-      # Optional exact policy-id + asset-name unit. Leave empty for ADA-only.
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-preprod
+          envVarKey: CARDANO_PAYER_ADDRESS
       - key: CARDANO_USDCX_ASSET_ID
-        sync: false
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-preprod
+          envVarKey: CARDANO_USDCX_ASSET_ID
       - key: CARDANO_BLOCKFROST_URL
-        value: https://cardano-preprod.blockfrost.io/api/v0
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-preprod
+          envVarKey: CARDANO_BLOCKFROST_URL
       - key: CARDANO_BLOCKFROST_PROJECT_ID
-        sync: false
-      # Public HTTPS URL of the separately deployed isolated signer gateway.
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-preprod
+          envVarKey: CARDANO_BLOCKFROST_PROJECT_ID
       - key: CARDANO_SIGNER_URL
-        sync: false
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-preprod
+          envVarKey: RENDER_EXTERNAL_URL
       - key: CARDANO_SIGNER_API_KEY
-        sync: false
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-preprod
+          envVarKey: CARDANO_SIGNER_API_KEY
+      # Exact endpoint required by the Cardano settlement claim protocol:
+      # https://<dashboard-host>/api/v1/internal/cardano-settlement-claims
+      # Render cannot concatenate a service URL and path in Blueprint YAML, so
+      # this one URL is supplied during Blueprint setup and validated as HTTPS
+      # by the facilitator in production.
       - key: CARDANO_SETTLEMENT_STORE_URL
         sync: false
+      # Generate the capability once at the control-plane boundary; the
+      # dashboard reads this exact secret through fromService below.
       - key: CARDANO_SETTLEMENT_STORE_API_KEY
-        sync: false
+        generateValue: true
       - key: HEDERA_MANAGED_SIGNING_API_KEY
         generateValue: true
       - key: HEDERA_SETTLEMENT_API_KEY
@@ -103,12 +174,23 @@ services:
       # Flip this to true only after the shared asset unit and funded canary are verified.
       - key: CARDANO_USDCX_ENABLED
         value: "false"
+      # The combined facilitator's root dispatcher selects the namespaced rail
+      # from the exact network binding in the x402 payload/requirement pair.
       - key: FACILITATOR_URL
-        sync: false
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: RENDER_EXTERNAL_URL
       - key: ARC_FACILITATOR_URL
-        sync: false
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: RENDER_EXTERNAL_URL
       - key: CARDANO_PREPROD_FACILITATOR_URL
-        sync: false
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: RENDER_EXTERNAL_URL
       - key: FACILITATOR_SETTLEMENT_API_KEY
         fromService:
           type: web
@@ -142,7 +224,143 @@ services:
       - key: CARDANO_PREPROD_USDCX_ASSET_ID
         fromService:
           type: web
-          name: agentpay-facilitator
+          name: agentpay-cardano-signer-preprod
           envVarKey: CARDANO_USDCX_ASSET_ID
       - key: CARDANO_USDCX_RESOURCE_PRICE_ATOMIC
         value: "1000000"
+
+  - type: web
+    name: agentpay-dashboard
+    runtime: node
+    plan: starter
+    region: frankfurt
+    buildCommand: bash scripts/render/build-dashboard.sh
+    preDeployCommand: bash scripts/render/predeploy-dashboard.sh
+    startCommand: bash scripts/render/start-dashboard.sh
+    healthCheckPath: /api/v1/health
+    autoDeployTrigger: checksPass
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: NODE_ENV
+        value: production
+      - key: RENDER_DASHBOARD_ORIGIN
+        fromService:
+          type: web
+          name: agentpay-dashboard
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: AGENTPAY_FACILITATOR_ORIGIN
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: DATABASE_URL
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+      # Must be exactly 32 random bytes encoded as 43-char unpadded base64url.
+      # Do not use Render generateValue for this key because its encoding shape
+      # is not the dashboard's encryption-key contract.
+      - key: KEY_ENCRYPTION_MASTER_KEY
+        sync: false
+      - key: CRON_SECRET
+        generateValue: true
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: HEDERA_PAYER_ACCOUNT_ID
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: HEDERA_PAYER_ID
+      - key: HEDERA_PROVIDER_ACCOUNT_ID
+        fromService:
+          type: web
+          name: agentpay-resource-server
+          envVarKey: PROVIDER_ACCOUNT_ID
+      - key: HEDERA_USDC_TOKEN_ID
+        fromService:
+          type: web
+          name: agentpay-resource-server
+          envVarKey: USDC_TOKEN_ID
+      - key: FACILITATOR_SIGNING_API_KEY
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: HEDERA_MANAGED_SIGNING_API_KEY
+      - key: FACILITATOR_SETTLEMENT_API_KEY
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: HEDERA_SETTLEMENT_API_KEY
+      - key: FACILITATOR_CONTRACT_API_KEY
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: HEDERA_CONTRACT_EXECUTION_API_KEY
+      - key: ARC_FACILITATOR_SIGNING_API_KEY
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: ARC_MANAGED_SIGNING_API_KEY
+      - key: ARC_FACILITATOR_CONTRACT_API_KEY
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: ARC_CONTRACT_EXECUTION_API_KEY
+      - key: ARC_RPC_URL
+        value: https://rpc.testnet.arc.network
+      - key: ARC_PROVIDER_ADDRESS
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: ARC_PROVIDER_ADDRESS
+      - key: ARC_PAYER_ADDRESS
+        sync: false
+      - key: CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: CARDANO_MANAGED_SIGNING_API_KEY
+      - key: CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: CARDANO_SETTLEMENT_API_KEY
+      - key: CARDANO_PREPROD_PAYER_ADDRESS
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-preprod
+          envVarKey: CARDANO_PAYER_ADDRESS
+      - key: CARDANO_PREPROD_PROVIDER_ADDRESS
+        fromService:
+          type: web
+          name: agentpay-resource-server
+          envVarKey: CARDANO_PREPROD_PROVIDER_ADDRESS
+      - key: CARDANO_PREPROD_BLOCKFROST_URL
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-preprod
+          envVarKey: CARDANO_BLOCKFROST_URL
+      - key: CARDANO_PREPROD_BLOCKFROST_PROJECT_ID
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-preprod
+          envVarKey: CARDANO_BLOCKFROST_PROJECT_ID
+      - key: CARDANO_SETTLEMENT_STORE_API_KEY
+        fromService:
+          type: web
+          name: agentpay-facilitator
+          envVarKey: CARDANO_SETTLEMENT_STORE_API_KEY
+      - key: X402_NETWORK
+        value: hedera:testnet
+      - key: NOTIFICATION_FROM_EMAIL
+        value: notifications@agentpay.dev
+      - key: VIRTUAL_CARDS_ENABLED
+        value: "false"
+      - key: CARD_PROVIDER
+        value: SANDBOX
+      - key: CATALYST_PRODUCTION_ENABLED
+        value: "false"

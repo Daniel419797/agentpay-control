@@ -53,9 +53,18 @@ describe("evaluatePolicy", () => {
     expect(result.reasonCodes).toEqual(["MERCHANT_DENIED"]);
   });
 
-  it("denies requests outside an overnight schedule", () => {
+  it("denies requests outside an overnight UTC schedule", () => {
     const result = evaluatePolicy({ ...base, evaluatedAt: new Date("2026-07-26T12:00:00Z"), allowedStartMinute: 22 * 60, allowedEndMinute: 6 * 60 });
     expect(result.reasonCodes).toEqual(["OUTSIDE_POLICY_SCHEDULE"]);
+  });
+
+  it("evaluates allowed weekdays and clock minutes in UTC", () => {
+    // 2026-07-26T23:30Z is Sunday (0) at minute 1410 UTC regardless of the
+    // operator browser or organization display timezone.
+    const allowed = evaluatePolicy({ ...base, evaluatedAt: new Date("2026-07-26T23:30:00Z"), allowedWeekdays: [0], allowedStartMinute: 23 * 60, allowedEndMinute: 23 * 60 + 59 });
+    const blockedDay = evaluatePolicy({ ...base, evaluatedAt: new Date("2026-07-27T00:30:00Z"), allowedWeekdays: [0], allowedStartMinute: 0, allowedEndMinute: 60 });
+    expect(allowed.reasonCodes).toEqual(["WITHIN_POLICY"]);
+    expect(blockedDay.reasonCodes).toEqual(["OUTSIDE_POLICY_SCHEDULE"]);
   });
 
   it("enforces category and velocity controls", () => {

@@ -68,7 +68,7 @@ async function recordProviderDivergence(mutation: ProviderMutation, containment:
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ cardId: string }> }) {
-  let providerMutation: ProviderMutation | null = null;
+  const providerMutationRef: { current: ProviderMutation | null } = { current: null };
   try {
     const workspace = await workspaceFromRequest(request);
     if (!workspace) return problem(401, "AUTH_REQUIRED", "Sign in before changing a card.");
@@ -91,7 +91,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ cardI
       if (provider.name !== card.provider) throw new Error("CARD_PROVIDER_MISMATCH");
       if (card.version !== input.expectedVersion) throw new Error("CARD_VERSION_CONFLICT");
       await provider.updateCardStatus(card.externalCardId, input.status === "FROZEN" ? "INACTIVE" : input.status, `card-status:${card.id}:${input.expectedVersion}:${input.status}`);
-      providerMutation = {
+      providerMutationRef.current = {
         organizationId: workspace.organization.id,
         userId: workspace.user.id,
         cardId: card.id,
@@ -106,11 +106,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ cardI
       await tx.auditEvent.create({ data: { organizationId: workspace.organization.id, actorType: "USER", actorId: workspace.user.id, action: `VIRTUAL_CARD_${input.status}`, targetType: "VIRTUAL_CARD", targetId: card.id, result: "SUCCESS", metadata: { previousStatus: card.status, version: record.version } } });
       return record;
     }, { timeout: 60_000 });
-    providerMutation = null;
+    providerMutationRef.current = null;
     const { externalCardId: _external, ...safe } = updated;
     void _external;
     return ok({ ...safe, spendingLimitMinor: safe.spendingLimitMinor?.toString() ?? null });
   } catch (error) {
+    const providerMutation = providerMutationRef.current;
     if (providerMutation) {
       let containment: "REFROZEN" | "REFREEZE_FAILED" | "NOT_REQUIRED" = "NOT_REQUIRED";
       if (providerMutation.requestedStatus === "ACTIVE") {
