@@ -16,6 +16,21 @@ executors:
       CRON_SECRET: ci-cron-secret-that-is-at-least-thirty-two-characters
       APP_ENV: test
 
+commands:
+  install-workspace-dependencies:
+    steps:
+      - checkout
+      - run:
+          name: Pin repository npm version
+          command: npm install --global npm@11.11.1
+      - restore_cache:
+          keys:
+            - npm-v2-{{ checksum "package-lock.json" }}
+            - npm-v2-
+      - run:
+          name: Install workspace dependencies
+          command: npm ci
+
 jobs:
   verify:
     executor: node-postgres
@@ -54,6 +69,46 @@ jobs:
       - run:
           name: Verify application and browser smoke tests
           command: bash scripts/ci/verify.sh
+
+  diagnostic-dashboard-typecheck:
+    executor: node-postgres
+    resource_class: medium
+    steps:
+      - install-workspace-dependencies
+      - run:
+          name: Dashboard typecheck only
+          command: cd dashboard && npm run typecheck
+
+  diagnostic-dashboard-test:
+    executor: node-postgres
+    resource_class: large
+    steps:
+      - install-workspace-dependencies
+      - run:
+          name: Wait for PostgreSQL
+          command: |
+            for attempt in $(seq 1 60); do
+              if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
+                exit 0
+              fi
+              sleep 1
+            done
+            exit 1
+      - run:
+          name: Prepare dashboard test database
+          command: cd dashboard && npm run db:deploy
+      - run:
+          name: Dashboard unit tests only
+          command: cd dashboard && npm run test
+
+  diagnostic-dashboard-build:
+    executor: node-postgres
+    resource_class: large
+    steps:
+      - install-workspace-dependencies
+      - run:
+          name: Dashboard build only
+          command: cd dashboard && npm run build
 
   security:
     machine:
@@ -123,6 +178,9 @@ workflows:
   agentpay-production:
     jobs:
       - verify
+      - diagnostic-dashboard-typecheck
+      - diagnostic-dashboard-test
+      - diagnostic-dashboard-build
       - security
       - codeql
       - cardano-signer
