@@ -103,9 +103,9 @@ export function parseCardanoEnv(input: unknown = process.env): CardanoFacilitato
 function secretMatches(primary: string | undefined, fallback: string | undefined, authorization: string | undefined) {
   const expected = primary ?? fallback;
   if (!expected || !authorization?.startsWith("Bearer ")) return false;
-  const actualHash = createHash("sha256").update(authorization.slice(7)).digest();
-  const expectedHash = createHash("sha256").update(expected).digest();
-  return timingSafeEqual(actualHash, expectedHash);
+  const actual = Buffer.from(authorization.slice(7), "utf8");
+  const wanted = Buffer.from(expected, "utf8");
+  return actual.length === wanted.length && timingSafeEqual(actual, wanted);
 }
 
 async function boundedJson(request: Request, maxBytes = 128 * 1024) {
@@ -536,7 +536,7 @@ async function submitTransaction(env: CardanoFacilitatorEnv, transaction: { byte
   const response = await fetch(`${env.CARDANO_BLOCKFROST_URL.replace(/\/$/, "")}/tx/submit`, {
     method: "POST",
     headers: { project_id: env.CARDANO_BLOCKFROST_PROJECT_ID, "content-type": "application/cbor", accept: "application/json" },
-    body: transaction.bytes,
+    body: Uint8Array.from(transaction.bytes),
     signal: AbortSignal.timeout(60000),
     redirect: "error",
   });
