@@ -78,7 +78,7 @@ export function createArcApp(env: ArcFacilitatorEnv): { app: Hono; network: stri
     }
 
     const captured = await facilitator.captureSettlementEvidence(() => facilitator.scheme.settle(body.paymentPayload, body.paymentRequirements));
-    if (captured.error !== undefined) {
+    if ("error" in captured) {
       logFailure("settlement_submission_unknown", captured.error);
       return c.json({
         success: false,
