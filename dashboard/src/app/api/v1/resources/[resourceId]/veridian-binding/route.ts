@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { boundedJson, handleApiError, ok, problem } from "@/lib/api";
