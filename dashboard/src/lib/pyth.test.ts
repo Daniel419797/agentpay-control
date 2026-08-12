@@ -4,11 +4,12 @@ import { assertPythObservation, pythConfigFromEnv, pythFeedForSymbol, usdMicrosF
 
 const ADA_FEED = `0x${"a".repeat(64)}`;
 const USDC_FEED = `0x${"b".repeat(64)}`;
+const TEST_ENV = { NODE_ENV: "test" as const };
 
 describe("Pyth policy valuation", () => {
   it("requires authenticated production configuration", () => {
-    expect(() => pythConfigFromEnv({ APP_ENV: "production", PYTH_ADA_USD_FEED_ID: ADA_FEED, PYTH_USDC_USD_FEED_ID: USDC_FEED })).toThrow("PYTH_API_KEY_REQUIRED");
-    const config = pythConfigFromEnv({ APP_ENV: "production", PYTH_API_KEY: "x".repeat(32), PYTH_ADA_USD_FEED_ID: ADA_FEED, PYTH_USDC_USD_FEED_ID: USDC_FEED });
+    expect(() => pythConfigFromEnv({ ...TEST_ENV, APP_ENV: "production", PYTH_ADA_USD_FEED_ID: ADA_FEED, PYTH_USDC_USD_FEED_ID: USDC_FEED })).toThrow("PYTH_API_KEY_REQUIRED");
+    const config = pythConfigFromEnv({ ...TEST_ENV, APP_ENV: "production", PYTH_API_KEY: "x".repeat(32), PYTH_ADA_USD_FEED_ID: ADA_FEED, PYTH_USDC_USD_FEED_ID: USDC_FEED });
     expect(pythFeedForSymbol("ADA", config)).toBe(ADA_FEED);
     expect(pythFeedForSymbol("USDCx", config)).toBe(USDC_FEED);
   });
