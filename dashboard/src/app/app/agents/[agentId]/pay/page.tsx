@@ -36,7 +36,7 @@ export default async function PaidRequestPage({ params }: { params: Promise<{ ag
   return (
     <FormPage title="Send paid request" description={`Create a policy-controlled payment from ${agent.name}.`}>
       <section className="workspace-section">
-        <div className="section-heading"><div><h3>Direct x402</h3><p>Pay a registered x402 resource directly under the agent's active policy.</p></div></div>
+        <div className="section-heading"><div><h3>Direct x402</h3><p>Pay a registered x402 resource directly under the agent&apos;s active policy.</p></div></div>
         <PaidRequestForm agents={agents} defaultAgentId={agentId} />
       </section>
       {process.env.MASUMI_ESCROW_ENABLED === "true" && <MasumiEscrowPanel
