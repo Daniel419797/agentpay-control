@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { catalystProductionConfigErrors, releaseEvidenceHash } from "@/lib/catalyst-release";
 
 const base = {
+  NODE_ENV: "test" as const,
   APP_ENV: "production",
   CATALYST_PRODUCTION_ENABLED: "true",
   CARDANO_USDCX_ENABLED: "true",
