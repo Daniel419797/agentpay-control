@@ -18,16 +18,17 @@ describe("Google OAuth callback", () => {
     createSessionResponseMock.mockClear();
   });
 
-  it("exchanges a Supabase code using the browser-bound PKCE verifier", async () => {
+  it("exchanges a Supabase code using the browser-bound PKCE verifier and matching state", async () => {
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
       expect(JSON.parse(String(init?.body))).toEqual({ auth_code: "auth-code", code_verifier: "v".repeat(43) });
       return Response.json({ user: { id: "user-1", email: "operator@example.com" } });
     });
     vi.stubGlobal("fetch", fetchMock);
 
+    const state = "state-token";
     const response = await GET(new Request(
-      "http://localhost:3100/api/v1/auth/oauth/callback?code=auth-code",
-      { headers: { cookie: `agentpay_oauth=${"v".repeat(43)}` } }
+      `http://localhost:3100/api/v1/auth/oauth/callback?code=auth-code&state=${state}`,
+      { headers: { cookie: `agentpay_oauth=${"v".repeat(43)}.${state}` } }
     ));
 
     expect(fetchMock).toHaveBeenCalledOnce();
@@ -39,9 +40,24 @@ describe("Google OAuth callback", () => {
 
   it("rejects callbacks without the verifier cookie", async () => {
     const response = await GET(new Request(
-      "http://localhost:3100/api/v1/auth/oauth/callback?code=auth-code"
+      "http://localhost:3100/api/v1/auth/oauth/callback?code=auth-code&state=state-token"
     ));
 
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("http://localhost:3100/sign-in?error=oauth_state");
+  });
+
+  it("rejects callbacks when OAuth state does not match the browser cookie", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await GET(new Request(
+      "http://localhost:3100/api/v1/auth/oauth/callback?code=auth-code&state=attacker-state",
+      { headers: { cookie: `agentpay_oauth=${"v".repeat(43)}.expected-state` } }
+    ));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(createSessionResponseMock).not.toHaveBeenCalled();
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe("http://localhost:3100/sign-in?error=oauth_state");
   });
