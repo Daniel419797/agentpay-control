@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 
 export type PublicFailure = {
   code: "REQUEST_BODY_TOO_LARGE" | string;
@@ -62,9 +62,11 @@ export type ContractCall = {
 
 export function authorizationMatches(apiKey: string | undefined, authorization: string | undefined) {
   if (!apiKey) return true;
-  const expected = createHash("sha256").update(`Bearer ${apiKey}`).digest();
-  const actual = createHash("sha256").update(authorization ?? "").digest();
-  return timingSafeEqual(expected, actual);
+  if (!authorization?.startsWith("Bearer ")) return false;
+
+  const expected = Buffer.from(apiKey, "utf8");
+  const actual = Buffer.from(authorization.slice(7), "utf8");
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
 export function capabilityAuthorizationMatches(
