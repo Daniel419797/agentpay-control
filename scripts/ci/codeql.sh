@@ -48,8 +48,8 @@ cd "$ROOT_DIR"
 
 # The external CI gate does not depend on GitHub's code-scanning UI. Parse the
 # SARIF locally and fail closed if the code-scanning query suite reports any
-# result. Python 3 is part of the CircleCI Ubuntu machine image contract used by
-# this job; verify it explicitly rather than assuming jq is installed.
+# result. The summary intentionally prints only rule, source location and the
+# scanner message; no source snippets or runtime secrets are emitted.
 python3 --version > "$OUT_DIR/python-version.txt"
 RESULT_COUNT="$(python3 - "$OUT_DIR/codeql.sarif" <<'PY'
 import json
@@ -64,5 +64,35 @@ PY
 printf 'codeql_results=%s\n' "$RESULT_COUNT" > "$OUT_DIR/codeql-summary.txt"
 if [[ "$RESULT_COUNT" -ne 0 ]]; then
   printf 'CodeQL reported %s result(s); refusing release.\n' "$RESULT_COUNT" >&2
+  python3 - "$OUT_DIR/codeql.sarif" <<'PY' || true
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    sarif = json.load(handle)
+
+print("=== Sanitized CodeQL finding summary ===")
+shown = 0
+for run in sarif.get("runs", []):
+    for result in run.get("results", []):
+        rule = str(result.get("ruleId") or "unknown")[:160]
+        message = " ".join(str((result.get("message") or {}).get("text") or "").split())[:240]
+        location = "unknown"
+        locations = result.get("locations") or []
+        if locations:
+            physical = (locations[0].get("physicalLocation") or {})
+            artifact = (physical.get("artifactLocation") or {})
+            region = (physical.get("region") or {})
+            path = str(artifact.get("uri") or "unknown")[:200]
+            line = region.get("startLine") or "?"
+            location = f"{path}:{line}"
+        print(f"  - {rule} {location}" + (f" :: {message}" if message else ""))
+        shown += 1
+        if shown >= 100:
+            break
+    if shown >= 100:
+        break
+print("=== End sanitized CodeQL finding summary ===")
+PY
   exit 1
 fi
