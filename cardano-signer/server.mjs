@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { blake2b, buildSignedCardanoTransaction, parseAssetUnit, paymentCredential, publicKeyFromSeed, signHashWithSeed, verifyEd25519 } from "./cardano.mjs";
 
@@ -7,7 +7,7 @@ const MAX_BODY_BYTES = 64 * 1024;
 function required(name, value = process.env[name]) { if (!value) throw new Error(`${name}_REQUIRED`); return value; }
 function numberEnv(name, fallback, min, max) { const value = Number(process.env[name] ?? fallback); if (!Number.isInteger(value) || value < min || value > max) throw new Error(`${name}_INVALID`); return value; }
 function bigintEnv(name,fallback,min,max){const raw=process.env[name]??fallback;if(!/^\d+$/.test(raw))throw new Error(`${name}_INVALID`);const value=BigInt(raw);if(value<min||value>max)throw new Error(`${name}_INVALID`);return value;}
-function safeEqual(a,b){const ah=createHash("sha256").update(a).digest(),bh=createHash("sha256").update(b).digest();return timingSafeEqual(ah,bh);}
+function safeEqual(a,b){const left=Buffer.from(String(a),"utf8"),right=Buffer.from(String(b),"utf8");return left.length===right.length&&timingSafeEqual(left,right);}
 function json(res,status,payload){const body=JSON.stringify(payload);res.writeHead(status,{"content-type":"application/json","content-length":Buffer.byteLength(body),"cache-control":"no-store"});res.end(body);}
 function networkName(value){if(value==="preprod")return"cardano:preprod";if(value==="mainnet")return"cardano:mainnet";throw new Error("CARDANO_NETWORK_INVALID");}
 
