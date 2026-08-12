@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 
 import { handleApiError, ok, problem, requestBody } from "@/lib/api";
@@ -24,9 +24,9 @@ function authorized(request: Request) {
   const expected = process.env.CARDANO_SETTLEMENT_STORE_API_KEY;
   const authorization = request.headers.get("authorization");
   if (!expected || expected.length < 32 || !authorization?.startsWith("Bearer ")) return false;
-  const actual = createHash("sha256").update(authorization.slice(7)).digest();
-  const wanted = createHash("sha256").update(expected).digest();
-  return timingSafeEqual(actual, wanted);
+  const actual = Buffer.from(authorization.slice(7), "utf8");
+  const wanted = Buffer.from(expected, "utf8");
+  return actual.length === wanted.length && timingSafeEqual(actual, wanted);
 }
 
 async function readClaim(transactionHash: string) {
