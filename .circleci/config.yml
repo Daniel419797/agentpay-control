@@ -110,6 +110,40 @@ jobs:
           name: Dashboard build only
           command: cd dashboard && npm run build
 
+  diagnostic-test-reconciliation:
+    executor: node-postgres
+    resource_class: medium
+    steps:
+      - install-workspace-dependencies
+      - run:
+          name: Reconciliation test only
+          command: cd dashboard && npm run test -- src/domain/reconciliation-service.test.ts
+
+  diagnostic-test-session:
+    executor: node-postgres
+    resource_class: medium
+    steps:
+      - install-workspace-dependencies
+      - run:
+          name: Session test only
+          command: cd dashboard && npm run test -- src/lib/session.test.ts
+
+  diagnostic-test-catalyst-libs:
+    executor: node-postgres
+    resource_class: medium
+    steps:
+      - install-workspace-dependencies
+      - run:
+          name: Touched Catalyst library tests only
+          command: >-
+            cd dashboard && npm run test --
+            src/lib/cardano-assets.test.ts
+            src/lib/catalyst-release.test.ts
+            src/lib/masumi-payment.test.ts
+            src/lib/masumi.test.ts
+            src/lib/pyth.test.ts
+            src/lib/veridian-keri.test.ts
+
   security:
     machine:
       image: ubuntu-2404:current
@@ -181,6 +215,9 @@ workflows:
       - diagnostic-dashboard-typecheck
       - diagnostic-dashboard-test
       - diagnostic-dashboard-build
+      - diagnostic-test-reconciliation
+      - diagnostic-test-session
+      - diagnostic-test-catalyst-libs
       - security
       - codeql
       - cardano-signer
