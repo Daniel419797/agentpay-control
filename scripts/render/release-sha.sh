@@ -27,3 +27,30 @@ assert_render_release_sha() {
 
   export RELEASE_SHA="$RENDER_GIT_COMMIT"
 }
+
+configure_render_dashboard_env() {
+  local dashboard_origin="${RENDER_DASHBOARD_ORIGIN:-${RENDER_EXTERNAL_URL:-}}"
+  local facilitator_origin="${AGENTPAY_FACILITATOR_ORIGIN:-}"
+
+  if [[ -n "$dashboard_origin" ]]; then
+    dashboard_origin="${dashboard_origin%/}"
+    export NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_APP_URL:-$dashboard_origin}"
+  fi
+
+  if [[ -n "$facilitator_origin" ]]; then
+    facilitator_origin="${facilitator_origin%/}"
+    export FACILITATOR_URL="${FACILITATOR_URL:-$facilitator_origin/hedera}"
+    export ARC_FACILITATOR_URL="${ARC_FACILITATOR_URL:-$facilitator_origin/arc}"
+    export CARDANO_PREPROD_FACILITATOR_URL="${CARDANO_PREPROD_FACILITATOR_URL:-$facilitator_origin/cardano}"
+  fi
+
+  if [[ "${APP_ENV:-}" == "production" ]]; then
+    for url_name in NEXT_PUBLIC_APP_URL FACILITATOR_URL ARC_FACILITATOR_URL CARDANO_PREPROD_FACILITATOR_URL; do
+      local url_value="${!url_name:-}"
+      if [[ -n "$url_value" && "$url_value" != https://* ]]; then
+        printf '%s must use HTTPS in production.\n' "$url_name" >&2
+        return 1
+      fi
+    done
+  fi
+}
