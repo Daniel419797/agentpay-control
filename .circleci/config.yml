@@ -1,0 +1,124 @@
+version: 2.1
+
+executors:
+  node-postgres:
+    docker:
+      - image: cimg/node:22.22-browsers
+      - image: cimg/postgres:17.5.0
+        environment:
+          POSTGRES_USER: agentpay
+          POSTGRES_PASSWORD: agentpay
+          POSTGRES_DB: agentpay
+    environment:
+      DATABASE_URL: postgresql://agentpay:agentpay@localhost:5432/agentpay?schema=public
+      AUTH_SECRET: ci-auth-secret-that-is-at-least-thirty-two-characters
+      KEY_ENCRYPTION_MASTER_KEY: ci-encryption-key-that-is-at-least-thirty-two-characters
+      CRON_SECRET: ci-cron-secret-that-is-at-least-thirty-two-characters
+      APP_ENV: test
+
+jobs:
+  verify:
+    executor: node-postgres
+    resource_class: large
+    steps:
+      - checkout
+      - run:
+          name: Pin repository npm version
+          command: npm install --global npm@11.11.1
+      - restore_cache:
+          keys:
+            - npm-v2-{{ checksum "package-lock.json" }}
+            - npm-v2-
+      - run:
+          name: Install workspace dependencies
+          command: npm ci
+      - save_cache:
+          key: npm-v2-{{ checksum "package-lock.json" }}
+          paths:
+            - ~/.npm
+      - run:
+          name: Wait for PostgreSQL
+          command: dockerize -wait tcp://localhost:5432 -timeout 60s
+      - run:
+          name: Verify application and browser smoke tests
+          command: bash scripts/ci/verify.sh
+
+  security:
+    machine:
+      image: ubuntu-2404:current
+    resource_class: large
+    steps:
+      - checkout
+      - run:
+          name: Dependency, SAST and secret scans
+          command: bash scripts/ci/security.sh
+      - store_artifacts:
+          path: artifacts/security
+          destination: security
+
+  codeql:
+    machine:
+      image: ubuntu-2404:current
+    resource_class: large
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - codeql-bundle-v2.25.5-linux64
+      - run:
+          name: CodeQL JavaScript/TypeScript analysis
+          command: bash scripts/ci/codeql.sh
+      - save_cache:
+          key: codeql-bundle-v2.25.5-linux64
+          paths:
+            - ~/.cache/agentpay-codeql
+      - store_artifacts:
+          path: artifacts/security/codeql.sarif
+          destination: security/codeql.sarif
+
+  cardano-signer:
+    machine:
+      image: ubuntu-2404:current
+    steps:
+      - checkout
+      - run:
+          name: Verify isolated Cardano signer
+          command: bash scripts/ci/cardano-signer.sh
+
+  container-builds:
+    machine:
+      image: ubuntu-2404:current
+    resource_class: large
+    steps:
+      - checkout
+      - run:
+          name: Build production service images
+          command: bash scripts/ci/container-builds.sh
+
+  release-gate:
+    docker:
+      - image: cimg/base:2026.07
+    steps:
+      - checkout
+      - run:
+          name: Produce immutable CI release evidence
+          command: bash scripts/ci/release-gate.sh
+      - store_artifacts:
+          path: artifacts/release
+          destination: release
+
+workflows:
+  agentpay-production:
+    jobs:
+      - verify
+      - security
+      - codeql
+      - cardano-signer
+      - container-builds
+      - release-gate:
+          requires:
+            - verify
+            - security
+            - codeql
+            - cardano-signer
+            - container-builds
