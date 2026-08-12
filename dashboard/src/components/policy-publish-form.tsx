@@ -85,11 +85,9 @@ export function PolicyPublishForm({ agentId, agentNetwork, pythEnabled, masumiEn
   const supportsPyth = Boolean(asset && ["ADA", "USDC", "USDCX"].includes(asset.symbol));
   const cardano = agentNetwork === "cardano:preprod" || agentNetwork === "cardano:mainnet";
   const masumiNetwork = agentNetwork === "cardano:mainnet" ? "Mainnet" : "Preprod";
-
-  useEffect(() => {
-    if (!supportsPyth) setUsePyth(false);
-    if (!cardano) { setUseMasumi(false); setUseKeri(false); }
-  }, [supportsPyth, cardano]);
+  const effectiveUsePyth = usePyth && supportsPyth;
+  const effectiveUseMasumi = useMasumi && cardano;
+  const effectiveUseKeri = useKeri && cardano;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -113,7 +111,7 @@ export function PolicyPublishForm({ agentId, agentNetwork, pythEnabled, masumiEn
       return;
     }
 
-    const oracle = usePyth ? {
+    const oracle = effectiveUsePyth ? {
       enabled: true,
       perTransactionUsdMicros: usdToMicros(String(form.get("usdPerTransaction") || "")),
       hourlyUsdMicros: usdToMicros(String(form.get("usdHourly") || "")),
@@ -135,7 +133,7 @@ export function PolicyPublishForm({ agentId, agentNetwork, pythEnabled, masumiEn
       setBusy(false);
       return;
     }
-    const masumi = useMasumi ? {
+    const masumi = effectiveUseMasumi ? {
       enabled: true,
       required: true,
       network: masumiNetwork,
@@ -149,12 +147,12 @@ export function PolicyPublishForm({ agentId, agentNetwork, pythEnabled, masumiEn
 
     const trustedIssuerAids = csv(form.get("keriTrustedIssuerAids"));
     const allowedSchemaSaids = csv(form.get("keriAllowedSchemaSaids"));
-    if (useKeri && (!trustedIssuerAids.length || !allowedSchemaSaids.length)) {
+    if (effectiveUseKeri && (!trustedIssuerAids.length || !allowedSchemaSaids.length)) {
       setError("Veridian/KERI enforcement requires at least one trusted issuer AID and one allowed schema SAID.");
       setBusy(false);
       return;
     }
-    const keri = useKeri ? {
+    const keri = effectiveUseKeri ? {
       enabled: true,
       required: true,
       trustedIssuerAids,
@@ -251,7 +249,7 @@ export function PolicyPublishForm({ agentId, agentNetwork, pythEnabled, masumiEn
       <div className="button-row">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label, index) => <label className="checkbox-label" key={label}><input type="checkbox" name="allowedWeekdays" value={index} /> {label}</label>)}
       </div>
-      <p className="form-help">Leave every day unchecked to allow all weekdays. Weekday and recurring clock-window evaluation is UTC; active-from/active-until are converted from the browser's local date/time into absolute timestamps before publication.</p>
+      <p className="form-help">Leave every day unchecked to allow all weekdays. Weekday and recurring clock-window evaluation is UTC; active-from/active-until are converted from the browser’s local date/time into absolute timestamps before publication.</p>
     </fieldset>
 
     <fieldset className="app-form-section">
@@ -266,7 +264,7 @@ export function PolicyPublishForm({ agentId, agentNetwork, pythEnabled, masumiEn
       <legend>Oracle-valued USD limits</legend>
       <label className="checkbox-label"><input type="checkbox" checked={usePyth} onChange={(event) => setUsePyth(event.target.checked)} /> Enforce Pyth-valued USD limits</label>
       {usePyth && <>
-        <p className="form-help">These limits can only make the base {asset?.symbol} policy stricter. AgentPay uses the upper edge of Pyth's confidence interval and fails closed on stale or uncertain prices.</p>
+        <p className="form-help">These limits can only make the base {asset?.symbol} policy stricter. AgentPay uses the upper edge of Pyth’s confidence interval and fails closed on stale or uncertain prices.</p>
         <div className="form-grid">
           <label>Maximum per transaction (USD)<input name="usdPerTransaction" inputMode="decimal" placeholder="1.00" /></label>
           <label>Maximum per hour (USD)<input name="usdHourly" inputMode="decimal" placeholder="10.00" /></label>
@@ -299,7 +297,7 @@ export function PolicyPublishForm({ agentId, agentNetwork, pythEnabled, masumiEn
       <legend>Veridian / KERI identity</legend>
       <label className="checkbox-label"><input type="checkbox" checked={useKeri} onChange={(event) => setUseKeri(event.target.checked)} /> Require a fresh cryptographically verified KERI/ACDC resource credential</label>
       {useKeri && <>
-        <p className="form-help">The deployment-level KERIA verifier remains the cryptographic authority. Policy allowlists can only narrow the deployment's trusted issuer and schema sets.</p>
+        <p className="form-help">The deployment-level KERIA verifier remains the cryptographic authority. Policy allowlists can only narrow the deployment’s trusted issuer and schema sets.</p>
         <div className="form-grid">
           <label>Trusted issuer AIDs<input name="keriTrustedIssuerAids" placeholder="AID, another AID" /></label>
           <label>Allowed schema SAIDs<input name="keriAllowedSchemaSaids" placeholder="SAID, another SAID" /></label>
