@@ -38,7 +38,16 @@ jobs:
             - ~/.npm
       - run:
           name: Wait for PostgreSQL
-          command: dockerize -wait tcp://localhost:5432 -timeout 60s
+          command: |
+            for attempt in $(seq 1 60); do
+              if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
+                echo "PostgreSQL is reachable."
+                exit 0
+              fi
+              sleep 1
+            done
+            echo "PostgreSQL did not become reachable within the retry window." >&2
+            exit 1
       - run:
           name: Verify application and browser smoke tests
           command: bash scripts/ci/verify.sh
@@ -97,7 +106,7 @@ jobs:
 
   release-gate:
     docker:
-      - image: cimg/base:2026.07
+      - image: cimg/node:22.22
     steps:
       - checkout
       - run:
