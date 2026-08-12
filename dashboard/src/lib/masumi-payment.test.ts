@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { assertMasumiRefundTransition, masumiInputHash, masumiPaymentConfigFromEnv, masumiResultHash, type MasumiPurchase } from "@/lib/masumi-payment";
 
+const TEST_ENV = { NODE_ENV: "test" as const };
+
 describe("Masumi escrow client", () => {
   it("hashes canonical input deterministically", () => {
     expect(masumiInputHash({ b: 2, a: 1 })).toBe(masumiInputHash({ a: 1, b: 2 }));
@@ -13,9 +15,9 @@ describe("Masumi escrow client", () => {
 
   it("requires HTTPS and distinct registry/payment credentials in production", () => {
     const key = "a".repeat(32);
-    expect(() => masumiPaymentConfigFromEnv({ APP_ENV: "production", MASUMI_PAYMENT_URL: "http://payments.example.com", MASUMI_PAYMENT_API_KEY: key })).toThrow("MASUMI_PAYMENT_HTTPS_REQUIRED");
-    expect(() => masumiPaymentConfigFromEnv({ APP_ENV: "production", MASUMI_PAYMENT_URL: "https://payments.example.com", MASUMI_PAYMENT_API_KEY: key, MASUMI_REGISTRY_API_KEY: key })).toThrow("MASUMI_REGISTRY_PAYMENT_KEYS_MUST_BE_DISTINCT");
-    expect(masumiPaymentConfigFromEnv({ APP_ENV: "production", MASUMI_PAYMENT_URL: "https://payments.example.com", MASUMI_PAYMENT_API_KEY: key, MASUMI_REGISTRY_API_KEY: "b".repeat(32) }).baseUrl).toBe("https://payments.example.com");
+    expect(() => masumiPaymentConfigFromEnv({ ...TEST_ENV, APP_ENV: "production", MASUMI_PAYMENT_URL: "http://payments.example.com", MASUMI_PAYMENT_API_KEY: key })).toThrow("MASUMI_PAYMENT_HTTPS_REQUIRED");
+    expect(() => masumiPaymentConfigFromEnv({ ...TEST_ENV, APP_ENV: "production", MASUMI_PAYMENT_URL: "https://payments.example.com", MASUMI_PAYMENT_API_KEY: key, MASUMI_REGISTRY_API_KEY: key })).toThrow("MASUMI_REGISTRY_PAYMENT_KEYS_MUST_BE_DISTINCT");
+    expect(masumiPaymentConfigFromEnv({ ...TEST_ENV, APP_ENV: "production", MASUMI_PAYMENT_URL: "https://payments.example.com", MASUMI_PAYMENT_API_KEY: key, MASUMI_REGISTRY_API_KEY: "b".repeat(32) }).baseUrl).toBe("https://payments.example.com");
   });
 
   it("requires the documented refund state transition", () => {
@@ -27,6 +29,6 @@ describe("Masumi escrow client", () => {
   it("requires the documented seller refund-authorization transition", () => {
     const purchase = { NextAction: { requestedAction: "RefundAuthorized" } } as MasumiPurchase;
     expect(() => assertMasumiRefundTransition(purchase, "RefundAuthorized")).not.toThrow();
-    expect(() => assertMasumiRefundTransition({ NextAction: { requestedAction: "RefundRequested" } } as MasumiPurchase, "RefundAuthorized")).toThrow("MASUMI_REFUND_AUTH_STATE_INVALID");
+    expect(() => assertMasumiRefundTransition({ NextAction: { requestedAction: "RefundRequested" } } as MasumiPurchase, "RefundAuthorized")).toThrow("MASUMI_REFUND_AUTH_RESPONSE_INVALID");
   });
 });
