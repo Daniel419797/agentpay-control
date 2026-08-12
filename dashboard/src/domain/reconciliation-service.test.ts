@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { matchMirrorSettlement } from "@/domain/reconciliation-service";
+import { hederaPaymentReconciliationOutcome } from "@/domain/payment-reconciliation-service";
 
 describe("mirror-node reconciliation", () => {
   const transaction = {
@@ -14,15 +14,15 @@ describe("mirror-node reconciliation", () => {
   };
 
   it("matches the exact payer, payee, and amount", () => {
-    expect(matchMirrorSettlement([transaction], { payer: "0.0.100", payee: "0.0.200", amountAtomic: 5000000n })?.transaction_id).toBe(transaction.transaction_id);
+    expect(hederaPaymentReconciliationOutcome(transaction, { type: "NATIVE" }, "0.0.100", "0.0.200", "5000000")).toBe("CONFIRMED");
   });
 
   it("does not accept a transfer with a changed destination or amount", () => {
-    expect(matchMirrorSettlement([transaction], { payer: "0.0.100", payee: "0.0.201", amountAtomic: 5000000n })).toBeUndefined();
-    expect(matchMirrorSettlement([transaction], { payer: "0.0.100", payee: "0.0.200", amountAtomic: 5000001n })).toBeUndefined();
+    expect(hederaPaymentReconciliationOutcome(transaction, { type: "NATIVE" }, "0.0.100", "0.0.201", "5000000")).toBe("MISMATCH");
+    expect(hederaPaymentReconciliationOutcome(transaction, { type: "NATIVE" }, "0.0.100", "0.0.200", "5000001")).toBe("MISMATCH");
   });
 
   it("does not accept a failed transaction", () => {
-    expect(matchMirrorSettlement([{ ...transaction, result: "INSUFFICIENT_ACCOUNT_BALANCE" }], { payer: "0.0.100", payee: "0.0.200", amountAtomic: 5000000n })).toBeUndefined();
+    expect(hederaPaymentReconciliationOutcome({ ...transaction, result: "INSUFFICIENT_ACCOUNT_BALANCE" }, { type: "NATIVE" }, "0.0.100", "0.0.200", "5000000")).toBe("FAILED");
   });
 });
