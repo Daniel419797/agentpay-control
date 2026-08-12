@@ -38,7 +38,17 @@ export function VeridianResourceBindingForm({ resourceId, canManage, canRemove }
     }
   }
 
-  useEffect(() => { void refresh(); }, [resourceId]);
+  useEffect(() => {
+    let active = true;
+    void api<{ binding: Binding | null }>(`/api/v1/resources/${resourceId}/veridian-binding`)
+      .then((result) => {
+        if (active) setBinding(result.binding ?? null);
+      })
+      .catch((cause) => {
+        if (active) setError(cause instanceof Error ? cause.message : "Could not load Veridian identity binding.");
+      });
+    return () => { active = false; };
+  }, [resourceId]);
 
   async function verifyAndBind() {
     setBusy(true); setError(""); setMessage("");
@@ -71,7 +81,7 @@ export function VeridianResourceBindingForm({ resourceId, canManage, canRemove }
   }
 
   return <section className="workspace-section">
-    <div className="section-heading"><div><h3>Veridian / KERI identity</h3><p>Bind a KERIA-verified ACDC credential to the resource's already verified Masumi agent identity.</p></div></div>
+    <div className="section-heading"><div><h3>Veridian / KERI identity</h3><p>Bind a KERIA-verified ACDC credential to the resource&apos;s already verified Masumi agent identity.</p></div></div>
     {error && <div className="form-error" role="alert">{error}</div>}
     {message && <div className="form-success" role="status">{message}</div>}
     {binding ? <>
