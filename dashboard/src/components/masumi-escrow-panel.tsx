@@ -72,6 +72,7 @@ export function MasumiEscrowPanel({ agents, defaultAgentId, canOperate, canAutho
 
   const agent = cardanoAgents.find((candidate) => candidate.id === agentId);
   const compatibleResources = useMemo(() => resources.filter((resource) => resource.status === "ACTIVE" && resource.prices?.some((price) => price.asset?.network === agent?.network)), [resources, agent?.network]);
+  const selectedResourceId = compatibleResources.some((resource) => resource.id === resourceId) ? resourceId : compatibleResources[0]?.id ?? "";
 
   async function refreshPurchases() {
     try { setPurchases(await api<Purchase[]>("/api/v1/masumi/purchases")); }
@@ -85,12 +86,8 @@ export function MasumiEscrowPanel({ agents, defaultAgentId, canOperate, canAutho
     ]).catch((cause) => setError(cause instanceof Error ? cause.message : "Could not load Masumi escrow data."));
   }, []);
 
-  useEffect(() => {
-    if (!compatibleResources.some((resource) => resource.id === resourceId)) setResourceId(compatibleResources[0]?.id ?? "");
-  }, [compatibleResources, resourceId]);
-
   async function createPurchase() {
-    if (!agentId || !resourceId) return;
+    if (!agentId || !selectedResourceId) return;
     let inputData: unknown;
     try { inputData = JSON.parse(inputJson); }
     catch { setError("Job input must be valid JSON."); return; }
@@ -101,7 +98,7 @@ export function MasumiEscrowPanel({ agents, defaultAgentId, canOperate, canAutho
       const response = await fetch("/api/v1/masumi/purchases", {
         method: "POST",
         headers: { "content-type": "application/json", "idempotency-key": key },
-        body: JSON.stringify({ agentId, resourceListingId: resourceId, inputData, purpose: purpose.trim() || undefined }),
+        body: JSON.stringify({ agentId, resourceListingId: selectedResourceId, inputData, purpose: purpose.trim() || undefined }),
       });
       const body = await response.json().catch(() => ({})) as Envelope<unknown>;
       if (!response.ok) {
@@ -139,12 +136,12 @@ export function MasumiEscrowPanel({ agents, defaultAgentId, canOperate, canAutho
     {canOperate && <div className="app-form-section">
       <div className="form-grid">
         <label>Buyer agent<select value={agentId} onChange={(event) => setAgentId(event.target.value)}>{cardanoAgents.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name} · {candidate.network} · {candidate.status}</option>)}</select></label>
-        <label>Verified resource<select value={resourceId} onChange={(event) => setResourceId(event.target.value)} disabled={!compatibleResources.length}>{compatibleResources.length ? compatibleResources.map((resource) => <option key={resource.id} value={resource.id}>{resource.name}{resource.provider?.name ? ` · ${resource.provider.name}` : ""}</option>) : <option value="">No active Cardano resource for this agent</option>}</select></label>
+        <label>Verified resource<select value={selectedResourceId} onChange={(event) => setResourceId(event.target.value)} disabled={!compatibleResources.length}>{compatibleResources.length ? compatibleResources.map((resource) => <option key={resource.id} value={resource.id}>{resource.name}{resource.provider?.name ? ` · ${resource.provider.name}` : ""}</option>) : <option value="">No active Cardano resource for this agent</option>}</select></label>
         <label>Purpose (optional)<input value={purpose} onChange={(event) => setPurpose(event.target.value)} maxLength={500} placeholder="e.g. Produce a market-risk brief" /></label>
       </div>
       <label>Job input JSON<textarea rows={8} value={inputJson} onChange={(event) => setInputJson(event.target.value)} spellCheck={false} /></label>
       <p className="form-help">The resource must already have a fresh Masumi registry binding. If the active policy requires Veridian/KERI, it must also have a fresh verified credential. AgentPay encrypts job input at rest and purges it after terminal completion/refund.</p>
-      <button className="primary-button" type="button" disabled={Boolean(busy) || !agentId || !resourceId || agent?.status !== "ACTIVE"} onClick={() => void createPurchase()}>{busy === "create" ? "Starting escrow…" : "Start Masumi escrow purchase"}</button>
+      <button className="primary-button" type="button" disabled={Boolean(busy) || !agentId || !selectedResourceId || agent?.status !== "ACTIVE"} onClick={() => void createPurchase()}>{busy === "create" ? "Starting escrow…" : "Start Masumi escrow purchase"}</button>
     </div>}
 
     <div className="record-list" style={{ marginTop: 16 }}>
