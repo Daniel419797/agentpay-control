@@ -14,7 +14,8 @@ const entrySchema = z.object({
   AgentPricing: z.unknown().optional(), metadataVersion: z.number().int().optional(), tags: z.array(z.string()).optional().default([]),
 }).passthrough();
 
-const paymentInformationEntrySchema = entrySchema.extend({ sellerWallet: z.object({ address: z.string().regex(/^addr(_test)?1[0-9a-z]+$/), vkey: sellerPaymentKeyHash }) });
+const sellerWalletSchema = z.object({ address: z.string().regex(/^addr(_test)?1[0-9a-z]+$/), vkey: sellerPaymentKeyHash });
+const paymentInformationEntrySchema = entrySchema.extend({ sellerWallet: sellerWalletSchema });
 const registryResponseSchema = z.object({ status: z.string(), data: z.object({ entries: z.array(entrySchema) }) });
 const paymentInformationResponseSchema = z.object({ status: z.string(), data: paymentInformationEntrySchema });
 
@@ -48,8 +49,13 @@ function stable(value: unknown): string {
   return `{${Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${stable(item)}`).join(",")}}`;
 }
 
+function sellerWalletFromEntry(entry: MasumiEntry | MasumiVerifiedEntry) {
+  if (!("sellerWallet" in entry)) return undefined;
+  return sellerWalletSchema.parse(entry.sellerWallet);
+}
+
 export function masumiMetadataHash(entry: MasumiEntry | MasumiVerifiedEntry): string {
-  const sellerWallet = "sellerWallet" in entry ? entry.sellerWallet : undefined;
+  const sellerWallet = sellerWalletFromEntry(entry);
   return createHash("sha256").update(stable({ agentIdentifier: entry.agentIdentifier, apiBaseUrl: entry.apiBaseUrl, status: entry.status,
     registryPolicyId: entry.RegistrySource.policyId, capability: entry.Capability ?? null, paymentType: entry.paymentType ?? null,
     pricing: entry.AgentPricing ?? null, sellerAddress: sellerWallet?.address ?? null, sellerVkey: sellerWallet?.vkey ?? null,
@@ -110,7 +116,8 @@ export function assertMasumiEntryMatches(entry: MasumiEntry | MasumiVerifiedEntr
   const normalizedResourcePath = resource.pathname.endsWith("/") ? resource.pathname : `${resource.pathname}/`;
   if (base.origin !== resource.origin || !normalizedResourcePath.startsWith(normalizedBasePath)) throw new Error("MASUMI_RESOURCE_URL_MISMATCH");
   if (expected.allowedCapabilities?.length) { const capability = entry.Capability?.name; if (!capability || !expected.allowedCapabilities.includes(capability)) throw new Error("MASUMI_CAPABILITY_NOT_ALLOWED"); }
-  if ("sellerWallet" in entry) assertCardanoPaymentCredential(entry.sellerWallet.address, expected.network, entry.sellerWallet.vkey);
+  const sellerWallet = sellerWalletFromEntry(entry);
+  if (sellerWallet) assertCardanoPaymentCredential(sellerWallet.address, expected.network, sellerWallet.vkey);
 }
 
 export function masumiReadinessErrors(env: NodeJS.ProcessEnv = process.env): string[] {
