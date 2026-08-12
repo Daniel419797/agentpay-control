@@ -12,7 +12,11 @@ cd "$ROOT_DIR"
 printf 'Node: %s\n' "$(node --version)"
 printf 'npm: %s\n' "$(npm --version)"
 
-npm audit --omit=dev --audit-level=high
+# Dependency/SAST/secret scanning is owned by scripts/ci/security.sh and is a
+# separate required workflow dependency of release-gate. Keep this job focused
+# on executable application verification so security findings do not prevent
+# migrations, lint, typecheck, tests, builds, and browser smoke tests from
+# producing their own independent evidence.
 
 (
   cd dashboard
