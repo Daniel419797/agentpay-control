@@ -81,7 +81,7 @@ function compress(h: bigint[], block: Buffer, bytesCompressed: bigint, last: boo
 export function blake2b(input: Uint8Array, outputLength: number) {
   if (!Number.isInteger(outputLength) || outputLength < 1 || outputLength > 64) throw new Error("BLAKE2B_OUTPUT_LENGTH_INVALID");
   const data = Buffer.from(input);
-  const h = [...IV];
+  const h: bigint[] = [...IV];
   h[0] = (h[0] ^ BigInt(0x01010000 ^ outputLength)) & MASK_64;
 
   let offset = 0;
