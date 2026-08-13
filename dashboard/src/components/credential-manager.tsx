@@ -6,14 +6,30 @@ import { useState } from "react";
 type Credential = { id: string; label: string; prefix: string; scopes: string[]; status: string; expiresAt: Date | string | null; lastUsedAt: Date | string | null; createdAt: Date | string };
 type CreatedCredential = Credential & { secret: string };
 
-export function CredentialManager({ agentId, existing }: { agentId: string; existing: Credential[] }) {
+type Props = {
+  agentId: string;
+  existing: Credential[];
+  defaultLabel?: string;
+  defaultScopes?: string[];
+  createLabel?: string;
+};
+
+const standardScopes = ["payments:create", "payments:read"];
+
+export function CredentialManager({ agentId, existing, defaultLabel = "", defaultScopes = standardScopes, createLabel = "Create credential" }: Props) {
   const router = useRouter();
-  const [showForm, setShowForm] = useState(false);
-  const [label, setLabel] = useState("");
-  const [scopes, setScopes] = useState<string[]>(["payments:create", "payments:read"]);
+  const [showForm, setShowForm] = useState(Boolean(defaultLabel));
+  const [label, setLabel] = useState(defaultLabel);
+  const [scopes, setScopes] = useState<string[]>(defaultScopes);
   const [created, setCreated] = useState<CreatedCredential | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  function resetForm() {
+    setLabel(defaultLabel);
+    setScopes(defaultScopes);
+    setError("");
+  }
 
   async function create() {
     setLoading(true);
@@ -26,13 +42,13 @@ export function CredentialManager({ agentId, existing }: { agentId: string; exis
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? `Request failed (${response.status})`);
+        setError(body?.error?.message ?? body?.detail ?? `Request failed (${response.status})`);
         return;
       }
       const body = await response.json() as { data: CreatedCredential };
       setCreated(body.data);
       setShowForm(false);
-      setLabel("");
+      resetForm();
       router.refresh();
     } catch {
       setError("Network error. Please try again.");
@@ -59,7 +75,7 @@ export function CredentialManager({ agentId, existing }: { agentId: string; exis
           <div style={{ fontFamily: "monospace", background: "var(--color-surface, #f5f5f5)", padding: 12, borderRadius: 6, wordBreak: "break-all", fontSize: 13 }}>
             {created.secret}
           </div>
-          <button className="secondary-button" style={{ marginTop: 10 }} onClick={() => { navigator.clipboard.writeText(created.secret); }}>Copy to clipboard</button>
+          <button className="secondary-button" style={{ marginTop: 10 }} onClick={() => { void navigator.clipboard.writeText(created.secret); }}>Copy to clipboard</button>
           <button className="ghost-link" style={{ marginLeft: 10 }} onClick={() => setCreated(null)}>Dismiss</button>
         </div>
       )}
@@ -100,13 +116,13 @@ export function CredentialManager({ agentId, existing }: { agentId: string; exis
           {!label && <div className="form-error">Enter a label to continue.</div>}
           <div className="button-row">
             <button className="primary-button" disabled={loading || scopes.length === 0} onClick={() => { if (!label) { setError("Enter a label for this credential."); return; } void create(); }}>
-              {loading ? "Creating…" : "Create credential"}
+              {loading ? "Creating…" : createLabel}
             </button>
-            <button className="secondary-button" onClick={() => { setShowForm(false); setError(""); setLabel(""); }}>Cancel</button>
+            <button className="secondary-button" onClick={() => { setShowForm(false); resetForm(); }}>Cancel</button>
           </div>
         </div>
       ) : (
-        <button className="primary-button" onClick={() => setShowForm(true)}>Create credential</button>
+        <button className="primary-button" onClick={() => setShowForm(true)}>{createLabel}</button>
       )}
     </>
   );
