@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseCardanoEnv } from "./cardano.js";
 
 const PREPROD_PAYER = "addr_test1qzjeazrvkpc3twtg9xu7na0dw5zshqwwh354gmh0626gv4r9vh67k4754l9ugvw5uex30x4u6lyfvr0a34vynjmk2nzq7hqhjn";
-const MAINNET_PAYER = "addr1qx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj0vs2qd4a8cpkp0k8cqq0sq2nq";
+const MAINNET_PAYER = "addr1qxjeazrvkpc3twtg9xu7na0dw5zshqwwh354gmh0626gv4r9vh67k4754l9ugvw5uex30x4u6lyfvr0a34vynjmk2nzqapah7v";
 
 function preprod(overrides: Record<string, string> = {}) {
   return {
