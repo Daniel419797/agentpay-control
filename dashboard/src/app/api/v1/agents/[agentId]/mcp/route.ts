@@ -19,11 +19,25 @@ const tools = [
     name: "agentpay_get_connection_status",
     description: "Check whether this AgentPay payment identity is active and has a published spending policy.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    annotations: {
+      title: "Check AgentPay connection",
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: "agentpay_list_resources",
     description: "List AgentPay resources this agent can discover, including public verified resources and resources owned by its organization.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    annotations: {
+      title: "List purchasable AgentPay resources",
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: "agentpay_purchase_resource",
@@ -39,6 +53,13 @@ const tools = [
       required: ["resourceUrl", "idempotencyKey"],
       additionalProperties: false,
     },
+    annotations: {
+      title: "Purchase resource with AgentPay",
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
   },
   {
     name: "agentpay_get_payment_status",
@@ -48,6 +69,13 @@ const tools = [
       properties: { intentId: { type: "string", format: "uuid", description: "AgentPay payment intent ID." } },
       required: ["intentId"],
       additionalProperties: false,
+    },
+    annotations: {
+      title: "Read AgentPay payment status",
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
 ];
@@ -177,7 +205,10 @@ async function handleMessage(request: Request, agentId: string, message: JsonRpc
     });
   }
   if (message.method === "notifications/initialized") return null;
-  if (message.method === "ping") return jsonRpcResult(id, {});
+  if (message.method === "ping") {
+    if (!(await authorize(request, agentId, "resources:read"))) return jsonRpcError(id, -32001, "Unauthorized AgentPay connection.");
+    return jsonRpcResult(id, {});
+  }
 
   if (message.method === "tools/list") {
     if (!(await authorize(request, agentId, "resources:read"))) return jsonRpcError(id, -32001, "Unauthorized AgentPay connection.");
