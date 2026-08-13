@@ -18,17 +18,17 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@hono/node-server": "2.0.12",
-    "@x402/core": "2.20.0",
-    "@x402/evm": "2.20.0",
-    "hono": "4.12.32",
-    "viem": "^2.39.3",
-    "zod": "4.3.6"
+    "@hono/node-server": "2.1.0",
+    "@x402/core": "2.21.0",
+    "@x402/evm": "2.21.0",
+    "hono": "4.13.0",
+    "viem": "^2.55.11",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/node": "25.0.10",
-    "tsx": "4.21.0",
+    "tsx": "4.23.9",
     "typescript": "5.9.3",
-    "vitest": "4.0.18"
+    "vitest": "4.1.10"
   }
 }

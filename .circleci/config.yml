@@ -52,8 +52,63 @@ jobs:
             echo "PostgreSQL did not become reachable within the retry window." >&2
             exit 1
       - run:
-          name: Verify application and browser smoke tests
-          command: bash scripts/ci/verify.sh
+          name: Dashboard database and governance checks
+          command: |
+            cd dashboard
+            npm run db:deploy
+            npm run db:resources:check
+            npm run verify:governance
+      - run:
+          name: Dashboard lint
+          command: cd dashboard && npm run lint
+      - run:
+          name: Dashboard typecheck
+          command: cd dashboard && npm run typecheck
+      - run:
+          name: Dashboard unit tests
+          command: cd dashboard && npm run test
+      - run:
+          name: Dashboard production build
+          command: cd dashboard && npm run build
+      - run:
+          name: Hedera facilitator verification
+          command: |
+            cd facilitator
+            npm run build
+            npm run typecheck
+            npm test
+      - run:
+          name: Arc facilitator verification
+          command: |
+            cd facilitator-arc
+            npm run build
+            npm run typecheck
+            npm test
+      - run:
+          name: Combined facilitator verification
+          command: |
+            npm run build --workspace=@agentpay/hedera-facilitator
+            npm run build --workspace=@agentpay/arc-facilitator
+            npm run typecheck --workspace=@agentpay/combined-facilitator
+            npm test --workspace=@agentpay/combined-facilitator
+            npm run build --workspace=@agentpay/combined-facilitator
+      - run:
+          name: Resource server verification
+          command: |
+            cd resource-server
+            npm run build
+            npm run typecheck
+            npm test
+      - run:
+          name: Install Playwright Chromium
+          command: |
+            if [[ "${CI_SKIP_PLAYWRIGHT_INSTALL:-0}" != "1" ]]; then
+              cd dashboard
+              npx playwright install --with-deps chromium
+            fi
+      - run:
+          name: Dashboard browser smoke tests
+          command: cd dashboard && npm run test:e2e
 
   security:
     machine:
@@ -104,8 +159,17 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Build production service images
-          command: bash scripts/ci/container-builds.sh
+          name: Build Hedera facilitator image
+          command: docker build -f facilitator/Dockerfile -t "agentpay/facilitator:${CIRCLE_SHA1}" .
+      - run:
+          name: Build Arc facilitator image
+          command: docker build -f facilitator-arc/Dockerfile -t "agentpay/facilitator-arc:${CIRCLE_SHA1}" .
+      - run:
+          name: Build combined facilitator image
+          command: docker build -f facilitator-combined/Dockerfile -t "agentpay/facilitator-combined:${CIRCLE_SHA1}" .
+      - run:
+          name: Build resource server image
+          command: docker build -f resource-server/Dockerfile -t "agentpay/resource-server:${CIRCLE_SHA1}" .
 
   release-gate:
     docker:

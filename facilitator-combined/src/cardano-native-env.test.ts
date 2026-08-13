@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseCardanoNativeEnv } from "./cardano-native.js";
 
-const PAYER = "addr_test1vr8nl3s7rk0tqn4rd9u49s0k52f9sezrt98rs4cnpfj47wggeuy4d";
+const PAYER = "addr_test1qzjeazrvkpc3twtg9xu7na0dw5zshqwwh354gmh0626gv4r9vh67k4754l9ugvw5uex30x4u6lyfvr0a34vynjmk2nzq7hqhjn";
 const USDCX = `${"ab".repeat(28)}5553444378`;
 
 function production(overrides: Record<string, string> = {}) {
