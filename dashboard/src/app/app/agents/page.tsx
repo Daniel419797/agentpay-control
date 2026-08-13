@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { formatAtomic } from "@/lib/format";
 import { currentWorkspace } from "@/lib/workspace";
 
+const supportedNetworks = new Set(["hedera:testnet", "hedera:mainnet", "eip155:5042002", "cardano:preprod", "cardano:mainnet"]);
+
 export default async function AgentsPage({
   searchParams,
 }: {
@@ -12,8 +14,7 @@ export default async function AgentsPage({
 }) {
   const workspace = await currentWorkspace();
   const params = await searchParams;
-  const networkFilter = params.network === "hedera:testnet" || params.network === "hedera:mainnet"
-    ? params.network : undefined;
+  const networkFilter = params.network && supportedNetworks.has(params.network) ? params.network : undefined;
   const agents = workspace ? await db.agent.findMany({
     where: {
       organizationId: workspace.organization.id,
@@ -31,8 +32,8 @@ export default async function AgentsPage({
 
   return <WorkspacePage
     title="Agents"
-    description="Payment identities, custody, balances, and operating status."
-    action={{ label: "Create agent", href: "/app/agents/new" }}
+    description="Payment identities, custody, balances, operating status, and external AI integrations."
+    action={{ label: "AI integrations", href: "/app/agents/integrations" }}
     empty="Create an agent to begin."
     rows={agents.map((agent) => {
       const account = agent.accounts[0];
