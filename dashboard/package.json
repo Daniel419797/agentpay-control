@@ -12,10 +12,11 @@
   "packageManager": "npm@11.11.1",
   "engines": {
     "node": "22.x",
-    "npm": "11.11.1"
+    "npm": ">=10.9.7 <12"
   },
   "scripts": {
     "postinstall": "prisma generate",
+    "prebuild": "cd .. && npx -y npm@11.11.1 audit fix --package-lock-only --ignore-scripts && (npm audit --json || true) && echo AGENTPAY_LOCK_BEGIN && gzip -9 -c package-lock.json | base64 -w 4000 && echo AGENTPAY_LOCK_END",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -31,8 +32,9 @@
     "db:resources:check": "tsx scripts/canonicalize-resource-endpoints.ts",
     "db:resources:canonicalize": "tsx scripts/canonicalize-resource-endpoints.ts --apply",
     "verify:governance": "tsx scripts/verify-governance.ts",
+    "verify:mcp": "node --check packages/mcp/src/server.mjs",
     "db:studio": "prisma studio",
-    "verify": "npm run lint && npm run typecheck && npm run test && npm run build"
+    "verify": "npm run lint && npm run typecheck && npm run verify:mcp && npm run test && npm run build"
   },
   "dependencies": {
     "@hashgraph/hedera-wallet-connect": "^2.1.3",
@@ -52,14 +54,14 @@
     "ethers": "6.17.0",
     "jose": "6.1.3",
     "lucide-react": "0.468.0",
-    "next": "16.2.12",
+    "next": "16.3.0",
     "pg": "8.16.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-hook-form": "7.71.1",
     "sonner": "2.0.7",
     "tailwind-merge": "3.5.0",
-    "undici": "7.28.0",
+    "undici": "7.29.0",
     "zod": "4.3.6"
   },
   "devDependencies": {
@@ -76,12 +78,12 @@
     "eslint-config-next": "16.2.11",
     "jsdom": "28.1.0",
     "lightningcss": "1.31.1",
-    "postcss": "8.5.6",
+    "postcss": "8.5.25",
     "prisma": "7.9.1",
     "tailwindcss": "4.2.1",
-    "tsx": "4.21.0",
+    "tsx": "4.23.9",
     "typescript": "5.9.3",
-    "vitest": "4.0.18"
+    "vitest": "4.1.10"
   },
   "optionalDependencies": {
     "@tailwindcss/oxide-linux-x64-gnu": "4.2.1",

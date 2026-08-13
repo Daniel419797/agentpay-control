@@ -15,13 +15,13 @@
     "@agentpay/arc-facilitator": "0.1.0",
     "@agentpay/hedera-facilitator": "0.1.0",
     "@hono/node-server": "2.0.12",
-    "hono": "4.12.32",
+    "hono": "4.12.34",
     "zod": "4.3.6"
   },
   "devDependencies": {
     "@types/node": "25.0.10",
-    "tsx": "4.21.0",
+    "tsx": "4.23.9",
     "typescript": "5.9.3",
-    "vitest": "4.0.18"
+    "vitest": "4.1.10"
   }
 }
