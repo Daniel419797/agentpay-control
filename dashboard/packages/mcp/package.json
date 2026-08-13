@@ -1,1 +1,22 @@
-{"name":"@agentpay/mcp","version":"0.1.0","type":"module","bin":{"agentpay-mcp":"src/server.mjs"}}
+{
+  "name": "@agentpay/mcp",
+  "version": "0.2.0",
+  "description": "MCP bridge for policy-controlled AgentPay payments from AI agents",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "agentpay-mcp": "src/server.mjs"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Daniel419797/agentpay-control.git",
+    "directory": "dashboard/packages/mcp"
+  }
+}
