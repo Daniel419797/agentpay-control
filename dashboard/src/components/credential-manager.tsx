@@ -36,6 +36,7 @@ export function CredentialManager({ agentId, existing, defaultLabel, defaultScop
   const [created, setCreated] = useState<CreatedCredential | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [verification, setVerification] = useState("");
 
   useEffect(() => {
     if (!integrationScreen || defaultLabel || defaultScopes) return;
@@ -43,17 +44,20 @@ export function CredentialManager({ agentId, existing, defaultLabel, defaultScop
     setScopes(integrationScopes);
     setShowForm(true);
     setError("");
+    setVerification("");
   }, [defaultLabel, defaultScopes, integrationScreen, integrationType]);
 
   function resetForm() {
     setLabel(initialLabel);
     setScopes(initialScopes);
     setError("");
+    setVerification("");
   }
 
   async function create() {
     setLoading(true);
     setError("");
+    setVerification("");
     try {
       const response = await fetch(`/api/v1/agents/${agentId}/credentials`, {
         method: "POST",
@@ -77,10 +81,42 @@ export function CredentialManager({ agentId, existing, defaultLabel, defaultScop
     }
   }
 
+  async function verifyCreatedConnection() {
+    if (!created) return;
+    setVerification("Checking connection…");
+    try {
+      const response = await fetch(`/api/v1/agents/${agentId}/connection`, {
+        cache: "no-store",
+        headers: { authorization: `Bearer ${created.secret}` },
+      });
+      const body = await response.json().catch(() => null) as { data?: { ready?: boolean; blockingReasons?: string[] }; detail?: string } | null;
+      if (!response.ok) {
+        setVerification(body?.detail ?? `Connection verification failed (${response.status}).`);
+        return;
+      }
+      if (body?.data?.ready) {
+        setVerification("Verified — this credential is authenticated and the agent, payment account, and published policy are ready.");
+      } else {
+        const blockers = body?.data?.blockingReasons?.join(", ") || "unknown readiness issue";
+        setVerification(`Credential authenticated, but spending is blocked: ${blockers}.`);
+      }
+      router.refresh();
+    } catch {
+      setVerification("Connection verification could not reach AgentPay.");
+    }
+  }
+
   async function revoke(id: string) {
-    if (!confirm("Revoke this credential? The agent will lose access.")) return;
+    const action = integrationScreen ? "Disconnect this AI client? Its AgentPay credential will be revoked immediately." : "Revoke this credential? The agent will lose access.";
+    if (!confirm(action)) return;
     const response = await fetch(`/api/v1/agents/${agentId}/credentials/${id}`, { method: "DELETE" });
-    if (response.ok) router.refresh();
+    if (response.ok) {
+      if (created?.id === id) {
+        setCreated(null);
+        setVerification("");
+      }
+      router.refresh();
+    }
   }
 
   function toggleScope(scope: string) {
@@ -95,8 +131,12 @@ export function CredentialManager({ agentId, existing, defaultLabel, defaultScop
           <div style={{ fontFamily: "monospace", background: "var(--color-surface, #f5f5f5)", padding: 12, borderRadius: 6, wordBreak: "break-all", fontSize: 13 }}>
             {created.secret}
           </div>
-          <button className="secondary-button" style={{ marginTop: 10 }} onClick={() => { void navigator.clipboard.writeText(created.secret); }}>Copy to clipboard</button>
-          <button className="ghost-link" style={{ marginLeft: 10 }} onClick={() => setCreated(null)}>Dismiss</button>
+          <div className="button-row" style={{ marginTop: 10 }}>
+            <button className="secondary-button" onClick={() => { void navigator.clipboard.writeText(created.secret); }}>Copy to clipboard</button>
+            {integrationScreen && <button className="primary-button" onClick={() => void verifyCreatedConnection()}>Verify connection</button>}
+            <button className="ghost-link" onClick={() => { setCreated(null); setVerification(""); }}>Dismiss</button>
+          </div>
+          {verification && <div className={verification.startsWith("Verified") ? "form-success" : "form-help"} role="status" style={{ marginTop: 10 }}>{verification}</div>}
         </div>
       )}
 
@@ -109,7 +149,7 @@ export function CredentialManager({ agentId, existing, defaultLabel, defaultScop
                 <div className="record-subtitle">{cred.prefix}… &middot; {cred.scopes.join(", ")} &middot; {cred.status}</div>
               </div>
               {cred.status !== "REVOKED" && (
-                <button className="secondary-button" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => void revoke(cred.id)}>Revoke</button>
+                <button className="secondary-button" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => void revoke(cred.id)}>{integrationScreen ? "Disconnect" : "Revoke"}</button>
               )}
             </div>
           ))}
