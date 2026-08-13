@@ -21,14 +21,14 @@
     "@hono/node-server": "2.0.12",
     "@x402/core": "2.20.0",
     "@x402/evm": "2.20.0",
-    "hono": "4.12.32",
+    "hono": "4.12.34",
     "viem": "^2.39.3",
     "zod": "4.3.6"
   },
   "devDependencies": {
     "@types/node": "25.0.10",
-    "tsx": "4.21.0",
+    "tsx": "4.23.9",
     "typescript": "5.9.3",
-    "vitest": "4.0.18"
+    "vitest": "4.1.10"
   }
 }
