@@ -4,7 +4,7 @@
   "packageManager": "npm@11.11.1",
   "engines": {
     "node": "22.x",
-    "npm": "11.11.1"
+    "npm": ">=10.9.7 <12"
   },
   "description": "Policy-controlled x402 payment OS for autonomous software agents across Hedera, Arc and Cardano",
   "license": "MIT",
