@@ -1,8 +1,7 @@
 "use client";
 
-import { usePathname, useSearchParams } from "next/navigation";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { INTEGRATION_META, INTEGRATION_TYPES, integrationCredentialLabel, type IntegrationType } from "@/lib/agent-integration";
 
@@ -37,6 +36,14 @@ export function CredentialManager({ agentId, existing, defaultLabel, defaultScop
   const [created, setCreated] = useState<CreatedCredential | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!integrationScreen || defaultLabel || defaultScopes) return;
+    setLabel(integrationCredentialLabel(integrationType, INTEGRATION_META[integrationType].name));
+    setScopes(integrationScopes);
+    setShowForm(true);
+    setError("");
+  }, [defaultLabel, defaultScopes, integrationScreen, integrationType]);
 
   function resetForm() {
     setLabel(initialLabel);
