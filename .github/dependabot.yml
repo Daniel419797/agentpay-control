@@ -2,7 +2,7 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: /
-    target-branch: agent/fix-ci-security-cardano
+    target-branch: master
     schedule:
       interval: weekly
     cooldown:
