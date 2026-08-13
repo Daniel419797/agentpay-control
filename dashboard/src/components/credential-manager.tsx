@@ -3,7 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { INTEGRATION_META, INTEGRATION_TYPES, integrationCredentialLabel, type IntegrationType } from "@/lib/agent-integration";
+import { INTEGRATION_CREDENTIAL_PREFIX, INTEGRATION_META, INTEGRATION_TYPES, integrationCredentialLabel, type IntegrationType } from "@/lib/agent-integration";
 
 type Credential = { id: string; label: string; prefix: string; scopes: string[]; status: string; expiresAt: Date | string | null; lastUsedAt: Date | string | null; createdAt: Date | string };
 type CreatedCredential = Credential & { secret: string };
@@ -29,6 +29,7 @@ export function CredentialManager({ agentId, existing, defaultLabel, defaultScop
   const initialLabel = defaultLabel ?? (integrationScreen ? integrationCredentialLabel(integrationType, INTEGRATION_META[integrationType].name) : "");
   const initialScopes = defaultScopes ?? (integrationScreen ? integrationScopes : standardScopes);
   const buttonLabel = createLabel ?? (integrationScreen ? `Create ${INTEGRATION_META[integrationType].name} connection` : "Create credential");
+  const visibleCredentials = integrationScreen ? existing.filter((credential) => credential.label.startsWith(INTEGRATION_CREDENTIAL_PREFIX)) : existing;
 
   const [showForm, setShowForm] = useState(Boolean(initialLabel));
   const [label, setLabel] = useState(initialLabel);
@@ -140,9 +141,9 @@ export function CredentialManager({ agentId, existing, defaultLabel, defaultScop
         </div>
       )}
 
-      {existing.length > 0 && (
+      {visibleCredentials.length > 0 && (
         <div className="record-list" style={{ marginBottom: 18 }}>
-          {existing.map((cred) => (
+          {visibleCredentials.map((cred) => (
             <div className="record-row" key={cred.id} style={{ justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <div className="record-title">{cred.label}</div>
