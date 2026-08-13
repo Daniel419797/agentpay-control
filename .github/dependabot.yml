@@ -11,9 +11,21 @@ updates:
     allow:
       - dependency-name: "tsx"
       - dependency-name: "vitest"
+      - dependency-name: "fast-uri"
+      - dependency-name: "js-yaml"
+      - dependency-name: "brace-expansion"
+      - dependency-name: "nanoid"
+      - dependency-name: "postcss"
     groups:
-      development-dependencies:
-        dependency-type: development
+      ci-security-dependencies:
+        patterns:
+          - "tsx"
+          - "vitest"
+          - "fast-uri"
+          - "js-yaml"
+          - "brace-expansion"
+          - "nanoid"
+          - "postcss"
   - package-ecosystem: github-actions
     directory: /
     schedule:
