@@ -20,8 +20,8 @@
   },
   "devDependencies": {
     "@types/node": "25.0.10",
-    "tsx": "4.21.0",
+    "tsx": "4.23.9",
     "typescript": "5.9.3",
-    "vitest": "4.0.18"
+    "vitest": "4.1.10"
   }
 }
