@@ -1,7 +1,10 @@
 "use client";
 
+import { usePathname, useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+
+import { INTEGRATION_META, INTEGRATION_TYPES, integrationCredentialLabel, type IntegrationType } from "@/lib/agent-integration";
 
 type Credential = { id: string; label: string; prefix: string; scopes: string[]; status: string; expiresAt: Date | string | null; lastUsedAt: Date | string | null; createdAt: Date | string };
 type CreatedCredential = Credential & { secret: string };
@@ -15,19 +18,29 @@ type Props = {
 };
 
 const standardScopes = ["payments:create", "payments:read"];
+const integrationScopes = ["payments:create", "payments:read", "resources:read"];
 
-export function CredentialManager({ agentId, existing, defaultLabel = "", defaultScopes = standardScopes, createLabel = "Create credential" }: Props) {
+export function CredentialManager({ agentId, existing, defaultLabel, defaultScopes, createLabel }: Props) {
   const router = useRouter();
-  const [showForm, setShowForm] = useState(Boolean(defaultLabel));
-  const [label, setLabel] = useState(defaultLabel);
-  const [scopes, setScopes] = useState<string[]>(defaultScopes);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const integrationScreen = pathname.endsWith("/integrations");
+  const requestedType = searchParams.get("type") as IntegrationType | null;
+  const integrationType: IntegrationType = requestedType && INTEGRATION_TYPES.includes(requestedType) ? requestedType : "CLAUDE_CODE";
+  const initialLabel = defaultLabel ?? (integrationScreen ? integrationCredentialLabel(integrationType, INTEGRATION_META[integrationType].name) : "");
+  const initialScopes = defaultScopes ?? (integrationScreen ? integrationScopes : standardScopes);
+  const buttonLabel = createLabel ?? (integrationScreen ? `Create ${INTEGRATION_META[integrationType].name} connection` : "Create credential");
+
+  const [showForm, setShowForm] = useState(Boolean(initialLabel));
+  const [label, setLabel] = useState(initialLabel);
+  const [scopes, setScopes] = useState<string[]>(initialScopes);
   const [created, setCreated] = useState<CreatedCredential | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   function resetForm() {
-    setLabel(defaultLabel);
-    setScopes(defaultScopes);
+    setLabel(initialLabel);
+    setScopes(initialScopes);
     setError("");
   }
 
@@ -116,13 +129,13 @@ export function CredentialManager({ agentId, existing, defaultLabel = "", defaul
           {!label && <div className="form-error">Enter a label to continue.</div>}
           <div className="button-row">
             <button className="primary-button" disabled={loading || scopes.length === 0} onClick={() => { if (!label) { setError("Enter a label for this credential."); return; } void create(); }}>
-              {loading ? "Creating…" : createLabel}
+              {loading ? "Creating…" : buttonLabel}
             </button>
             <button className="secondary-button" onClick={() => { setShowForm(false); resetForm(); }}>Cancel</button>
           </div>
         </div>
       ) : (
-        <button className="primary-button" onClick={() => setShowForm(true)}>{createLabel}</button>
+        <button className="primary-button" onClick={() => setShowForm(true)}>{buttonLabel}</button>
       )}
     </>
   );
