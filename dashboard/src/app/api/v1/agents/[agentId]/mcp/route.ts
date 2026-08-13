@@ -65,7 +65,8 @@ function jsonRpcError(id: JsonRpcId, code: number, message: string, data?: unkno
 }
 
 function textToolResult(value: unknown, isError = false) {
-  return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }], ...(isError ? { isError: true } : {}) };
+  const text = JSON.stringify(value, (_key, item) => typeof item === "bigint" ? item.toString() : item, 2);
+  return { content: [{ type: "text", text }], ...(isError ? { isError: true } : {}) };
 }
 
 async function authorize(request: Request, agentId: string, scope: string) {
