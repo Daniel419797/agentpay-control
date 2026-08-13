@@ -16,6 +16,7 @@
   },
   "scripts": {
     "postinstall": "prisma generate",
+    "prebuild": "cd .. && npx -y npm@11.11.1 install --package-lock-only --ignore-scripts && mkdir -p dashboard/public && cp package-lock.json dashboard/public/generated-package-lock.json",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
