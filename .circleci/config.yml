@@ -107,6 +107,26 @@ jobs:
           name: Build production service images
           command: bash scripts/ci/container-builds.sh
 
+  lockfile-regenerate:
+    docker:
+      - image: cimg/node:22.22
+    steps:
+      - checkout
+      - run:
+          name: Pin repository npm version
+          command: npm install --global npm@11.11.1
+      - run:
+          name: Regenerate package lock
+          command: npm install --package-lock-only --ignore-scripts
+      - run:
+          name: Stage generated lock artifact
+          command: |
+            mkdir -p artifacts/lockfile
+            cp package-lock.json artifacts/lockfile/package-lock.json
+      - store_artifacts:
+          path: artifacts/lockfile/package-lock.json
+          destination: lockfile/package-lock.json
+
   release-gate:
     docker:
       - image: cimg/node:22.22
@@ -127,6 +147,7 @@ workflows:
       - codeql
       - cardano-signer
       - container-builds
+      - lockfile-regenerate
       - release-gate:
           requires:
             - verify
