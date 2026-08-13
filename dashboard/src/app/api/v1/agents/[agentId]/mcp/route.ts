@@ -19,25 +19,13 @@ const tools = [
     name: "agentpay_get_connection_status",
     description: "Check whether this AgentPay payment identity is active and has a published spending policy.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
-    annotations: {
-      title: "Check AgentPay connection",
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
+    annotations: { title: "Check AgentPay connection", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   {
     name: "agentpay_list_resources",
     description: "List AgentPay resources this agent can discover, including public verified resources and resources owned by its organization.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
-    annotations: {
-      title: "List purchasable AgentPay resources",
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
+    annotations: { title: "List purchasable AgentPay resources", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   {
     name: "agentpay_purchase_resource",
@@ -53,13 +41,7 @@ const tools = [
       required: ["resourceUrl", "idempotencyKey"],
       additionalProperties: false,
     },
-    annotations: {
-      title: "Purchase resource with AgentPay",
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: true,
-      openWorldHint: true,
-    },
+    annotations: { title: "Purchase resource with AgentPay", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   },
   {
     name: "agentpay_get_payment_status",
@@ -70,13 +52,7 @@ const tools = [
       required: ["intentId"],
       additionalProperties: false,
     },
-    annotations: {
-      title: "Read AgentPay payment status",
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
+    annotations: { title: "Read AgentPay payment status", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
 ];
 
@@ -173,6 +149,17 @@ async function paymentStatus(agentId: string, intentId: string) {
     },
   });
   if (!row) return null;
+  const fulfillment = row.fulfillment ? {
+    id: row.fulfillment.id,
+    status: row.fulfillment.status,
+    contentType: row.fulfillment.contentType,
+    contentHash: row.fulfillment.contentHash,
+    contentBytes: row.fulfillment.contentBytes,
+    errorCode: row.fulfillment.errorCode,
+    fulfilledAt: row.fulfillment.fulfilledAt,
+    createdAt: row.fulfillment.createdAt,
+    updatedAt: row.fulfillment.updatedAt,
+  } : null;
   return {
     id: row.id,
     resourceUrl: row.resourceUrl,
@@ -183,7 +170,7 @@ async function paymentStatus(agentId: string, intentId: string) {
     updatedAt: row.updatedAt,
     quote: row.quote ? { ...row.quote, amountAtomic: row.quote.amountAtomic.toString() } : null,
     approval: row.approval,
-    fulfillment: row.fulfillment,
+    fulfillment,
     attempts: row.attempts.map((attempt) => ({
       ...attempt,
       settlement: attempt.settlement ? { ...attempt.settlement, amountAtomic: attempt.settlement.amountAtomic.toString() } : null,
