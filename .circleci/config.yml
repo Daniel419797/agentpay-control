@@ -119,6 +119,18 @@ jobs:
           name: Regenerate package lock
           command: npm install --package-lock-only --ignore-scripts
       - run:
+          name: Commit regenerated package lock
+          command: |
+            if git diff --quiet -- package-lock.json; then
+              echo "package-lock.json already matches the manifests."
+              exit 0
+            fi
+            git config user.name "CircleCI"
+            git config user.email "circleci@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "chore: regenerate patched package lock"
+            git push origin HEAD:ai-connections
+      - run:
           name: Stage generated lock artifact
           command: |
             mkdir -p artifacts/lockfile
