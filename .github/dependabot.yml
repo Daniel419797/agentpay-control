@@ -2,16 +2,16 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: /
-    target-branch: agent/fix-ci-security-cardano
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
-    allow:
-      - dependency-name: "postcss"
     groups:
-      lockfile-refresh:
-        patterns:
-          - "postcss"
+      production-dependencies:
+        dependency-type: production
+      development-dependencies:
+        dependency-type: development
   - package-ecosystem: github-actions
     directory: /
     schedule:
