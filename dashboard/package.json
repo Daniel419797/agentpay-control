@@ -76,7 +76,7 @@
     "eslint-config-next": "16.2.11",
     "jsdom": "28.1.0",
     "lightningcss": "1.33.0",
-    "postcss": "8.5.24",
+    "postcss": "8.5.26",
     "prisma": "7.9.1",
     "tailwindcss": "4.2.1",
     "tsx": "4.23.9",
