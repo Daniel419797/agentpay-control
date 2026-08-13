@@ -125,7 +125,7 @@ export default async function IntegrationsPage({
         <pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{suggestedLabel}</pre>
         <p className="form-help">Use this label if you want AgentPay to classify the credential as {INTEGRATION_META[selectedType].name}. Select payments:create, payments:read and resources:read for the complete connection.</p>
       </div>
-      {ready ? <CredentialManager agentId={agentId} existing={credentials} /> : <p className="form-help">Credential issuance is shown after financial readiness is complete. This avoids presenting an AI client as connected before it can operate under policy.</p>}
+      {ready ? <CredentialManager key={selectedType} agentId={agentId} existing={credentials} /> : <p className="form-help">Credential issuance is shown after financial readiness is complete. This avoids presenting an AI client as connected before it can operate under policy.</p>}
     </section>
 
     <section className="workspace-section">
