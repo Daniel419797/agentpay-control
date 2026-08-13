@@ -2,28 +2,16 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: /
-    target-branch: agent/fix-ci-security-cardano
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
-    allow:
-      - dependency-name: "tsx"
-      - dependency-name: "vitest"
-      - dependency-name: "fast-uri"
-      - dependency-name: "js-yaml"
-      - dependency-name: "brace-expansion"
-      - dependency-name: "nanoid"
-      - dependency-name: "postcss"
     groups:
-      ci-security-dependencies:
-        patterns:
-          - "tsx"
-          - "vitest"
-          - "fast-uri"
-          - "js-yaml"
-          - "brace-expansion"
-          - "nanoid"
-          - "postcss"
+      production-dependencies:
+        dependency-type: production
+      development-dependencies:
+        dependency-type: development
   - package-ecosystem: github-actions
     directory: /
     schedule:
