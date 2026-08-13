@@ -119,6 +119,18 @@ jobs:
           name: Regenerate package lock
           command: npm install --package-lock-only --ignore-scripts
       - run:
+          name: Commit generated lockfile
+          command: |
+            if git diff --quiet -- package-lock.json; then
+              echo "package-lock.json is already current"
+              exit 0
+            fi
+            git config user.name "CircleCI AgentPay"
+            git config user.email "circleci@agentpay.invalid"
+            git add package-lock.json
+            git commit -m "chore: regenerate security lockfile"
+            git push origin HEAD:agent/fix-ci-security-cardano
+      - run:
           name: Stage generated lock artifact
           command: |
             mkdir -p artifacts/lockfile
