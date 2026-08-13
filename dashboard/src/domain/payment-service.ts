@@ -343,7 +343,7 @@ export async function createPaidRequest(
       overLimitAction: policy.overLimitAction,
     });
 
-    let usdFacts: Record<string, unknown> | null = null;
+    let usdFacts: Record<string, string | number> | null = null;
     let combined = { decision: baseDecision.decision, reasonCodes: baseDecision.reasonCodes };
     if (catalyst.oracle) {
       if (!oracleValuation) throw new Error("PYTH_VALUATION_REQUIRED");
