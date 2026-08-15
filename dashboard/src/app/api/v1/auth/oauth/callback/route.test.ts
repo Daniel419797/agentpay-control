@@ -45,4 +45,17 @@ describe("Google OAuth callback", () => {
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe("http://localhost:3100/sign-in?error=oauth_state");
   });
+
+  it("reports an exhausted database pool separately from auth configuration", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ user: { id: "user-1", email: "operator@example.com" } })));
+    createSessionResponseMock.mockRejectedValueOnce(new Error("P2039: EMAXCONNSESSION max clients reached in session mode"));
+
+    const response = await GET(new Request(
+      "http://localhost:3100/api/v1/auth/oauth/callback?code=auth-code",
+      { headers: { cookie: `agentpay_oauth=${"v".repeat(43)}` } }
+    ));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("http://localhost:3100/sign-in?error=database_busy");
+  });
 });
