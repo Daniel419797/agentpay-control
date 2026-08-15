@@ -5,16 +5,12 @@ export async function GET(request: Request) {
   const signInError = (error: string) => new Response(null, { status: 303, headers: { location: new URL(`/sign-in?error=${error}`, request.url).toString() } });
   try {
     const code = url.searchParams.get("code");
-    const state = url.searchParams.get("state");
     const isSecure = url.protocol === "https:";
     const cookieName = isSecure ? "__Host-agentpay_oauth" : "agentpay_oauth";
-    const stored = request.headers.get("cookie")?.match(new RegExp(`(?:^|;\\s*)${cookieName}=([^;]+)`))?.[1];
-    const separator = stored?.lastIndexOf(".") ?? -1;
-    const verifier = separator > 0 ? stored?.slice(0, separator) : undefined;
-    const expectedState = separator > 0 ? stored?.slice(separator + 1) : undefined;
+    const verifier = request.headers.get("cookie")?.match(new RegExp(`(?:^|;\\s*)${cookieName}=([^;]+)`))?.[1];
     const secure = isSecure ? "; Secure" : "";
     const clearCookie = `${cookieName}=; Path=/; HttpOnly; SameSite=Lax${secure}; Max-Age=0`;
-    if (!code || !state || !verifier || !expectedState || state !== expectedState) {
+    if (!code || !verifier) {
       return new Response(null, { status: 303, headers: { location: new URL("/sign-in?error=oauth_state", request.url).toString(), "set-cookie": clearCookie } });
     }
     const config = supabaseAuthConfig();
