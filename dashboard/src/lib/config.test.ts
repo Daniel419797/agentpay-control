@@ -4,6 +4,7 @@ import { parseEnv } from "@/lib/config";
 
 const CARDANO_PREPROD_PAYER = "addr_test1qzjeazrvkpc3twtg9xu7na0dw5zshqwwh354gmh0626gv4r9vh67k4754l9ugvw5uex30x4u6lyfvr0a34vynjmk2nzq7hqhjn";
 const CARDANO_PREPROD_PROVIDER = "addr_test1vr8nl3s7rk0tqn4rd9u49s0k52f9sezrt98rs4cnpfj47wggeuy4d";
+const CARDANO_MAINNET_PROVIDER = "addr1v9x7y0l7m8k3cq4k8w8n6wsysr7t9u3kz3q4j5t6u7v8w9x0y2z3a";
 
 function productionEnv(overrides: Record<string, string> = {}) {
   return {
@@ -107,5 +108,18 @@ describe("production configuration", () => {
   it("requires HTTPS for Cardano production facilitator and Blockfrost endpoints", () => {
     expect(() => parseEnv(cardanoPreprodEnv({ CARDANO_PREPROD_FACILITATOR_URL: "http://facilitator.agentpay.example/cardano" }))).toThrow(/CARDANO_PREPROD_FACILITATOR_URL must use HTTPS/);
     expect(() => parseEnv(cardanoPreprodEnv({ CARDANO_PREPROD_BLOCKFROST_URL: "http://cardano-preprod.blockfrost.io/api/v0" }))).toThrow(/CARDANO_PREPROD_BLOCKFROST_URL must use HTTPS/);
+  });
+
+  it("accepts an unsigned-only Cardano Mainnet rail without an operator payer", () => {
+    const env = parseEnv(productionEnv({
+      CARDANO_MAINNET_FACILITATOR_URL: "https://mainnet-facilitator.agentpay.example/cardano",
+      CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY: "cardano-mainnet-signing-abcdefghijklmnopqrstuvwxyz",
+      CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY: "cardano-mainnet-settlement-abcdefghijklmnopqrstuvwxyz",
+      CARDANO_MAINNET_PROVIDER_ADDRESS: CARDANO_MAINNET_PROVIDER,
+      CARDANO_MAINNET_BLOCKFROST_PROJECT_ID: "mainnet-project-id-abcdefghijklmnopqrstuvwxyz",
+      CARDANO_SETTLEMENT_STORE_API_KEY: "cardano-store-secret-abcdefghijklmnopqrstuvwxyz",
+    }));
+    expect(env.CARDANO_MAINNET_PAYER_ADDRESS).toBeUndefined();
+    expect(env.CARDANO_MAINNET_FACILITATOR_URL).toContain("mainnet-facilitator");
   });
 });

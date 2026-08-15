@@ -85,11 +85,10 @@ describe("network router", () => {
     expect(route.facilitatorUrl).toBe("https://facilitator.example/cardano");
   });
 
-  it("advertises Cardano Mainnet only when its independent production rail is complete", () => {
+  it("advertises Cardano Mainnet self-custody without an operator payer", () => {
     mockedGetConfig.mockReturnValue(config({
       CARDANO_MAINNET_FACILITATOR_URL: "https://mainnet-facilitator.example/cardano",
       CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY: "cardano-mainnet-signing-key",
-      CARDANO_MAINNET_PAYER_ADDRESS: "addr1payer",
       CARDANO_MAINNET_PROVIDER_ADDRESS: "addr1provider",
       CARDANO_MAINNET_BLOCKFROST_PROJECT_ID: "mainnet-project-id",
     }));

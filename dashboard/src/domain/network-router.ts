@@ -34,12 +34,11 @@ export function isManagedCardanoPreprodEnabled(config: AppConfig): boolean {
   );
 }
 
-export function isManagedCardanoMainnetEnabled(config: AppConfig): boolean {
+export function isCardanoMainnetEnabled(config: AppConfig): boolean {
   const signingKey = config.CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY ?? (config.APP_ENV === "production" ? undefined : config.CARDANO_MAINNET_FACILITATOR_API_KEY);
   return Boolean(
     config.CARDANO_MAINNET_FACILITATOR_URL &&
     signingKey &&
-    config.CARDANO_MAINNET_PAYER_ADDRESS &&
     config.CARDANO_MAINNET_PROVIDER_ADDRESS &&
     config.CARDANO_MAINNET_BLOCKFROST_PROJECT_ID
   );
@@ -86,7 +85,7 @@ class DefaultNetworkRouter implements NetworkRouter {
       };
     }
 
-    if (isManagedCardanoMainnetEnabled(config)) {
+    if (isCardanoMainnetEnabled(config)) {
       this.routes["cardano:mainnet"] = {
         facilitatorUrl: config.CARDANO_MAINNET_FACILITATOR_URL!,
         facilitatorApiKey: config.CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY ?? (production ? undefined : config.CARDANO_MAINNET_FACILITATOR_API_KEY),
