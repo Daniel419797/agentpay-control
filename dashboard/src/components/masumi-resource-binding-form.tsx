@@ -158,14 +158,14 @@ export function MasumiResourceBindingForm({ resourceId, defaultNetwork = "Prepro
     </div>
 
     {results.length > 0 && <div className="data-table-wrap">
-      <table className="data-table">
+      <table className="data-table mobile-card-table">
         <thead><tr><th>Agent</th><th>Capability</th><th>Payment</th><th>Registry status</th><th /></tr></thead>
         <tbody>{results.map((entry) => <tr key={entry.agentIdentifier}>
-          <td><strong>{entry.name}</strong><small>{entry.description ?? entry.apiBaseUrl}</small></td>
-          <td>{entry.capability?.name ?? "—"}</td>
-          <td>{entry.paymentType ?? "—"}</td>
-          <td>{entry.status}</td>
-          <td><button className="table-action" type="button" onClick={() => { setAgentIdentifier(entry.agentIdentifier); void bind(entry.agentIdentifier); }} disabled={busy}>Bind</button></td>
+          <td data-label="Agent"><strong>{entry.name}</strong><small>{entry.description ?? entry.apiBaseUrl}</small></td>
+          <td data-label="Capability">{entry.capability?.name ?? "—"}</td>
+          <td data-label="Payment">{entry.paymentType ?? "—"}</td>
+          <td data-label="Registry status">{entry.status}</td>
+          <td data-label="Actions"><button className="table-action" type="button" onClick={() => { setAgentIdentifier(entry.agentIdentifier); void bind(entry.agentIdentifier); }} disabled={busy}>Bind</button></td>
         </tr>)}</tbody>
       </table>
     </div>}
