@@ -1,5 +1,12 @@
 import { createSessionResponse, supabaseAuthConfig, type SupabaseUser } from "@/lib/supabase-auth";
 
+function authFailureCode(error: unknown) {
+  const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error ?? "");
+  if (message.includes("SUPABASE_AUTH_NOT_CONFIGURED")) return "auth_config";
+  if (message.includes("EMAXCONNSESSION") || message.includes("max clients reached") || message.includes("P2039")) return "database_busy";
+  return "sign_in_failed";
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const signInError = (error: string) => new Response(null, { status: 303, headers: { location: new URL(`/sign-in?error=${error}`, request.url).toString() } });
@@ -27,6 +34,6 @@ export async function GET(request: Request) {
     return result;
   } catch (err) {
     console.error("[oauth/callback] Auth flow failed:", err);
-    return signInError("auth_config");
+    return signInError(authFailureCode(err));
   }
 }
