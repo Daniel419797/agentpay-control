@@ -4,6 +4,7 @@ import "@/app/globals.css";
 import "@/app/sidebar.css";
 import "@/app/accessibility.css";
 import "@/app/marketing.css";
+import "@/app/marketing-hero.css";
 
 export const metadata: Metadata = {
   title: { default: "AgentPay", template: "%s · AgentPay" },

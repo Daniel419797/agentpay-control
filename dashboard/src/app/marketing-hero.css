@@ -1,0 +1,63 @@
+/* Homepage hero artwork override. Keeps detail-page product previews unchanged. */
+.m-home-hero-grid > .m-hero-product {
+  min-height: 535px;
+  overflow: visible;
+  perspective: none;
+  isolation: isolate;
+}
+
+.m-home-hero-grid > .m-hero-product > * {
+  display: none;
+}
+
+.m-home-hero-grid > .m-hero-product::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: -72px -118px -82px -92px;
+  background: url("/marketing/agentpay-hero-dashboard.webp") center / contain no-repeat;
+  pointer-events: none;
+}
+
+@media (max-width: 1120px) {
+  .m-home-hero-grid > .m-hero-product {
+    min-height: 500px;
+  }
+
+  .m-home-hero-grid > .m-hero-product::before {
+    inset: -54px -68px -62px -52px;
+  }
+}
+
+@media (max-width: 920px) {
+  .m-home-hero-grid > .m-hero-product {
+    width: min(780px, 100%);
+    min-height: 520px;
+    margin: -10px auto 0;
+  }
+
+  .m-home-hero-grid > .m-hero-product::before {
+    inset: -48px -46px -62px;
+  }
+}
+
+@media (max-width: 620px) {
+  .m-home-hero-grid > .m-hero-product {
+    min-height: 410px;
+    margin-top: -24px;
+  }
+
+  .m-home-hero-grid > .m-hero-product::before {
+    inset: -22px -34px -34px;
+  }
+}
+
+@media (max-width: 440px) {
+  .m-home-hero-grid > .m-hero-product {
+    min-height: 335px;
+  }
+
+  .m-home-hero-grid > .m-hero-product::before {
+    inset: -12px -28px -24px;
+  }
+}
