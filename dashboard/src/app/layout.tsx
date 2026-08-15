@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Toaster } from "sonner";
-import { MarketingHeroAssetHydrator } from "@/components/marketing-hero-asset-hydrator";
 import "@/app/globals.css";
 import "@/app/sidebar.css";
 import "@/app/accessibility.css";
@@ -16,7 +15,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body>
-        <MarketingHeroAssetHydrator />
         {children}
         <Toaster richColors position="bottom-right" />
       </body>
