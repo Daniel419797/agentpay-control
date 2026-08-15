@@ -1,45 +1,75 @@
 @media (max-width: 620px) {
   .topbar {
+    flex: 0 0 auto;
+    flex-basis: auto;
+    height: auto;
+    min-height: 106px;
     flex-wrap: wrap;
     align-items: center;
-    padding-top: 8px;
-    padding-bottom: 8px;
+    align-content: center;
+    padding: 8px 12px 10px;
+    gap: 8px;
   }
 
   .topbar-leading {
     flex: 1 0 100%;
     width: 100%;
+    min-height: 38px;
   }
 
   .topbar-actions {
     width: 100%;
+    min-width: 0;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 38px;
+    grid-template-columns: minmax(0, 1fr) 38px;
     align-items: center;
     gap: 7px;
   }
 
-  .topbar-actions .network-switcher,
+  /* The full network switcher is intentionally hidden by the base mobile shell. */
+  .topbar-actions > .network-switcher:not(.compact) {
+    display: none;
+  }
+
   .topbar-actions .wallet-control {
     width: 100%;
     min-width: 0;
   }
 
-  .topbar-actions .network-switcher-trigger,
   .topbar-actions .wallet-trigger {
     width: 100%;
     max-width: none;
-    justify-content: center;
+    min-width: 0;
+    justify-content: flex-start;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
   .topbar-actions .account-chip {
-    grid-column: 1 / 3;
+    grid-column: 1;
     width: 100%;
     max-width: none;
+    min-width: 0;
     box-sizing: border-box;
-    text-align: center;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .topbar-actions .primary-button {
+    grid-column: 2;
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    min-height: 38px;
+    padding: 0;
+    justify-self: end;
+  }
+
+  .main-scroll-area {
+    flex: 1 1 auto;
+    min-height: 0;
   }
 
   .rule-actions {
