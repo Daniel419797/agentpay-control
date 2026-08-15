@@ -6,7 +6,7 @@
   isolation: isolate;
 }
 
-/* Use the exact replacement.png pushed by the user; do not show the generated fallback mockup. */
+/* Use the exact replacement.png copied from docs/design into the public app assets. */
 .m-home-hero-grid > .m-hero-product > * {
   display: none;
 }
@@ -16,7 +16,7 @@
   position: absolute;
   z-index: 2;
   inset: -72px -118px -82px -92px;
-  background: url("https://raw.githubusercontent.com/Daniel419797/agentpay-control/2dd678a97740c850d9c2defb425d0f10c74f866d/docs/design/replacement.png") center / contain no-repeat;
+  background: url("/marketing/replacement.png") center / contain no-repeat;
   pointer-events: none;
 }
 
