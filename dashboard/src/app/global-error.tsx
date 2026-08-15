@@ -1,18 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import Image from "next/image";
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
-  useEffect(() => {
-    console.error("AgentPay global error", error);
-  }, [error]);
-
   return (
     <html lang="en">
       <body style={{ margin: 0, fontFamily: "Arial, sans-serif", background: "#eef0f8", color: "#111a2b" }}>
         <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, boxSizing: "border-box" }}>
           <section role="alert" style={{ width: "min(560px, 100%)", padding: 32, boxSizing: "border-box", border: "1px solid #d8deea", borderRadius: 18, background: "#fff", textAlign: "center", boxShadow: "0 18px 50px rgba(25,36,70,.08)" }}>
-            <img src="/brand/agentpay-lockup.png" alt="AgentPay" style={{ width: 160, maxWidth: "55%", height: "auto", marginBottom: 32 }} />
+            <Image src="/brand/agentpay-lockup.png" alt="AgentPay" width={160} height={33} priority style={{ width: 160, maxWidth: "55%", height: "auto", marginBottom: 32 }} />
             <div style={{ width: 68, height: 68, margin: "0 auto 20px", border: "1px solid #d8deea", borderRadius: 18, display: "grid", placeItems: "center", color: "#2539a8", fontSize: 30 }}>!</div>
             <p style={{ margin: "0 0 10px", color: "#2539a8", fontSize: 12, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase" }}>Application error</p>
             <h1 style={{ margin: 0, fontSize: "clamp(30px, 7vw, 46px)", lineHeight: 1.05, letterSpacing: "-.04em" }}>AgentPay could not start correctly.</h1>
