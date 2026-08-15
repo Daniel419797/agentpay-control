@@ -7,7 +7,7 @@
 }
 
 .m-home-hero-grid > .m-hero-product > * {
-  display: none;
+  transition: opacity .18s ease, visibility .18s ease;
 }
 
 .m-home-hero-grid > .m-hero-product::before {
@@ -15,8 +15,22 @@
   position: absolute;
   z-index: 2;
   inset: -72px -118px -82px -92px;
-  background: url("/marketing/agentpay-hero-dashboard.webp") center / contain no-repeat;
+  background-image: var(--agentpay-hero-image, none);
+  background-position: center;
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity .2s ease;
   pointer-events: none;
+}
+
+html[data-agentpay-hero-ready="true"] .m-home-hero-grid > .m-hero-product > * {
+  opacity: 0;
+  visibility: hidden;
+}
+
+html[data-agentpay-hero-ready="true"] .m-home-hero-grid > .m-hero-product::before {
+  opacity: 1;
 }
 
 @media (max-width: 1120px) {
