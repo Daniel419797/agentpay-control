@@ -3,10 +3,11 @@ import { Toaster } from "sonner";
 import "@/app/globals.css";
 import "@/app/sidebar.css";
 import "@/app/accessibility.css";
+import "@/app/marketing.css";
 
 export const metadata: Metadata = {
-  title: { default: "AgentPay Control", template: "%s · AgentPay Control" },
-  description: "Policy-controlled x402 and financial operations for autonomous agents across configured Hedera and Arc rails."
+  title: { default: "AgentPay", template: "%s · AgentPay" },
+  description: "Policy-controlled payments and financial operations for autonomous software across configured payment rails."
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
