@@ -1,7 +1,9 @@
 /* Isolated shell styles keep the production sidebar asset independently cacheable. */
-.sidebar { background: radial-gradient(circle at 18% 0%, rgb(16 71 103 / 58%), transparent 28%), linear-gradient(180deg, #061d37 0%, #071a31 100%); width: 272px; padding: 18px 14px 14px; border-right: 1px solid rgb(137 193 211 / 14%); box-shadow: 18px 0 42px rgb(3 18 35 / 8%); }
+.app-shell { height: 100vh; height: 100dvh; overflow: hidden; }
+.sidebar { background: radial-gradient(circle at 18% 0%, rgb(16 71 103 / 58%), transparent 28%), linear-gradient(180deg, #061d37 0%, #071a31 100%); width: 272px; padding: 18px 14px 14px; border-right: 1px solid rgb(137 193 211 / 14%); box-shadow: 18px 0 42px rgb(3 18 35 / 8%); transition: width .18s ease, padding .18s ease; }
 .sidebar-brand { justify-content: space-between; gap: 12px; min-height: 46px; padding: 2px 8px 16px; }
 .sidebar-brand img { width: 148px; }
+.sidebar-brand .sidebar-brand-mark { display: none; width: 35px; height: 35px; object-fit: contain; }
 .sidebar-brand .sidebar-live { border: 1px solid rgb(82 217 196 / 24%); border-radius: 999px; padding: 5px 7px; display: inline-flex; align-items: center; gap: 5px; background: rgb(20 188 166 / 8%); color: #a5f3e9; font-size: 8px; letter-spacing: .08em; opacity: 1; }
 .sidebar-live i { width: 5px; height: 5px; border-radius: 50%; background: #2dd4bf; box-shadow: 0 0 8px #2dd4bf; }
 .nav-list { gap: 8px; padding: 2px 3px 12px 0; scrollbar-width: none; }
@@ -27,11 +29,44 @@
 .sidebar-signout { width: 100%; min-height: 36px; margin-top: 8px; border: 0; border-top: 1px solid rgb(126 181 200 / 14%); padding: 9px 7px 0; display: flex; align-items: center; justify-content: center; gap: 8px; background: transparent; color: #8fa7bd; font-size: 11px; font-weight: 650; cursor: pointer; }
 .sidebar-signout:hover { color: #fff; }
 .sidebar-signout:disabled { opacity: .5; cursor: wait; }
-.main-area { padding-left: 272px; }
+.main-area { padding-left: 272px; height: 100vh; height: 100dvh; min-height: 0; display: flex; flex-direction: column; overflow: hidden; transition: padding-left .18s ease; }
+.topbar { position: relative; top: auto; flex: 0 0 68px; }
+.topbar-leading { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.main-scroll-area { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.sidebar-collapse-button { width: 34px; height: 34px; display: inline-grid; place-items: center; flex: 0 0 auto; border: 1px solid #d5dfe6; border-radius: 7px; background: #fff; color: #526377; cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease; }
+.sidebar-collapse-button:hover { background: #f4f7f9; border-color: #b9c7d1; color: #142238; }
 .sidebar-session .network-switcher.compact .network-switcher-trigger { max-width: 100%; font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-session .network-switcher-dropdown { top: auto; bottom: calc(100% + 7px); left: -38px; min-width: 228px; box-shadow: 0 -14px 34px rgb(2 16 31 / 24%); }
+
+@media (min-width: 821px) {
+  .shell-sidebar-collapsed .sidebar { width: 78px; padding-left: 10px; padding-right: 10px; }
+  .shell-sidebar-collapsed .main-area { padding-left: 78px; }
+  .shell-sidebar-collapsed .sidebar-brand { justify-content: center; padding-left: 0; padding-right: 0; }
+  .shell-sidebar-collapsed .sidebar-brand-lockup,
+  .shell-sidebar-collapsed .sidebar-live,
+  .shell-sidebar-collapsed .nav-group,
+  .shell-sidebar-collapsed .nav-label,
+  .shell-sidebar-collapsed .session-eyebrow,
+  .shell-sidebar-collapsed .session-row > div,
+  .shell-sidebar-collapsed .sidebar-signout-label { display: none; }
+  .shell-sidebar-collapsed .sidebar-brand .sidebar-brand-mark { display: block; }
+  .shell-sidebar-collapsed .nav-list { padding-right: 0; }
+  .shell-sidebar-collapsed .nav-section { gap: 2px; }
+  .shell-sidebar-collapsed .nav-section + .nav-section { padding-top: 6px; }
+  .shell-sidebar-collapsed .nav-section-links { gap: 4px; }
+  .shell-sidebar-collapsed .nav-link { justify-content: center; min-height: 42px; padding: 0; }
+  .shell-sidebar-collapsed .nav-link:hover { transform: none; }
+  .shell-sidebar-collapsed .nav-icon { width: 34px; height: 34px; }
+  .shell-sidebar-collapsed .sidebar-session { gap: 4px; padding: 8px 6px; }
+  .shell-sidebar-collapsed .session-row { display: flex; justify-content: center; min-height: 38px; padding: 2px; }
+  .shell-sidebar-collapsed .session-icon { width: 32px; height: 32px; }
+  .shell-sidebar-collapsed .sidebar-signout { min-height: 38px; margin-top: 2px; padding: 8px 0 0; }
+}
 
 @media (max-width: 820px) {
   .sidebar.sidebar-open { width: min(292px, calc(100vw - 28px)); }
   .sidebar-session .compact .network-switcher-trigger span { display: inline; }
+  .main-area { padding-left: 0; }
+  .topbar { flex-basis: 60px; }
+  .sidebar-collapse-button { display: none; }
 }
