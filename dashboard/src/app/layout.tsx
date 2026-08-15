@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Toaster } from "sonner";
 import "@/app/globals.css";
+import "@/app/sidebar.css";
 import "@/app/accessibility.css";
 
 export const metadata: Metadata = {
