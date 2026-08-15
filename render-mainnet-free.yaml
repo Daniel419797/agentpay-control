@@ -15,7 +15,6 @@ services:
     dockerfilePath: facilitator/Dockerfile
     healthCheckPath: /health
     autoDeployTrigger: commit
-    maxShutdownDelaySeconds: 60
     envVars:
       - key: APP_ENV
         value: production
@@ -51,7 +50,6 @@ services:
     dockerfilePath: cardano-signer/Dockerfile
     healthCheckPath: /health
     autoDeployTrigger: commit
-    maxShutdownDelaySeconds: 30
     envVars:
       - key: APP_ENV
         value: production
@@ -87,7 +85,6 @@ services:
     dockerfilePath: facilitator-combined/Dockerfile.cardano
     healthCheckPath: /health
     autoDeployTrigger: commit
-    maxShutdownDelaySeconds: 60
     envVars:
       - key: APP_ENV
         value: production
