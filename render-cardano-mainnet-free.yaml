@@ -21,10 +21,6 @@ services:
         value: mainnet
       - key: CARDANO_SIGNING_MODE
         value: unsigned-only
-      - key: CARDANO_PAYER_ADDRESS
-        sync: false
-      - key: CARDANO_USDCX_ASSET_ID
-        sync: false
       - key: CARDANO_BLOCKFROST_URL
         value: https://cardano-mainnet.blockfrost.io/api/v0
       - key: CARDANO_BLOCKFROST_PROJECT_ID
@@ -54,16 +50,8 @@ services:
         value: production
       - key: CARDANO_NETWORK
         value: mainnet
-      - key: CARDANO_PAYER_ADDRESS
-        fromService:
-          type: web
-          name: agentpay-cardano-signer-mainnet
-          envVarKey: CARDANO_PAYER_ADDRESS
-      - key: CARDANO_USDCX_ASSET_ID
-        fromService:
-          type: web
-          name: agentpay-cardano-signer-mainnet
-          envVarKey: CARDANO_USDCX_ASSET_ID
+      - key: CARDANO_SIGNING_MODE
+        value: unsigned-only
       - key: CARDANO_BLOCKFROST_URL
         fromService:
           type: web

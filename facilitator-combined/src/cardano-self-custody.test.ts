@@ -9,7 +9,7 @@ function app() {
   return createCardanoNativeApp(parseCardanoNativeEnv({
     APP_ENV: "test",
     CARDANO_NETWORK: "preprod",
-    CARDANO_PAYER_ADDRESS: MANAGED_PAYER,
+    CARDANO_SIGNING_MODE: "unsigned-only",
     CARDANO_BLOCKFROST_URL: "https://cardano-preprod.blockfrost.io/api/v0",
     CARDANO_BLOCKFROST_PROJECT_ID: "preprod-project-id-abcdefghijklmnopqrstuvwxyz",
     CARDANO_SIGNER_URL: "https://signer.example/cardano",
@@ -60,5 +60,15 @@ describe("Cardano self-custody preparation", () => {
     });
     expect(response.status).toBe(422);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when managed signing is disabled", async () => {
+    const response = await app().request("/managed-sign", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${SIGNING_KEY}` },
+      body: JSON.stringify({ paymentRequirements: requirement }),
+    });
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ code: "CARDANO_MANAGED_SIGNING_DISABLED" });
   });
 });

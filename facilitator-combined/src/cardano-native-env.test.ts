@@ -28,6 +28,18 @@ describe("Cardano native facilitator production config", () => {
     expect(parseCardanoNativeEnv(production({ CARDANO_USDCX_ASSET_ID: USDCX })).CARDANO_USDCX_ASSET_ID).toBe(USDCX);
   });
 
+  it("allows unsigned-only self-custody without a fixed operator payer", () => {
+    const { CARDANO_PAYER_ADDRESS: _payer, ...input } = production({ CARDANO_SIGNING_MODE: "unsigned-only" });
+    const env = parseCardanoNativeEnv(input);
+    expect(env.CARDANO_SIGNING_MODE).toBe("unsigned-only");
+    expect(env.CARDANO_PAYER_ADDRESS).toBeUndefined();
+  });
+
+  it("keeps a fixed payer mandatory for managed signing", () => {
+    const { CARDANO_PAYER_ADDRESS: _payer, ...input } = production();
+    expect(() => parseCardanoNativeEnv(input)).toThrow("CARDANO_PAYER_ADDRESS_REQUIRED");
+  });
+
   it("rejects malformed native-asset configuration", () => {
     expect(() => parseCardanoNativeEnv(production({ CARDANO_USDCX_ASSET_ID: "usdcx" }))).toThrow();
   });

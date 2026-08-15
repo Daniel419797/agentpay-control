@@ -19,7 +19,9 @@ function configFromEnv(){
   if(!["managed","unsigned-only"].includes(signingMode))throw new Error("CARDANO_SIGNING_MODE_INVALID");
   const usdcxAssetId=process.env.CARDANO_USDCX_ASSET_ID?.trim().toLowerCase();
   if(usdcxAssetId)parseAssetUnit(usdcxAssetId);
-  const cfg={appEnv,network,signingMode,payerAddress:required("CARDANO_PAYER_ADDRESS"),blockfrostUrl:required("CARDANO_BLOCKFROST_URL").replace(/\/$/,""),blockfrostProjectId:required("CARDANO_BLOCKFROST_PROJECT_ID"),apiKey:required("CARDANO_SIGNER_API_KEY"),port:numberEnv("PORT",8791,1,65535),minOutput:bigintEnv("CARDANO_MIN_OUTPUT_LOVELACE","1000000",500000n,10000000n),minTokenOutput:bigintEnv("CARDANO_TOKEN_OUTPUT_LOVELACE","2000000",1000000n,10000000n),minChange:bigintEnv("CARDANO_MIN_CHANGE_LOVELACE","2000000",1000000n,10000000n),maxInputs:numberEnv("CARDANO_MAX_INPUTS",20,1,64),usdcxAssetId,remoteSignerUrl:process.env.CARDANO_ED25519_SIGNER_URL,remoteSignerApiKey:process.env.CARDANO_ED25519_SIGNER_API_KEY,publicKeyHex:process.env.CARDANO_PAYMENT_PUBLIC_KEY_HEX,seedHex:process.env.CARDANO_SIGNING_SEED_HEX};
+  const payerAddress=process.env.CARDANO_PAYER_ADDRESS?.trim()||undefined;
+  if(signingMode==="managed"&&!payerAddress)throw new Error("CARDANO_PAYER_ADDRESS_REQUIRED");
+  const cfg={appEnv,network,signingMode,payerAddress,blockfrostUrl:required("CARDANO_BLOCKFROST_URL").replace(/\/$/,""),blockfrostProjectId:required("CARDANO_BLOCKFROST_PROJECT_ID"),apiKey:required("CARDANO_SIGNER_API_KEY"),port:numberEnv("PORT",8791,1,65535),minOutput:bigintEnv("CARDANO_MIN_OUTPUT_LOVELACE","1000000",500000n,10000000n),minTokenOutput:bigintEnv("CARDANO_TOKEN_OUTPUT_LOVELACE","2000000",1000000n,10000000n),minChange:bigintEnv("CARDANO_MIN_CHANGE_LOVELACE","2000000",1000000n,10000000n),maxInputs:numberEnv("CARDANO_MAX_INPUTS",20,1,64),usdcxAssetId,remoteSignerUrl:process.env.CARDANO_ED25519_SIGNER_URL,remoteSignerApiKey:process.env.CARDANO_ED25519_SIGNER_API_KEY,publicKeyHex:process.env.CARDANO_PAYMENT_PUBLIC_KEY_HEX,seedHex:process.env.CARDANO_SIGNING_SEED_HEX};
   if(cfg.apiKey.length<32)throw new Error("CARDANO_SIGNER_API_KEY_TOO_SHORT");
   if(cfg.appEnv==="production"){
     if(network!=="cardano:preprod"&&network!=="cardano:mainnet")throw new Error("CARDANO_NETWORK_INVALID");
@@ -35,7 +37,7 @@ function configFromEnv(){
   if(cfg.seedHex&&!/^[0-9a-fA-F]{64}$/.test(cfg.seedHex))throw new Error("CARDANO_SIGNING_SEED_INVALID");
   if(cfg.publicKeyHex&&!/^[0-9a-fA-F]{64}$/.test(cfg.publicKeyHex))throw new Error("CARDANO_PAYMENT_PUBLIC_KEY_INVALID");
   const startupKey=cfg.publicKeyHex?Buffer.from(cfg.publicKeyHex,"hex"):(cfg.seedHex?publicKeyFromSeed(cfg.seedHex):null);
-  if(startupKey&&!blake2b(startupKey,28).equals(paymentCredential(cfg.payerAddress,cfg.network)))throw new Error("CARDANO_PAYER_KEY_MISMATCH");
+  if(startupKey&&(!cfg.payerAddress||!blake2b(startupKey,28).equals(paymentCredential(cfg.payerAddress,cfg.network))))throw new Error("CARDANO_PAYER_KEY_MISMATCH");
   return cfg;
 }
 

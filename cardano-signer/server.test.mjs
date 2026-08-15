@@ -32,6 +32,9 @@ function withProductionEnv(overrides, callback) {
     CARDANO_SIGNER_API_KEY: "gateway-capability-secret-1234567890",
     ...overrides,
   });
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value === undefined) delete process.env[key];
+  }
   for (const key of MANAGED_ENV_KEYS) {
     if (!(key in overrides)) delete process.env[key];
   }
@@ -46,9 +49,10 @@ function withProductionEnv(overrides, callback) {
 }
 
 test("production unsigned-only mode requires no private or remote signing key", () => {
-  const config = withProductionEnv({}, () => configFromEnv());
+  const config = withProductionEnv({ CARDANO_PAYER_ADDRESS: undefined }, () => configFromEnv());
   assert.equal(config.signingMode, "unsigned-only");
   assert.equal(config.network, "cardano:mainnet");
+  assert.equal(config.payerAddress, undefined);
   assert.equal(config.remoteSignerUrl, undefined);
 });
 
@@ -56,6 +60,13 @@ test("production managed mode still requires an isolated remote signer", () => {
   assert.throws(
     () => withProductionEnv({ CARDANO_SIGNING_MODE: "managed" }, () => configFromEnv()),
     /CARDANO_REMOTE_ED25519_SIGNER_REQUIRED/,
+  );
+});
+
+test("managed mode still requires a fixed operator payer address", () => {
+  assert.throws(
+    () => withProductionEnv({ CARDANO_SIGNING_MODE: "managed", CARDANO_PAYER_ADDRESS: undefined }, () => configFromEnv()),
+    /CARDANO_PAYER_ADDRESS_REQUIRED/,
   );
 });
 
