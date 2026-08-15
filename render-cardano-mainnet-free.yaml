@@ -75,11 +75,11 @@ services:
       - key: CARDANO_SETTLEMENT_STORE_URL
         value: https://agentpay-zeta.vercel.app/api/v1/internal/cardano-settlement-claims
       - key: CARDANO_SETTLEMENT_STORE_API_KEY
-        generateValue: true
+        sync: false
       - key: MANAGED_SIGNING_API_KEY
-        generateValue: true
+        sync: false
       - key: SETTLEMENT_API_KEY
-        generateValue: true
+        sync: false
       - key: CARDANO_MAX_FEE_LOVELACE
         value: "1000000"
       - key: CARDANO_CONFIRMATION_TIMEOUT_MS
