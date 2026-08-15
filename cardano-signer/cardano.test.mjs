@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { blake2b, buildSignedAdaTransaction, buildSignedCardanoTransaction, publicKeyFromSeed, selectAdaOnlyUtxos, selectWhitelistedTokenUtxos, signHashWithSeed } from "./cardano.mjs";
+import { blake2b, buildSignedAdaTransaction, buildSignedCardanoTransaction, buildUnsignedCardanoTransaction, publicKeyFromSeed, selectAdaOnlyUtxos, selectWhitelistedTokenUtxos, signHashWithSeed } from "./cardano.mjs";
 
 const ALPHABET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 const USDCX = `${"ab".repeat(28)}5553444378`;
@@ -55,6 +55,17 @@ test("builds and signs a deterministic ADA-only Preprod transaction",async()=>{
   assert.equal(result.nonce,`${"c".repeat(64)}#2`);
   assert.ok(Buffer.from(result.transaction,"base64").length>100);
   assert.equal(result.inputCount,1);
+});
+
+test("builds CIP-30 unsigned CBOR with the same exact body and fee as the signed transaction",async()=>{
+  const seed="9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",publicKey=publicKeyFromSeed(seed),payer=enterpriseAddress(publicKey),payee=enterpriseAddress(Buffer.alloc(32,7));
+  const common={network:"cardano:preprod",payerAddress:payer,payeeAddress:payee,assetUnit:"lovelace",amountAtomic:"1000000",maxTimeoutSeconds:900,latestSlot:1000000,protocolParameters:{min_fee_a:"44",min_fee_b:"155381"},utxos:[{tx_hash:"c".repeat(64),output_index:2,amount:[{unit:"lovelace",quantity:"5000000"}]}],minOutputLovelace:1_000_000n,minChangeLovelace:1_000_000n};
+  const unsigned=buildUnsignedCardanoTransaction(common);
+  const signed=await buildSignedCardanoTransaction({...common,publicKey,signBodyHash:(hash)=>signHashWithSeed(seed,hash)});
+  assert.equal(unsigned.transactionId,signed.transactionId);
+  assert.equal(unsigned.feeLovelace,signed.feeLovelace);
+  assert.match(unsigned.transaction,/^[0-9a-f]+$/);
+  assert.ok(Buffer.from(unsigned.transaction,"hex").length>80);
 });
 
 test("builds an exact whitelisted native-token payment with token change only to payer",async()=>{

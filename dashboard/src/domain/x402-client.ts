@@ -15,8 +15,10 @@ const legacyPaymentResponseSchema = z.object({ transactionId: z.string().optiona
 
 export type PaymentRequirement = z.infer<typeof paymentRequirementSchema>;
 export type PaymentRequired = z.infer<typeof paymentRequiredSchema>;
+export type PaymentPayload = z.infer<typeof paymentPayloadSchema>;
 
 export function parsePaymentRequired(value: unknown) { return paymentRequiredSchema.parse(value); }
+export function parsePaymentPayload(value: unknown) { return paymentPayloadSchema.parse(value); }
 
 async function boundedText(response: Response, maximum: number) {
   const declared = Number(response.headers.get("content-length") ?? 0);

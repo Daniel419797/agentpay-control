@@ -91,11 +91,11 @@ export async function POST(request: Request) {
     const isCardano = isCardanoPreprod || isCardanoMainnet;
 
     if (isArc && input.asset !== "USDC") return problem(400, "ASSET_UNSUPPORTED", "Arc testnet agents use the configured USDC rail.");
-    if (isArc && input.custody !== "PLATFORM_MANAGED_TESTNET") return problem(400, "CUSTODY_UNSUPPORTED", "Arc browser-wallet custody is not enabled. Use the isolated managed Arc signer.");
+    if (isArc && !["SELF_CUSTODY", "PLATFORM_MANAGED_TESTNET"].includes(input.custody)) return problem(400, "CUSTODY_UNSUPPORTED", "Arc supports verified self-custody wallets or the isolated managed testnet signer.");
     if (isHederaMainnet && input.custody !== "SELF_CUSTODY") return problem(400, "CUSTODY_UNSUPPORTED", "Hedera Mainnet agents must use SELF_CUSTODY. Platform-managed custody is intentionally testnet-only.");
     if (isCardano && !["ADA", "USDCX"].includes(input.asset)) return problem(400, "ASSET_UNSUPPORTED", "Cardano autonomous agents support ADA or the explicitly configured USDCx asset only.");
-    if (isCardanoPreprod && input.custody !== "PLATFORM_MANAGED_TESTNET") return problem(400, "CUSTODY_UNSUPPORTED", "Cardano Preprod autonomous agents use the isolated managed testnet signer.");
-    if (isCardanoMainnet && input.custody !== "EXTERNAL_DELEGATED") return problem(400, "CUSTODY_UNSUPPORTED", "Cardano Mainnet autonomous agents require the separately configured delegated production signer.");
+    if (isCardanoPreprod && !["SELF_CUSTODY", "PLATFORM_MANAGED_TESTNET"].includes(input.custody)) return problem(400, "CUSTODY_UNSUPPORTED", "Cardano Preprod supports verified self-custody wallets or the isolated managed testnet signer.");
+    if (isCardanoMainnet && !["SELF_CUSTODY", "EXTERNAL_DELEGATED"].includes(input.custody)) return problem(400, "CUSTODY_UNSUPPORTED", "Cardano Mainnet supports verified self-custody wallets or a separately configured bounded delegation.");
 
     if (!getNetworkRouter().supportsNetwork(input.network)) return problem(503, "PAYMENT_RAIL_UNAVAILABLE", `${input.network} is not fully configured for this deployment.`);
 

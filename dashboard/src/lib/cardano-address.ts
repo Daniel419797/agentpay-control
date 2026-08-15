@@ -33,6 +33,42 @@ function convertBits(values: number[], fromBits: number, toBits: number): Uint8A
   return Uint8Array.from(result);
 }
 
+function encodeBits(values: Uint8Array, fromBits: number, toBits: number): number[] {
+  let accumulator = 0;
+  let bits = 0;
+  const result: number[] = [];
+  const maxValue = (1 << toBits) - 1;
+  for (const value of values) {
+    accumulator = (accumulator << fromBits) | value;
+    bits += fromBits;
+    while (bits >= toBits) {
+      bits -= toBits;
+      result.push((accumulator >> bits) & maxValue);
+    }
+  }
+  if (bits > 0) result.push((accumulator << (toBits - bits)) & maxValue);
+  return result;
+}
+
+export function encodeCardanoAddressBytes(bytes: Uint8Array): string {
+  if (bytes.length < 29) throw new Error("CARDANO_ADDRESS_LENGTH_INVALID");
+  const networkId = bytes[0] & 15;
+  if (networkId !== 0 && networkId !== 1) throw new Error("CARDANO_ADDRESS_NETWORK_UNSUPPORTED");
+  const hrp = networkId === 1 ? "addr" : "addr_test";
+  const data = encodeBits(bytes, 8, 5);
+  const values = [...expandHrp(hrp), ...data, 0, 0, 0, 0, 0, 0];
+  const checksum = polymod(values) ^ 1;
+  const checksumValues = Array.from({ length: 6 }, (_, index) => (checksum >> (5 * (5 - index))) & 31);
+  return `${hrp}1${[...data, ...checksumValues].map((value) => BECH32_ALPHABET[value]).join("")}`;
+}
+
+export function cardanoAddressFromHex(hex: string): string {
+  if (!/^[0-9a-f]+$/i.test(hex) || hex.length % 2 !== 0) throw new Error("CARDANO_ADDRESS_HEX_INVALID");
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let index = 0; index < bytes.length; index += 1) bytes[index] = Number.parseInt(hex.slice(index * 2, index * 2 + 2), 16);
+  return encodeCardanoAddressBytes(bytes);
+}
+
 export function decodeCardanoAddress(address: string) {
   if (address !== address.toLowerCase()) throw new Error("CARDANO_ADDRESS_CASE_INVALID");
   const separator = address.lastIndexOf("1");

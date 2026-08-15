@@ -1,11 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import { getConfig } from "@/lib/config";
 import { evaluatePolicy, policyScheduleViolation } from "@/domain/policy";
 import { paymentFingerprint } from "@/domain/fingerprint";
 import { managedPayerMatches, paymentAccountForNetwork, providerPayeeForNetwork, x402AssetIdentifier } from "@/domain/payment-routing";
 import { getNetworkRouter } from "@/domain/network-router";
-import { createManagedPaymentPayload, discoverX402, fulfillX402Resource, parsePaymentRequired, selectRequirement, X402SubmissionUnknownError } from "@/domain/x402-client";
+import { createManagedPaymentPayload, discoverX402, fulfillX402Resource, parsePaymentPayload, parsePaymentRequired, selectRequirement, X402SubmissionUnknownError, type PaymentPayload } from "@/domain/x402-client";
 import { assertSafeResourceUrl } from "@/lib/safe-url";
 import { retrySerializable } from "@/lib/retry";
 import { assertPlanLimit } from "@/domain/entitlement-service";
@@ -278,7 +279,7 @@ export async function createPaidRequest(
     }
 
     const account = paymentAccountForNetwork(agent.accounts, requirement.network);
-    if (!isManagedSigningAccount(account)) throw new Error("MANAGED_SIGNER_REQUIRED");
+    if (!isManagedSigningAccount(account) && account.custodyType !== "SELF_CUSTODY") throw new Error("PAYMENT_SIGNER_UNSUPPORTED");
 
     const now = new Date();
     const balanceSnapshot = account.balances[0];
@@ -478,7 +479,101 @@ export async function createPaidRequest(
       },
     });
 
-    return { intent, shouldExecute: status === "AUTHORIZED" };
+    return { intent, shouldExecute: status === "AUTHORIZED" && isManagedSigningAccount(account) };
   }, { isolationLevel: "Serializable" }));
   return result.shouldExecute ? executeAuthorizedIntent(result.intent.id) : result.intent;
+}
+
+function exactStoredRequirement(intent: {
+  resourceUrl: string;
+  quote: { rawChallenge: unknown; network: string; asset: { type: string; symbol: string; hederaTokenId: string | null }; amountAtomic: { toString(): string }; payToAccountId: string } | null;
+}) {
+  if (!intent.quote) throw new Error("PAYMENT_QUOTE_MISSING");
+  return selectRequirement(parsePaymentRequired(intent.quote.rawChallenge), {
+    network: intent.quote.network,
+    asset: x402AssetIdentifier(intent.quote.asset, intent.quote.network, getConfig()),
+    amount: intent.quote.amountAtomic.toString(),
+    payTo: intent.quote.payToAccountId,
+    resourceUrl: intent.resourceUrl,
+  });
+}
+
+export async function prepareSelfCustodyPayment(intentId: string, organizationId: string) {
+  const intent = await db.paymentIntent.findFirstOrThrow({
+    where: { id: intentId, organizationId },
+    include: { quote: { include: { asset: true } }, agent: { include: { accounts: true } }, reservation: true },
+  });
+  if (intent.status !== "AUTHORIZED") throw new Error("PAYMENT_NOT_AUTHORIZED");
+  if (!intent.quote || intent.quote.validUntil <= new Date()) throw new Error("PAYMENT_QUOTE_EXPIRED");
+  if (!intent.reservation || intent.reservation.status !== "ACTIVE" || intent.reservation.expiresAt <= new Date()) throw new Error("SPEND_RESERVATION_INVALID");
+  const account = paymentAccountForNetwork(intent.agent.accounts, intent.quote.network);
+  if (account.custodyType !== "SELF_CUSTODY" || account.signingMode !== "WALLET_CONFIRMATION") throw new Error("SELF_CUSTODY_ACCOUNT_REQUIRED");
+  const requirement = exactStoredRequirement(intent);
+  if (account.network.startsWith("cardano:")) {
+    const route = getNetworkRouter().getRoute(account.network);
+    if (!route.facilitatorApiKey) throw new Error("LIVE_FACILITATOR_REQUIRED");
+    const response = await fetch(`${route.facilitatorUrl.replace(/\/$/, "")}/prepare`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${route.facilitatorApiKey}` },
+      body: JSON.stringify({ payerAddress: account.accountId, paymentRequirements: requirement }),
+      redirect: "error",
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!response.ok) throw new Error(`CARDANO_PREPARE_${response.status}`);
+    const prepared = z.object({ unsignedTransaction: z.string().regex(/^[0-9a-f]+$/), nonce: z.string().regex(/^[0-9a-f]{64}#\d+$/), transactionId: z.string().regex(/^[0-9a-f]{64}$/).optional(), payerAddress: z.string() }).parse(await response.json());
+    if (prepared.payerAddress !== account.accountId) throw new Error("SELF_CUSTODY_PAYER_MISMATCH");
+    return { intentId: intent.id, accountId: account.accountId, network: account.network, requirement, validUntil: intent.quote.validUntil, unsignedTransaction: prepared.unsignedTransaction, nonce: prepared.nonce, transactionId: prepared.transactionId };
+  }
+  return { intentId: intent.id, accountId: account.accountId, network: account.network, requirement, validUntil: intent.quote.validUntil };
+}
+
+function evmPayloadPayer(payload: PaymentPayload) {
+  const authorization = payload.payload.authorization;
+  if (!authorization || typeof authorization !== "object") return null;
+  const from = (authorization as Record<string, unknown>).from;
+  return typeof from === "string" ? from.toLowerCase() : null;
+}
+
+function cardanoPayloadPayer(payload: PaymentPayload) {
+  const payer = payload.payload.payerAddress;
+  return typeof payer === "string" ? payer : null;
+}
+
+export async function submitSelfCustodyPayment(intentId: string, organizationId: string, candidatePayload: unknown) {
+  const prepared = await prepareSelfCustodyPayment(intentId, organizationId);
+  if (prepared.network !== "eip155:5042002" && !prepared.network.startsWith("cardano:")) throw new Error("SELF_CUSTODY_SUBMISSION_NETWORK_UNSUPPORTED");
+  const paymentPayload = parsePaymentPayload(candidatePayload);
+  if (JSON.stringify(paymentPayload.accepted) !== JSON.stringify(prepared.requirement)) throw new Error("X402_REQUIREMENT_MISMATCH");
+  const payloadPayer = prepared.network === "eip155:5042002" ? evmPayloadPayer(paymentPayload) : cardanoPayloadPayer(paymentPayload);
+  if (payloadPayer !== (prepared.network === "eip155:5042002" ? prepared.accountId.toLowerCase() : prepared.accountId)) throw new Error("SELF_CUSTODY_PAYER_MISMATCH");
+
+  const claimed = await db.paymentIntent.updateMany({ where: { id: intentId, organizationId, status: "AUTHORIZED" }, data: { status: "SIGNING" } });
+  if (claimed.count !== 1) throw new Error("PAYMENT_ALREADY_CLAIMED");
+  const attemptNumber = (await db.paymentAttempt.count({ where: { paymentIntentId: intentId } })) + 1;
+  const attempt = await db.paymentAttempt.create({ data: { paymentIntentId: intentId, attemptNumber, status: "SIGNED", facilitatorRequestId: randomUUID(), signatureFingerprint: hash(paymentPayload) } });
+  let confirmedSettlement: { transactionId: string; network: string } | undefined;
+  try {
+    const fulfillment = await fulfillX402Resource((await db.paymentIntent.findUniqueOrThrow({ where: { id: intentId }, select: { resourceUrl: true } })).resourceUrl, prepared.requirement, paymentPayload, getConfig().APP_ENV === "production");
+    confirmedSettlement = { transactionId: fulfillment.transactionId, network: fulfillment.network };
+    if (fulfillment.network !== prepared.network) throw new Error("SETTLEMENT_NETWORK_MISMATCH");
+    return db.$transaction(async (tx) => {
+      const intent = await tx.paymentIntent.findUniqueOrThrow({ where: { id: intentId }, include: { quote: { include: { asset: true } } } });
+      await tx.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "CONFIRMED", candidateTransactionId: fulfillment.transactionId } });
+      await tx.settlement.create({ data: { paymentAttemptId: attempt.id, assetId: intent.quote!.assetId, status: "CONFIRMED", network: fulfillment.network, transactionId: fulfillment.transactionId, payerAccountId: prepared.accountId, payeeAccountId: intent.quote!.payToAccountId, amountAtomic: intent.quote!.amountAtomic, resultCode: "SUCCESS", submittedAt: new Date(), confirmedAt: new Date() } });
+      const responseBody = JSON.parse(JSON.stringify(fulfillment.body));
+      await tx.resourceFulfillment.upsert({ where: { paymentIntentId: intentId }, create: { paymentIntentId: intentId, status: "FULFILLED", contentType: fulfillment.contentType, contentHash: fulfillment.contentHash, contentBytes: fulfillment.contentBytes, responseBody, fulfilledAt: new Date() }, update: { status: "FULFILLED", contentType: fulfillment.contentType, contentHash: fulfillment.contentHash, contentBytes: fulfillment.contentBytes, responseBody, errorCode: null, fulfilledAt: new Date() } });
+      await tx.spendReservation.updateMany({ where: { paymentIntentId: intentId }, data: { status: "SETTLED" } });
+      await tx.outboxEvent.create({ data: { organizationId, eventType: "PAYMENT_SETTLED", aggregateType: "PAYMENT_INTENT", aggregateId: intentId, payload: { transactionId: fulfillment.transactionId, network: fulfillment.network, selfCustody: true } } });
+      return tx.paymentIntent.update({ where: { id: intentId }, data: { status: "SETTLED" }, include: { quote: { include: { asset: true } }, fulfillment: true, attempts: { include: { settlement: true } } } });
+    });
+  } catch (error) {
+    const code = error instanceof Error ? error.message.slice(0, 120) : "PAYMENT_FAILED";
+    if (error instanceof X402SubmissionUnknownError || confirmedSettlement) return markSubmissionUnknown({ id: intentId, organizationId }, attempt.id, prepared.network, code, confirmedSettlement?.transactionId ?? (error instanceof X402SubmissionUnknownError ? error.candidateTransactionId : undefined));
+    await db.$transaction([
+      db.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "FAILED", errorCode: code } }),
+      db.paymentIntent.update({ where: { id: intentId }, data: { status: "FAILED_BEFORE_SUBMISSION" } }),
+      db.spendReservation.updateMany({ where: { paymentIntentId: intentId, status: "ACTIVE" }, data: { status: "RELEASED" } }),
+    ]);
+    throw error;
+  }
 }

@@ -70,7 +70,7 @@ export function HederaWalletConnect() {
       const linkResponse = await fetch("/api/v1/wallet", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ challengeToken: challengeBody.data.challengeToken, signatureMap, walletProvider: "HashPack via WalletConnect" }),
+        body: JSON.stringify({ proofType: "hedera", challengeToken: challengeBody.data.challengeToken, signatureMap, walletProvider: "HashPack via WalletConnect" }),
       });
       const linkBody = await linkResponse.json();
       if (!linkResponse.ok) throw new Error(linkBody.detail ?? "Wallet verification failed.");

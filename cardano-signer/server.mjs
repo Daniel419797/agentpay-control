@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
-import { blake2b, buildSignedCardanoTransaction, parseAssetUnit, paymentCredential, publicKeyFromSeed, signHashWithSeed, verifyEd25519 } from "./cardano.mjs";
+import { blake2b, buildSignedCardanoTransaction, buildUnsignedCardanoTransaction, decodeAddress, parseAssetUnit, paymentCredential, publicKeyFromSeed, signHashWithSeed, verifyEd25519 } from "./cardano.mjs";
 
 const MAX_BODY_BYTES = 64 * 1024;
 
@@ -44,16 +44,19 @@ async function signBodyHash(cfg,hash){if(cfg.seedHex)return signHashWithSeed(cfg
 
 function validateRequest(body,cfg){if(!body||typeof body!=="object")throw new Error("CARDANO_SIGN_REQUEST_INVALID");const requirement=body.paymentRequirements;if(!requirement||typeof requirement!=="object")throw new Error("CARDANO_PAYMENT_REQUIREMENT_INVALID");if(body.network!==cfg.network||requirement.network!==cfg.network)throw new Error("CARDANO_NETWORK_MISMATCH");if(body.payerAddress!==cfg.payerAddress)throw new Error("CARDANO_PAYER_MISMATCH");if(body.submissionMode!=="server")throw new Error("CARDANO_SUBMISSION_MODE_MISMATCH");if(requirement.scheme!=="exact"||!/^\d+$/.test(String(requirement.amount??""))||BigInt(requirement.amount)<=0n||!requirement.payTo)throw new Error("CARDANO_PAYMENT_REQUIREMENT_INVALID");if(requirement.asset!=="lovelace"&&requirement.asset!==cfg.usdcxAssetId)throw new Error("CARDANO_ASSET_NOT_WHITELISTED");const timeout=Number(requirement.maxTimeoutSeconds);if(!Number.isInteger(timeout)||timeout<2||timeout>3600)throw new Error("CARDANO_TIMEOUT_INVALID");return{requirement,timeout};}
 
+function validateUnsignedRequest(body,cfg){if(!body||typeof body!=="object")throw new Error("CARDANO_SIGN_REQUEST_INVALID");const requirement=body.paymentRequirements;if(!requirement||typeof requirement!=="object")throw new Error("CARDANO_PAYMENT_REQUIREMENT_INVALID");if(body.network!==cfg.network||requirement.network!==cfg.network)throw new Error("CARDANO_NETWORK_MISMATCH");const payerAddress=String(body.payerAddress??"");decodeAddress(payerAddress,cfg.network);if(body.submissionMode!=="server")throw new Error("CARDANO_SUBMISSION_MODE_MISMATCH");if(requirement.scheme!=="exact"||!/^\d+$/.test(String(requirement.amount??""))||BigInt(requirement.amount)<=0n||!requirement.payTo)throw new Error("CARDANO_PAYMENT_REQUIREMENT_INVALID");if(requirement.asset!=="lovelace"&&requirement.asset!==cfg.usdcxAssetId)throw new Error("CARDANO_ASSET_NOT_WHITELISTED");const timeout=Number(requirement.maxTimeoutSeconds);if(!Number.isInteger(timeout)||timeout<2||timeout>3600)throw new Error("CARDANO_TIMEOUT_INVALID");return{requirement,timeout,payerAddress};}
+
 export function createSignerServer(cfg=configFromEnv()){
   return createServer(async(req,res)=>{
     try{
       if(req.method==="GET"&&req.url==="/health")return json(res,200,{status:"ok",network:cfg.network,custody:cfg.appEnv==="production"?"remote-ed25519":"isolated-test-signer",assets:["lovelace",...(cfg.usdcxAssetId?[cfg.usdcxAssetId]:[])]});
-      if(req.method!=="POST"||!(req.url==="/sign"||req.url==="/"))return json(res,404,{code:"NOT_FOUND"});
+      if(req.method!=="POST"||!(req.url==="/sign"||req.url==="/unsigned"||req.url==="/"))return json(res,404,{code:"NOT_FOUND"});
       const auth=req.headers.authorization;if(!auth?.startsWith("Bearer ")||!safeEqual(auth.slice(7),cfg.apiKey))return json(res,401,{code:"UNAUTHORIZED"});
-      const body=await readJson(req),{requirement,timeout}=validateRequest(body,cfg);
-      const [latest,params,utxos,key]=await Promise.all([bfJson(cfg,"/blocks/latest"),bfJson(cfg,"/epochs/latest/parameters"),addressUtxos(cfg,cfg.payerAddress),publicKey(cfg)]);
+      const body=await readJson(req),unsigned=req.url==="/unsigned",validated=unsigned?validateUnsignedRequest(body,cfg):validateRequest(body,cfg),{requirement,timeout}=validated,payerAddress=unsigned?validated.payerAddress:cfg.payerAddress;
+      const [latest,params,utxos,key]=await Promise.all([bfJson(cfg,"/blocks/latest"),bfJson(cfg,"/epochs/latest/parameters"),addressUtxos(cfg,payerAddress),unsigned?Promise.resolve(null):publicKey(cfg)]);
       if(!Number.isInteger(latest?.slot)||latest.slot<0)throw new Error("CARDANO_LATEST_SLOT_UNAVAILABLE");
-      const signed=await buildSignedCardanoTransaction({network:cfg.network,payerAddress:cfg.payerAddress,payeeAddress:requirement.payTo,assetUnit:requirement.asset,amountAtomic:String(requirement.amount),maxTimeoutSeconds:timeout,latestSlot:latest.slot,protocolParameters:protocolParams(params),utxos,publicKey:key,signBodyHash:(hash)=>signBodyHash(cfg,hash),minOutputLovelace:cfg.minOutput,minTokenOutputLovelace:cfg.minTokenOutput,minChangeLovelace:cfg.minChange,maxInputs:cfg.maxInputs});
+      const common={network:cfg.network,payerAddress,payeeAddress:requirement.payTo,assetUnit:requirement.asset,amountAtomic:String(requirement.amount),maxTimeoutSeconds:timeout,latestSlot:latest.slot,protocolParameters:protocolParams(params),utxos,minOutputLovelace:cfg.minOutput,minTokenOutputLovelace:cfg.minTokenOutput,minChangeLovelace:cfg.minChange,maxInputs:cfg.maxInputs};
+      const signed=unsigned?buildUnsignedCardanoTransaction(common):await buildSignedCardanoTransaction({...common,publicKey:key,signBodyHash:(hash)=>signBodyHash(cfg,hash)});
       return json(res,200,{transaction:signed.transaction,nonce:signed.nonce,transactionId:signed.transactionId,asset:signed.assetUnit,amount:signed.amountAtomic});
     }catch(error){const code=error instanceof Error&&error.message.startsWith("CARDANO_")?error.message:"CARDANO_SIGNING_FAILED";const status=code==="REQUEST_BODY_TOO_LARGE"?413:code.includes("PROVIDER_")||code.includes("REMOTE_SIGNER_")?502:422;console.error(JSON.stringify({event:"cardano_signing_request_failed",code}));return json(res,status,{code});}
   });

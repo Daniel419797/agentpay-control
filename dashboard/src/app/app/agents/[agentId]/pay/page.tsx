@@ -26,7 +26,7 @@ export default async function PaidRequestPage({ params }: { params: Promise<{ ag
       network: true,
       accounts: {
         where: { status: "ACTIVE" },
-        select: { network: true, custodyType: true, signingMode: true },
+        select: { network: true, accountId: true, custodyType: true, signingMode: true },
       },
     },
     orderBy: { createdAt: "desc" },

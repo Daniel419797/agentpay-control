@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import type { SupportedCardanoWallet } from "@/lib/cardano-browser-wallet";
 
-type AgentAccount = { network: string; custodyType: string; signingMode: string };
+type AgentAccount = { network: string; accountId: string; custodyType: string; signingMode: string };
 type Agent = { id: string; name: string; status: string; network: string; accounts: AgentAccount[] };
 type Resource = {
   id: string;
@@ -63,6 +64,17 @@ function supportsManagedRequest(account: AgentAccount | undefined) {
     || (account.custodyType === "EXTERNAL_DELEGATED" && account.signingMode === "BOUNDED_DELEGATION");
 }
 
+function supportsWalletRequest(account: AgentAccount | undefined) {
+  return Boolean(account && (account.network === "eip155:5042002" || account.network.startsWith("cardano:")) && account.custodyType === "SELF_CUSTODY" && account.signingMode === "WALLET_CONFIRMATION");
+}
+
+function hexToBase64(hex: string) {
+  if (!/^[0-9a-f]+$/i.test(hex) || hex.length % 2 !== 0) throw new Error("The wallet returned invalid Cardano transaction CBOR.");
+  let binary = "";
+  for (let index = 0; index < hex.length; index += 2) binary += String.fromCharCode(Number.parseInt(hex.slice(index, index + 2), 16));
+  return btoa(binary);
+}
+
 export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; defaultAgentId?: string }) {
   const [agentId, setAgentId] = useState(defaultAgentId ?? agents[0]?.id ?? "");
   const [resources, setResources] = useState<Resource[]>([]);
@@ -79,6 +91,8 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
   const activeAccount = activeAgent?.accounts.find((account) => account.network === activeAgent.network) ?? activeAgent?.accounts[0];
   const isPaused = activeAgent?.status === "PAUSED";
   const managedRequest = supportsManagedRequest(activeAccount);
+  const walletRequest = supportsWalletRequest(activeAccount);
+  const supportedRequest = managedRequest || walletRequest;
 
   const compatibleResources = useMemo(() => {
     if (!activeAgent) return [];
@@ -102,7 +116,7 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
 
   async function submit() {
     const url = useCustom ? customUrl.trim() : selectedResourceUrl;
-    if (!agentId || !url || !managedRequest) return;
+    if (!agentId || !url || !supportedRequest) return;
     setLoading(true);
     setError("");
     setResult(null);
@@ -118,7 +132,36 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
         setError(body?.detail ?? body?.error?.message ?? `Request failed (${response.status})`);
         return;
       }
-      const data = body.data;
+      let data = body.data;
+      if (walletRequest && data.status === "AUTHORIZED") {
+        const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
+        if (!activeAccount) throw new Error("The active payment account is unavailable.");
+        const preparedResponse = await fetch(`/api/v1/payment-intents/${encodeURIComponent(data.id)}/self-custody`, { cache: "no-store" });
+        const preparedBody = await preparedResponse.json() as { data?: { accountId: string; network: string; requirement: unknown; unsignedTransaction?: string; nonce?: string }; detail?: string };
+        if (!preparedResponse.ok || !preparedBody.data) throw new Error(preparedBody.detail ?? "The payment authorization could not be prepared.");
+        let paymentPayload: unknown;
+        if (activeAccount.network === "eip155:5042002") {
+          if (!projectId) throw new Error("WalletConnect is not configured for Arc wallet confirmation.");
+          const { createArcEip3009Payload } = await import("@/lib/arc-wallet-appkit");
+          paymentPayload = await createArcEip3009Payload(projectId, preparedBody.data.accountId, preparedBody.data.requirement);
+        } else {
+          if (!preparedBody.data.unsignedTransaction || !preparedBody.data.nonce) throw new Error("The Cardano unsigned transaction is missing.");
+          const identitiesResponse = await fetch("/api/v1/wallet", { cache: "no-store" });
+          const identitiesBody = await identitiesResponse.json() as { data?: { identities?: Array<{ network: string; walletProvider: string }> }; detail?: string };
+          const identity = identitiesBody.data?.identities?.find((item) => item.network === activeAccount.network);
+          if (!identitiesResponse.ok || !identity) throw new Error(identitiesBody.detail ?? "Reconnect the verified Cardano wallet.");
+          const cardano = await import("@/lib/cardano-browser-wallet");
+          if (!cardano.supportedCardanoWallets.includes(identity.walletProvider as SupportedCardanoWallet)) throw new Error("The verified Cardano wallet provider is not supported.");
+          const signedTransaction = await cardano.signCardanoTransaction(identity.walletProvider as SupportedCardanoWallet, activeAccount.network as "cardano:preprod" | "cardano:mainnet", preparedBody.data.accountId, preparedBody.data.unsignedTransaction);
+          paymentPayload = { x402Version: 2, accepted: preparedBody.data.requirement, payload: { transaction: hexToBase64(signedTransaction), nonce: preparedBody.data.nonce, payerAddress: preparedBody.data.accountId, submissionMode: "server" } };
+        }
+        const submitResponse = await fetch(`/api/v1/payment-intents/${encodeURIComponent(data.id)}/self-custody`, {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ paymentPayload }),
+        });
+        const submitBody = await submitResponse.json() as { data?: PaidRequestResponse; detail?: string };
+        if (!submitResponse.ok || !submitBody.data) throw new Error(submitBody.detail ?? "The signed payment could not be submitted.");
+        data = submitBody.data;
+      }
       const settlement = data.attempts?.find((attempt) => attempt.settlement)?.settlement;
       const network = data.quote?.network;
       const transactionId = settlement?.transactionId;
@@ -126,8 +169,8 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
       const decimals = Number(data.quote?.asset?.decimals ?? 0);
       const symbol = String(data.quote?.asset?.symbol ?? "");
       setResult({ id: data.id, status: data.status, resourceUrl: url, transactionId, explorerUrl: explorerTransactionUrl(network, transactionId), amount: amountAtomic ? formatAtomic(amountAtomic, decimals, symbol) : undefined, network });
-    } catch {
-      setError("Network error. The request status is unknown; check Transactions before retrying.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Network error. The request status is unknown; check Transactions before retrying.");
     } finally {
       setLoading(false);
     }
@@ -148,7 +191,8 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
           {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name} ({agent.status})</option>)}
         </select>
         {isPaused && <div className="form-error" style={{ marginTop: 4 }}>Agent is paused. Resume it before sending requests.</div>}
-        {activeAgent && !managedRequest && <div className="form-help" style={{ marginTop: 6 }}>This account requires wallet confirmation. Autonomous x402 requests are available only for managed or explicitly delegated signer accounts.</div>}
+        {activeAgent && walletRequest && <div className="form-help" style={{ marginTop: 6 }}>This account requires wallet confirmation. AgentPay will show the exact payment authorization or transaction after policy approval.</div>}
+        {activeAgent && !supportedRequest && <div className="form-help" style={{ marginTop: 6 }}>This wallet rail is not yet available for direct paid requests.</div>}
       </div>
 
       <div>
@@ -171,7 +215,7 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
 
       <div><label style={{ display: "block", fontSize: 13, marginBottom: 4 }}>Purpose (optional)</label><input className="form-input" value={purpose} onChange={(event) => setPurpose(event.target.value)} placeholder="e.g. Daily market analysis" /></div>
       {error && <div className="form-error" role="alert">{error}</div>}
-      <div className="button-row"><button className="primary-button" type="button" disabled={loading || !agentId || isPaused || !managedRequest || (useCustom ? !customUrl.trim() : !selectedResourceUrl)} onClick={() => void submit()}>{loading ? "Sending…" : "Send paid request"}</button></div>
+      <div className="button-row"><button className="primary-button" type="button" disabled={loading || !agentId || isPaused || !supportedRequest || (useCustom ? !customUrl.trim() : !selectedResourceUrl)} onClick={() => void submit()}>{loading ? "Sending…" : walletRequest ? "Review and sign payment" : "Send paid request"}</button></div>
 
       {result && (
         <div className="panel" style={{ borderRadius: 8, padding: 16 }}>
