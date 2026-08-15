@@ -21,7 +21,6 @@ export default function Loading() {
           </div>
           <div className="public-loading-art" />
         </div>
-        <span className="sr-only">Loading AgentPay…</span>
       </div>
     </div>
   );
