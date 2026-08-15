@@ -29,6 +29,7 @@
 .sidebar-signout:disabled { opacity: .5; cursor: wait; }
 .main-area { padding-left: 272px; }
 .sidebar-session .network-switcher.compact .network-switcher-trigger { max-width: 100%; font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-session .network-switcher-dropdown { top: auto; bottom: calc(100% + 7px); left: -38px; min-width: 228px; box-shadow: 0 -14px 34px rgb(2 16 31 / 24%); }
 
 @media (max-width: 820px) {
   .sidebar.sidebar-open { width: min(292px, calc(100vw - 28px)); }
