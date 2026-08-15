@@ -139,7 +139,7 @@ const detailPages: Record<Exclude<MarketingPageKey, "home" | "pricing">, DetailP
   },
   "agent-commerce": {
     eyebrow: "Agent commerce",
-    title: "Let software hire software—with verification in the middle.",
+    title: "Let software hire software, with verification in the middle.",
     intro:
       "AgentPay supports an agent-to-agent commerce model where identity, job terms, payment policy and settlement are checked before one agent pays another for work.",
     primaryCta: "Open AgentPay",
@@ -194,7 +194,7 @@ const detailPages: Record<Exclude<MarketingPageKey, "home" | "pricing">, DetailP
       { number: "02", title: "Let routine work flow", copy: "Requests inside policy can proceed without manual intervention." },
       { number: "03", title: "Escalate exceptions", copy: "Riskier requests are blocked or queued for an operator decision." },
     ],
-    closingTitle: "Delegate execution—not unlimited authority.",
+    closingTitle: "Delegate execution, not unlimited authority.",
     closingCopy: "Keep autonomy useful by making the financial limits explicit before the agent starts spending.",
   },
   developers: {
@@ -438,7 +438,7 @@ function HomePage() {
             <span className="m-kicker">Financial infrastructure for autonomous software</span>
             <h1>Let software spend.<br />Keep the rules human.</h1>
             <p>
-              AgentPay gives autonomous agents a governed way to pay for resources, services and other agents—inside budgets, policies and approval rules you control.
+              AgentPay gives autonomous agents a governed way to pay for resources, services and other agents, inside budgets, policies and approval rules you control.
             </p>
             <div className="m-hero-actions">
               <Link className="m-button" href="/sign-in">Open AgentPay</Link>
