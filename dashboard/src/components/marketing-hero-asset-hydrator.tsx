@@ -2,20 +2,25 @@
 
 import { useEffect } from "react";
 
-const HERO_ASSET_PATH = "/marketing/agentpay-hero-dashboard.webp";
+const HERO_ASSET_PARTS = Array.from(
+  { length: 10 },
+  (_, index) => `/marketing/hero-exact/part-${String(index).padStart(2, "0")}.txt`,
+);
 
 export function MarketingHeroAssetHydrator() {
   useEffect(() => {
     let cancelled = false;
 
-    void fetch(HERO_ASSET_PATH, { cache: "force-cache" })
-      .then(async (response) => {
+    void Promise.all(
+      HERO_ASSET_PARTS.map(async (path) => {
+        const response = await fetch(path, { cache: "force-cache" });
         if (!response.ok) throw new Error("HERO_ASSET_UNAVAILABLE");
         return response.text();
-      })
-      .then((payload) => {
+      }),
+    )
+      .then((parts) => {
         if (cancelled) return;
-        const encoded = payload.trim();
+        const encoded = parts.join("").replace(/\s+/g, "");
         if (!encoded.startsWith("UklG")) throw new Error("HERO_ASSET_INVALID");
 
         document.documentElement.style.setProperty(
