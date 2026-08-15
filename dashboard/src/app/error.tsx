@@ -3,13 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { AlertTriangle, RefreshCcw } from "lucide-react";
-import { useEffect } from "react";
 
 export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
-  useEffect(() => {
-    console.error("AgentPay route error", error);
-  }, [error]);
-
   return (
     <div className="route-state-page">
       <section className="route-state-shell" role="alert">
