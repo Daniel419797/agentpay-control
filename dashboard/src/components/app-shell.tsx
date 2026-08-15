@@ -6,9 +6,9 @@ import type { Route } from "next";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  Activity, Bot, Boxes, BrainCircuit, CircleDollarSign, ClipboardCheck, CreditCard,
+  Activity, Bot, Boxes, BrainCircuit, Building2, CircleDollarSign, ClipboardCheck, CreditCard,
   FileClock, FileText, GitBranch, LayoutDashboard, LogOut, Menu, Plus, ReceiptText, Repeat2,
-  Settings, ShieldCheck, Store
+  Settings, ShieldCheck, Store, UserRound
 } from "lucide-react";
 import { HederaWalletConnect } from "@/components/hedera-wallet-connect";
 import { ArcWalletConnect } from "@/components/arc-wallet-connect";
@@ -34,6 +34,12 @@ const navigation: Array<{ label: string; href: Route; icon: typeof LayoutDashboa
   { label: "Audit", href: "/app/audit", icon: FileClock },
   { label: "Settings", href: "/app/settings", icon: Settings }
 ];
+
+const navigationGroups = navigation.reduce<Array<{ label: string; items: typeof navigation }>>((groups, item) => {
+  if (item.group) groups.push({ label: item.group, items: [item] });
+  else groups.at(-1)?.items.push(item);
+  return groups;
+}, []);
 
 type OperatingState = "LOADING" | "OPEN" | "STOPPED" | "ERROR";
 
@@ -93,15 +99,32 @@ function ShellContent({ children }: { children: React.ReactNode }) {
     <div className="app-shell">
       {navOpen && <button className="nav-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}
       <aside className={`sidebar${navOpen ? " sidebar-open" : ""}`} aria-label="Primary navigation">
-        <div className="sidebar-brand"><Image src="/brand/agentpay-lockup-white.png" alt="AgentPay" width={177} height={35} priority /></div>
+        <div className="sidebar-brand">
+          <Image src="/brand/agentpay-lockup-white.png" alt="AgentPay" width={177} height={35} priority />
+          <span className="sidebar-live"><i aria-hidden="true" />Live</span>
+        </div>
         <nav className="nav-list">
-          {navigation.map((item) => <div className="nav-entry" key={item.href}>{item.group && <span className="nav-group">{item.group}</span>}<Link className={`nav-link${pathname === item.href || (item.href !== "/app/overview" && pathname.startsWith(`${item.href}/`)) ? " active" : ""}`} href={item.href} onClick={() => setNavOpen(false)}><item.icon aria-hidden="true" size={17} />{item.label}</Link></div>)}
+          {navigationGroups.map((group) => (
+            <section className="nav-section" key={group.label} aria-labelledby={`nav-${group.label.toLowerCase()}`}>
+              <span className="nav-group" id={`nav-${group.label.toLowerCase()}`}>{group.label}</span>
+              <div className="nav-section-links">
+                {group.items.map((item) => (
+                  <Link className={`nav-link${pathname === item.href || (item.href !== "/app/overview" && pathname.startsWith(`${item.href}/`)) ? " active" : ""}`} href={item.href} key={item.href} onClick={() => setNavOpen(false)}>
+                    <span className="nav-icon"><item.icon aria-hidden="true" size={17} /></span>
+                    <span>{item.label}</span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ))}
         </nav>
-        <div className="sidebar-spacer" />
-        <div className="sidebar-context"><span className="context-label">Workspace</span><WorkspaceSwitcher compact /></div>
-        <div className="sidebar-context"><span className="context-label">Environment</span><NetworkSwitcher compact /></div>
-        <div className="sidebar-context"><span className="context-label">Operator</span><span className="context-value">{operatorEmail}</span></div>
-        <button className="nav-link" type="button" onClick={() => void signOut()} disabled={signingOut} aria-label="Sign out"><LogOut aria-hidden="true" size={17} />{signingOut ? "Signing out…" : "Sign out"}</button>
+        <div className="sidebar-session">
+          <span className="session-eyebrow">Current session</span>
+          <div className="session-row"><span className="session-icon"><Building2 aria-hidden="true" size={15} /></span><div><span className="context-label">Workspace</span><WorkspaceSwitcher compact /></div></div>
+          <div className="session-row"><span className="session-icon"><span className="status-dot" aria-hidden="true" /></span><div><span className="context-label">Environment</span><NetworkSwitcher compact /></div></div>
+          <div className="session-row"><span className="session-icon"><UserRound aria-hidden="true" size={15} /></span><div><span className="context-label">Operator</span><span className="context-value" title={operatorEmail}>{operatorEmail}</span></div></div>
+          <button className="sidebar-signout" type="button" onClick={() => void signOut()} disabled={signingOut} aria-label="Sign out"><LogOut aria-hidden="true" size={16} />{signingOut ? "Signing out…" : "Sign out"}</button>
+        </div>
       </aside>
       <main className="main-area">
         <header className="topbar">
