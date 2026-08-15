@@ -15,7 +15,6 @@ export default function DashboardLoading() {
         <div className="dashboard-skeleton-panel" />
         <div className="dashboard-skeleton-panel" />
       </div>
-      <span className="sr-only">Loading payment operations…</span>
     </div>
   );
 }
