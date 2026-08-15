@@ -15,18 +15,22 @@ function configFromEnv(){
   const appEnv=process.env.APP_ENV??"development";
   if(!["development","test","production"].includes(appEnv))throw new Error("APP_ENV_INVALID");
   const network=networkName(process.env.CARDANO_NETWORK??"preprod");
+  const signingMode=process.env.CARDANO_SIGNING_MODE??"managed";
+  if(!["managed","unsigned-only"].includes(signingMode))throw new Error("CARDANO_SIGNING_MODE_INVALID");
   const usdcxAssetId=process.env.CARDANO_USDCX_ASSET_ID?.trim().toLowerCase();
   if(usdcxAssetId)parseAssetUnit(usdcxAssetId);
-  const cfg={appEnv,network,payerAddress:required("CARDANO_PAYER_ADDRESS"),blockfrostUrl:required("CARDANO_BLOCKFROST_URL").replace(/\/$/,""),blockfrostProjectId:required("CARDANO_BLOCKFROST_PROJECT_ID"),apiKey:required("CARDANO_SIGNER_API_KEY"),port:numberEnv("PORT",8791,1,65535),minOutput:bigintEnv("CARDANO_MIN_OUTPUT_LOVELACE","1000000",500000n,10000000n),minTokenOutput:bigintEnv("CARDANO_TOKEN_OUTPUT_LOVELACE","2000000",1000000n,10000000n),minChange:bigintEnv("CARDANO_MIN_CHANGE_LOVELACE","2000000",1000000n,10000000n),maxInputs:numberEnv("CARDANO_MAX_INPUTS",20,1,64),usdcxAssetId,remoteSignerUrl:process.env.CARDANO_ED25519_SIGNER_URL,remoteSignerApiKey:process.env.CARDANO_ED25519_SIGNER_API_KEY,publicKeyHex:process.env.CARDANO_PAYMENT_PUBLIC_KEY_HEX,seedHex:process.env.CARDANO_SIGNING_SEED_HEX};
+  const cfg={appEnv,network,signingMode,payerAddress:required("CARDANO_PAYER_ADDRESS"),blockfrostUrl:required("CARDANO_BLOCKFROST_URL").replace(/\/$/,""),blockfrostProjectId:required("CARDANO_BLOCKFROST_PROJECT_ID"),apiKey:required("CARDANO_SIGNER_API_KEY"),port:numberEnv("PORT",8791,1,65535),minOutput:bigintEnv("CARDANO_MIN_OUTPUT_LOVELACE","1000000",500000n,10000000n),minTokenOutput:bigintEnv("CARDANO_TOKEN_OUTPUT_LOVELACE","2000000",1000000n,10000000n),minChange:bigintEnv("CARDANO_MIN_CHANGE_LOVELACE","2000000",1000000n,10000000n),maxInputs:numberEnv("CARDANO_MAX_INPUTS",20,1,64),usdcxAssetId,remoteSignerUrl:process.env.CARDANO_ED25519_SIGNER_URL,remoteSignerApiKey:process.env.CARDANO_ED25519_SIGNER_API_KEY,publicKeyHex:process.env.CARDANO_PAYMENT_PUBLIC_KEY_HEX,seedHex:process.env.CARDANO_SIGNING_SEED_HEX};
   if(cfg.apiKey.length<32)throw new Error("CARDANO_SIGNER_API_KEY_TOO_SHORT");
   if(cfg.appEnv==="production"){
     if(network!=="cardano:preprod"&&network!=="cardano:mainnet")throw new Error("CARDANO_NETWORK_INVALID");
     if(new URL(cfg.blockfrostUrl).protocol!=="https:")throw new Error("CARDANO_BLOCKFROST_URL_HTTPS_REQUIRED");
-    if(!cfg.remoteSignerUrl||!cfg.remoteSignerApiKey||!cfg.publicKeyHex)throw new Error("CARDANO_REMOTE_ED25519_SIGNER_REQUIRED");
-    if(new URL(cfg.remoteSignerUrl).protocol!=="https:")throw new Error("CARDANO_ED25519_SIGNER_URL_HTTPS_REQUIRED");
-    if(cfg.remoteSignerApiKey.length<32)throw new Error("CARDANO_ED25519_SIGNER_API_KEY_TOO_SHORT");
     if(cfg.seedHex)throw new Error("CARDANO_RAW_SIGNING_SEED_PROHIBITED_IN_PRODUCTION");
-    if(safeEqual(cfg.apiKey,cfg.remoteSignerApiKey))throw new Error("CARDANO_SIGNER_CAPABILITY_KEYS_MUST_BE_DISTINCT");
+    if(cfg.signingMode==="managed"){
+      if(!cfg.remoteSignerUrl||!cfg.remoteSignerApiKey||!cfg.publicKeyHex)throw new Error("CARDANO_REMOTE_ED25519_SIGNER_REQUIRED");
+      if(new URL(cfg.remoteSignerUrl).protocol!=="https:")throw new Error("CARDANO_ED25519_SIGNER_URL_HTTPS_REQUIRED");
+      if(cfg.remoteSignerApiKey.length<32)throw new Error("CARDANO_ED25519_SIGNER_API_KEY_TOO_SHORT");
+      if(safeEqual(cfg.apiKey,cfg.remoteSignerApiKey))throw new Error("CARDANO_SIGNER_CAPABILITY_KEYS_MUST_BE_DISTINCT");
+    }
   } else if(!cfg.seedHex&&!cfg.remoteSignerUrl){throw new Error("CARDANO_LOCAL_OR_REMOTE_SIGNER_REQUIRED");}
   if(cfg.seedHex&&!/^[0-9a-fA-F]{64}$/.test(cfg.seedHex))throw new Error("CARDANO_SIGNING_SEED_INVALID");
   if(cfg.publicKeyHex&&!/^[0-9a-fA-F]{64}$/.test(cfg.publicKeyHex))throw new Error("CARDANO_PAYMENT_PUBLIC_KEY_INVALID");
@@ -49,9 +53,10 @@ function validateUnsignedRequest(body,cfg){if(!body||typeof body!=="object")thro
 export function createSignerServer(cfg=configFromEnv()){
   return createServer(async(req,res)=>{
     try{
-      if(req.method==="GET"&&req.url==="/health")return json(res,200,{status:"ok",network:cfg.network,custody:cfg.appEnv==="production"?"remote-ed25519":"isolated-test-signer",assets:["lovelace",...(cfg.usdcxAssetId?[cfg.usdcxAssetId]:[])]});
+      if(req.method==="GET"&&req.url==="/health")return json(res,200,{status:"ok",network:cfg.network,custody:cfg.signingMode==="unsigned-only"?"self-custody-unsigned-only":cfg.appEnv==="production"?"remote-ed25519":"isolated-test-signer",assets:["lovelace",...(cfg.usdcxAssetId?[cfg.usdcxAssetId]:[])]});
       if(req.method!=="POST"||!(req.url==="/sign"||req.url==="/unsigned"||req.url==="/"))return json(res,404,{code:"NOT_FOUND"});
       const auth=req.headers.authorization;if(!auth?.startsWith("Bearer ")||!safeEqual(auth.slice(7),cfg.apiKey))return json(res,401,{code:"UNAUTHORIZED"});
+      if(cfg.signingMode==="unsigned-only"&&req.url!=="/unsigned")return json(res,403,{code:"CARDANO_MANAGED_SIGNING_DISABLED"});
       const body=await readJson(req),unsigned=req.url==="/unsigned",validated=unsigned?validateUnsignedRequest(body,cfg):validateRequest(body,cfg),{requirement,timeout}=validated,payerAddress=unsigned?validated.payerAddress:cfg.payerAddress;
       const [latest,params,utxos,key]=await Promise.all([bfJson(cfg,"/blocks/latest"),bfJson(cfg,"/epochs/latest/parameters"),addressUtxos(cfg,payerAddress),unsigned?Promise.resolve(null):publicKey(cfg)]);
       if(!Number.isInteger(latest?.slot)||latest.slot<0)throw new Error("CARDANO_LATEST_SLOT_UNAVAILABLE");

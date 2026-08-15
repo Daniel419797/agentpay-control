@@ -3,9 +3,7 @@ import { redirect } from "next/navigation";
 import { CreateAgentForm } from "@/components/create-agent-form";
 import { FormPage } from "@/components/workspace-page";
 import {
-  isHederaMainnetEnabled,
   isManagedArcEnabled,
-  isManagedCardanoMainnetEnabled,
   isManagedCardanoPreprodEnabled,
 } from "@/domain/network-router";
 import { cardanoAssetConfigFromEnv } from "@/lib/cardano-assets";
@@ -28,10 +26,10 @@ export default async function NewAgentPage() {
       description="Create a policy-controlled payment identity with a signer appropriate to the selected rail."
     >
       <CreateAgentForm
-        mainnetEnabled={isHederaMainnetEnabled(config)}
+        mainnetEnabled
         arcEnabled={isManagedArcEnabled(config)}
         cardanoPreprodEnabled={isManagedCardanoPreprodEnabled(config)}
-        cardanoMainnetEnabled={isManagedCardanoMainnetEnabled(config)}
+        cardanoMainnetEnabled
         cardanoPreprodUsdcxEnabled={usdcxEnabled && Boolean(cardanoAssets.preprodUsdcxAssetId)}
         cardanoMainnetUsdcxEnabled={usdcxEnabled && Boolean(cardanoAssets.mainnetUsdcxAssetId)}
       />
