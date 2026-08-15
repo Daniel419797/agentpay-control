@@ -2,13 +2,8 @@
 
 import Link from "next/link";
 import { AlertTriangle, RefreshCcw } from "lucide-react";
-import { useEffect } from "react";
 
 export default function DashboardError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
-  useEffect(() => {
-    console.error("AgentPay dashboard route error", error);
-  }, [error]);
-
   return (
     <div className="dashboard-state">
       <section className="dashboard-state-card" role="alert">
