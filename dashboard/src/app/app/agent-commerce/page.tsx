@@ -105,7 +105,7 @@ export default function AgentCommercePage() {
             <p style={{ marginBottom: 0 }}>A scoped agent credential can create one through the Masumi purchase API after its resource identity and policy controls are configured.</p>
           </div>
         ) : (
-          <table className="data-table">
+          <table className="data-table mobile-card-table">
             <thead>
               <tr>
                 <th>Resource</th>
@@ -125,14 +125,14 @@ export default function AgentCommercePage() {
                 const canReconcile = !terminal(purchase.state);
                 return (
                   <tr key={purchase.id}>
-                    <td><strong>{purchase.resourceName ?? "Masumi resource"}</strong><br /><span style={{ opacity: .65 }}>{short(purchase.blockchainIdentifier, 10, 8)}</span></td>
-                    <td>{purchase.workspaceRole}</td>
-                    <td>{purchase.network}</td>
-                    <td>{purchase.state}</td>
-                    <td title={purchase.agentIdentifier}>{short(purchase.agentIdentifier)}</td>
-                    <td>{purchase.resultVerifiedAt ? <span title={purchase.resultHash ?? undefined}>Result verified</span> : purchase.failureCode ? <span title={purchase.failureCode}>Needs review</span> : "Pending"}</td>
-                    <td>{new Date(purchase.updatedAt).toLocaleString()}</td>
-                    <td>
+                    <td data-label="Resource"><strong>{purchase.resourceName ?? "Masumi resource"}</strong><br /><span style={{ opacity: .65 }}>{short(purchase.blockchainIdentifier, 10, 8)}</span></td>
+                    <td data-label="Role">{purchase.workspaceRole}</td>
+                    <td data-label="Network">{purchase.network}</td>
+                    <td data-label="State">{purchase.state}</td>
+                    <td data-label="Agent" title={purchase.agentIdentifier}>{short(purchase.agentIdentifier)}</td>
+                    <td data-label="Evidence">{purchase.resultVerifiedAt ? <span title={purchase.resultHash ?? undefined}>Result verified</span> : purchase.failureCode ? <span title={purchase.failureCode}>Needs review</span> : "Pending"}</td>
+                    <td data-label="Updated">{new Date(purchase.updatedAt).toLocaleString()}</td>
+                    <td data-label="Actions">
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                         {canReconcile && <button className="secondary-button" type="button" disabled={busy !== null} onClick={() => void action(purchase, "reconcile")}>{busy === `${purchase.id}:reconcile` ? "Reconciling…" : "Reconcile"}</button>}
                         {canRefund && <button className="secondary-button" type="button" disabled={busy !== null} onClick={() => void action(purchase, "refund")}>{busy === `${purchase.id}:refund` ? "Requesting…" : "Request refund"}</button>}
