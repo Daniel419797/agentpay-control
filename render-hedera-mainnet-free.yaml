@@ -1,0 +1,41 @@
+# Grant-stage Hedera Mainnet facilitator. The free instance can cold-start and
+# is not an availability SLA; production security validation remains enabled.
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
+previews:
+  generation: off
+
+services:
+  - type: web
+    name: agentpay-hedera-mainnet-facilitator
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerContext: .
+    dockerfilePath: facilitator/Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: HEDERA_NETWORK
+        value: mainnet
+      - key: HEDERA_OPERATOR_ID
+        sync: false
+      - key: HEDERA_OPERATOR_KEY
+        sync: false
+      - key: HEDERA_OPERATOR_KEY_TYPE
+        sync: false
+      - key: HEDERA_PAYER_ID
+        sync: false
+      - key: HEDERA_PAYER_KEY
+        sync: false
+      - key: HEDERA_PAYER_KEY_TYPE
+        sync: false
+      - key: MANAGED_SIGNING_API_KEY
+        generateValue: true
+      - key: SETTLEMENT_API_KEY
+        generateValue: true
+      - key: CONTRACT_EXECUTION_API_KEY
+        generateValue: true
+      - key: CONTRACT_ALLOWLIST_JSON
+        value: "[]"

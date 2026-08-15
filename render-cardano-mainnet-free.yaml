@@ -1,46 +1,10 @@
-# Grant-stage Mainnet pilot. These services retain production security
-# validation but use Render's free instances, so cold starts and availability
-# limits must be expected until the project is funded.
+# Grant-stage Cardano Mainnet self-custody services. Free instances can
+# cold-start and are not an availability SLA; production validation remains on.
 # yaml-language-server: $schema=https://render.com/schema/render.yaml.json
 previews:
   generation: off
 
 services:
-  - type: web
-    name: agentpay-hedera-mainnet-facilitator
-    runtime: docker
-    plan: free
-    region: frankfurt
-    dockerContext: .
-    dockerfilePath: facilitator/Dockerfile
-    healthCheckPath: /health
-    autoDeployTrigger: commit
-    envVars:
-      - key: APP_ENV
-        value: production
-      - key: HEDERA_NETWORK
-        value: mainnet
-      - key: HEDERA_OPERATOR_ID
-        sync: false
-      - key: HEDERA_OPERATOR_KEY
-        sync: false
-      - key: HEDERA_OPERATOR_KEY_TYPE
-        sync: false
-      - key: HEDERA_PAYER_ID
-        sync: false
-      - key: HEDERA_PAYER_KEY
-        sync: false
-      - key: HEDERA_PAYER_KEY_TYPE
-        sync: false
-      - key: MANAGED_SIGNING_API_KEY
-        generateValue: true
-      - key: SETTLEMENT_API_KEY
-        generateValue: true
-      - key: CONTRACT_EXECUTION_API_KEY
-        generateValue: true
-      - key: CONTRACT_ALLOWLIST_JSON
-        value: "[]"
-
   - type: web
     name: agentpay-cardano-signer-mainnet
     runtime: docker
