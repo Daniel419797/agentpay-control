@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { parseCardanoNativeEnv } from "./cardano-native.js";
 
-const PAYER = "addr_test1vr8nl3s7rk0tqn4rd9u49s0k52f9sezrt98rs4cnpfj47wggeuy4d";
+const PAYER = "addr_test1qzj8e3xsl4pk6k5hsdtsd0zahfcfsqjq0x6c25pcrsr7gpwvmfgfdlwkq3mkwqdqw569ghrrhyacd56u9lekvxrdujlq97kaac";
+const MAINNET_PAYER = "addr1qxj8e3xsl4pk6k5hsdtsd0zahfcfsqjq0x6c25pcrsr7gpwvmfgfdlwkq3mkwqdqw569ghrrhyacd56u9lekvxrdujlqxgta38";
 const USDCX = `${"ab".repeat(28)}5553444378`;
 
 function production(overrides: Record<string, string> = {}) {
@@ -43,6 +44,11 @@ describe("Cardano native facilitator production config", () => {
   });
 
   it("never permits a Mainnet facilitator in non-production mode", () => {
-    expect(() => parseCardanoNativeEnv({ ...production(), APP_ENV: "test", CARDANO_NETWORK: "mainnet" })).toThrow("Cardano Mainnet is prohibited outside production");
+    expect(() => parseCardanoNativeEnv({
+      ...production(),
+      APP_ENV: "test",
+      CARDANO_NETWORK: "mainnet",
+      CARDANO_PAYER_ADDRESS: MAINNET_PAYER,
+    })).toThrow("Cardano Mainnet is prohibited outside production");
   });
 });

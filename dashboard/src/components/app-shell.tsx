@@ -11,6 +11,8 @@ import {
   Settings, ShieldCheck, Store
 } from "lucide-react";
 import { HederaWalletConnect } from "@/components/hedera-wallet-connect";
+import { ArcWalletConnect } from "@/components/arc-wallet-connect";
+import { CardanoWalletConnect } from "@/components/cardano-wallet-connect";
 import { NetworkProvider, useNetwork } from "@/domain/network-context";
 import { NetworkSwitcher } from "@/components/network-switcher";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
@@ -45,9 +47,8 @@ function SignerControl({ operatingState }: { operatingState: OperatingState }) {
         : "Signing is disabled until operator state is verified";
     return <span className="account-chip" title={title}>Signing disabled</span>;
   }
-  if (network === "eip155:5042002") return <span className="account-chip" title="Arc payments are signed by the isolated AgentPay facilitator">Arc managed signer</span>;
-  if (network === "cardano:preprod") return <span className="account-chip" title="Cardano Preprod x402 transactions are built and signed by the isolated managed signer">Cardano managed signer</span>;
-  if (network === "cardano:mainnet") return <span className="account-chip" title="Cardano Mainnet signing is delegated to the configured production signer outside the dashboard">Cardano delegated signer</span>;
+  if (network === "eip155:5042002") return <ArcWalletConnect />;
+  if (network === "cardano:preprod" || network === "cardano:mainnet") return <CardanoWalletConnect />;
   return <HederaWalletConnect />;
 }
 
