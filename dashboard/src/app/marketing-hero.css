@@ -6,8 +6,9 @@
   isolation: isolate;
 }
 
+/* Use the exact replacement.png pushed by the user; do not show the generated fallback mockup. */
 .m-home-hero-grid > .m-hero-product > * {
-  transition: opacity .18s ease, visibility .18s ease;
+  display: none;
 }
 
 .m-home-hero-grid > .m-hero-product::before {
@@ -15,22 +16,8 @@
   position: absolute;
   z-index: 2;
   inset: -72px -118px -82px -92px;
-  background-image: var(--agentpay-hero-image, none);
-  background-position: center;
-  background-size: contain;
-  background-repeat: no-repeat;
-  opacity: 0;
-  transition: opacity .2s ease;
+  background: url("https://raw.githubusercontent.com/Daniel419797/agentpay-control/2dd678a97740c850d9c2defb425d0f10c74f866d/docs/design/replacement.png") center / contain no-repeat;
   pointer-events: none;
-}
-
-html[data-agentpay-hero-ready="true"] .m-home-hero-grid > .m-hero-product > * {
-  opacity: 0;
-  visibility: hidden;
-}
-
-html[data-agentpay-hero-ready="true"] .m-home-hero-grid > .m-hero-product::before {
-  opacity: 1;
 }
 
 @media (max-width: 1120px) {
