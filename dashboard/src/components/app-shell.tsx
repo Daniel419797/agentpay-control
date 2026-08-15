@@ -7,8 +7,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Activity, Bot, Boxes, BrainCircuit, Building2, CircleDollarSign, ClipboardCheck, CreditCard,
-  FileClock, FileText, GitBranch, LayoutDashboard, LogOut, Menu, Plus, ReceiptText, Repeat2,
-  Settings, ShieldCheck, Store, UserRound
+  FileClock, FileText, GitBranch, LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Plus,
+  ReceiptText, Repeat2, Settings, ShieldCheck, Store, UserRound
 } from "lucide-react";
 import { HederaWalletConnect } from "@/components/hedera-wallet-connect";
 import { ArcWalletConnect } from "@/components/arc-wallet-connect";
@@ -61,6 +61,7 @@ function SignerControl({ operatingState }: { operatingState: OperatingState }) {
 function ShellContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [operatorEmail, setOperatorEmail] = useState("Loading operator…");
   const [roles, setRoles] = useState<string[]>([]);
   const [operatingState, setOperatingState] = useState<OperatingState>("LOADING");
@@ -96,11 +97,12 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${sidebarCollapsed ? " shell-sidebar-collapsed" : ""}`}>
       {navOpen && <button className="nav-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}
       <aside className={`sidebar${navOpen ? " sidebar-open" : ""}`} aria-label="Primary navigation">
         <div className="sidebar-brand">
-          <Image src="/brand/agentpay-lockup-white.png" alt="AgentPay" width={177} height={35} priority />
+          <Image className="sidebar-brand-lockup" src="/brand/agentpay-lockup-white.png" alt="AgentPay" width={177} height={35} priority />
+          <Image className="sidebar-brand-mark" src="/brand/agentpay-mark-white.png" alt="AgentPay" width={35} height={35} priority />
           <span className="sidebar-live"><i aria-hidden="true" />Live</span>
         </div>
         <nav className="nav-list">
@@ -109,9 +111,15 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               <span className="nav-group" id={`nav-${group.label.toLowerCase()}`}>{group.label}</span>
               <div className="nav-section-links">
                 {group.items.map((item) => (
-                  <Link className={`nav-link${pathname === item.href || (item.href !== "/app/overview" && pathname.startsWith(`${item.href}/`)) ? " active" : ""}`} href={item.href} key={item.href} onClick={() => setNavOpen(false)}>
+                  <Link
+                    className={`nav-link${pathname === item.href || (item.href !== "/app/overview" && pathname.startsWith(`${item.href}/`)) ? " active" : ""}`}
+                    href={item.href}
+                    key={item.href}
+                    onClick={() => setNavOpen(false)}
+                    title={sidebarCollapsed ? item.label : undefined}
+                  >
                     <span className="nav-icon"><item.icon aria-hidden="true" size={17} /></span>
-                    <span>{item.label}</span>
+                    <span className="nav-label">{item.label}</span>
                   </Link>
                 ))}
               </div>
@@ -120,16 +128,25 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         </nav>
         <div className="sidebar-session">
           <span className="session-eyebrow">Current session</span>
-          <div className="session-row"><span className="session-icon"><Building2 aria-hidden="true" size={15} /></span><div><span className="context-label">Workspace</span><WorkspaceSwitcher compact /></div></div>
-          <div className="session-row"><span className="session-icon"><span className="status-dot" aria-hidden="true" /></span><div><span className="context-label">Environment</span><NetworkSwitcher compact /></div></div>
-          <div className="session-row"><span className="session-icon"><UserRound aria-hidden="true" size={15} /></span><div><span className="context-label">Operator</span><span className="context-value" title={operatorEmail}>{operatorEmail}</span></div></div>
-          <button className="sidebar-signout" type="button" onClick={() => void signOut()} disabled={signingOut} aria-label="Sign out"><LogOut aria-hidden="true" size={16} />{signingOut ? "Signing out…" : "Sign out"}</button>
+          <div className="session-row" title="Workspace"><span className="session-icon"><Building2 aria-hidden="true" size={15} /></span><div><span className="context-label">Workspace</span><WorkspaceSwitcher compact /></div></div>
+          <div className="session-row" title="Environment"><span className="session-icon"><span className="status-dot" aria-hidden="true" /></span><div><span className="context-label">Environment</span><NetworkSwitcher compact /></div></div>
+          <div className="session-row" title={operatorEmail}><span className="session-icon"><UserRound aria-hidden="true" size={15} /></span><div><span className="context-label">Operator</span><span className="context-value" title={operatorEmail}>{operatorEmail}</span></div></div>
+          <button className="sidebar-signout" type="button" onClick={() => void signOut()} disabled={signingOut} aria-label="Sign out"><LogOut aria-hidden="true" size={16} /><span className="sidebar-signout-label">{signingOut ? "Signing out…" : "Sign out"}</span></button>
         </div>
       </aside>
       <main className="main-area">
         <header className="topbar">
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div className="topbar-leading">
             <button className="mobile-nav-button" aria-label="Open navigation" aria-expanded={navOpen} onClick={() => setNavOpen(true)}><Menu size={20} /></button>
+            <button
+              className="sidebar-collapse-button"
+              type="button"
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-expanded={!sidebarCollapsed}
+              onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen size={19} aria-hidden="true" /> : <PanelLeftClose size={19} aria-hidden="true" />}
+            </button>
             <span className="topbar-title">Payment operations</span>
           </div>
           <div className="topbar-actions">
@@ -138,9 +155,11 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             {canCreateAgent && <Link className="primary-button" href="/app/agents/new" aria-label="Create agent"><Plus size={16} aria-hidden="true" /><span>Create agent</span></Link>}
           </div>
         </header>
-        {operatingState === "STOPPED" && <div className="form-error" role="status" style={{ margin: "16px 24px 0" }}><strong>Emergency stop active.</strong> New payment signing, card/fiat provisioning, cross-chain preparation, credentials, and automation side effects are disabled. Reconciliation and defensive actions remain available.</div>}
-        {operatingState === "ERROR" && <div className="form-error" role="alert" style={{ margin: "16px 24px 0" }}><strong>Operator state could not be verified.</strong> Payment signing and other risky actions remain disabled until the session and active workspace can be verified.</div>}
-        {children}
+        <div className="main-scroll-area">
+          {operatingState === "STOPPED" && <div className="form-error" role="status" style={{ margin: "16px 24px 0" }}><strong>Emergency stop active.</strong> New payment signing, card/fiat provisioning, cross-chain preparation, credentials, and automation side effects are disabled. Reconciliation and defensive actions remain available.</div>}
+          {operatingState === "ERROR" && <div className="form-error" role="alert" style={{ margin: "16px 24px 0" }}><strong>Operator state could not be verified.</strong> Payment signing and other risky actions remain disabled until the session and active workspace can be verified.</div>}
+          {children}
+        </div>
       </main>
     </div>
   );
