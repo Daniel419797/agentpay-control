@@ -1,8 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import {
-  isHederaMainnetEnabled,
   isManagedArcEnabled,
-  isManagedCardanoMainnetEnabled,
   isManagedCardanoPreprodEnabled,
 } from "@/domain/network-router";
 import { getConfig } from "@/lib/config";
@@ -16,10 +14,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const config = getConfig();
   return (
     <AppShell
-      mainnetEnabled={isHederaMainnetEnabled(config)}
+      // Mainnet remains selectable for self-custody wallet linking even while
+      // managed settlement is fail-closed pending facilitator readiness.
+      mainnetEnabled
       arcEnabled={isManagedArcEnabled(config)}
       cardanoPreprodEnabled={isManagedCardanoPreprodEnabled(config)}
-      cardanoMainnetEnabled={isManagedCardanoMainnetEnabled(config)}
+      cardanoMainnetEnabled
     >
       {children}
     </AppShell>

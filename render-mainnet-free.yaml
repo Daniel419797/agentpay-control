@@ -1,0 +1,139 @@
+# Grant-stage Mainnet pilot. These services retain production security
+# validation but use Render's free instances, so cold starts and availability
+# limits must be expected until the project is funded.
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
+previews:
+  generation: off
+
+services:
+  - type: web
+    name: agentpay-hedera-mainnet-facilitator
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerContext: .
+    dockerfilePath: facilitator/Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: HEDERA_NETWORK
+        value: mainnet
+      - key: HEDERA_OPERATOR_ID
+        sync: false
+      - key: HEDERA_OPERATOR_KEY
+        sync: false
+      - key: HEDERA_OPERATOR_KEY_TYPE
+        sync: false
+      - key: HEDERA_PAYER_ID
+        sync: false
+      - key: HEDERA_PAYER_KEY
+        sync: false
+      - key: HEDERA_PAYER_KEY_TYPE
+        sync: false
+      - key: MANAGED_SIGNING_API_KEY
+        generateValue: true
+      - key: SETTLEMENT_API_KEY
+        generateValue: true
+      - key: CONTRACT_EXECUTION_API_KEY
+        generateValue: true
+      - key: CONTRACT_ALLOWLIST_JSON
+        value: "[]"
+
+  - type: web
+    name: agentpay-cardano-signer-mainnet
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerContext: .
+    dockerfilePath: cardano-signer/Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: CARDANO_NETWORK
+        value: mainnet
+      - key: CARDANO_SIGNING_MODE
+        value: unsigned-only
+      - key: CARDANO_PAYER_ADDRESS
+        sync: false
+      - key: CARDANO_USDCX_ASSET_ID
+        sync: false
+      - key: CARDANO_BLOCKFROST_URL
+        value: https://cardano-mainnet.blockfrost.io/api/v0
+      - key: CARDANO_BLOCKFROST_PROJECT_ID
+        sync: false
+      - key: CARDANO_SIGNER_API_KEY
+        generateValue: true
+      - key: CARDANO_MIN_OUTPUT_LOVELACE
+        value: "1000000"
+      - key: CARDANO_TOKEN_OUTPUT_LOVELACE
+        value: "2000000"
+      - key: CARDANO_MIN_CHANGE_LOVELACE
+        value: "2000000"
+      - key: CARDANO_MAX_INPUTS
+        value: "20"
+
+  - type: web
+    name: agentpay-cardano-mainnet-facilitator
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerContext: .
+    dockerfilePath: facilitator-combined/Dockerfile.cardano
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: CARDANO_NETWORK
+        value: mainnet
+      - key: CARDANO_PAYER_ADDRESS
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-mainnet
+          envVarKey: CARDANO_PAYER_ADDRESS
+      - key: CARDANO_USDCX_ASSET_ID
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-mainnet
+          envVarKey: CARDANO_USDCX_ASSET_ID
+      - key: CARDANO_BLOCKFROST_URL
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-mainnet
+          envVarKey: CARDANO_BLOCKFROST_URL
+      - key: CARDANO_BLOCKFROST_PROJECT_ID
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-mainnet
+          envVarKey: CARDANO_BLOCKFROST_PROJECT_ID
+      - key: CARDANO_SIGNER_URL
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-mainnet
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: CARDANO_SIGNER_API_KEY
+        fromService:
+          type: web
+          name: agentpay-cardano-signer-mainnet
+          envVarKey: CARDANO_SIGNER_API_KEY
+      - key: CARDANO_SETTLEMENT_STORE_URL
+        value: https://agentpay-zeta.vercel.app/api/v1/internal/cardano-settlement-claims
+      - key: CARDANO_SETTLEMENT_STORE_API_KEY
+        generateValue: true
+      - key: MANAGED_SIGNING_API_KEY
+        generateValue: true
+      - key: SETTLEMENT_API_KEY
+        generateValue: true
+      - key: CARDANO_MAX_FEE_LOVELACE
+        value: "1000000"
+      - key: CARDANO_CONFIRMATION_TIMEOUT_MS
+        value: "120000"
+      - key: CARDANO_CONFIRMATION_POLL_MS
+        value: "3000"
