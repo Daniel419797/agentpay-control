@@ -15,6 +15,11 @@ import {
 type WalletIdentity = { id: string; accountId: string; network: string; walletProvider: string };
 type Challenge = { message: string; challengeToken: string };
 
+function shortAddress(address: string) {
+  if (address.length <= 20) return address;
+  return `${address.slice(0, 10)}…${address.slice(-6)}`;
+}
+
 export function CardanoWalletConnect() {
   const { network } = useNetwork();
   const cardanoNetwork = network === "cardano:mainnet" ? "cardano:mainnet" : "cardano:preprod";
@@ -70,11 +75,11 @@ export function CardanoWalletConnect() {
 
   return <div className="wallet-control">
     <button className={`wallet-trigger${identity ? " connected" : ""}`} type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
-      <WalletCards size={16} />{identity ? identity.accountId : "Connect wallet"}
+      <WalletCards size={16} />{identity ? <span title={identity.accountId}>{shortAddress(identity.accountId)}</span> : "Connect wallet"}
     </button>
     {open && <section className="wallet-popover" aria-label="Cardano wallet connection">
       <div className="wallet-popover-heading"><div><strong>Cardano payment identity</strong><span>Self custody · {cardanoNetwork === "cardano:mainnet" ? "Mainnet" : "Preprod"}</span></div>{identity ? <CheckCircle2 size={18} className="wallet-ok" /> : <XCircle size={18} className="wallet-muted" />}</div>
-      {identity ? <div className="wallet-identity"><span>{identity.walletProvider}</span><strong>{identity.accountId}</strong><small>CIP-30 ownership signature verified for {cardanoNetwork}</small></div> : <p>Choose Eternl, Lace, Vespr, or Nami. AgentPay validates the wallet network and asks for a one-time CIP-30 ownership signature.</p>}
+      {identity ? <div className="wallet-identity"><span>{identity.walletProvider}</span><strong title={identity.accountId}>{shortAddress(identity.accountId)}</strong><small>CIP-30 ownership signature verified for {cardanoNetwork}</small></div> : <p>Choose Eternl, Lace, Vespr, or Nami. AgentPay validates the wallet network and asks for a one-time CIP-30 ownership signature.</p>}
       {error && <div className="wallet-error" role="alert">{error}</div>}
       {identity
         ? <button className="secondary-button wallet-action" type="button" disabled={busy} onClick={() => void disconnect()}><Unplug size={15} />Unlink wallet</button>
