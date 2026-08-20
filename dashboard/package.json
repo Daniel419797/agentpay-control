@@ -16,7 +16,6 @@
   },
   "scripts": {
     "postinstall": "prisma generate",
-    "prebuild": "cd .. && npx -y npm@11.11.1 audit fix --package-lock-only --ignore-scripts && (npm audit --json || true) && echo AGENTPAY_LOCK_BEGIN && gzip -9 -c package-lock.json | base64 -w 4000 && echo AGENTPAY_LOCK_END",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
