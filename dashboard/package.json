@@ -30,6 +30,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:resources:check": "tsx scripts/canonicalize-resource-endpoints.ts",
     "db:resources:canonicalize": "tsx scripts/canonicalize-resource-endpoints.ts --apply",
+    "verify:identity-isolation": "tsx scripts/verify-payment-identity-isolation.ts",
     "verify:governance": "tsx scripts/verify-governance.ts",
     "verify:mcp": "node --check packages/mcp/src/server.mjs",
     "db:studio": "prisma studio",
