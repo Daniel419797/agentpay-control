@@ -3,11 +3,13 @@ import test from "node:test";
 import { configFromEnv } from "./server.mjs";
 
 const MAINNET_ADDRESS = "addr1qxj8e3xsl4pk6k5hsdtsd0zahfcfsqjq0x6c25pcrsr7gpwvmfgfdlwkq3mkwqdqw569ghrrhyacd56u9lekvxrdujlqxgta38";
+const MANAGED_AGENT_MASTER_KEY = Buffer.alloc(32, 6).toString("base64url");
 const MANAGED_ENV_KEYS = [
   "CARDANO_ED25519_SIGNER_URL",
   "CARDANO_ED25519_SIGNER_API_KEY",
   "CARDANO_PAYMENT_PUBLIC_KEY_HEX",
   "CARDANO_SIGNING_SEED_HEX",
+  "CARDANO_MANAGED_AGENT_MASTER_KEY",
 ];
 
 function withProductionEnv(overrides, callback) {
@@ -48,25 +50,48 @@ function withProductionEnv(overrides, callback) {
   }
 }
 
-test("production unsigned-only mode requires no private or remote signing key", () => {
+test("production mainnet unsigned-only mode requires no private or remote signing key", () => {
   const config = withProductionEnv({ CARDANO_PAYER_ADDRESS: undefined }, () => configFromEnv());
   assert.equal(config.signingMode, "unsigned-only");
   assert.equal(config.network, "cardano:mainnet");
   assert.equal(config.payerAddress, undefined);
   assert.equal(config.remoteSignerUrl, undefined);
+  assert.equal(config.agentMasterKey, undefined);
 });
 
-test("production managed mode still requires an isolated remote signer", () => {
+test("production preprod requires an isolated per-agent master key", () => {
   assert.throws(
-    () => withProductionEnv({ CARDANO_SIGNING_MODE: "managed" }, () => configFromEnv()),
-    /CARDANO_REMOTE_ED25519_SIGNER_REQUIRED/,
+    () => withProductionEnv({
+      CARDANO_NETWORK: "preprod",
+      CARDANO_SIGNING_MODE: "unsigned-only",
+      CARDANO_BLOCKFROST_URL: "https://cardano-preprod.blockfrost.io/api/v0",
+      CARDANO_PAYER_ADDRESS: undefined,
+    }, () => configFromEnv()),
+    /CARDANO_MANAGED_AGENT_MASTER_KEY_REQUIRED/,
+  );
+
+  const config = withProductionEnv({
+    CARDANO_NETWORK: "preprod",
+    CARDANO_SIGNING_MODE: "unsigned-only",
+    CARDANO_BLOCKFROST_URL: "https://cardano-preprod.blockfrost.io/api/v0",
+    CARDANO_PAYER_ADDRESS: undefined,
+    CARDANO_MANAGED_AGENT_MASTER_KEY: MANAGED_AGENT_MASTER_KEY,
+  }, () => configFromEnv());
+  assert.equal(config.network, "cardano:preprod");
+  assert.equal(config.agentMasterKey.length, 32);
+});
+
+test("mainnet rejects deterministic managed-agent master keys", () => {
+  assert.throws(
+    () => withProductionEnv({ CARDANO_MANAGED_AGENT_MASTER_KEY: MANAGED_AGENT_MASTER_KEY }, () => configFromEnv()),
+    /CARDANO_MANAGED_AGENT_MASTER_KEY_TESTNET_ONLY/,
   );
 });
 
-test("managed mode still requires a fixed operator payer address", () => {
+test("legacy production managed mode still requires an isolated remote signer", () => {
   assert.throws(
-    () => withProductionEnv({ CARDANO_SIGNING_MODE: "managed", CARDANO_PAYER_ADDRESS: undefined }, () => configFromEnv()),
-    /CARDANO_PAYER_ADDRESS_REQUIRED/,
+    () => withProductionEnv({ CARDANO_SIGNING_MODE: "managed" }, () => configFromEnv()),
+    /CARDANO_REMOTE_ED25519_SIGNER_REQUIRED/,
   );
 });
 
