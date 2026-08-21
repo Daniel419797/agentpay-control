@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { handleApiError, ok, problem, requestBody } from "@/lib/api";
@@ -9,6 +10,7 @@ import { cardanoAssetIdentifier } from "@/lib/cardano-assets";
 import { workspaceFromRequest, workspaceHasRole } from "@/lib/workspace";
 import { assertPlanLimit } from "@/domain/entitlement-service";
 import { getNetworkRouter } from "@/domain/network-router";
+import { isManagedTestnetNetwork, provisionManagedAgentIdentity } from "@/domain/managed-signer";
 
 const createAgent = z.object({
   name: z.string().min(2).max(80),
@@ -89,13 +91,16 @@ export async function POST(request: Request) {
     const isCardanoPreprod = input.network === "cardano:preprod";
     const isCardanoMainnet = input.network === "cardano:mainnet";
     const isCardano = isCardanoPreprod || isCardanoMainnet;
+    const isManaged = input.custody === "PLATFORM_MANAGED_TESTNET";
 
     if (isArc && input.asset !== "USDC") return problem(400, "ASSET_UNSUPPORTED", "Arc testnet agents use the configured USDC rail.");
-    if (isArc && !["SELF_CUSTODY", "PLATFORM_MANAGED_TESTNET"].includes(input.custody)) return problem(400, "CUSTODY_UNSUPPORTED", "Arc supports verified self-custody wallets or the isolated managed testnet signer.");
+    if (isArc && !["SELF_CUSTODY", "PLATFORM_MANAGED_TESTNET"].includes(input.custody)) return problem(400, "CUSTODY_UNSUPPORTED", "Arc supports verified self-custody wallets or an isolated managed testnet wallet.");
     if (isHederaMainnet && input.custody !== "SELF_CUSTODY") return problem(400, "CUSTODY_UNSUPPORTED", "Hedera Mainnet agents must use SELF_CUSTODY. Platform-managed custody is intentionally testnet-only.");
     if (isCardano && !["ADA", "USDCX"].includes(input.asset)) return problem(400, "ASSET_UNSUPPORTED", "Cardano autonomous agents support ADA or the explicitly configured USDCx asset only.");
-    if (isCardanoPreprod && !["SELF_CUSTODY", "PLATFORM_MANAGED_TESTNET"].includes(input.custody)) return problem(400, "CUSTODY_UNSUPPORTED", "Cardano Preprod supports verified self-custody wallets or the isolated managed testnet signer.");
+    if (isCardanoPreprod && !["SELF_CUSTODY", "PLATFORM_MANAGED_TESTNET"].includes(input.custody)) return problem(400, "CUSTODY_UNSUPPORTED", "Cardano Preprod supports verified self-custody wallets or an isolated managed testnet wallet.");
     if (isCardanoMainnet && !["SELF_CUSTODY", "EXTERNAL_DELEGATED"].includes(input.custody)) return problem(400, "CUSTODY_UNSUPPORTED", "Cardano Mainnet supports verified self-custody wallets or a separately configured bounded delegation.");
+    if (input.custody === "EXTERNAL_DELEGATED") return problem(503, "DELEGATED_SIGNER_PROVISIONING_UNAVAILABLE", "Bounded mainnet delegation must be provisioned through an isolated external HSM/KMS identity; shared deployment payer accounts are not accepted.");
+    if (isManaged && !isManagedTestnetNetwork(input.network)) return problem(400, "MANAGED_SIGNER_TESTNET_ONLY", "Managed autonomous wallets are isolated per agent and available only on supported test networks.");
 
     if (!getNetworkRouter().supportsNetwork(input.network)) return problem(503, "PAYMENT_RAIL_UNAVAILABLE", `${input.network} is not fully configured for this deployment.`);
 
@@ -108,41 +113,39 @@ export async function POST(request: Request) {
     if (!asset) return problem(409, "ASSET_NOT_CONFIGURED", `${input.asset} is not configured for ${input.network}.`);
     if (input.custody === "SELF_CUSTODY" && !wallet) return problem(409, "WALLET_REQUIRED", `Connect and verify a wallet for ${input.network} before creating a self-custody agent.`);
 
-    // Resolve the exact Cardano asset identifier before provisioning so an
-    // agent cannot be activated for USDCx unless the verified network-specific
-    // policy-id + asset-name unit is present in deployment configuration.
     const cardanoAsset = isCardano ? cardanoAssetIdentifier(asset, input.network) : null;
+    const agentId = randomUUID();
 
-    const managedSignerAvailable = isArc
-      ? Boolean(config.ARC_FACILITATOR_URL && config.ARC_FACILITATOR_SIGNING_API_KEY && config.ARC_PAYER_ADDRESS)
-      : isCardanoPreprod
-        ? Boolean(config.CARDANO_PREPROD_FACILITATOR_URL && config.CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY && config.CARDANO_PREPROD_PAYER_ADDRESS)
-        : isCardanoMainnet
-          ? Boolean(config.CARDANO_MAINNET_FACILITATOR_URL && config.CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY && config.CARDANO_MAINNET_PAYER_ADDRESS)
-          : Boolean(config.HEDERA_PAYER_ACCOUNT_ID && config.FACILITATOR_URL && config.FACILITATOR_SIGNING_API_KEY);
-    if (input.custody !== "SELF_CUSTODY" && !managedSignerAvailable) return problem(503, "MANAGED_SIGNER_UNAVAILABLE", `The managed signer for ${input.network} is not fully configured.`);
+    // Fail before calling an external signer whenever the workspace is already
+    // unable to provision another agent. The final transaction repeats these
+    // checks under the same advisory lock to close the race.
+    await db.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`agent-provision:${workspace.organization.id}`}, 0))`;
+      const organization = await tx.organization.findUniqueOrThrow({ where: { id: workspace.organization.id }, select: { status: true, killSwitchEnabled: true } });
+      if (organization.status !== "ACTIVE" || organization.killSwitchEnabled) throw new Error("ORGANIZATION_STOPPED");
+      await assertPlanLimit(tx, workspace.organization.id, "AGENTS");
+    });
 
-    const accountId = input.custody === "SELF_CUSTODY"
-      ? wallet!.accountId
-      : isArc
-        ? config.ARC_PAYER_ADDRESS!
-        : isCardanoPreprod
-          ? config.CARDANO_PREPROD_PAYER_ADDRESS!
-          : isCardanoMainnet
-            ? config.CARDANO_MAINNET_PAYER_ADDRESS!
-            : config.HEDERA_PAYER_ACCOUNT_ID!;
-    const network = input.custody === "SELF_CUSTODY" ? wallet!.network : input.network;
-    if (input.custody === "SELF_CUSTODY") {
-      const inUse = await db.paymentAccount.findFirst({ where: { network, accountId } });
-      if (inUse) return problem(409, "WALLET_ALREADY_ASSIGNED", "This wallet already backs another agent.");
-    }
+    const managedIdentity = isManaged
+      ? await provisionManagedAgentIdentity(input.network, agentId)
+      : null;
+    const accountId = input.custody === "SELF_CUSTODY" ? wallet!.accountId : managedIdentity!.accountId;
+    const network = input.network;
+
+    const inUse = await db.paymentAccount.findFirst({ where: { network, accountId, status: { not: "ERROR" } }, select: { id: true, agentId: true } });
+    if (inUse) return problem(409, isManaged ? "MANAGED_IDENTITY_NOT_ISOLATED" : "WALLET_ALREADY_ASSIGNED", isManaged ? "The managed signer returned an account already assigned to another agent. Provisioning was stopped." : "This wallet already backs another agent.");
 
     let evmAddress: string | undefined;
-    let publicKey: string | undefined;
+    let publicKey: string | undefined = managedIdentity?.publicKey;
     let initialBalanceAtomic = "0";
-    let balanceSource = "HEDERA_MIRROR_NODE";
+    let balanceSource = isManaged ? "ISOLATED_MANAGED_IDENTITY_INITIAL" : "HEDERA_MIRROR_NODE";
 
-    if (isArc) {
+    if (isManaged) {
+      if (isArc) evmAddress = accountId.toLowerCase();
+      // A newly provisioned isolated address is intentionally unfunded. Do not
+      // require it to exist at the chain indexer before the user funds it.
+      initialBalanceAtomic = "0";
+    } else if (isArc) {
       evmAddress = accountId.toLowerCase();
       initialBalanceAtomic = await arcUsdcBalance(evmAddress);
       balanceSource = "ARC_USDC_RPC";
@@ -164,8 +167,12 @@ export async function POST(request: Request) {
       const organization = await tx.organization.findUniqueOrThrow({ where: { id: workspace.organization.id }, select: { status: true, killSwitchEnabled: true } });
       if (organization.status !== "ACTIVE" || organization.killSwitchEnabled) throw new Error("ORGANIZATION_STOPPED");
       await assertPlanLimit(tx, workspace.organization.id, "AGENTS");
+      const duplicate = await tx.paymentAccount.findFirst({ where: { network, accountId, status: { not: "ERROR" } }, select: { id: true } });
+      if (duplicate) throw new Error("MANAGED_IDENTITY_NOT_ISOLATED");
+
       const created = await tx.agent.create({
         data: {
+          id: agentId,
           organizationId: workspace.organization.id,
           name: input.name,
           description: input.description || null,
@@ -179,7 +186,7 @@ export async function POST(request: Request) {
               evmAddress,
               publicKey,
               custodyType: input.custody,
-              signingMode: input.custody === "SELF_CUSTODY" ? "WALLET_CONFIRMATION" : input.custody === "EXTERNAL_DELEGATED" ? "BOUNDED_DELEGATION" : "AUTONOMOUS_MANAGED",
+              signingMode: input.custody === "SELF_CUSTODY" ? "WALLET_CONFIRMATION" : "AUTONOMOUS_MANAGED",
               status: "ACTIVE",
               syncedAt: new Date(),
               balances: {
@@ -204,7 +211,7 @@ export async function POST(request: Request) {
           targetType: "AGENT",
           targetId: created.id,
           result: "SUCCESS",
-          metadata: { accountId, network, custodyType: input.custody, asset: asset.symbol, cardanoAsset: cardanoAsset ?? null },
+          metadata: { accountId, network, custodyType: input.custody, asset: asset.symbol, cardanoAsset: cardanoAsset ?? null, signerRef: managedIdentity?.signerRef ?? null, identityIsolation: isManaged ? "PER_AGENT" : "SELF_CUSTODY" },
         },
       });
       return created;
@@ -214,6 +221,8 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof Error && error.message === "PLAN_AGENTS_LIMIT_REACHED") return problem(402, error.message, "Your plan's active-agent limit has been reached.");
     if (error instanceof Error && error.message === "ORGANIZATION_STOPPED") return problem(423, error.message, "Agent provisioning was stopped because the organization is inactive or the emergency stop became active.");
+    if (error instanceof Error && error.message === "MANAGED_IDENTITY_NOT_ISOLATED") return problem(409, error.message, "The signer attempted to reuse an existing managed payment identity. Agent creation was blocked.");
+    if (error instanceof Error && (error.message.startsWith("MANAGED_IDENTITY_") || error.message.startsWith("MANAGED_SIGNER_"))) return problem(502, error.message, "An isolated managed payment identity could not be provisioned.");
     if (error instanceof Error && ["ARC_RPC_UNAVAILABLE", "ARC_BALANCE_UNAVAILABLE"].includes(error.message)) return problem(502, error.message, "The Arc USDC balance could not be verified before agent activation.");
     if (error instanceof Error && ["CARDANO_PREPROD_USDCX_ASSET_ID_REQUIRED", "CARDANO_MAINNET_USDCX_ASSET_ID_REQUIRED", "CARDANO_ASSET_UNSUPPORTED"].includes(error.message)) return problem(409, error.message, "The selected Cardano asset is not fully configured for this deployment.");
     if (error instanceof Error && error.message.startsWith("CARDANO_")) return problem(502, error.message, "The Cardano balance or chain evidence could not be verified before agent activation.");
