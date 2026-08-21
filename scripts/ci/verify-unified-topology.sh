@@ -5,8 +5,11 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 cd "$ROOT"
 
 echo "[unified-topology] Cardano signer syntax and tests"
-npm run typecheck --workspace=@agentpay/cardano-signer
-npm test --workspace=@agentpay/cardano-signer
+(
+  cd cardano-signer
+  npm run typecheck
+  npm test
+)
 
 echo "[unified-topology] Hedera facilitator typecheck, tests and build"
 npm run typecheck --workspace=@agentpay/hedera-facilitator
