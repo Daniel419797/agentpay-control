@@ -12,7 +12,7 @@ const envSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3100"),
   DATABASE_URL: z.string().min(1).default("postgresql://agentpay:agentpay@localhost:54329/agentpay?schema=public"),
   AUTH_SECRET: z.string().min(32).default("development-only-secret-change-before-deploy"),
-  HEDERA_NETWORK: z.enum(appEnvironments.includes("production") ? ["testnet", "mainnet"] : ["testnet", "mainnet"]).default("testnet"),
+  HEDERA_NETWORK: z.enum(["testnet", "mainnet"]).default("testnet"),
   HEDERA_OPERATOR_ID: z.string().optional(),
   HEDERA_OPERATOR_KEY: z.string().optional(),
   // Infrastructure/contract payer only. Managed agents never inherit this ID.
@@ -46,7 +46,7 @@ const envSchema = z.object({
   CARDANO_PREPROD_FACILITATOR_API_KEY: z.string().min(32).optional(),
   CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY: z.string().min(32).optional(),
   CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
-  // Legacy deployment values retained for compatibility; isolated managed agents use per-agent addresses.
+  // Legacy deployment value retained for compatibility; isolated agents use per-agent addresses.
   CARDANO_PREPROD_PAYER_ADDRESS: z.string().regex(cardanoPreprodAddress).optional(),
   CARDANO_PREPROD_PROVIDER_ADDRESS: z.string().regex(cardanoPreprodAddress).optional(),
   CARDANO_PREPROD_BLOCKFROST_URL: z.string().url().default("https://cardano-preprod.blockfrost.io/api/v0"),
