@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { parseArcEnv } from "./app.js";
 
+const MANAGED_AGENT_MASTER_KEY = Buffer.alloc(32, 4).toString("base64url");
+
 function productionEnv(overrides: Record<string, string> = {}) {
   return {
     APP_ENV: "production",
     ARC_PAYER_PRIVATE_KEY: "1".repeat(64),
     ARC_RELAYER_PRIVATE_KEY: "2".repeat(64),
     ARC_CONTRACT_EXECUTION_PRIVATE_KEY: "3".repeat(64),
+    ARC_MANAGED_AGENT_MASTER_KEY: MANAGED_AGENT_MASTER_KEY,
     ARC_RPC_URL: "https://rpc.testnet.arc.network",
     ARC_PROVIDER_ADDRESS: "0x1111111111111111111111111111111111111111",
     MANAGED_SIGNING_API_KEY: "signing-secret-abcdefghijklmnopqrstuvwxyz-123",
@@ -31,6 +34,12 @@ describe("Arc facilitator production environment", () => {
     });
     expect(parsed.ARC_RELAYER_PRIVATE_KEY).toBeUndefined();
     expect(parsed.ARC_CONTRACT_EXECUTION_PRIVATE_KEY).toBeUndefined();
+  });
+
+  it("rejects production managed signing without a per-agent master key", () => {
+    const env = productionEnv();
+    delete (env as Record<string, string>).ARC_MANAGED_AGENT_MASTER_KEY;
+    expect(() => parseArcEnv(env)).toThrow(/ARC_MANAGED_AGENT_MASTER_KEY/);
   });
 
   it("rejects missing capability-specific credentials", () => {
