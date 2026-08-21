@@ -1,40 +1,61 @@
 # yaml-language-server: $schema=https://render.com/schema/render.yaml.json
+#
+# AgentPay production topology intentionally has exactly two Render services:
+#   1. agentpay-facilitator     - public multi-rail protocol boundary
+#   2. agentpay-cardano-signer  - isolated Cardano transaction/signing boundary
+#
+# The Next.js dashboard/API is deployed only on Vercel. PostgreSQL/Supabase and
+# external paid resource servers are external dependencies, not Blueprint services.
 previews:
   generation: off
 
 services:
-
   - type: web
-    name: agentpay-cardano-signer-preprod
+    name: agentpay-cardano-signer
     runtime: docker
     plan: starter
     region: frankfurt
     dockerContext: .
-    dockerfilePath: cardano-signer/Dockerfile
+    dockerfilePath: cardano-signer/Dockerfile.unified
     healthCheckPath: /health
     autoDeployTrigger: checksPass
     maxShutdownDelaySeconds: 30
     envVars:
       - key: APP_ENV
         value: production
-      - key: CARDANO_NETWORK
-        value: preprod
-      # Disable the legacy deployment-wide payer. The separate managed-agent
-      # endpoints derive a unique testnet key/address from agentId.
-      - key: CARDANO_SIGNING_MODE
-        value: unsigned-only
-      # Exactly 32 random bytes as 43-char unpadded base64url. Testnet signer
-      # only. Never expose this value to the dashboard and never use on mainnet.
-      - key: CARDANO_MANAGED_AGENT_MASTER_KEY
+      - key: NODE_ENV
+        value: production
+
+      # Preprod managed agents get isolated deterministic keys derived only
+      # inside this signer service. Never copy this secret to Vercel/facilitator.
+      - key: CARDANO_PREPROD_MANAGED_AGENT_MASTER_KEY
         sync: false
-      - key: CARDANO_USDCX_ASSET_ID
-        sync: false
-      - key: CARDANO_BLOCKFROST_URL
+
+      # Network-specific Blockfrost credentials. The two project IDs must be
+      # created for the matching Blockfrost networks and must not be reused.
+      - key: CARDANO_PREPROD_BLOCKFROST_URL
         value: https://cardano-preprod.blockfrost.io/api/v0
-      - key: CARDANO_BLOCKFROST_PROJECT_ID
+      - key: CARDANO_PREPROD_BLOCKFROST_PROJECT_ID
         sync: false
-      - key: CARDANO_SIGNER_API_KEY
+      - key: CARDANO_MAINNET_BLOCKFROST_URL
+        value: https://cardano-mainnet.blockfrost.io/api/v0
+      - key: CARDANO_MAINNET_BLOCKFROST_PROJECT_ID
+        sync: false
+
+      # Circle xReserve USDCx Cardano native-asset identities. These are public
+      # identifiers, not credentials. Mainnet never receives a managed master key.
+      - key: CARDANO_PREPROD_USDCX_ASSET_ID
+        value: 31dde3db98ad05feb688d4dbb146b3b6054e1246cbcef98c79b0bf665553444378
+      - key: CARDANO_MAINNET_USDCX_ASSET_ID
+        value: 1f3aec8bfe7ea4fe14c5f121e2a92e301afe414147860d557cac7e345553444378
+
+      # Separate internal capabilities prevent one compromised network client
+      # credential from authorizing signer calls on the other Cardano network.
+      - key: CARDANO_PREPROD_SIGNER_API_KEY
         generateValue: true
+      - key: CARDANO_MAINNET_SIGNER_API_KEY
+        generateValue: true
+
       - key: CARDANO_MIN_OUTPUT_LOVELACE
         value: "1000000"
       - key: CARDANO_TOKEN_OUTPUT_LOVELACE
@@ -57,428 +78,156 @@ services:
     envVars:
       - key: APP_ENV
         value: production
-      - key: HEDERA_BASE_PATH
-        value: /hedera
-      - key: ARC_BASE_PATH
-        value: /arc
-      - key: CARDANO_BASE_PATH
-        value: /cardano
-      - key: HEDERA_NETWORK
-        value: testnet
-      - key: HEDERA_OPERATOR_ID
+      - key: NODE_ENV
+        value: production
+
+      # ------------------------- Hedera Testnet -------------------------
+      - key: HEDERA_TESTNET_OPERATOR_ID
         sync: false
-      - key: HEDERA_OPERATOR_KEY
+      - key: HEDERA_TESTNET_OPERATOR_KEY
         sync: false
-      - key: HEDERA_OPERATOR_KEY_TYPE
+      - key: HEDERA_TESTNET_OPERATOR_KEY_TYPE
         sync: false
-      # Infrastructure contract/settlement payer. It is not assigned to agents.
-      - key: HEDERA_PAYER_ID
+      - key: HEDERA_TESTNET_PAYER_ID
         sync: false
-      - key: HEDERA_PAYER_KEY
+      - key: HEDERA_TESTNET_PAYER_KEY
         sync: false
-      - key: HEDERA_PAYER_KEY_TYPE
+      - key: HEDERA_TESTNET_PAYER_KEY_TYPE
         sync: false
-      # Exactly 32 random bytes as 43-char unpadded base64url. Testnet
-      # facilitator only; each agent gets a deterministic isolated Hedera key.
-      - key: HEDERA_MANAGED_AGENT_MASTER_KEY
+      - key: HEDERA_TESTNET_MANAGED_AGENT_MASTER_KEY
         sync: false
-      - key: HEDERA_MANAGED_AGENT_INITIAL_TINYBAR
+      - key: HEDERA_TESTNET_MANAGED_AGENT_INITIAL_TINYBAR
         value: "0"
-      # Legacy Arc payer remains an internal facilitator bootstrap role only.
-      # Managed agents never receive this key/address.
-      - key: ARC_PAYER_PRIVATE_KEY
+      - key: HEDERA_TESTNET_MANAGED_SIGNING_API_KEY
+        generateValue: true
+      - key: HEDERA_TESTNET_SETTLEMENT_API_KEY
+        generateValue: true
+      - key: HEDERA_TESTNET_CONTRACT_EXECUTION_API_KEY
+        generateValue: true
+      - key: HEDERA_TESTNET_CONTRACT_ALLOWLIST_JSON
+        value: "[]"
+
+      # -------------------------- Hedera Mainnet ------------------------
+      # Mainnet has separate operator/payer credentials. No deterministic
+      # managed-agent master key is accepted on mainnet; agents are self-custody.
+      - key: HEDERA_MAINNET_OPERATOR_ID
         sync: false
-      - key: ARC_RELAYER_PRIVATE_KEY
+      - key: HEDERA_MAINNET_OPERATOR_KEY
         sync: false
-      - key: ARC_CONTRACT_EXECUTION_PRIVATE_KEY
+      - key: HEDERA_MAINNET_OPERATOR_KEY_TYPE
         sync: false
-      - key: ARC_MANAGED_AGENT_MASTER_KEY
+      - key: HEDERA_MAINNET_PAYER_ID
         sync: false
-      - key: ARC_RPC_URL
+      - key: HEDERA_MAINNET_PAYER_KEY
+        sync: false
+      - key: HEDERA_MAINNET_PAYER_KEY_TYPE
+        sync: false
+      # Kept as a distinct internal capability because the Hedera child app has
+      # one capability schema for both networks. Managed-agent endpoints still
+      # reject mainnet before signing.
+      - key: HEDERA_MAINNET_MANAGED_SIGNING_API_KEY
+        generateValue: true
+      - key: HEDERA_MAINNET_SETTLEMENT_API_KEY
+        generateValue: true
+      - key: HEDERA_MAINNET_CONTRACT_EXECUTION_API_KEY
+        generateValue: true
+      - key: HEDERA_MAINNET_CONTRACT_ALLOWLIST_JSON
+        value: "[]"
+
+      # ---------------------------- Arc Testnet -------------------------
+      # Arc public mainnet is intentionally not enabled before Circle's public
+      # mainnet launch. Testnet identities remain isolated per agent.
+      - key: ARC_TESTNET_PAYER_PRIVATE_KEY
+        sync: false
+      - key: ARC_TESTNET_RELAYER_PRIVATE_KEY
+        sync: false
+      - key: ARC_TESTNET_CONTRACT_EXECUTION_PRIVATE_KEY
+        sync: false
+      - key: ARC_TESTNET_MANAGED_AGENT_MASTER_KEY
+        sync: false
+      - key: ARC_TESTNET_RPC_URL
         value: https://rpc.testnet.arc.network
-      - key: ARC_USDC_ADDRESS
+      - key: ARC_TESTNET_USDC_ADDRESS
         value: "0x3600000000000000000000000000000000000000"
-      - key: ARC_PROVIDER_ADDRESS
+      - key: ARC_TESTNET_PROVIDER_ADDRESS
         sync: false
-      - key: CARDANO_NETWORK
-        value: preprod
-      - key: CARDANO_SIGNING_MODE
-        value: unsigned-only
-      - key: CARDANO_USDCX_ASSET_ID
+      - key: ARC_TESTNET_MANAGED_SIGNING_API_KEY
+        generateValue: true
+      - key: ARC_TESTNET_SETTLEMENT_API_KEY
+        generateValue: true
+      - key: ARC_TESTNET_CONTRACT_EXECUTION_API_KEY
+        generateValue: true
+      - key: ARC_TESTNET_CONTRACT_ALLOWLIST_JSON
+        value: "[]"
+
+      # ------------------------ Cardano shared routing ------------------
+      - key: CARDANO_SIGNER_ORIGIN
         fromService:
           type: web
-          name: agentpay-cardano-signer-preprod
-          envVarKey: CARDANO_USDCX_ASSET_ID
-      - key: CARDANO_BLOCKFROST_URL
-        fromService:
-          type: web
-          name: agentpay-cardano-signer-preprod
-          envVarKey: CARDANO_BLOCKFROST_URL
-      - key: CARDANO_BLOCKFROST_PROJECT_ID
-        fromService:
-          type: web
-          name: agentpay-cardano-signer-preprod
-          envVarKey: CARDANO_BLOCKFROST_PROJECT_ID
-      - key: CARDANO_SIGNER_URL
-        fromService:
-          type: web
-          name: agentpay-cardano-signer-preprod
+          name: agentpay-cardano-signer
           envVarKey: RENDER_EXTERNAL_URL
-      - key: CARDANO_SIGNER_API_KEY
+      - key: CARDANO_PREPROD_SIGNER_API_KEY
         fromService:
           type: web
-          name: agentpay-cardano-signer-preprod
-          envVarKey: CARDANO_SIGNER_API_KEY
-      # Exact endpoint required by the Cardano settlement claim protocol:
-      # https://<dashboard-host>/api/v1/internal/cardano-settlement-claims
+          name: agentpay-cardano-signer
+          envVarKey: CARDANO_PREPROD_SIGNER_API_KEY
+      - key: CARDANO_MAINNET_SIGNER_API_KEY
+        fromService:
+          type: web
+          name: agentpay-cardano-signer
+          envVarKey: CARDANO_MAINNET_SIGNER_API_KEY
+      - key: CARDANO_PREPROD_BLOCKFROST_URL
+        fromService:
+          type: web
+          name: agentpay-cardano-signer
+          envVarKey: CARDANO_PREPROD_BLOCKFROST_URL
+      - key: CARDANO_PREPROD_BLOCKFROST_PROJECT_ID
+        fromService:
+          type: web
+          name: agentpay-cardano-signer
+          envVarKey: CARDANO_PREPROD_BLOCKFROST_PROJECT_ID
+      - key: CARDANO_MAINNET_BLOCKFROST_URL
+        fromService:
+          type: web
+          name: agentpay-cardano-signer
+          envVarKey: CARDANO_MAINNET_BLOCKFROST_URL
+      - key: CARDANO_MAINNET_BLOCKFROST_PROJECT_ID
+        fromService:
+          type: web
+          name: agentpay-cardano-signer
+          envVarKey: CARDANO_MAINNET_BLOCKFROST_PROJECT_ID
+      - key: CARDANO_PREPROD_USDCX_ASSET_ID
+        fromService:
+          type: web
+          name: agentpay-cardano-signer
+          envVarKey: CARDANO_PREPROD_USDCX_ASSET_ID
+      - key: CARDANO_MAINNET_USDCX_ASSET_ID
+        fromService:
+          type: web
+          name: agentpay-cardano-signer
+          envVarKey: CARDANO_MAINNET_USDCX_ASSET_ID
+
+      # Dashboard durable replay/settlement-claim endpoint. Use the Vercel
+      # production origin, e.g. https://agentpay-zeta.vercel.app/api/v1/internal/cardano-settlement-claims
       - key: CARDANO_SETTLEMENT_STORE_URL
         sync: false
       - key: CARDANO_SETTLEMENT_STORE_API_KEY
         generateValue: true
-      - key: HEDERA_MANAGED_SIGNING_API_KEY
-        generateValue: true
-      - key: HEDERA_SETTLEMENT_API_KEY
-        generateValue: true
-      - key: HEDERA_CONTRACT_EXECUTION_API_KEY
-        generateValue: true
-      - key: ARC_MANAGED_SIGNING_API_KEY
-        generateValue: true
-      - key: ARC_SETTLEMENT_API_KEY
-        generateValue: true
-      - key: ARC_CONTRACT_EXECUTION_API_KEY
-        generateValue: true
-      - key: CARDANO_MANAGED_SIGNING_API_KEY
-        generateValue: true
-      - key: CARDANO_SETTLEMENT_API_KEY
-        generateValue: true
-      - key: CONTRACT_ALLOWLIST_JSON
-        value: "[]"
 
-  - type: web
-    name: agentpay-hedera-mainnet-facilitator
-    runtime: docker
-    plan: starter
-    region: frankfurt
-    dockerContext: .
-    dockerfilePath: facilitator/Dockerfile
-    healthCheckPath: /health
-    autoDeployTrigger: checksPass
-    maxShutdownDelaySeconds: 60
-    envVars:
-      - key: APP_ENV
-        value: production
-      - key: HEDERA_NETWORK
-        value: mainnet
-      - key: HEDERA_OPERATOR_ID
-        sync: false
-      - key: HEDERA_OPERATOR_KEY
-        sync: false
-      - key: HEDERA_OPERATOR_KEY_TYPE
-        sync: false
-      - key: HEDERA_PAYER_ID
-        sync: false
-      - key: HEDERA_PAYER_KEY
-        sync: false
-      - key: HEDERA_PAYER_KEY_TYPE
-        sync: false
-      # No HEDERA_MANAGED_AGENT_MASTER_KEY on mainnet. Managed deterministic
-      # agent custody is testnet-only; mainnet agents use self custody today.
-      - key: MANAGED_SIGNING_API_KEY
+      - key: CARDANO_PREPROD_MANAGED_SIGNING_API_KEY
         generateValue: true
-      - key: SETTLEMENT_API_KEY
+      - key: CARDANO_PREPROD_SETTLEMENT_API_KEY
         generateValue: true
-      - key: CONTRACT_EXECUTION_API_KEY
+      # Mainnet capability is transaction-preparation only. Managed deterministic
+      # agent signing remains rejected by both facilitator and signer.
+      - key: CARDANO_MAINNET_MANAGED_SIGNING_API_KEY
         generateValue: true
-      - key: CONTRACT_ALLOWLIST_JSON
-        value: "[]"
+      - key: CARDANO_MAINNET_SETTLEMENT_API_KEY
+        generateValue: true
 
-  - type: web
-    name: agentpay-cardano-signer-mainnet
-    runtime: docker
-    plan: starter
-    region: frankfurt
-    dockerContext: .
-    dockerfilePath: cardano-signer/Dockerfile
-    healthCheckPath: /health
-    autoDeployTrigger: checksPass
-    maxShutdownDelaySeconds: 30
-    envVars:
-      - key: APP_ENV
-        value: production
-      - key: CARDANO_NETWORK
-        value: mainnet
-      - key: CARDANO_SIGNING_MODE
-        value: unsigned-only
-      # No CARDANO_MANAGED_AGENT_MASTER_KEY and no deployment-wide payer on
-      # mainnet. This gateway only prepares self-custody transactions.
-      - key: CARDANO_USDCX_ASSET_ID
-        sync: false
-      - key: CARDANO_BLOCKFROST_URL
-        value: https://cardano-mainnet.blockfrost.io/api/v0
-      - key: CARDANO_BLOCKFROST_PROJECT_ID
-        sync: false
-      - key: CARDANO_SIGNER_API_KEY
-        generateValue: true
-      - key: CARDANO_MIN_OUTPUT_LOVELACE
-        value: "1000000"
-      - key: CARDANO_TOKEN_OUTPUT_LOVELACE
-        value: "2000000"
-      - key: CARDANO_MIN_CHANGE_LOVELACE
-        value: "2000000"
-      - key: CARDANO_MAX_INPUTS
-        value: "20"
-
-  - type: web
-    name: agentpay-cardano-mainnet-facilitator
-    runtime: docker
-    plan: starter
-    region: frankfurt
-    dockerContext: .
-    dockerfilePath: facilitator-combined/Dockerfile.cardano
-    healthCheckPath: /health
-    autoDeployTrigger: checksPass
-    maxShutdownDelaySeconds: 60
-    envVars:
-      - key: APP_ENV
-        value: production
-      - key: CARDANO_NETWORK
-        value: mainnet
-      - key: CARDANO_SIGNING_MODE
-        value: unsigned-only
-      - key: CARDANO_USDCX_ASSET_ID
-        fromService:
-          type: web
-          name: agentpay-cardano-signer-mainnet
-          envVarKey: CARDANO_USDCX_ASSET_ID
-      - key: CARDANO_BLOCKFROST_URL
-        fromService:
-          type: web
-          name: agentpay-cardano-signer-mainnet
-          envVarKey: CARDANO_BLOCKFROST_URL
-      - key: CARDANO_BLOCKFROST_PROJECT_ID
-        fromService:
-          type: web
-          name: agentpay-cardano-signer-mainnet
-          envVarKey: CARDANO_BLOCKFROST_PROJECT_ID
-      - key: CARDANO_SIGNER_URL
-        fromService:
-          type: web
-          name: agentpay-cardano-signer-mainnet
-          envVarKey: RENDER_EXTERNAL_URL
-      - key: CARDANO_SIGNER_API_KEY
-        fromService:
-          type: web
-          name: agentpay-cardano-signer-mainnet
-          envVarKey: CARDANO_SIGNER_API_KEY
-      - key: CARDANO_SETTLEMENT_STORE_URL
-        sync: false
-      - key: CARDANO_SETTLEMENT_STORE_API_KEY
-        generateValue: true
-      - key: MANAGED_SIGNING_API_KEY
-        generateValue: true
-      - key: SETTLEMENT_API_KEY
-        generateValue: true
       - key: CARDANO_MAX_FEE_LOVELACE
         value: "1000000"
       - key: CARDANO_CONFIRMATION_TIMEOUT_MS
         value: "120000"
       - key: CARDANO_CONFIRMATION_POLL_MS
         value: "3000"
-
-  - type: web
-    name: agentpay-resource-server
-    runtime: docker
-    plan: starter
-    region: frankfurt
-    dockerContext: .
-    dockerfilePath: resource-server/Dockerfile
-    healthCheckPath: /health
-    autoDeployTrigger: checksPass
-    maxShutdownDelaySeconds: 60
-    envVars:
-      - key: APP_ENV
-        value: production
-      - key: ENABLED_NETWORKS
-        value: hedera:testnet,eip155:5042002,cardano:preprod
-      # Fail closed: Cardano USDCx is not advertised merely because source support exists.
-      - key: CARDANO_USDCX_ENABLED
-        value: "false"
-      - key: FACILITATOR_URL
-        fromService:
-          type: web
-          name: agentpay-facilitator
-          envVarKey: RENDER_EXTERNAL_URL
-      - key: ARC_FACILITATOR_URL
-        fromService:
-          type: web
-          name: agentpay-facilitator
-          envVarKey: RENDER_EXTERNAL_URL
-      - key: CARDANO_PREPROD_FACILITATOR_URL
-        fromService:
-          type: web
-          name: agentpay-facilitator
-          envVarKey: RENDER_EXTERNAL_URL
-      - key: FACILITATOR_SETTLEMENT_API_KEY
-        fromService:
-          type: web
-          name: agentpay-facilitator
-          envVarKey: HEDERA_SETTLEMENT_API_KEY
-      - key: ARC_FACILITATOR_SETTLEMENT_API_KEY
-        fromService:
-          type: web
-          name: agentpay-facilitator
-          envVarKey: ARC_SETTLEMENT_API_KEY
-      - key: CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY
-        fromService:
-          type: web
-          name: agentpay-facilitator
-          envVarKey: CARDANO_SETTLEMENT_API_KEY
-      - key: PROVIDER_ACCOUNT_ID
-        sync: false
-      - key: USDC_TOKEN_ID
-        sync: false
-      - key: FACILITATOR_FEE_PAYER_ID
-        sync: false
-      - key: ARC_PROVIDER_ADDRESS
-        fromService:
-          type: web
-          name: agentpay-facilitator
-          envVarKey: ARC_PROVIDER_ADDRESS
-      - key: ARC_USDC_ADDRESS
-        value: "0x3600000000000000000000000000000000000000"
-      - key: CARDANO_PREPROD_PROVIDER_ADDRESS
-        sync: false
-      - key: CARDANO_PREPROD_USDCX_ASSET_ID
-        fromService:
-          type: web
-          name: agentpay-cardano-signer-preprod
-          envVarKey: CARDANO_USDCX_ASSET_ID
-      - key: CARDANO_USDCX_RESOURCE_PRICE_ATOMIC
-        value: "1000000"
-
-  - type: web
-    name: agentpay-dashboard
-    runtime: node
-    plan: starter
-    region: frankfurt
-    buildCommand: bash scripts/render/build-dashboard.sh
-    preDeployCommand: bash scripts/render/predeploy-dashboard.sh
-    startCommand: bash scripts/render/start-dashboard.sh
-    healthCheckPath: /api/v1/health
-    autoDeployTrigger: checksPass
-    maxShutdownDelaySeconds: 60
-    envVars:
-      - key: APP_ENV
-        value: production
-      - key: NODE_ENV
-        value: production
-      - key: RENDER_DASHBOARD_ORIGIN
-        fromService:
-          type: web
-          name: agentpay-dashboard
-          envVarKey: RENDER_EXTERNAL_URL
-      - key: AGENTPAY_FACILITATOR_ORIGIN
-        fromService:
-          type: web
-          name: agentpay-facilitator
-          envVarKey: RENDER_EXTERNAL_URL
-      - key: DATABASE_URL
-        sync: false
-      - key: AUTH_SECRET
-        generateValue: true
-      - key: KEY_ENCRYPTION_MASTER_KEY
-        sync: false
-      - key: CRON_SECRET
-        generateValue: true
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_ANON_KEY
-        sync: false
-      # Contract-execution infrastructure payer ID only; never an agent wallet.
-      - key: HEDERA_PAYER_ACCOUNT_ID
-        fromService:
-          type: web
-          name: agentpay-facilitator
-          envVarKey: HEDERA_PAYER_ID
-      - key: HEDERA_PROVIDER_ACCOUNT_ID
-        fromService:
-          type: web
-          name: agentpay-resource-server
-          envVarKey: PROVIDER_ACCOUNT_ID
-      - key: HEDERA_USDC_TOKEN_ID
-        fromService:
-          type: web
-          name: agentpay-resource-server
-          envVarKey: USDC_TOKEN_ID
-      - key: FACILITATOR_SIGNING_API_KEY
-        fromService:
-          type: web
-          name: agentpay-facilitator
-          envVarKey: HEDERA_MANAGED_SIGNING_API_KEY
-      - key: FACILITATOR_SETTLEMENT_API_KEY
-        fromService:
-          type: web
-          name: agentpay-facilitator
-          envVarKey: HEDERA_SETTLEMENT_API_KEY
-      - key: FACILITATOR_CONTRACT_API_KEY
-        fromService:
-          type: web
-          name: agentpay-facilitator
-          envVarKey: HEDERA_CONTRACT_EXECUTION_API_KEY
-      - key: ARC_FACILITATOR_SIGNING_API_KEY
-        fromService:
-          type: web
-          name: agentpay-facilitator
-          envVarKey: ARC_MANAGED_SIGNING_API_KEY
-      - key: ARC_FACILITATOR_CONTRACT_API_KEY
-        fromService:
-          type: web
-          name: agentpay-facilitator
-          envVarKey: ARC_CONTRACT_EXECUTION_API_KEY
-      - key: ARC_RPC_URL
-        value: https://rpc.testnet.arc.network
-      - key: ARC_PROVIDER_ADDRESS
-        fromService:
-          type: web
-          name: agentpay-facilitator
-          envVarKey: ARC_PROVIDER_ADDRESS
-      - key: CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY
-        fromService:
-          type: web
-          name: agentpay-facilitator
-          envVarKey: CARDANO_MANAGED_SIGNING_API_KEY
-      - key: CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY
-        fromService:
-          type: web
-          name: agentpay-facilitator
-          envVarKey: CARDANO_SETTLEMENT_API_KEY
-      - key: CARDANO_PREPROD_PROVIDER_ADDRESS
-        fromService:
-          type: web
-          name: agentpay-resource-server
-          envVarKey: CARDANO_PREPROD_PROVIDER_ADDRESS
-      - key: CARDANO_PREPROD_BLOCKFROST_URL
-        fromService:
-          type: web
-          name: agentpay-cardano-signer-preprod
-          envVarKey: CARDANO_BLOCKFROST_URL
-      - key: CARDANO_PREPROD_BLOCKFROST_PROJECT_ID
-        fromService:
-          type: web
-          name: agentpay-cardano-signer-preprod
-          envVarKey: CARDANO_BLOCKFROST_PROJECT_ID
-      - key: CARDANO_SETTLEMENT_STORE_API_KEY
-        fromService:
-          type: web
-          name: agentpay-facilitator
-          envVarKey: CARDANO_SETTLEMENT_STORE_API_KEY
-      - key: X402_NETWORK
-        value: hedera:testnet
-      - key: NOTIFICATION_FROM_EMAIL
-        value: notifications@agentpay.dev
-      - key: VIRTUAL_CARDS_ENABLED
-        value: "false"
-      - key: CARD_PROVIDER
-        value: SANDBOX
-      - key: CATALYST_PRODUCTION_ENABLED
-        value: "false"
