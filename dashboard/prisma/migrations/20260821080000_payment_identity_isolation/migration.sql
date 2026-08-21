@@ -51,7 +51,9 @@ BEFORE INSERT OR UPDATE OF "network", "accountId" ON "PaymentAccount"
 FOR EACH ROW
 EXECUTE FUNCTION agentpay_lock_payment_identity();
 
-DROP INDEX IF EXISTS "PaymentAccount_network_accountId_idx";
+-- Keep the ordinary Prisma-managed lookup index. The expression-unique index
+-- below is an additional database security constraint rather than a replacement
+-- for the schema-declared lookup index.
 CREATE UNIQUE INDEX "PaymentAccount_network_canonical_accountId_key"
 ON "PaymentAccount" (
   "network",
