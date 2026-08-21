@@ -48,14 +48,6 @@ export function paymentAccountForNetwork<T extends PaymentAccountLike>(accounts:
   return account;
 }
 
-export function managedPayerMatches(account: PaymentAccountLike, config: AppConfig = getConfig()): boolean {
-  if (account.network === "hedera:testnet") return Boolean(config.HEDERA_PAYER_ACCOUNT_ID && config.HEDERA_PAYER_ACCOUNT_ID === account.accountId);
-  if (account.network === "eip155:5042002") return Boolean(config.ARC_PAYER_ADDRESS && config.ARC_PAYER_ADDRESS.toLowerCase() === account.accountId.toLowerCase());
-  if (account.network === "cardano:preprod") return Boolean(config.CARDANO_PREPROD_PAYER_ADDRESS && config.CARDANO_PREPROD_PAYER_ADDRESS === account.accountId);
-  if (account.network === "cardano:mainnet") return Boolean(config.CARDANO_MAINNET_PAYER_ADDRESS && config.CARDANO_MAINNET_PAYER_ADDRESS === account.accountId);
-  return false;
-}
-
 /**
  * Platform-owned bundled resources have deployment-configured payees per rail.
  * Organization-owned marketplace providers are currently verified only for
