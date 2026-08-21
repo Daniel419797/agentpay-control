@@ -4,6 +4,12 @@ set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 cd "$ROOT"
 
+# Vercel's project root is dashboard/, so its initial install may omit sibling
+# workspace-only runtime packages. Add the locked workspace dependencies without
+# rewriting package.json/package-lock or running package lifecycle scripts.
+echo "[unified-topology] ensure backend workspace dependencies"
+npm install --ignore-scripts --no-save --package-lock=false --workspaces --include-workspace-root=false
+
 echo "[unified-topology] Cardano signer syntax and tests"
 (
   cd cardano-signer
