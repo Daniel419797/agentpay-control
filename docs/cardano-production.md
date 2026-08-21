@@ -1,172 +1,174 @@
 # Cardano x402 production guide
 
-AgentPay supports the Cardano Foundation x402 `exact` scheme on `cardano:preprod` and `cardano:mainnet`. ADA is represented by the reserved identifier `lovelace`. A deployment may additionally enable **one exact USDCx Cardano native-asset unit**; arbitrary native-token payments remain unsupported.
+AgentPay supports the Cardano Foundation x402 `exact` scheme on `cardano:preprod` and `cardano:mainnet`. ADA is `lovelace`. A deployment may additionally enable one exact USDCx Cardano native-asset unit; arbitrary native-token payments remain unsupported.
+
+See [`managed-signer-isolation.md`](./managed-signer-isolation.md) for the cross-chain payment-identity invariant.
 
 ## Architecture
 
-The Cardano path is split across four payment trust boundaries and three external policy/observability integrations:
+The Cardano path has separate trust boundaries:
 
-1. **Dashboard / control plane** — atomic policy evaluation, optional Pyth-valued USD limits, optional Masumi identity/payee trust, approvals, spend reservations, exact resource/payee/amount binding, durable settlement claims, and independent Blockfrost reconciliation. It never stores a Cardano signing secret.
-2. **Resource server** — advertises an exact Cardano payment requirement. Every Cardano requirement includes `extra.resourceBinding`, a SHA-256 binding to the canonical paid-resource URL.
-3. **Combined facilitator** — receives signed Cardano transaction CBOR, independently validates signatures, payer inputs, outputs, whitelisted asset, amount, fee, TTL, resource binding, nonce/replay state, and submits verified CBOR to Blockfrost.
-4. **Cardano signer gateway** — builds the narrow ADA or explicitly whitelisted USDCx transaction from current chain/protocol data and requests an Ed25519 signature from a separate production signing boundary. It cannot settle the payment by itself.
-5. **Pyth Hermes** — optional fail-closed oracle source for USD-denominated policy limits. Oracle values can only make a policy more restrictive; they never relax the existing atomic limits.
-6. **Masumi Registry Service** — optional agent identity/discovery trust. AgentPay binds the resource to the exact registry identity, API base URL, capability and seller wallet returned by Masumi payment information before that wallet may become the x402 payee.
-7. **Dune** — public Cardano settlement analytics only. It is deliberately outside the payment critical path.
+1. **Dashboard / control plane** — policy, approvals, spend reservations, exact resource/payee/amount binding, durable settlement claims and reconciliation. It never stores a Cardano signing secret or managed-agent master key.
+2. **Resource server** — advertises exact Cardano requirements, including `extra.resourceBinding`, the SHA-256 binding to the canonical paid-resource URL.
+3. **Combined facilitator** — validates signed CBOR, payer inputs, outputs, whitelisted asset, amount, fee, TTL, resource binding, nonce/replay state and settlement evidence before submission.
+4. **Cardano signer gateway** — builds the deliberately narrow transaction shape using current chain/protocol data. On Preprod it can also derive a distinct managed-agent payment key/address from an immutable Agent ID. On Mainnet it is unsigned/self-custody only in the checked-in deployment.
+5. **Blockfrost** — independent chain/protocol/evidence provider used for construction and reconciliation.
+6. **Pyth / Masumi / Dune** — optional policy, seller-trust and observability integrations outside the signer custody boundary.
 
-This split is intentional. A dashboard compromise does not expose the signing key; a signer compromise cannot alter a transaction without the facilitator detecting it; a lost HTTP response after submission is reconciled from immutable chain evidence instead of resubmitting blindly; and analytics failure cannot block settlement.
+A shared signer **service** does not imply a shared payer. Every managed Preprod agent has its own address/key. Mainnet has no deployment-wide agent payer.
+
+## Payment identity and custody
+
+### Managed Cardano Preprod
+
+`CARDANO_MANAGED_AGENT_MASTER_KEY` is a signer-only testnet secret. It must be exactly 32 random bytes encoded as 43-character unpadded base64url.
+
+For each immutable Agent ID, the signer derives a distinct Ed25519 payment key and corresponding `addr_test...` address. Provisioning returns only the public address/public key/signer reference to the dashboard. The derived private key never leaves the signer process.
+
+A managed signing request is bound to all of:
+
+- Agent ID;
+- expected payer address stored on that agent's `PaymentAccount`;
+- exact network;
+- exact x402 requirement;
+- server submission mode.
+
+The combined facilitator independently verifies the resulting signed transaction before accepting the payload.
+
+The legacy deployment-wide `/managed-sign` flow is disabled in production. Preprod is deployed with `CARDANO_SIGNING_MODE=unsigned-only` for legacy routes while the dedicated `/managed-identity` and `/managed-agent-sign` paths handle isolated testnet managed agents.
+
+### Self custody
+
+For self-custody agents, `/prepare` builds an unsigned transaction for the exact verified wallet address. The wallet signs it. This applies to Cardano Mainnet and may also be used on Preprod.
+
+### Mainnet
+
+`CARDANO_MANAGED_AGENT_MASTER_KEY` is prohibited on Mainnet. `CARDANO_SIGNING_SEED_HEX` is also prohibited in production.
+
+The checked-in Mainnet Blueprint uses:
+
+```text
+CARDANO_NETWORK=mainnet
+CARDANO_SIGNING_MODE=unsigned-only
+```
+
+There is no `CARDANO_PAYER_ADDRESS`, no shared payment public key and no deterministic managed-agent master key. Autonomous Mainnet custody must remain disabled until a separately provisioned **per-agent** external HSM/KMS/delegation identity is implemented and reviewed.
 
 ## Supported payment invariants
 
 ### ADA
 
-- x402 scheme `exact`
-- asset `lovelace`
-- phase-1 key-spend transaction only
-- payer inputs must all belong to the configured payer address
-- every consumed UTxO must be ADA-only
-- exactly the quoted ADA amount goes to the payee
-- change may only return to the payer
+- x402 scheme `exact`;
+- asset `lovelace`;
+- phase-1 key-spend transaction only;
+- payer inputs belong to the exact payer address carried by the payment payload;
+- every consumed UTxO is ADA-only;
+- exactly the quoted ADA amount goes to the payee;
+- change returns only to that payer.
 
 ### USDCx
 
-- x402 scheme `exact`
-- asset must equal the exact `CARDANO_USDCX_ASSET_ID` configured for that single-network signer/facilitator deployment
-- the dashboard asset symbol is deliberately `USDCX`, not generic `USDC`
-- consumed UTxOs may contain only lovelace plus that exact configured asset
-- the payee receives exactly the quoted token amount and the configured ADA carried with a native-token output
-- token conservation is exact: the transaction cannot mint, burn, or leak USDCx
-- any token change and ADA change may only return to the payer
-- any unrelated Cardano native asset causes the UTxO/transaction to be rejected
+- x402 scheme `exact`;
+- asset equals the exact configured `CARDANO_USDCX_ASSET_ID` for that network;
+- dashboard symbol is `USDCX`, not generic `USDC`;
+- consumed UTxOs contain only lovelace plus that exact asset;
+- payee receives exactly the quoted token amount plus the required ADA carried by the output;
+- token conservation is exact: no mint, burn or unrelated asset leakage;
+- token/ADA change returns only to the payer.
 
-For both modes, scripts, minting fields, certificates, withdrawals, collateral, bootstrap witnesses, auxiliary data and unrelated third-party outputs are rejected. The transaction body must carry a bounded TTL compatible with the x402 timeout and the configured fee ceiling is enforced before submission.
+For both modes, scripts, minting, certificates, withdrawals, collateral, bootstrap witnesses, auxiliary data and unrelated third-party outputs are rejected. TTL and fee ceilings are enforced before submission.
 
 ## Resource replay binding
 
-A Cardano requirement must contain `extra.resourceBinding`, calculated by the resource server as SHA-256 of the canonical paid-resource URL. The facilitator includes the complete requirement in its durable transaction binding.
+Every Cardano requirement contains `extra.resourceBinding`, SHA-256 of the canonical paid-resource URL. Durable settlement state binds the complete requirement to the transaction.
 
-This provides two required properties:
+This permits idempotent retry for the same resource/signed transaction but rejects use of the same confirmed transaction against a different resource even if network/payee/asset/amount happen to match.
 
-- an idempotent retry for the **same resource and same signed transaction** resolves to the same durable claim;
-- the same confirmed transaction presented to a **different endpoint**, even when network/payee/asset/amount happen to match, produces a different binding and is rejected as replay.
+## Preprod deployment
 
-The earlier one-shot claim seal has been removed because it prevented legitimate same-resource retries. Resource-specific binding is now the replay boundary.
+### Dashboard / Vercel
 
-## Pyth policy valuation
+Required control-plane values for an enabled Preprod rail include:
 
-When `PYTH_POLICY_ENABLED=true`, a draft policy version may add USD-denominated per-transaction/hourly/daily/monthly limits. The policy records `maxPriceAgeSeconds` and `maxConfidenceBps`.
+- `CARDANO_SETTLEMENT_STORE_API_KEY`;
+- `CARDANO_PREPROD_FACILITATOR_URL`;
+- `CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY`;
+- `CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY`;
+- `CARDANO_PREPROD_PROVIDER_ADDRESS`;
+- `CARDANO_PREPROD_BLOCKFROST_URL`;
+- `CARDANO_PREPROD_BLOCKFROST_PROJECT_ID`;
+- optional verified `CARDANO_PREPROD_USDCX_ASSET_ID` and `CARDANO_USDCX_ENABLED=true` only after asset/canary verification.
 
-For a payment decision AgentPay:
-
-1. fetches the configured ADA/USD or USDC/USD feed from Hermes;
-2. requires a fresh, positive observation whose confidence interval is within policy;
-3. values the payment using the **upper edge of the confidence interval**;
-4. rounds USD micro-dollar spend upward;
-5. combines the result with the existing atomic policy using the most restrictive outcome;
-6. persists the exact price/confidence/exponent/publish-time and USD amount used for the reservation.
-
-If Pyth is unavailable, stale, malformed or outside the configured confidence bound, an oracle-governed payment fails closed. Existing atomic limits never depend on Pyth and are never loosened by it.
-
-Catalyst extension controls may be changed only while the parent `PolicyVersion` is `DRAFT`. Database triggers seal them after publication.
-
-## Masumi identity and seller-wallet binding
-
-Masumi trust is configured on a draft policy and on a resource binding. A provider administrator/owner first binds a resource to a Masumi `agentIdentifier`. AgentPay then queries the registry and payment-information endpoints and persists only trust-relevant facts: network, registry policy, API base URL, capability, payment type, seller wallet, pricing snapshot hash/facts and verification expiry.
-
-For every payment whose policy requires Masumi:
-
-- the Cardano network must match the Masumi network;
-- the agent identifier/capability must satisfy the policy allowlists;
-- the resource URL must be under the verified Masumi API base URL;
-- the registry binding must be fresh and, when required, still online;
-- the x402 `payTo` must equal the seller wallet returned by verified Masumi payment information;
-- the same seller wallet and metadata hash are rechecked inside the serializable authorization transaction before spend is reserved.
-
-A Masumi identity passing validation while the challenge pays another wallet is therefore rejected.
-
-## Dune analytics
-
-Dune is read-only observability. Templates are under `analytics/dune/` and intentionally expose only public Cardano settlement activity. Query IDs and dashboard URLs are production facts and are not fabricated in source control.
-
-The AgentPay API reads only latest completed Dune query results. Dune degradation is reported by readiness metadata but never takes the payment plane offline.
-
-## Preprod rollout
-
-Preprod is the default Cardano rail. Before enabling it, configure the base Cardano values plus any optional Catalyst integrations.
-
-### Dashboard
-
-- `CARDANO_SETTLEMENT_STORE_API_KEY`
-- `CARDANO_PREPROD_FACILITATOR_URL`
-- `CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY`
-- `CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY`
-- `CARDANO_PREPROD_PAYER_ADDRESS`
-- `CARDANO_PREPROD_PROVIDER_ADDRESS`
-- `CARDANO_PREPROD_BLOCKFROST_URL`
-- `CARDANO_PREPROD_BLOCKFROST_PROJECT_ID`
-- optional verified `CARDANO_PREPROD_USDCX_ASSET_ID`
-- `CARDANO_USDCX_ENABLED=true` only when that exact asset has been independently verified and funded
-- Pyth/Masumi/Dune variables from `.env.example` when those integrations are enabled
+`CARDANO_PREPROD_PAYER_ADDRESS` is not required for isolated managed agents and must not be treated as an agent identity. `CARDANO_MANAGED_AGENT_MASTER_KEY` must never be placed in Vercel.
 
 ### Combined facilitator
 
-- `CARDANO_NETWORK=preprod`
-- `CARDANO_PAYER_ADDRESS`
-- optional `CARDANO_USDCX_ASSET_ID`
-- `CARDANO_BLOCKFROST_URL`
-- `CARDANO_BLOCKFROST_PROJECT_ID`
-- `CARDANO_SIGNER_URL`
-- `CARDANO_SIGNER_API_KEY`
-- `CARDANO_SETTLEMENT_STORE_URL`
-- `CARDANO_SETTLEMENT_STORE_API_KEY`
-- `CARDANO_MANAGED_SIGNING_API_KEY`
-- `CARDANO_SETTLEMENT_API_KEY`
+Use:
 
-`CARDANO_SETTLEMENT_STORE_URL` must be the deployed dashboard internal settlement-claim endpoint. All production URLs must be HTTPS and capability/custody/store secrets must be distinct.
+```text
+APP_ENV=production
+CARDANO_NETWORK=preprod
+CARDANO_SIGNING_MODE=unsigned-only
+CARDANO_BLOCKFROST_URL=...
+CARDANO_BLOCKFROST_PROJECT_ID=...
+CARDANO_SIGNER_URL=...
+CARDANO_SIGNER_API_KEY=...
+CARDANO_SETTLEMENT_STORE_URL=...
+CARDANO_SETTLEMENT_STORE_API_KEY=...
+CARDANO_MANAGED_SIGNING_API_KEY=...
+CARDANO_SETTLEMENT_API_KEY=...
+```
 
-### Isolated signer gateway
+Optional exact USDCx asset configuration may also be supplied. No shared payer address is required.
 
-- `APP_ENV=production`
-- `CARDANO_NETWORK=preprod`
-- `CARDANO_PAYER_ADDRESS`
-- optional exact `CARDANO_USDCX_ASSET_ID`
-- `CARDANO_BLOCKFROST_URL`
-- `CARDANO_BLOCKFROST_PROJECT_ID`
-- `CARDANO_SIGNER_API_KEY`
-- `CARDANO_PAYMENT_PUBLIC_KEY_HEX`
-- `CARDANO_ED25519_SIGNER_URL`
-- `CARDANO_ED25519_SIGNER_API_KEY`
+### Cardano signer
 
-Production must not define `CARDANO_SIGNING_SEED_HEX`. The remote signer/HSM gateway holds signing material and signs only the 32-byte Cardano transaction-body hash. The signer gateway verifies the returned Ed25519 signature before returning CBOR to the facilitator.
+Use:
 
-## Mainnet rollout
+```text
+APP_ENV=production
+CARDANO_NETWORK=preprod
+CARDANO_SIGNING_MODE=unsigned-only
+CARDANO_MANAGED_AGENT_MASTER_KEY=<32 random bytes, base64url>
+CARDANO_BLOCKFROST_URL=...
+CARDANO_BLOCKFROST_PROJECT_ID=...
+CARDANO_SIGNER_API_KEY=...
+```
 
-Mainnet support exists in code but is **not a continuation of the Preprod custody instance**. Use a separate signer/facilitator deployment and independently scoped credentials, payer address, provider address, Blockfrost project, monitoring and signing custody.
+The master key belongs only to this signer service. New managed agents are intentionally unfunded; fund the specific agent address after provisioning.
 
-Do not enable `cardano:mainnet` until all applicable items are true:
+## Mainnet deployment
 
-- independent production signing custody is provisioned and reviewed;
-- the exact Mainnet payer/public key relationship is verified;
-- the payer is funded with deliberately selected ADA-only UTxOs and, when USDCx is enabled, UTxOs containing only ADA plus the exact verified USDCx asset;
-- the exact USDCx asset unit is independently verified before configuration;
-- production provider or Masumi seller payee is independently verified;
-- Pyth feed IDs/API authentication are configured and tested if USD policies are enabled;
-- Masumi registry identity/seller-wallet binding is tested if Masumi trust is enabled;
-- Blockfrost/evidence credentials are live and alerting is configured;
-- the durable settlement-claim store is reachable from the facilitator;
-- a low-value end-to-end x402 canary succeeds for every enabled asset;
-- exact transaction hash, payer, payee, asset, amount and confirmation depth are independently explorer-verified;
-- canaries are recorded against the immutable application/facilitator/signer release SHA;
-- failure drills cover provider rejection, submission timeout, pending confirmation, evidence mismatch, cross-resource replay, signer unavailability, Pyth failure and Masumi registry failure where applicable.
+`render-cardano-mainnet-free.yaml` and the Mainnet services in `render.yaml` intentionally use unsigned/self-custody mode. Before enabling `cardano:mainnet`:
+
+- verify the exact user/self-custody wallet and network;
+- configure real Blockfrost credentials and capacity;
+- independently verify the Mainnet provider/Masumi seller payee;
+- independently verify the canonical USDCx asset when USDCx is enabled;
+- fund the exact user wallet with deliberately suitable UTxOs;
+- verify a low-value end-to-end x402 canary for every enabled asset;
+- record transaction hash, payer, payee, asset, amount and confirmation depth against the immutable release SHA;
+- test provider rejection, submission timeout, pending confirmation, evidence mismatch, cross-resource replay and signer unavailability;
+- provision and review a unique per-agent HSM/KMS/delegation identity before enabling autonomous Mainnet custody.
+
+Do not solve Mainnet autonomy by adding a shared hot wallet or by setting `CARDANO_MANAGED_AGENT_MASTER_KEY` on a Mainnet service.
+
+## Database identity invariant
+
+The dashboard database globally prevents duplicate payment identities across organizations and app instances. For EVM-style networks identities are lowercased for uniqueness; Cardano addresses retain exact representation.
+
+The payment-identity migration installs a transaction advisory-lock trigger and unique canonical identity index. It aborts if legacy duplicate rows already exist. Old shared-payer managed agents therefore have to be archived/reprovisioned rather than silently migrated in place.
+
+## Pyth, Masumi and Dune
+
+Pyth valuation can only make spending policy more restrictive and persists the exact price evidence used. Masumi seller-wallet trust can require the x402 payee to equal the verified seller address. Dune remains read-only observability and is never a signing/settlement availability dependency.
 
 ## Ambiguous submission and reconciliation
 
-Before crossing the Cardano submission boundary the facilitator durably claims the transaction hash and records `SUBMISSION_STARTED`. After that point it never assumes a timeout is safe to retry.
+Before submission the facilitator durably claims the transaction hash and records submission state. A timeout or missing provider response is ambiguous and is never assumed safe to retry blindly.
 
-A missing/5xx/timeout result becomes ambiguous settlement with the exact candidate transaction hash. Dashboard maintenance checks Blockfrost for that hash. Confirmation requires the exact network, valid transaction evidence, sufficient block depth, exact payer inputs, exact whitelisted asset behavior, exact payee amount and no unrelated output. A mismatch or replay keeps spend consumed and opens an urgent support incident.
+Maintenance resolves the exact candidate transaction using chain evidence. A confirmed payment with a lost paid-resource HTTP response remains settled; fulfillment becomes an operational incident rather than releasing spend and repaying.
 
-If the chain confirms a payment but the original paid HTTP response was lost, AgentPay records the payment as settled and records fulfillment as unavailable rather than releasing spend or pretending the content was recovered.
+## Release gate
 
-## Operational release gate
-
-Source support is not sufficient to call the stack production-ready. The exact release must also have successful repository checks, deployed dashboard/resource/facilitator/signer services, production secret management, HSM/remote signing custody, monitoring/paging ownership, database backup/restore evidence, funded canaries, explorer verification, real Pyth/Masumi/Dune credentials where enabled, and an independent security assessment appropriate to the release.
+Source support is not production evidence. The exact release must pass migrations, the concurrent identity-isolation verification, dashboard/service tests and builds, Cardano signer tests/image build, browser smoke tests, security/dependency gates, operational readiness, and real low-value canaries for enabled live rails.
