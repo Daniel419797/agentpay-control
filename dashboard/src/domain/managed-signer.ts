@@ -30,7 +30,9 @@ export function isManagedTestnetNetwork(network: string): network is ManagedTest
  * signer/facilitator owns the key derivation/custody and returns only the
  * on-chain account/address plus an opaque signer reference.
  */
-export async function provisionManagedAgentIdentity(network: ManagedTestnetNetwork, agentId: string): Promise<ManagedAgentIdentity> {
+export async function provisionManagedAgentIdentity(network: string, agentId: string): Promise<ManagedAgentIdentity> {
+  if (!isManagedTestnetNetwork(network)) throw new Error("MANAGED_SIGNER_TESTNET_ONLY");
+
   const route = getNetworkRouter().getRoute(network);
   if (!route.facilitatorApiKey) throw new Error("MANAGED_SIGNER_CAPABILITY_REQUIRED");
 
