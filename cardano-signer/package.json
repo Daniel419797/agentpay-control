@@ -7,8 +7,9 @@
     "node": "22.x"
   },
   "scripts": {
-    "start": "node server.mjs",
-    "typecheck": "node --check cardano.mjs && node --check server.mjs",
+    "start": "node unified-server.mjs",
+    "start:single-network": "node server.mjs",
+    "typecheck": "node --check cardano.mjs && node --check server.mjs && node --check unified-server.mjs",
     "test": "node --test *.test.mjs"
   }
 }
