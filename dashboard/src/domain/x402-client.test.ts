@@ -10,6 +10,7 @@ const challenge = parsePaymentRequired({
   resource: { url: RESOURCE_URL, mimeType: "application/json" },
   accepts: [{ scheme: "exact", network: "hedera:testnet", asset: "0.0.0", amount: "5000000", payTo: "0.0.1234", maxTimeoutSeconds: 900, extra: { feePayer: "0.0.5678" } }],
 });
+const identity = { agentId: "11111111-1111-4111-8111-111111111111", payerAccountId: "0.0.4321" };
 
 describe("x402 challenge binding", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -67,14 +68,21 @@ describe("x402 challenge binding", () => {
     expect(() => selectRequirement(challenge, { network: "hedera:testnet", asset: "0.0.0", amount: "5000000", payTo: "0.0.1234", resourceUrl: "https://provider.example/v1/market-data/BTC" })).toThrow("X402_RESOURCE_MISMATCH");
   });
 
-  it("requires signing evidence and authenticates to the facilitator", async () => {
+  it("requires signing evidence, agent identity, and facilitator authentication", async () => {
     const requirement = challenge.accepts[0]!;
-    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe("https://facilitator.example/managed-agent-sign");
       expect(new Headers(init?.headers).get("authorization")).toBe("Bearer service-secret");
+      expect(JSON.parse(String(init?.body))).toEqual({ paymentRequirements: requirement, ...identity });
       return Response.json({ transactionId: "0.0.1234@1753510000.123456789", paymentPayload: { x402Version: 2, accepted: requirement, payload: { transaction: "base64" } } });
     });
     vi.stubGlobal("fetch", fetchMock);
-    await expect(createManagedPaymentPayload("https://facilitator.example", requirement, "service-secret")).resolves.toMatchObject({ transactionId: "0.0.1234@1753510000.123456789" });
+    await expect(createManagedPaymentPayload("https://facilitator.example", requirement, identity, "service-secret")).resolves.toMatchObject({ transactionId: "0.0.1234@1753510000.123456789" });
+  });
+
+  it("rejects managed signing without an isolated identity", async () => {
+    const requirement = challenge.accepts[0]!;
+    await expect(createManagedPaymentPayload("https://facilitator.example", requirement, { agentId: "", payerAccountId: "" }, "service-secret")).rejects.toThrow("MANAGED_SIGNER_IDENTITY_REQUIRED");
   });
 
   it("rejects a facilitator that mutates the signed requirement", async () => {
@@ -83,7 +91,7 @@ describe("x402 challenge binding", () => {
       transactionId: "0.0.1234@1753510000.123456789",
       paymentPayload: { x402Version: 2, accepted: { ...requirement, amount: "1" }, payload: { transaction: "base64" } },
     })));
-    await expect(createManagedPaymentPayload("https://facilitator.example", requirement, "service-secret")).rejects.toThrow("FACILITATOR_REQUIREMENT_MISMATCH");
+    await expect(createManagedPaymentPayload("https://facilitator.example", requirement, identity, "service-secret")).rejects.toThrow("FACILITATOR_REQUIREMENT_MISMATCH");
   });
 
   it("stops reading an oversized chunked challenge response", async () => {
