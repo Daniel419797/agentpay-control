@@ -20,7 +20,7 @@ export function isHederaMainnetEnabled(config: AppConfig): boolean {
 
 export function isManagedArcEnabled(config: AppConfig): boolean {
   const signingKey = config.ARC_FACILITATOR_SIGNING_API_KEY ?? (config.APP_ENV === "production" ? undefined : config.ARC_FACILITATOR_API_KEY);
-  return Boolean(config.ARC_FACILITATOR_URL && signingKey && config.ARC_PAYER_ADDRESS);
+  return Boolean(config.ARC_FACILITATOR_URL && signingKey);
 }
 
 export function isManagedCardanoPreprodEnabled(config: AppConfig): boolean {
@@ -28,7 +28,6 @@ export function isManagedCardanoPreprodEnabled(config: AppConfig): boolean {
   return Boolean(
     config.CARDANO_PREPROD_FACILITATOR_URL &&
     signingKey &&
-    config.CARDANO_PREPROD_PAYER_ADDRESS &&
     config.CARDANO_PREPROD_PROVIDER_ADDRESS &&
     config.CARDANO_PREPROD_BLOCKFROST_PROJECT_ID
   );
