@@ -1,145 +1,150 @@
 # AgentPay CI and production deployment
 
-AgentPay treats GitHub as the source repository and pull-request control plane. Executable release verification is intentionally provider-independent: the real checks live in `scripts/ci/`, CircleCI orchestrates them, and Render deploys only after external checks pass.
+AgentPay treats GitHub as source/control plane and keeps executable release checks tied to the exact immutable commit being promoted. A blocked or skipped CI job is not release evidence.
 
-This architecture is also the fallback when GitHub Actions or Vercel cannot execute. A blocked GitHub Actions job or Vercel preview is not counted as release evidence.
+See [`managed-signer-isolation.md`](./managed-signer-isolation.md) for the payment-identity migration and signer trust model.
 
 ## Trust boundaries
 
 - **GitHub**: source, pull requests, commit identity and check/status aggregation.
-- **CircleCI**: application verification, browser tests, security scans, signer verification, production image builds and exact-SHA CI evidence.
-- **Render dashboard**: AgentPay Next.js application/API and database migrations. It never receives chain signing private keys.
-- **Render combined facilitator**: Hedera and Arc signing/execution capability boundary plus the Cardano x402 verification/settlement boundary.
-- **Render Cardano signer gateway**: constructs the deliberately narrow Cardano transaction and delegates only the transaction-body hash to the external Ed25519/HSM-style custody service.
-- **Render resource server**: x402 resource advertisement and settlement verification calls. Cardano USDCx remains disabled until its canary/evidence gate is satisfied.
-- **External Ed25519/HSM custody**: production Cardano private signing material. It is not stored in GitHub, CircleCI, the dashboard, or a Docker image.
+- **CI runners**: migrations, concurrent identity-isolation verification, application/service tests, browser tests, security scans and production image builds. CI never receives production signing material.
+- **Dashboard**: policy/control plane and database migrations. It never receives blockchain private keys or managed-agent master keys.
+- **Combined facilitator**: Hedera/Arc service boundary and Cardano verification/settlement boundary. Testnet managed agents receive distinct identities even though this service is shared.
+- **Cardano signer gateway**: Cardano transaction construction plus isolated Preprod per-agent signing identity derivation. Mainnet is unsigned/self-custody only in the checked-in deployment.
+- **Resource server**: x402 resource advertisement and settlement verification calls.
+- **Future mainnet HSM/KMS**: must expose a unique key reference per agent; a deployment-wide payer fallback is prohibited.
 
-## CircleCI workflow
+## Required repository workflow
 
-`.circleci/config.yml` runs the `agentpay-production` workflow.
+The exact release candidate must run the repository CI on a disposable PostgreSQL 17 database and complete all of these executable gates:
 
-Required jobs:
+1. `npm ci` and production dependency audit.
+2. Prisma migration deployment.
+3. `verify:identity-isolation`:
+   - verifies the canonical unique payment-identity index;
+   - verifies the PostgreSQL advisory-lock trigger/function;
+   - performs two simultaneous cross-organization claims for the same EVM identity using different casing;
+   - requires the second transaction to block until the first commits, then fail with PostgreSQL unique violation `23505`.
+4. Resource endpoint invariants.
+5. Governance invariants.
+6. Dashboard lint, typecheck, unit tests and production build.
+7. Hedera facilitator build/typecheck/tests.
+8. Arc facilitator build/typecheck/tests.
+9. Combined facilitator typecheck/tests/build.
+10. Cardano signer tests.
+11. Resource-server build/typecheck/tests.
+12. Playwright browser smoke tests.
+13. Production Docker image builds for facilitator, Arc facilitator, combined facilitator, resource server and Cardano signer.
 
-1. `verify`
-   - installs the exact repository dependency graph with `npm ci`
-   - starts a disposable PostgreSQL 17 service
-   - deploys Prisma migrations and checks resource data
-   - runs governance verification
-   - runs dashboard lint, typecheck, unit tests and production build
-   - runs Hedera, Arc, combined-facilitator and resource-server builds/tests
-   - runs the dashboard Playwright smoke suite
-2. `security`
-   - production dependency audit
-   - OSV Scanner
-   - Semgrep OWASP rules
-   - Gitleaks release-tree secret scan
-   - stores machine-readable security artifacts
-3. `codeql`
-   - downloads the pinned CodeQL bundle
-   - verifies its SHA-256 checksum
-   - analyzes JavaScript/TypeScript
-   - stores SARIF
-   - fails closed when the selected code-scanning suite reports a result
-4. `cardano-signer`
-   - signer typecheck/test
-   - signer production image build
-   - never supplies signing material as a Docker build argument
-5. `container-builds`
-   - facilitator
-   - Arc facilitator
-   - combined facilitator
-   - resource server
-6. `release-gate`
-   - runs only after all jobs above succeed
-   - requires the checked-out Git SHA to equal `CIRCLE_SHA1`
-   - records the Git tree SHA and CircleCI execution identifiers
-   - creates a checksummed `ci-release-manifest.json`
-   - explicitly does **not** claim that external launch evidence has been satisfied
+Security/dependency/code-scanning workflows applicable to the release must also be green before promotion.
 
-Generated reports are stored as CircleCI artifacts and the local `artifacts/` directory is gitignored.
+## Global identity migration gate
 
-## Provider-independent CI scripts
+`20260821080000_payment_identity_isolation` is intentionally fail-closed. Before creating the expression-unique index it scans all `PaymentAccount` rows for duplicate canonical identities.
 
-The release logic is not embedded in CircleCI-specific YAML. CircleCI calls:
+If legacy shared-payer agents exist, migration stops with:
 
-- `scripts/ci/verify.sh`
-- `scripts/ci/security.sh`
-- `scripts/ci/codeql.sh`
-- `scripts/ci/cardano-signer.sh`
-- `scripts/ci/container-builds.sh`
-- `scripts/ci/release-gate.sh`
+```text
+PAYMENT_ACCOUNT_IDENTITY_DUPLICATES_EXIST
+```
 
-These scripts are the canonical release checks and can be executed by another controlled CI runner if CircleCI is unavailable.
+Do not bypass this error by deleting the constraint or rewriting historical payer rows. Archive/reprovision legacy managed agents onto distinct identities, retain their historical settlement/audit evidence, then rerun migration.
+
+The resulting database has two layers:
+
+```text
+BEFORE INSERT/UPDATE trigger
+        ↓
+pg_advisory_xact_lock(network + canonical account)
+        ↓
+unique canonical identity index
+```
+
+That boundary applies across organizations, concurrent HTTP requests and multiple dashboard replicas.
 
 ## Render Blueprint
 
-`render.yaml` defines:
+`render.yaml` defines the production service topology, including:
 
-- `agentpay-cardano-signer-preprod`
-- `agentpay-facilitator`
-- `agentpay-resource-server`
-- `agentpay-dashboard`
+- `agentpay-cardano-signer-preprod`;
+- `agentpay-facilitator`;
+- Hedera/Cardano mainnet-specific services where configured;
+- `agentpay-resource-server`;
+- `agentpay-dashboard`.
 
-All services use `autoDeployTrigger: checksPass`. Production preview environments are disabled so a pull request cannot accidentally receive production credentials through an automatically generated preview service.
+### Testnet managed signer secrets
 
-The dashboard's build, pre-deploy migration and start commands all call the exact-release guard in `scripts/render/release-sha.sh`. The deployed Git checkout must equal Render's `RENDER_GIT_COMMIT`; the script exports that immutable commit as `RELEASE_SHA` for the process.
+Generate **three independent** values, each exactly 32 cryptographically random bytes encoded as 43-character unpadded base64url:
 
-The same helper derives the dashboard's namespaced facilitator URLs from one `AGENTPAY_FACILITATOR_ORIGIN`:
+```text
+HEDERA_MANAGED_AGENT_MASTER_KEY
+ARC_MANAGED_AGENT_MASTER_KEY
+CARDANO_MANAGED_AGENT_MASTER_KEY
+```
 
-- Hedera: `<origin>/hedera`
-- Arc: `<origin>/arc`
-- Cardano Preprod: `<origin>/cardano`
+Placement is strict:
 
-This avoids duplicating service URLs and avoids unsupported string interpolation in Blueprint configuration.
+- Hedera key: combined facilitator only.
+- Arc key: combined facilitator only.
+- Cardano key: Cardano Preprod signer only.
+- None of them: dashboard/Vercel.
+- None of them: any mainnet service.
 
-## Render secret setup
+Never reuse an API capability, `KEY_ENCRYPTION_MASTER_KEY`, operator key, relayer key or another rail's master key as one of these values.
 
-`sync: false` values must be supplied through Render during initial Blueprint setup (or explicitly updated in the Render dashboard afterward).
+### Infrastructure accounts are separate
 
-At minimum, production operators must supply the values marked `sync: false` in `render.yaml`, including database/auth-provider configuration, real rail account identifiers, Cardano Blockfrost access, Arc payer address/private-key boundary inputs, Cardano signer custody inputs and provider addresses.
+Hedera operator/contract payer credentials and Arc relayer/contract-execution credentials remain infrastructure roles required by those service paths. They are not agent wallets and must not be copied into `PaymentAccount.accountId`.
 
-`KEY_ENCRYPTION_MASTER_KEY` has a stricter contract than a generic generated secret: it must be exactly 32 random bytes encoded as **43-character unpadded base64url**.
+The old Arc/Cardano public payer-address variables can remain available for compatibility with old deployments, but new managed-agent provisioning and readiness do not depend on them.
 
-The Cardano settlement-store capability is generated once on `agentpay-facilitator` and shared to the dashboard through `fromService`. Its endpoint must be set exactly to:
+### Cardano deployment modes
 
-`https://<agentpay-dashboard-host>/api/v1/internal/cardano-settlement-claims`
+Preprod signer and the Cardano child of the combined facilitator run the legacy signing interface in `unsigned-only` mode. Managed Preprod agents use dedicated `/managed-identity` and `/managed-agent-sign` routes, each bound to immutable Agent ID plus expected payer address.
 
-The combined facilitator rejects a non-HTTPS settlement-store URL in production.
+Mainnet signer/facilitator also run `unsigned-only` and contain no shared payer or deterministic agent master key. `render-cardano-mainnet-free.yaml` follows the same rule.
 
-Do not put Hedera operator keys, Hedera payer keys, Arc payer/relayer/contract private keys, a Cardano signing seed, or the external HSM/Ed25519 custody secret into the dashboard environment.
+## Dashboard/Vercel secret boundary
+
+Dashboard production configuration may contain public account identifiers, service URLs, API capabilities and chain data-provider credentials necessary for the control plane. It must not contain:
+
+```text
+HEDERA_OPERATOR_KEY
+HEDERA_PAYER_KEY
+HEDERA_MANAGED_AGENT_MASTER_KEY
+ARC_PAYER_PRIVATE_KEY
+ARC_RELAYER_PRIVATE_KEY
+ARC_CONTRACT_EXECUTION_PRIVATE_KEY
+ARC_MANAGED_AGENT_MASTER_KEY
+CARDANO_SIGNING_SEED_HEX
+CARDANO_ED25519_SIGNER_API_KEY
+CARDANO_MANAGED_AGENT_MASTER_KEY
+```
+
+`KEY_ENCRYPTION_MASTER_KEY` is a separate dashboard encryption key and must itself be exactly 32 random bytes encoded as unpadded base64url.
 
 ## Activation sequence
 
-1. Connect the GitHub repository to CircleCI using the CircleCI GitHub integration.
-2. Configure CircleCI to run the repository `.circleci/config.yml` for pull requests and branch pushes.
-3. Run the full `agentpay-production` workflow for the exact production-hardening commit.
-4. Inspect all stored security/test artifacts. A skipped, canceled or infrastructure-rejected job is not green evidence.
-5. Add the resulting CircleCI check names to the repository's required PR checks only after the first successful real execution proves the integration is reporting statuses correctly.
-6. Create or sync the Render Blueprint from `render.yaml`.
-7. Supply every required `sync: false` production value. Use separate credentials for every capability that the application requires to be distinct.
-8. Set `CARDANO_SETTLEMENT_STORE_URL` to the exact HTTPS dashboard endpoint above.
-9. Deploy the same immutable Git SHA that passed CircleCI. Render must report successful build, pre-deploy migration, start and health check for that commit.
-10. Perform staging/sandbox smoke checks before enabling any production financial rail.
-11. Only after the replacement path has produced real green exact-SHA evidence should GitHub Actions/Vercel checks be removed from the required release path.
+1. Rebase/finalize the release branch and open a pull request against the intended production branch.
+2. Run all exact-head CI/security checks; inspect logs rather than treating skipped infrastructure as a pass.
+3. Identify and reprovision any legacy managed agents sharing a canonical payment identity.
+4. Generate the three independent testnet managed-agent master keys and store them only on the correct Render services.
+5. Create/sync Render services from the reviewed Blueprint and supply required `sync: false` values.
+6. Apply database migrations; confirm the payment identity trigger and unique expression index exist.
+7. Deploy signer/facilitator services before enabling creation of new managed testnet agents.
+8. Create at least two managed agents on each enabled testnet rail and verify their account identities differ.
+9. Fund and canary the **specific agent identities** being tested. Do not fund or treat an operator/shared wallet as proof of agent isolation.
+10. Deploy the dashboard from the same immutable release SHA and verify readiness/health endpoints.
+11. Promote only after every repository and applicable external launch gate has evidence against that SHA.
 
-The existing GitHub workflows may remain in the repository as a secondary implementation until the replacement path has executed successfully. Their failure to start because of an account/infrastructure problem is not treated as an application failure, but neither is it treated as a pass.
+## Mainnet release rule
 
-## External production gates remain mandatory
+Current mainnet agent spending is self-custody/wallet-confirmation. Autonomous mainnet delegation is not production-ready until the system provisions and persists a unique external HSM/KMS/delegation key reference for each agent and verifies that signer against that agent's on-chain payer identity.
 
-Passing CircleCI and deploying successfully to Render does not establish all facts required for production. The release still needs evidence tied to the same immutable release SHA for every applicable launch gate, including:
+Do not enable autonomous mainnet spending by restoring a shared hot wallet, shared Cardano payer or shared EVM/Hedera payer.
 
-- authenticated Pyth production access/feed IDs and failure drills
-- Masumi Registry/Payment credentials plus escrow/result/refund/dispute drills
-- reviewed Veridian/KERIA verification including negative/revocation cases
-- published Dune query/visualization/dashboard evidence
-- funded Cardano Preprod canaries
-- separately isolated Cardano Mainnet custody and deliberately low-value canonical USDCx canary before Mainnet enablement
-- remote Ed25519/HSM custody review
-- production DNS/TLS and secret management
-- monitoring, paging and named on-call
-- database PITR and recorded restore drill
-- incident exercise
-- independent security assessment
-- Stripe/LI.FI approvals/canaries if those optional rails are enabled
+## External production gates
 
-Do not mark the production-hardening PR ready or merge it until exact-head executable checks and all applicable external evidence gates are satisfied.
+Repository CI cannot establish external facts. Applicable release evidence still includes production DNS/TLS, secrets management, monitoring/on-call, database PITR/restore drill, incident exercise, independent security assessment, provider approvals and low-value chain canaries.
+
+Cardano Mainnet evidence must come from the exact self-custody payer (or future reviewed per-agent HSM/KMS identity), with transaction hash, payer, payee, asset, amount and confirmation independently verified.
