@@ -4,11 +4,12 @@ set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 cd "$ROOT"
 
-# Vercel's project root is dashboard/, so its initial install may omit sibling
-# workspace-only runtime packages. Add the locked workspace dependencies without
-# rewriting package.json/package-lock or running package lifecycle scripts.
-echo "[unified-topology] ensure backend workspace dependencies"
-npm install --ignore-scripts --no-save --package-lock=false --workspaces --include-workspace-root=false
+# Vercel's configured project root is dashboard/, so its first install can omit
+# sibling-only runtime packages. Install the repository graph without changing
+# package.json/package-lock and use the repository's established peer-resolution
+# mode for the Hedera wallet-connect dependency.
+echo "[unified-topology] ensure repository workspace dependencies"
+npm install --ignore-scripts --no-save --package-lock=false --legacy-peer-deps
 
 echo "[unified-topology] Cardano signer syntax and tests"
 (
