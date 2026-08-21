@@ -87,12 +87,12 @@ export function CreateAgentForm({
       {cardanoPreprodEnabled && <option value="cardano:preprod">Cardano Preprod</option>}
       {cardanoMainnetEnabled && <option value="cardano:mainnet">Cardano Mainnet</option>}
     </select></label>
-    <label>Custody<select name="custody" value={custody} onChange={(event) => setCustody(event.target.value as Custody)} disabled={network === "hedera:mainnet"}>
-      {network === "hedera:testnet" ? <><option value="PLATFORM_MANAGED_TESTNET">Managed testnet signer · autonomous</option><option value="SELF_CUSTODY">Verified wallet · confirmation required</option></> : null}
+    <label>Custody<select name="custody" value={custody} onChange={(event) => setCustody(event.target.value as Custody)} disabled={network === "hedera:mainnet" || network === "cardano:mainnet"}>
+      {network === "hedera:testnet" ? <><option value="PLATFORM_MANAGED_TESTNET">Dedicated managed testnet wallet · autonomous</option><option value="SELF_CUSTODY">Verified wallet · confirmation required</option></> : null}
       {network === "hedera:mainnet" && <option value="SELF_CUSTODY">Verified wallet · confirmation required</option>}
-      {network === "eip155:5042002" && <><option value="SELF_CUSTODY">Verified wallet · confirmation required</option><option value="PLATFORM_MANAGED_TESTNET">Managed Arc signer · autonomous</option></>}
-      {network === "cardano:preprod" && <><option value="SELF_CUSTODY">Verified wallet · confirmation required</option><option value="PLATFORM_MANAGED_TESTNET">Managed Cardano signer · autonomous</option></>}
-      {network === "cardano:mainnet" && <><option value="SELF_CUSTODY">Verified wallet · confirmation required</option><option value="EXTERNAL_DELEGATED">Bounded production delegation · autonomous</option></>}
+      {network === "eip155:5042002" && <><option value="SELF_CUSTODY">Verified wallet · confirmation required</option><option value="PLATFORM_MANAGED_TESTNET">Dedicated managed Arc wallet · autonomous</option></>}
+      {network === "cardano:preprod" && <><option value="SELF_CUSTODY">Verified wallet · confirmation required</option><option value="PLATFORM_MANAGED_TESTNET">Dedicated managed Cardano wallet · autonomous</option></>}
+      {network === "cardano:mainnet" && <option value="SELF_CUSTODY">Verified wallet · confirmation required</option>}
     </select></label>
     <label>Default asset<select name="asset" value={asset} onChange={(event) => setAsset(event.target.value as Asset)} disabled={network === "eip155:5042002" || (cardano && !usdcxEnabled)}>
       {network.startsWith("hedera:") && <option value="HBAR">HBAR</option>}
@@ -101,11 +101,13 @@ export function CreateAgentForm({
       {cardano && <option value="ADA">ADA</option>}
       {cardano && usdcxEnabled && <option value="USDCX">USDCx</option>}
     </select></label>
-    {network === "hedera:testnet" && custody === "PLATFORM_MANAGED_TESTNET" && <p className="form-help">The account is assigned from the isolated managed payer configured for the Hedera testnet facilitator. The dashboard never receives its private key.</p>}
+    {network === "hedera:testnet" && custody === "PLATFORM_MANAGED_TESTNET" && <p className="form-help">AgentPay creates a separate Hedera testnet account and signer identity for this agent. No other agent shares its payer account or key.</p>}
     {network === "hedera:mainnet" && <p className="form-help">Hedera Mainnet requires a previously verified wallet identity and explicit wallet confirmation for payments.</p>}
-    {network === "eip155:5042002" && <p className="form-help">Self custody requires the verified Arc wallet to confirm every USDC authorization. The managed testnet signer remains available for autonomous testing.</p>}
-    {network === "cardano:preprod" && <p className="form-help">Self custody requires the verified CIP-30 wallet to sign every transaction. Managed Preprod signing remains available for autonomous testing.</p>}
-    {network === "cardano:mainnet" && <p className="form-help">Use per-transaction wallet confirmation by default. Bounded delegation is available only after the separately deployed production signer and spending caps are configured.</p>}
+    {network === "eip155:5042002" && custody === "PLATFORM_MANAGED_TESTNET" && <p className="form-help">AgentPay derives a unique Arc testnet address for this agent. Fund that address separately before autonomous payments.</p>}
+    {network === "eip155:5042002" && custody === "SELF_CUSTODY" && <p className="form-help">Self custody requires the verified Arc wallet to confirm every USDC authorization.</p>}
+    {network === "cardano:preprod" && custody === "PLATFORM_MANAGED_TESTNET" && <p className="form-help">AgentPay derives a unique Cardano Preprod address for this agent. Fund that address with test ADA and the required token before autonomous payments.</p>}
+    {network === "cardano:preprod" && custody === "SELF_CUSTODY" && <p className="form-help">Self custody requires the verified CIP-30 wallet to sign every transaction.</p>}
+    {network === "cardano:mainnet" && <p className="form-help">Mainnet defaults to per-transaction wallet confirmation. Autonomous Mainnet delegation stays disabled until an isolated per-agent HSM/KMS key and explicit spending bounds are provisioned.</p>}
     <p className="form-help">Provisioning requires recent authentication and is blocked while the organization emergency stop is active.</p>
     <button className="primary-button" type="submit" disabled={busy}>{busy ? "Creating…" : "Create agent"}</button>
   </form>;
