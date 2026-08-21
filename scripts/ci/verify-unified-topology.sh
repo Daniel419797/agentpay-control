@@ -7,9 +7,10 @@ cd "$ROOT"
 # Vercel's configured project root is dashboard/, so its first install can omit
 # sibling-only runtime packages. Install the repository graph without changing
 # package.json/package-lock and use the repository's established peer-resolution
-# mode for the Hedera wallet-connect dependency.
+# mode for the Hedera wallet-connect dependency. Dev dependencies are required
+# here because this is a build-time verification step (tsc/vitest), not runtime.
 echo "[unified-topology] ensure repository workspace dependencies"
-npm install --ignore-scripts --no-save --package-lock=false --legacy-peer-deps
+npm install --ignore-scripts --no-save --package-lock=false --legacy-peer-deps --include=dev
 
 echo "[unified-topology] Cardano signer syntax and tests"
 (
