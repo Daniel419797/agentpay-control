@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { parseHederaEnv } from "./app.js";
 
+const MANAGED_AGENT_MASTER_KEY = Buffer.alloc(32, 5).toString("base64url");
+
 function productionEnv(overrides: Record<string, string> = {}) {
   return {
     APP_ENV: "production",
@@ -9,6 +11,7 @@ function productionEnv(overrides: Record<string, string> = {}) {
     HEDERA_OPERATOR_KEY: "operator-private-key",
     HEDERA_PAYER_ID: "0.0.1002",
     HEDERA_PAYER_KEY: "payer-private-key",
+    HEDERA_MANAGED_AGENT_MASTER_KEY: MANAGED_AGENT_MASTER_KEY,
     MANAGED_SIGNING_API_KEY: "signing-secret-abcdefghijklmnopqrstuvwxyz-123",
     SETTLEMENT_API_KEY: "settlement-secret-abcdefghijklmnopqrstuvwxyz",
     CONTRACT_EXECUTION_API_KEY: "contract-secret-abcdefghijklmnopqrstuvwxyz-12",
@@ -17,8 +20,18 @@ function productionEnv(overrides: Record<string, string> = {}) {
 }
 
 describe("Hedera facilitator production environment", () => {
-  it("accepts independent capability and chain keys", () => {
+  it("accepts independent capability, service, and managed-agent keys", () => {
     expect(parseHederaEnv(productionEnv()).APP_ENV).toBe("production");
+  });
+
+  it("rejects production testnet managed signing without a per-agent master key", () => {
+    const env = productionEnv();
+    delete (env as Record<string, string>).HEDERA_MANAGED_AGENT_MASTER_KEY;
+    expect(() => parseHederaEnv(env)).toThrow(/HEDERA_MANAGED_AGENT_MASTER_KEY/);
+  });
+
+  it("prohibits deterministic managed-agent master keys on mainnet", () => {
+    expect(() => parseHederaEnv(productionEnv({ HEDERA_NETWORK: "mainnet" }))).toThrow(/testnet-only/);
   });
 
   it("rejects missing capability-specific credentials", () => {
@@ -35,11 +48,11 @@ describe("Hedera facilitator production environment", () => {
     }))).toThrow(/must be distinct/);
   });
 
-  it("rejects reuse of the x402 operator key as the managed payer key", () => {
+  it("rejects reuse of the x402 operator key as the contract/service payer key", () => {
     expect(() => parseHederaEnv(productionEnv({
       HEDERA_OPERATOR_KEY: "same-chain-private-key",
       HEDERA_PAYER_KEY: "same-chain-private-key",
-    }))).toThrow(/settlement and managed payer keys must be distinct/);
+    }))).toThrow(/settlement and contract payer keys must be distinct/);
   });
 
   it("requires an explicit algorithm for raw 64-hex private keys", () => {
@@ -55,6 +68,6 @@ describe("Hedera facilitator production environment", () => {
       HEDERA_OPERATOR_KEY_TYPE: "ECDSA",
       HEDERA_PAYER_KEY: key,
       HEDERA_PAYER_KEY_TYPE: "ECDSA",
-    }))).toThrow(/settlement and managed payer keys must be distinct/);
+    }))).toThrow(/settlement and contract payer keys must be distinct/);
   });
 });
