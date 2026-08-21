@@ -1,150 +1,108 @@
 # AgentPay CI and production deployment
 
-AgentPay treats GitHub as source/control plane and keeps executable release checks tied to the exact immutable commit being promoted. A blocked or skipped CI job is not release evidence.
-
-See [`managed-signer-isolation.md`](./managed-signer-isolation.md) for the payment-identity migration and signer trust model.
-
-## Trust boundaries
-
-- **GitHub**: source, pull requests, commit identity and check/status aggregation.
-- **CI runners**: migrations, concurrent identity-isolation verification, application/service tests, browser tests, security scans and production image builds. CI never receives production signing material.
-- **Dashboard**: policy/control plane and database migrations. It never receives blockchain private keys or managed-agent master keys.
-- **Combined facilitator**: Hedera/Arc service boundary and Cardano verification/settlement boundary. Testnet managed agents receive distinct identities even though this service is shared.
-- **Cardano signer gateway**: Cardano transaction construction plus isolated Preprod per-agent signing identity derivation. Mainnet is unsigned/self-custody only in the checked-in deployment.
-- **Resource server**: x402 resource advertisement and settlement verification calls.
-- **Future mainnet HSM/KMS**: must expose a unique key reference per agent; a deployment-wide payer fallback is prohibited.
-
-## Required repository workflow
-
-The exact release candidate must run the repository CI on a disposable PostgreSQL 17 database and complete all of these executable gates:
-
-1. `npm ci` and production dependency audit.
-2. Prisma migration deployment.
-3. `verify:identity-isolation`:
-   - verifies the canonical unique payment-identity index;
-   - verifies the PostgreSQL advisory-lock trigger/function;
-   - performs two simultaneous cross-organization claims for the same EVM identity using different casing;
-   - requires the second transaction to block until the first commits, then fail with PostgreSQL unique violation `23505`.
-4. Resource endpoint invariants.
-5. Governance invariants.
-6. Dashboard lint, typecheck, unit tests and production build.
-7. Hedera facilitator build/typecheck/tests.
-8. Arc facilitator build/typecheck/tests.
-9. Combined facilitator typecheck/tests/build.
-10. Cardano signer tests.
-11. Resource-server build/typecheck/tests.
-12. Playwright browser smoke tests.
-13. Production Docker image builds for facilitator, Arc facilitator, combined facilitator, resource server and Cardano signer.
-
-Security/dependency/code-scanning workflows applicable to the release must also be green before promotion.
-
-## Global identity migration gate
-
-`20260821080000_payment_identity_isolation` is intentionally fail-closed. Before creating the expression-unique index it scans all `PaymentAccount` rows for duplicate canonical identities.
-
-If legacy shared-payer agents exist, migration stops with:
+AgentPay promotes one immutable Git commit through two deployment targets:
 
 ```text
-PAYMENT_ACCOUNT_IDENTITY_DUPLICATES_EXIST
+GitHub commit
+   |-- Vercel: AgentPay Next.js dashboard/API
+   `-- Render Blueprint: exactly two services
+       |-- agentpay-facilitator
+       `-- agentpay-cardano-signer
 ```
 
-Do not bypass this error by deleting the constraint or rewriting historical payer rows. Archive/reprovision legacy managed agents onto distinct identities, retain their historical settlement/audit evidence, then rerun migration.
+See [`unified-production-deployment.md`](./unified-production-deployment.md) for the canonical environment mapping and rollout procedure, and [`managed-signer-isolation.md`](./managed-signer-isolation.md) for per-agent payment identity isolation.
 
-The resulting database has two layers:
+## Release invariants
+
+A release is not green merely because a provider created a deployment object. Executable checks must actually run. A GitHub Actions job that fails before step execution is infrastructure-blocked, not application evidence.
+
+The exact release candidate must verify:
+
+1. PostgreSQL migrations, including the global canonical `PaymentAccount` identity uniqueness/locking migration.
+2. Concurrent cross-organization duplicate identity rejection.
+3. Dashboard lint, typecheck, unit tests and production Next.js build.
+4. Cardano signer syntax and unit tests.
+5. Hedera facilitator typecheck, tests and build.
+6. Arc facilitator typecheck, tests and build.
+7. Combined multi-network facilitator typecheck, tests and build.
+8. Resource server build/tests where that external demo/provider is part of the release.
+9. Browser smoke tests and applicable security/dependency scanning.
+10. Production container builds for the two canonical Render services.
+
+`scripts/ci/verify-unified-topology.sh` is the provider-independent check for the signer/facilitator source graph. The Vercel dashboard build invokes it as `prebuild`, which prevents the frontend release from succeeding if the checked-in backend topology is type-invalid or its unit tests fail.
+
+## Production trust boundaries
+
+- **Vercel dashboard/API:** policy, tenancy, approvals, audit, reconciliation and database access. No blockchain private keys or managed-agent master keys.
+- **agentpay-facilitator:** one public multi-rail service with network-scoped credentials. It serves Hedera Testnet/Mainnet, Arc Testnet and Cardano Preprod/Mainnet facilitator paths.
+- **agentpay-cardano-signer:** one Render service, internally split into isolated Preprod and Mainnet workers. Preprod may derive isolated managed-agent keys; Mainnet is self-custody/unsigned-only.
+- **PostgreSQL/Supabase:** authoritative control-plane state and global payment-identity uniqueness.
+- **External providers/resource servers:** separate from the canonical two-service Render Blueprint.
+
+One Render Blueprint deployment does not collapse the facilitator and Cardano signer into one security process. The signer remains a separate runtime service so compromise of the public facilitator does not automatically expose the Cardano managed-agent master key.
+
+## Global payment identity migration
+
+`20260821080000_payment_identity_isolation` fails closed if existing canonical identity duplicates exist. Do not bypass that check. Reprovision/archive legacy shared-payer managed agents while retaining historical settlement/audit evidence, then re-run migration.
+
+The database enforces:
 
 ```text
-BEFORE INSERT/UPDATE trigger
+INSERT/UPDATE PaymentAccount
         ↓
-pg_advisory_xact_lock(network + canonical account)
+canonical blockchain identity
+        ↓
+pg_advisory_xact_lock
         ↓
 unique canonical identity index
 ```
 
-That boundary applies across organizations, concurrent HTTP requests and multiple dashboard replicas.
+This protects against simultaneous requests across organizations and application replicas.
 
-## Render Blueprint
+## Canonical Render topology
 
-`render.yaml` defines the production service topology, including:
+Only root `render.yaml` is the production Blueprint entrypoint. It creates:
 
-- `agentpay-cardano-signer-preprod`;
-- `agentpay-facilitator`;
-- Hedera/Cardano mainnet-specific services where configured;
-- `agentpay-resource-server`;
-- `agentpay-dashboard`.
+- `agentpay-cardano-signer`
+- `agentpay-facilitator`
 
-### Testnet managed signer secrets
+Older `render-*.yaml` files are standalone/historical deployment helpers and must not be treated as the canonical production release topology.
 
-Generate **three independent** values, each exactly 32 cryptographically random bytes encoded as 43-character unpadded base64url:
+The facilitator exposes:
 
 ```text
-HEDERA_MANAGED_AGENT_MASTER_KEY
-ARC_MANAGED_AGENT_MASTER_KEY
-CARDANO_MANAGED_AGENT_MASTER_KEY
+/hedera/testnet
+/hedera/mainnet
+/arc/testnet
+/cardano/preprod
+/cardano/mainnet
 ```
 
-Placement is strict:
+Root `/verify` and `/settle` route by the exact network bound in both x402 requirement and payment payload. `/supported` aggregates every active child rail. `/ready` additionally verifies the Cardano signer service.
 
-- Hedera key: combined facilitator only.
-- Arc key: combined facilitator only.
-- Cardano key: Cardano Preprod signer only.
-- None of them: dashboard/Vercel.
-- None of them: any mainnet service.
+Arc public Mainnet is intentionally not declared until a public Mainnet exists and has its own asset/chain/canary review.
 
-Never reuse an API capability, `KEY_ENCRYPTION_MASTER_KEY`, operator key, relayer key or another rail's master key as one of these values.
+## Mainnet custody rule
 
-### Infrastructure accounts are separate
+Network support is separate from platform custody.
 
-Hedera operator/contract payer credentials and Arc relayer/contract-execution credentials remain infrastructure roles required by those service paths. They are not agent wallets and must not be copied into `PaymentAccount.accountId`.
+- Hedera Mainnet agents remain self-custody; facilitator operator/payer keys are infrastructure identities, not agent wallets.
+- Cardano Mainnet remains self-custody/unsigned-only and receives no deterministic managed-agent master key.
+- Never restore autonomous Mainnet support by assigning multiple agents a deployment-wide hot wallet.
 
-The old Arc/Cardano public payer-address variables can remain available for compatibility with old deployments, but new managed-agent provisioning and readiness do not depend on them.
+## Promotion sequence
 
-### Cardano deployment modes
+1. Open/finalize the release PR.
+2. Run exact-head repository checks. Inspect whether jobs actually executed.
+3. Verify Vercel prebuild output includes successful Cardano signer, Hedera, Arc and combined-facilitator checks.
+4. Ensure no legacy duplicate payment identities block the production migration.
+5. Sync root `render.yaml` and populate every `sync: false` secret.
+6. Verify signer `/health` reports both Cardano networks.
+7. Verify facilitator `/health`, `/supported` and `/ready`.
+8. Configure Vercel `AGENTPAY_FACILITATOR_ORIGIN` plus the matching network capability values from Render.
+9. Apply database migrations before enabling new managed-agent provisioning.
+10. Canary Hedera Testnet, Arc Testnet and Cardano Preprod with separate managed agents and separate funded identities.
+11. Canary Mainnet self-custody flows separately with low-value funds and independent explorer/provider verification.
+12. Retire old per-network services only after the new topology has real settlement evidence and a rollback window has passed.
 
-Preprod signer and the Cardano child of the combined facilitator run the legacy signing interface in `unsigned-only` mode. Managed Preprod agents use dedicated `/managed-identity` and `/managed-agent-sign` routes, each bound to immutable Agent ID plus expected payer address.
-
-Mainnet signer/facilitator also run `unsigned-only` and contain no shared payer or deterministic agent master key. `render-cardano-mainnet-free.yaml` follows the same rule.
-
-## Dashboard/Vercel secret boundary
-
-Dashboard production configuration may contain public account identifiers, service URLs, API capabilities and chain data-provider credentials necessary for the control plane. It must not contain:
-
-```text
-HEDERA_OPERATOR_KEY
-HEDERA_PAYER_KEY
-HEDERA_MANAGED_AGENT_MASTER_KEY
-ARC_PAYER_PRIVATE_KEY
-ARC_RELAYER_PRIVATE_KEY
-ARC_CONTRACT_EXECUTION_PRIVATE_KEY
-ARC_MANAGED_AGENT_MASTER_KEY
-CARDANO_SIGNING_SEED_HEX
-CARDANO_ED25519_SIGNER_API_KEY
-CARDANO_MANAGED_AGENT_MASTER_KEY
-```
-
-`KEY_ENCRYPTION_MASTER_KEY` is a separate dashboard encryption key and must itself be exactly 32 random bytes encoded as unpadded base64url.
-
-## Activation sequence
-
-1. Rebase/finalize the release branch and open a pull request against the intended production branch.
-2. Run all exact-head CI/security checks; inspect logs rather than treating skipped infrastructure as a pass.
-3. Identify and reprovision any legacy managed agents sharing a canonical payment identity.
-4. Generate the three independent testnet managed-agent master keys and store them only on the correct Render services.
-5. Create/sync Render services from the reviewed Blueprint and supply required `sync: false` values.
-6. Apply database migrations; confirm the payment identity trigger and unique expression index exist.
-7. Deploy signer/facilitator services before enabling creation of new managed testnet agents.
-8. Create at least two managed agents on each enabled testnet rail and verify their account identities differ.
-9. Fund and canary the **specific agent identities** being tested. Do not fund or treat an operator/shared wallet as proof of agent isolation.
-10. Deploy the dashboard from the same immutable release SHA and verify readiness/health endpoints.
-11. Promote only after every repository and applicable external launch gate has evidence against that SHA.
-
-## Mainnet release rule
-
-Current mainnet agent spending is self-custody/wallet-confirmation. Autonomous mainnet delegation is not production-ready until the system provisions and persists a unique external HSM/KMS/delegation key reference for each agent and verifies that signer against that agent's on-chain payer identity.
-
-Do not enable autonomous mainnet spending by restoring a shared hot wallet, shared Cardano payer or shared EVM/Hedera payer.
-
-## External production gates
-
-Repository CI cannot establish external facts. Applicable release evidence still includes production DNS/TLS, secrets management, monitoring/on-call, database PITR/restore drill, incident exercise, independent security assessment, provider approvals and low-value chain canaries.
-
-Cardano Mainnet evidence must come from the exact self-custody payer (or future reviewed per-agent HSM/KMS identity), with transaction hash, payer, payee, asset, amount and confirmation independently verified.
+Repository checks cannot manufacture external production facts. DNS/TLS, credentials, funded accounts, provider approvals, monitoring/on-call, database PITR/restore evidence, incident exercises and independent security review remain deployment gates.

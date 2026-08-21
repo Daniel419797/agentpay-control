@@ -2,10 +2,10 @@ import { timingSafeEqual } from "node:crypto";
 
 export type PublicFailure = {
   code: "REQUEST_BODY_TOO_LARGE" | string;
-  status: 400 | 413 | 500;
+  status: 400 | 413 | 422 | 500;
 };
 
-export function publicFailure(error: unknown, fallbackCode: string, fallbackStatus: 400 | 500): PublicFailure {
+export function publicFailure(error: unknown, fallbackCode: string, fallbackStatus: 400 | 422 | 500): PublicFailure {
   if (error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE") {
     return { code: "REQUEST_BODY_TOO_LARGE", status: 413 };
   }

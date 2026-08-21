@@ -45,7 +45,7 @@ describe("x402 payment routing", () => {
   it("fails closed for organization marketplace settlement outside verified Hedera testnet", () => {
     const provider = { organizationId: "org", status: "ACTIVE", verificationStatus: "VERIFIED", settlementAccountId: "0.0.999", settlementAccountVerified: true };
     expect(providerPayeeForNetwork(provider, "hedera:testnet", config)).toBe("0.0.999");
-    expect(() => providerPayeeForNetwork(provider, "hedera:mainnet")).toThrow("PLATFORM_MAINNET_PAYEE_NOT_CONFIGURED");
+    expect(() => providerPayeeForNetwork(provider, "hedera:mainnet", config)).toThrow("PROVIDER_NETWORK_SETTLEMENT_UNSUPPORTED");
     expect(() => providerPayeeForNetwork(provider, "eip155:5042002", config)).toThrow("PROVIDER_NETWORK_SETTLEMENT_UNSUPPORTED");
     expect(() => providerPayeeForNetwork(provider, "cardano:preprod", config)).toThrow("PROVIDER_NETWORK_SETTLEMENT_UNSUPPORTED");
   });

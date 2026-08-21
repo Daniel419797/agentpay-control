@@ -13,20 +13,43 @@ export interface NetworkRouter {
   supportedNetworks(): string[];
 }
 
+const unifiedPaths: Record<string, string> = {
+  "hedera:testnet": "/hedera/testnet",
+  "hedera:mainnet": "/hedera/mainnet",
+  "eip155:5042002": "/arc/testnet",
+  "cardano:preprod": "/cardano/preprod",
+  "cardano:mainnet": "/cardano/mainnet",
+};
+
+function stripSlash(value: string) { return value.replace(/\/$/, ""); }
+
+export function facilitatorUrlForNetwork(config: AppConfig, network: string): string | undefined {
+  const legacy = network === "hedera:testnet" ? config.FACILITATOR_URL
+    : network === "hedera:mainnet" ? config.HEDERA_MAINNET_FACILITATOR_URL
+    : network === "eip155:5042002" ? config.ARC_FACILITATOR_URL
+    : network === "cardano:preprod" ? config.CARDANO_PREPROD_FACILITATOR_URL
+    : network === "cardano:mainnet" ? config.CARDANO_MAINNET_FACILITATOR_URL
+    : undefined;
+  if (legacy) return stripSlash(legacy);
+  const path = unifiedPaths[network];
+  if (config.AGENTPAY_FACILITATOR_ORIGIN && path) return `${stripSlash(config.AGENTPAY_FACILITATOR_ORIGIN)}${path}`;
+  if (config.APP_ENV !== "production" && path) return `http://localhost:8787${path}`;
+  return undefined;
+}
+
 export function isHederaMainnetEnabled(config: AppConfig): boolean {
-  if (config.APP_ENV !== "production") return true;
-  return Boolean(config.HEDERA_MAINNET_FACILITATOR_URL && config.HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY);
+  return Boolean(facilitatorUrlForNetwork(config, "hedera:mainnet"));
 }
 
 export function isManagedArcEnabled(config: AppConfig): boolean {
   const signingKey = config.ARC_FACILITATOR_SIGNING_API_KEY ?? (config.APP_ENV === "production" ? undefined : config.ARC_FACILITATOR_API_KEY);
-  return Boolean(config.ARC_FACILITATOR_URL && signingKey);
+  return Boolean(facilitatorUrlForNetwork(config, "eip155:5042002") && signingKey);
 }
 
 export function isManagedCardanoPreprodEnabled(config: AppConfig): boolean {
   const signingKey = config.CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY ?? (config.APP_ENV === "production" ? undefined : config.CARDANO_PREPROD_FACILITATOR_API_KEY);
   return Boolean(
-    config.CARDANO_PREPROD_FACILITATOR_URL &&
+    facilitatorUrlForNetwork(config, "cardano:preprod") &&
     signingKey &&
     config.CARDANO_PREPROD_PROVIDER_ADDRESS &&
     config.CARDANO_PREPROD_BLOCKFROST_PROJECT_ID
@@ -34,10 +57,10 @@ export function isManagedCardanoPreprodEnabled(config: AppConfig): boolean {
 }
 
 export function isCardanoMainnetEnabled(config: AppConfig): boolean {
-  const signingKey = config.CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY ?? (config.APP_ENV === "production" ? undefined : config.CARDANO_MAINNET_FACILITATOR_API_KEY);
+  const prepareKey = config.CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY ?? (config.APP_ENV === "production" ? undefined : config.CARDANO_MAINNET_FACILITATOR_API_KEY);
   return Boolean(
-    config.CARDANO_MAINNET_FACILITATOR_URL &&
-    signingKey &&
+    facilitatorUrlForNetwork(config, "cardano:mainnet") &&
+    prepareKey &&
     config.CARDANO_MAINNET_PROVIDER_ADDRESS &&
     config.CARDANO_MAINNET_BLOCKFROST_PROJECT_ID
   );
@@ -49,17 +72,19 @@ class DefaultNetworkRouter implements NetworkRouter {
   constructor() {
     const config = getConfig();
     const production = config.APP_ENV === "production";
-
-    this.routes["hedera:testnet"] = {
-      facilitatorUrl: config.FACILITATOR_URL ?? "http://localhost:8787",
-      facilitatorApiKey: config.FACILITATOR_SIGNING_API_KEY ?? (production ? undefined : config.FACILITATOR_API_KEY),
-      explorerUrl: "https://hashscan.io/testnet/transaction",
-      nativeAsset: "0.0.0",
-    };
+    const hederaTestnetUrl = facilitatorUrlForNetwork(config, "hedera:testnet");
+    if (hederaTestnetUrl) {
+      this.routes["hedera:testnet"] = {
+        facilitatorUrl: hederaTestnetUrl,
+        facilitatorApiKey: config.FACILITATOR_SIGNING_API_KEY ?? (production ? undefined : config.FACILITATOR_API_KEY),
+        explorerUrl: "https://hashscan.io/testnet/transaction",
+        nativeAsset: "0.0.0",
+      };
+    }
 
     if (isHederaMainnetEnabled(config)) {
       this.routes["hedera:mainnet"] = {
-        facilitatorUrl: config.HEDERA_MAINNET_FACILITATOR_URL ?? "http://localhost:8787",
+        facilitatorUrl: facilitatorUrlForNetwork(config, "hedera:mainnet")!,
         facilitatorApiKey: config.HEDERA_MAINNET_FACILITATOR_SIGNING_API_KEY ?? (production ? undefined : config.HEDERA_MAINNET_FACILITATOR_API_KEY),
         explorerUrl: "https://hashscan.io/mainnet/transaction",
         nativeAsset: "0.0.0",
@@ -68,7 +93,7 @@ class DefaultNetworkRouter implements NetworkRouter {
 
     if (isManagedArcEnabled(config)) {
       this.routes["eip155:5042002"] = {
-        facilitatorUrl: config.ARC_FACILITATOR_URL!,
+        facilitatorUrl: facilitatorUrlForNetwork(config, "eip155:5042002")!,
         facilitatorApiKey: config.ARC_FACILITATOR_SIGNING_API_KEY ?? (production ? undefined : config.ARC_FACILITATOR_API_KEY),
         explorerUrl: "https://testnet.arcscan.app/tx",
         nativeAsset: config.ARC_USDC_ADDRESS,
@@ -77,7 +102,7 @@ class DefaultNetworkRouter implements NetworkRouter {
 
     if (isManagedCardanoPreprodEnabled(config)) {
       this.routes["cardano:preprod"] = {
-        facilitatorUrl: config.CARDANO_PREPROD_FACILITATOR_URL!,
+        facilitatorUrl: facilitatorUrlForNetwork(config, "cardano:preprod")!,
         facilitatorApiKey: config.CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY ?? (production ? undefined : config.CARDANO_PREPROD_FACILITATOR_API_KEY),
         explorerUrl: "https://preprod.cardanoscan.io/transaction",
         nativeAsset: "lovelace",
@@ -86,7 +111,7 @@ class DefaultNetworkRouter implements NetworkRouter {
 
     if (isCardanoMainnetEnabled(config)) {
       this.routes["cardano:mainnet"] = {
-        facilitatorUrl: config.CARDANO_MAINNET_FACILITATOR_URL!,
+        facilitatorUrl: facilitatorUrlForNetwork(config, "cardano:mainnet")!,
         facilitatorApiKey: config.CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY ?? (production ? undefined : config.CARDANO_MAINNET_FACILITATOR_API_KEY),
         explorerUrl: "https://cardanoscan.io/transaction",
         nativeAsset: "lovelace",
@@ -112,9 +137,7 @@ class DefaultNetworkRouter implements NetworkRouter {
 let instance: NetworkRouter | undefined;
 
 export function getNetworkRouter(): NetworkRouter {
-  if (!instance) {
-    instance = new DefaultNetworkRouter();
-  }
+  if (!instance) instance = new DefaultNetworkRouter();
   return instance;
 }
 

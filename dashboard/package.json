@@ -17,7 +17,8 @@
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "next dev",
-    "build": "next build",
+    "prebuild": "bash ../scripts/ci/verify-unified-topology.sh",
+    "build": "bash ../scripts/ci/build-dashboard.sh",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "next typegen && tsc --noEmit",

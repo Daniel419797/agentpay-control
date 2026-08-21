@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { boundedRequestText, paymentNetworkFromJson, ROOT_DISPATCH_BODY_LIMIT, targetForNetwork } from "./root-dispatch.js";
+import { boundedRequestText, paymentNetworkFromJson, ROOT_DISPATCH_BODY_LIMIT, targetForNetwork, type CombinedNetworkMap } from "./root-dispatch.js";
 
-const networks = { hedera: "hedera:testnet", arc: "eip155:5042002", cardano: "cardano:preprod" };
+const networks: CombinedNetworkMap = {
+  "hedera:testnet": "hederaTestnet",
+  "hedera:mainnet": "hederaMainnet",
+  "eip155:5042002": "arcTestnet",
+  "cardano:preprod": "cardanoPreprod",
+  "cardano:mainnet": "cardanoMainnet",
+};
 
 function body(requirementNetwork: string, acceptedNetwork = requirementNetwork) {
   return JSON.stringify({ paymentRequirements: { network: requirementNetwork }, paymentPayload: { accepted: { network: acceptedNetwork } } });
@@ -34,10 +40,12 @@ describe("combined facilitator root dispatch", () => {
     await expect(boundedRequestText(request)).resolves.toBe(expected);
   });
 
-  it("maps only exact configured network identifiers", () => {
-    expect(targetForNetwork("hedera:testnet", networks)).toBe("hedera");
-    expect(targetForNetwork("eip155:5042002", networks)).toBe("arc");
-    expect(targetForNetwork("cardano:preprod", networks)).toBe("cardano");
-    expect(targetForNetwork("cardano:mainnet", networks)).toBeNull();
+  it("maps all production network identifiers to exact child apps", () => {
+    expect(targetForNetwork("hedera:testnet", networks)).toBe("hederaTestnet");
+    expect(targetForNetwork("hedera:mainnet", networks)).toBe("hederaMainnet");
+    expect(targetForNetwork("eip155:5042002", networks)).toBe("arcTestnet");
+    expect(targetForNetwork("cardano:preprod", networks)).toBe("cardanoPreprod");
+    expect(targetForNetwork("cardano:mainnet", networks)).toBe("cardanoMainnet");
+    expect(targetForNetwork("eip155:1", networks)).toBeNull();
   });
 });

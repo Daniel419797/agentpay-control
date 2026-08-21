@@ -1,7 +1,7 @@
 export const ROOT_DISPATCH_BODY_LIMIT = 256 * 1024;
 
-export type CombinedNetworkSet = { hedera: string; arc: string; cardano: string };
-export type CombinedTarget = keyof CombinedNetworkSet;
+export type CombinedTarget = "hederaTestnet" | "hederaMainnet" | "arcTestnet" | "cardanoPreprod" | "cardanoMainnet";
+export type CombinedNetworkMap = Readonly<Record<string, CombinedTarget>>;
 
 export async function boundedRequestText(request: Request, maxBytes = ROOT_DISPATCH_BODY_LIMIT) {
   const contentLength = request.headers.get("content-length");
@@ -55,9 +55,6 @@ export function paymentNetworkFromJson(text: string, byteLength = Buffer.byteLen
   return requirementNetwork;
 }
 
-export function targetForNetwork(network: string, networks: CombinedNetworkSet): CombinedTarget | null {
-  if (network === networks.hedera) return "hedera";
-  if (network === networks.arc) return "arc";
-  if (network === networks.cardano) return "cardano";
-  return null;
+export function targetForNetwork(network: string, networks: CombinedNetworkMap): CombinedTarget | null {
+  return networks[network] ?? null;
 }
