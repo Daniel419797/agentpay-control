@@ -19,18 +19,15 @@ function config(overrides: Record<string, unknown> = {}) {
     ARC_FACILITATOR_URL: "https://facilitator.example/arc",
     ARC_FACILITATOR_SIGNING_API_KEY: "arc-signing-key",
     ARC_FACILITATOR_API_KEY: undefined,
-    ARC_PAYER_ADDRESS: "0x1111111111111111111111111111111111111111",
     ARC_USDC_ADDRESS: "0x3600000000000000000000000000000000000000",
     CARDANO_PREPROD_FACILITATOR_URL: "",
     CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY: undefined,
     CARDANO_PREPROD_FACILITATOR_API_KEY: undefined,
-    CARDANO_PREPROD_PAYER_ADDRESS: undefined,
     CARDANO_PREPROD_PROVIDER_ADDRESS: undefined,
     CARDANO_PREPROD_BLOCKFROST_PROJECT_ID: undefined,
     CARDANO_MAINNET_FACILITATOR_URL: "",
     CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY: undefined,
     CARDANO_MAINNET_FACILITATOR_API_KEY: undefined,
-    CARDANO_MAINNET_PAYER_ADDRESS: undefined,
     CARDANO_MAINNET_PROVIDER_ADDRESS: undefined,
     CARDANO_MAINNET_BLOCKFROST_PROJECT_ID: undefined,
     ...overrides,
@@ -63,11 +60,10 @@ describe("network router", () => {
     expect(route.facilitatorApiKey).toBe("mainnet-signing-key");
   });
 
-  it("advertises Cardano Preprod only with signer, payer, provider, and chain evidence", () => {
+  it("advertises Cardano Preprod without requiring a shared payer address", () => {
     mockedGetConfig.mockReturnValue(config({
       CARDANO_PREPROD_FACILITATOR_URL: "https://facilitator.example/cardano",
       CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY: "cardano-signing-key",
-      CARDANO_PREPROD_PAYER_ADDRESS: "addr_test1payer",
       CARDANO_PREPROD_PROVIDER_ADDRESS: "addr_test1provider",
     }));
     expect(getNetworkRouter().supportsNetwork("cardano:preprod")).toBe(false);
@@ -76,7 +72,6 @@ describe("network router", () => {
     mockedGetConfig.mockReturnValue(config({
       CARDANO_PREPROD_FACILITATOR_URL: "https://facilitator.example/cardano",
       CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY: "cardano-signing-key",
-      CARDANO_PREPROD_PAYER_ADDRESS: "addr_test1payer",
       CARDANO_PREPROD_PROVIDER_ADDRESS: "addr_test1provider",
       CARDANO_PREPROD_BLOCKFROST_PROJECT_ID: "preprod-project-id",
     }));
