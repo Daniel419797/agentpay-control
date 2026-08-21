@@ -75,8 +75,8 @@ async function insertFixtures(client: Client) {
     [organizationA, "Identity isolation A", `identity-isolation-a-${organizationA}`, now, organizationB, "Identity isolation B", `identity-isolation-b-${organizationB}`],
   );
   await client.query(
-    `INSERT INTO "Agent" ("id", "organizationId", "name", "status", "network", "updatedAt") VALUES ($1, $2, $3, 'ACTIVE', 'eip155:5042002', $5), ($6, $7, $8, 'ACTIVE', 'eip155:5042002', $5)`,
-    [agentA, organizationA, "Isolation verifier A", "unused", now, agentB, organizationB, "Isolation verifier B"],
+    `INSERT INTO "Agent" ("id", "organizationId", "name", "status", "network", "updatedAt") VALUES ($1, $2, $3, 'ACTIVE', 'eip155:5042002', $4), ($5, $6, $7, 'ACTIVE', 'eip155:5042002', $4)`,
+    [agentA, organizationA, "Isolation verifier A", now, agentB, organizationB, "Isolation verifier B"],
   );
 
   return { organizationA, organizationB, agentA, agentB };
