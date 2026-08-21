@@ -27,25 +27,51 @@ agentpay-control/
 └── .github/workflows/     CI, CodeQL, dependency review and signer verification
 ```
 
-The dashboard is not provisioned by `render.yaml`; deploy it separately to Vercel. The Cardano signer is a separate service/trust boundary from the combined facilitator even when both are declared in the same Render Blueprint. Mainnet must use separately scoped custody and deployment credentials.
+A signer/facilitator deployment may be shared infrastructure; an agent payment identity is never shared. Every managed testnet agent has its own blockchain account/address and signing key. The database globally enforces one canonical payment identity per `PaymentAccount`, including concurrent claims from different organizations/app replicas.
+
+The dashboard is deployed separately to Vercel and never receives managed-agent master keys or blockchain private keys. Mainnet uses self custody today; future autonomous mainnet custody must provision a unique per-agent external HSM/KMS/delegation identity rather than a deployment-wide payer.
+
+See [`docs/managed-signer-isolation.md`](docs/managed-signer-isolation.md) for the custody and migration model.
 
 ## Supported networks
 
 | Network | CAIP-2 | Role |
 |---|---|---|
-| Hedera Testnet | `hedera:testnet` | managed x402 signing/verification/settlement and test operation |
-| Hedera Mainnet | `hedera:mainnet` | separately configured production-capable Hedera route |
-| Arc Testnet | `eip155:5042002` | EVM x402 and contract-automation test rail |
-| Cardano Preprod | `cardano:preprod` | managed x402 `exact`, ADA and explicitly configured test native-token support |
-| Cardano Mainnet | `cardano:mainnet` | source-supported x402 `exact`; requires separate production custody and launch evidence |
+| Hedera Testnet | `hedera:testnet` | isolated per-agent managed wallets plus self-custody test operation |
+| Hedera Mainnet | `hedera:mainnet` | self-custody production route; no deterministic managed-agent master key |
+| Arc Testnet | `eip155:5042002` | isolated per-agent EVM managed wallets plus self custody |
+| Cardano Preprod | `cardano:preprod` | isolated per-agent managed x402 `exact`, ADA and configured test native-token support |
+| Cardano Mainnet | `cardano:mainnet` | x402 `exact` in unsigned/self-custody mode; autonomous delegation requires per-agent HSM/KMS custody |
 
 Cardano ADA uses `lovelace`. Mainnet `USDCX` is pinned in source/preflight to the canonical configured Circle xReserve Cardano native-asset identity; arbitrary Cardano native tokens are not accepted. Preprod token configuration is deployment-specific and must not be represented as Mainnet USDCx.
+
+## Payment identity isolation
+
+Managed autonomous identities are testnet-only in the current release:
+
+- Hedera Testnet derives a unique Ed25519 identity/account per immutable Agent ID.
+- Arc Testnet derives a unique secp256k1 identity/address per immutable Agent ID.
+- Cardano Preprod derives a unique Ed25519 payment identity/address per immutable Agent ID.
+
+The signer-side master secrets are:
+
+```text
+HEDERA_MANAGED_AGENT_MASTER_KEY
+ARC_MANAGED_AGENT_MASTER_KEY
+CARDANO_MANAGED_AGENT_MASTER_KEY
+```
+
+Each is exactly 32 cryptographically random bytes encoded as 43-character unpadded base64url. They must be independent and must exist only on the appropriate Render signer/facilitator service. Never place them in Vercel or on a mainnet service.
+
+The database migration `20260821080000_payment_identity_isolation` adds a canonical unique identity index and a transaction-scoped PostgreSQL advisory-lock trigger. The migration intentionally aborts if legacy duplicate/shared-payer identities still exist. Those managed agents must be archived/reprovisioned rather than having historical payer evidence rewritten.
+
+Infrastructure accounts such as a Hedera operator/contract payer or Arc relayer/contract executor remain separate service principals. They are not agent wallets.
 
 ## Catalyst integrations
 
 ### Cardano x402
 
-Each Cardano payment requirement is bound to the canonical paid-resource URL with a SHA-256 `resourceBinding`, exact network, payer, payee, asset, amount, server-submission policy, confirmation policy and bounded timeout. The signer builds a narrow phase-1 transaction; the facilitator independently decodes and verifies signed CBOR, witness, inputs, outputs, fee, TTL and nonce before submission.
+Each Cardano payment requirement is bound to the canonical paid-resource URL with a SHA-256 `resourceBinding`, exact network, payer, payee, asset, amount, server-submission policy, confirmation policy and bounded timeout. The transaction builder creates a narrow phase-1 transaction; the facilitator independently decodes and verifies signed CBOR, witness, inputs, outputs, fee, TTL and nonce before submission.
 
 Durable settlement claims bind the transaction hash to the complete resource-bound requirement, payer and UTxO nonce. Same-resource retries remain idempotent, while a transaction cannot unlock a second resource that happens to have the same price/payee. Ambiguous submission remains unresolved until independent chain evidence reconciles it.
 
@@ -53,7 +79,7 @@ Durable settlement claims bind the transaction hash to the complete resource-bou
 
 ADA is the default Cardano asset. The Cardano rail can additionally support exactly one explicitly configured native-token unit. Token-bearing inputs/outputs are constrained to lovelace plus that unit, exact token conservation is required, the payee receives the exact quote and change can return only to the payer.
 
-Preprod token support is disabled in the root production Blueprint until the exact unit, funded payer and low-value canary are verified. Mainnet requires an independent deployment/custody gate.
+Preprod token support stays disabled until the exact unit, a funded **agent-specific** payer and low-value canary are verified. Mainnet requires an independent self-custody canary and launch evidence.
 
 ### Pyth
 
@@ -78,9 +104,7 @@ Published policies can further narrow the deployment trust set with issuer AID a
 
 ### Dune
 
-Dune is public-chain observability only. Checked-in SQL exposes Cardano settlement activity without organization, user, prompt, policy or private resource-content data. `analytics/dune/publish.mjs` creates/updates the public queries, and `analytics/dune/publish-dashboard.mjs` creates the visualizations/dashboard when a real Dune write credential and query IDs are supplied.
-
-A Dune outage cannot block authorization, signing, settlement or reconciliation. Publication is a release-evidence gate, not a payment dependency.
+Dune is public-chain observability only. Checked-in SQL exposes Cardano settlement activity without organization, user, prompt, policy or private resource-content data. A Dune outage cannot block authorization, signing, settlement or reconciliation. Publication is a release-evidence gate, not a payment dependency.
 
 ## Policy controls
 
@@ -99,24 +123,19 @@ A published policy version can constrain:
 
 All selected controls are attached while a new policy version is still DRAFT, then the complete version is published atomically. Existing published versions are immutable and become SUPERSEDED when a new version is published.
 
+Budgets and reservations are per agent for every custody mode. Sharing a facilitator deployment does not create a shared organization treasury.
+
 ## Production safety model
 
 AgentPay production configuration fails closed. Required production secrets, HTTPS endpoints, database dependencies, payment-rail configuration, oracle trust and identity/escrow dependencies must be valid before an enabled feature is considered ready.
 
-Capability-scoped credentials are separated by rail and function. Cardano additionally separates:
+Capability-scoped credentials remain separated by rail and function. Agent signer identities are additionally isolated from infrastructure operator, relayer, contract-execution and settlement accounts.
 
-- dashboard/control-plane credentials
-- facilitator managed-signing capability
-- facilitator settlement capability
-- durable settlement-store capability
-- signer-gateway capability
-- remote Ed25519/HSM signing capability
+Cardano Preprod runs the legacy generic managed-signing route disabled while dedicated per-agent `/managed-identity` and `/managed-agent-sign` paths handle autonomous testnet agents. Cardano Mainnet runs `unsigned-only` and has no deployment-wide agent payer or managed-agent master key.
 
-The production Cardano signer rejects raw signing seeds. It sends only the transaction-body hash to the remote signing boundary and verifies the returned Ed25519 signature locally. Preprod and Mainnet must not share signer deployments or custody credentials.
+`/api/v1/ready` and Catalyst release evidence report enabled-but-incomplete external dependencies rather than turning source support into a false production-ready claim.
 
-`/api/v1/ready` and Catalyst release evidence are designed to report enabled-but-incomplete external dependencies rather than turning source support into a false production-ready claim.
-
-For the full code and launch gates, see [`docs/production-readiness.md`](docs/production-readiness.md), [`docs/cardano-production.md`](docs/cardano-production.md), [`docs/production-runbook.md`](docs/production-runbook.md), and [`docs/catalyst-submission.md`](docs/catalyst-submission.md).
+For the full code and launch gates, see [`docs/managed-signer-isolation.md`](docs/managed-signer-isolation.md), [`docs/production-readiness.md`](docs/production-readiness.md), [`docs/cardano-production.md`](docs/cardano-production.md), [`docs/production-runbook.md`](docs/production-runbook.md), and [`docs/catalyst-submission.md`](docs/catalyst-submission.md).
 
 ## Deployment
 
@@ -131,26 +150,32 @@ Deploy `dashboard` to Vercel and configure its production environment from `.env
 - exactly 32 random bytes encoded as unpadded base64url for `KEY_ENCRYPTION_MASTER_KEY`
 - production Supabase configuration
 - network/capability-specific facilitator credentials
-- Cardano Blockfrost/provider/payer configuration when a Cardano rail is enabled
-- Pyth API/feed configuration when Pyth policy is enabled
-- Masumi registry/payment-node configuration when the corresponding feature is enabled
-- Veridian/KERIA verifier URL plus explicit deployment issuer/schema trust sets when identity policy is enabled
-- verified Dune query IDs/read credential only when Dune analytics is enabled
-- no production payment private key or raw Cardano signing seed in dashboard environment
+- Cardano Blockfrost/provider configuration when a Cardano rail is enabled
+- Pyth/Masumi/Veridian/Dune configuration only when those features are enabled
+- no blockchain private keys, HSM secrets or managed-agent master keys in the dashboard environment
 
-Run Prisma migrations against the production database before shifting traffic to a release.
+Run Prisma migrations against the production database before shifting traffic to a release. The payment-identity migration will refuse legacy duplicate identities; reprovision them first rather than bypassing the constraint.
 
-### Preprod services → Render
+### Testnet services → Render
 
-Create a Render Blueprint from root `render.yaml`. It declares:
+Create a Render Blueprint from root `render.yaml`. The key isolation placement is:
 
-- `agentpay-cardano-signer-preprod`
-- `agentpay-facilitator`
-- `agentpay-resource-server`
+```text
+combined facilitator:
+  HEDERA_MANAGED_AGENT_MASTER_KEY
+  ARC_MANAGED_AGENT_MASTER_KEY
 
-The signer gateway API capability, signer URL, Cardano payer/asset configuration and Blockfrost configuration are wired into the facilitator with Render service references. The actual Ed25519 custody service remains external and receives only a transaction-body hash.
+Cardano Preprod signer:
+  CARDANO_MANAGED_AGENT_MASTER_KEY
 
-The combined facilitator serves both a network-bound root dispatcher and explicit namespaced endpoints:
+dashboard/Vercel:
+  none of the above
+
+mainnet services:
+  none of the above
+```
+
+The combined facilitator serves a network-bound root dispatcher and explicit namespaced endpoints:
 
 ```text
 https://<facilitator-host>/verify
@@ -162,15 +187,15 @@ https://<facilitator-host>/cardano/*
 https://<facilitator-host>/health
 ```
 
-Root `/verify` and `/settle` require `paymentRequirements.network` to exactly match `paymentPayload.accepted.network` before dispatch, so one public service URL can be safely used by the resource server while rail credentials remain scoped.
+Root `/verify` and `/settle` require `paymentRequirements.network` to match `paymentPayload.accepted.network` before dispatch. Dedicated managed-agent identity/signing routes additionally bind the immutable Agent ID and expected payer identity.
 
-`render-cardano-signer.yaml` remains available for a separately managed signer rollout. Mainnet should use a separate Blueprint/service/custody boundary rather than reusing Preprod.
+Mainnet uses separate services/custody and remains self-custody unless a reviewed per-agent HSM/KMS/delegation path is introduced.
 
 ## Organization data lifecycle
 
 Owners can generate the redacted organization export from Settings. Credential-bearing notification destinations and encrypted secret material are omitted/redacted by the export API.
 
-Owners can also schedule workspace deletion with exact slug and phrase confirmation plus recent authentication. Requesting deletion immediately activates containment controls (including emergency stop/agent credential revocation as implemented by the deletion saga). A REQUESTED deletion can be canceled; processing cannot be falsely reported complete before required provider cleanup succeeds.
+Owners can also schedule workspace deletion with exact slug and phrase confirmation plus recent authentication. Requesting deletion immediately activates containment controls. A REQUESTED deletion can be canceled; processing cannot be falsely reported complete before required provider cleanup succeeds.
 
 ## Local development
 
@@ -192,8 +217,7 @@ npm run dev
 
 # Cardano signer
 cd cardano-signer
-npm run typecheck
-npm test
+node --test server.test.mjs
 
 # Resource server
 cd resource-server
@@ -206,7 +230,7 @@ Use the service-specific `.env.example` files for local configuration. Developme
 
 ## Verification
 
-Repository workflows are intended to validate PostgreSQL migrations, governance/resource invariants, dashboard lint/typecheck/tests/build, Hedera/Arc/Cardano facilitator paths, the Cardano signer, resource server, browser smoke tests, production container builds, dependency risk and CodeQL. A workflow that never executes its steps is not considered a pass.
+Repository CI validates PostgreSQL migrations, the real concurrent payment-identity isolation invariant, governance/resource checks, dashboard lint/typecheck/tests/build, Hedera/Arc/combined facilitator paths, Cardano signer tests, resource server, browser smoke tests, production container builds, dependency risk and CodeQL/security gates. A workflow that never executes its steps is not a pass.
 
 For the dashboard directly:
 
@@ -218,19 +242,28 @@ npm test
 npm run build
 ```
 
+The database isolation check is:
+
+```bash
+cd dashboard
+npm run verify:identity-isolation
+```
+
+It is intentionally restricted to a disposable local database because it creates competing transactions to prove the lock/unique constraint.
+
 For a release, validation must be tied to the exact immutable commit SHA. An older successful preview is not evidence for a newer head.
 
 ## Feature status
 
-The repository contains source paths for organization-scoped agents and roles; immutable spend/approval policy; audit evidence; multi-rail x402; Cardano ADA/allowlisted-token settlement; isolated Cardano signing; Pyth-valued policy; Masumi registry trust; Masumi escrow/refund/result-hash/reputation workflows; Veridian/KERI identity binding; Dune public analytics; marketplace/resources; invoicing; virtual-card/fiat adapters; cross-chain automation; contract automation; organization export/deletion; and financial intelligence.
+The repository contains source paths for organization-scoped agents and roles; immutable spend/approval policy; audit evidence; multi-rail x402; per-agent managed testnet identities; Cardano ADA/allowlisted-token settlement; Pyth-valued policy; Masumi registry trust; Masumi escrow/refund/result-hash/reputation workflows; Veridian/KERI identity binding; Dune public analytics; marketplace/resources; invoicing; virtual-card/fiat adapters; cross-chain automation; contract automation; organization export/deletion; and financial intelligence.
 
-“Implemented in code” is not the same as “production launched.” Real credentials, provider access, funded wallets, remote signing custody, monitoring, backups/restore evidence, exact-head CI/deployment, canaries and independent security evidence remain release gates where applicable.
+“Implemented in code” is not the same as “production launched.” Real credentials, provider access, funded **agent-specific** wallets, monitoring, backups/restore evidence, exact-head CI/deployment, canaries and independent security evidence remain release gates where applicable.
 
 See [`docs/implementation-status.md`](docs/implementation-status.md) for feature traceability.
 
 ## Security
 
-Report suspected vulnerabilities privately according to [`SECURITY.md`](SECURITY.md). Never place production private keys, unrestricted provider credentials, card data, session secrets, HSM credentials or write-scoped analytics credentials in GitHub issues or pull requests.
+Report suspected vulnerabilities privately according to [`SECURITY.md`](SECURITY.md). Never place production private keys, managed-agent master keys, unrestricted provider credentials, card data, session secrets, HSM credentials or write-scoped analytics credentials in GitHub issues or pull requests.
 
 ## License
 

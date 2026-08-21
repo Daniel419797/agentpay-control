@@ -1,7 +1,9 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { createHmac } from "node:crypto";
 import { ExactEvmScheme } from "@x402/evm/exact/facilitator";
 import { ExactEvmScheme as ExactEvmClientScheme } from "@x402/evm/exact/client";
 import { toFacilitatorEvmSigner, verifyTypedDataSignature } from "@x402/evm";
+import type { PaymentRequirements } from "@x402/core/types";
 import { createWalletClient, createPublicClient, http, defineChain, type WalletClient, type PublicClient, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { z } from "zod";
@@ -10,6 +12,10 @@ const privateKeySchema = z.string().regex(/^(0x)?[0-9a-fA-F]{64}$/, "Must be a 6
 const optionalPrivateKeySchema = z.preprocess(
   (value) => value === "" ? undefined : value,
   privateKeySchema.optional(),
+);
+const managedMasterKeySchema = z.preprocess(
+  (value) => value === "" ? undefined : value,
+  z.string().regex(/^[A-Za-z0-9_-]{43}$/).optional(),
 );
 
 const arcTestnet = defineChain({
@@ -26,6 +32,7 @@ export const envSchema = z.object({
   ARC_PAYER_PRIVATE_KEY: privateKeySchema,
   ARC_RELAYER_PRIVATE_KEY: optionalPrivateKeySchema,
   ARC_CONTRACT_EXECUTION_PRIVATE_KEY: optionalPrivateKeySchema,
+  ARC_MANAGED_AGENT_MASTER_KEY: managedMasterKeySchema,
   ARC_RPC_URL: z.string().url().default("https://rpc.testnet.arc.network"),
   ARC_USDC_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).default("0x3600000000000000000000000000000000000000"),
   ARC_PROVIDER_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
@@ -69,11 +76,19 @@ function toAccount(value: string) {
   return privateKeyToAccount(key);
 }
 
+function masterKey(value: string | undefined) {
+  if (!value) return undefined;
+  const decoded = Buffer.from(value, "base64url");
+  if (decoded.length !== 32) throw new Error("ARC_MANAGED_AGENT_MASTER_KEY_INVALID");
+  return decoded;
+}
+
 export class EvmFacilitator {
   private readonly config: ArcConfig;
   private readonly payerAccount: ReturnType<typeof privateKeyToAccount>;
   private readonly relayerAccount: ReturnType<typeof privateKeyToAccount>;
   private readonly contractAccount: ReturnType<typeof privateKeyToAccount>;
+  private readonly managedAgentMasterKey: Buffer | undefined;
   private readonly settlementEvidence = new SettlementEvidenceScope();
   readonly walletClient: WalletClient;
   private readonly contractWalletClient: WalletClient;
@@ -88,6 +103,7 @@ export class EvmFacilitator {
     this.payerAccount = toAccount(config.ARC_PAYER_PRIVATE_KEY);
     this.relayerAccount = toAccount(config.ARC_RELAYER_PRIVATE_KEY ?? config.ARC_PAYER_PRIVATE_KEY);
     this.contractAccount = toAccount(config.ARC_CONTRACT_EXECUTION_PRIVATE_KEY ?? config.ARC_PAYER_PRIVATE_KEY);
+    this.managedAgentMasterKey = masterKey(config.ARC_MANAGED_AGENT_MASTER_KEY);
     this.usdcAddress = config.ARC_USDC_ADDRESS as Hex;
 
     const chain = defineChain({
@@ -132,6 +148,35 @@ export class EvmFacilitator {
     this.scheme = new ExactEvmScheme(signer);
     this.clientScheme = new ExactEvmClientScheme(this.payerAccount, { rpcUrl: config.ARC_RPC_URL });
     this.network = `eip155:${chain.id}`;
+  }
+
+  private managedAccount(agentId: string) {
+    if (!this.managedAgentMasterKey) throw new Error("ARC_MANAGED_AGENT_MASTER_KEY_REQUIRED");
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(agentId)) throw new Error("MANAGED_AGENT_ID_INVALID");
+
+    for (let counter = 0; counter < 256; counter += 1) {
+      const digest = createHmac("sha256", this.managedAgentMasterKey)
+        .update(`agentpay-managed-v1|${this.network}|${agentId}|${counter}`)
+        .digest("hex");
+      try {
+        return privateKeyToAccount(`0x${digest}` as Hex);
+      } catch {
+        // secp256k1 rejects zero/out-of-range scalars. Derive the next candidate.
+      }
+    }
+    throw new Error("ARC_MANAGED_AGENT_KEY_DERIVATION_FAILED");
+  }
+
+  managedIdentity(agentId: string) {
+    const account = this.managedAccount(agentId);
+    return { accountId: account.address.toLowerCase(), signerRef: `agent:${agentId}` };
+  }
+
+  async createManagedAgentPaymentPayload(agentId: string, payerAccountId: string, paymentRequirements: PaymentRequirements) {
+    const account = this.managedAccount(agentId);
+    if (account.address.toLowerCase() !== payerAccountId.toLowerCase()) throw new Error("MANAGED_AGENT_IDENTITY_MISMATCH");
+    const clientScheme = new ExactEvmClientScheme(account, { rpcUrl: this.config.ARC_RPC_URL });
+    return clientScheme.createPaymentPayload(2, paymentRequirements);
   }
 
   captureSettlementEvidence<T>(operation: () => Promise<T>) {

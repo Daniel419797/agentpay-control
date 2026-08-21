@@ -1,4 +1,5 @@
-import { AccountId, Client, ContractExecuteTransaction, ContractId, Hbar, PrivateKey, TransactionId } from "@hiero-ledger/sdk";
+import { createHmac } from "node:crypto";
+import { AccountCreateTransaction, AccountId, AccountInfoQuery, Client, ContractExecuteTransaction, ContractId, Hbar, PrivateKey, TransactionId } from "@hiero-ledger/sdk";
 import type { PaymentPayload, PaymentRequirements } from "@x402/core/types";
 import {
   createHederaClient,
@@ -15,6 +16,7 @@ import { z } from "zod";
 import { boundedJson, capabilityAuthorizationMatches, logFailure, publicFailure, validateContractCall } from "./security.js";
 
 const keyTypeSchema = z.enum(["ECDSA", "ED25519"]);
+const managedMasterKeySchema = z.preprocess((value) => value === "" ? undefined : value, z.string().regex(/^[A-Za-z0-9_-]{43}$/).optional());
 export const hederaEnvSchema = z.object({
   APP_ENV: z.enum(["development", "test", "production"]).default("development"),
   HEDERA_NETWORK: z.enum(["testnet", "mainnet"]).default("testnet"),
@@ -24,6 +26,8 @@ export const hederaEnvSchema = z.object({
   HEDERA_PAYER_ID: z.string(),
   HEDERA_PAYER_KEY: z.string(),
   HEDERA_PAYER_KEY_TYPE: keyTypeSchema.optional(),
+  HEDERA_MANAGED_AGENT_MASTER_KEY: managedMasterKeySchema,
+  HEDERA_MANAGED_AGENT_INITIAL_TINYBAR: z.string().regex(/^\d+$/).default("0"),
   FACILITATOR_API_KEY: z.string().min(32).optional(),
   MANAGED_SIGNING_API_KEY: z.string().min(32).optional(),
   SETTLEMENT_API_KEY: z.string().min(32).optional(),
@@ -48,6 +52,13 @@ function requireRawKeyType(name: string, value: string, keyType: HederaKeyType |
   if (rawPrivateKey(value) && !keyType) throw new Error(`${name}_TYPE is required for raw 64-hex private keys`);
 }
 
+function managedMasterKey(value: string | undefined) {
+  if (!value) return undefined;
+  const decoded = Buffer.from(value, "base64url");
+  if (decoded.length !== 32) throw new Error("HEDERA_MANAGED_AGENT_MASTER_KEY_INVALID");
+  return decoded;
+}
+
 export function parseHederaEnv(input: unknown = process.env): HederaFacilitatorEnv {
   const env = hederaEnvSchema.parse(input);
   requireRawKeyType("HEDERA_OPERATOR_KEY", env.HEDERA_OPERATOR_KEY, env.HEDERA_OPERATOR_KEY_TYPE);
@@ -56,8 +67,10 @@ export function parseHederaEnv(input: unknown = process.env): HederaFacilitatorE
     const capabilityKeys = [env.MANAGED_SIGNING_API_KEY, env.SETTLEMENT_API_KEY, env.CONTRACT_EXECUTION_API_KEY];
     if (capabilityKeys.some((key) => !key)) throw new Error("Production capability-specific facilitator API keys are required");
     if (new Set(capabilityKeys).size !== capabilityKeys.length) throw new Error("Production capability-specific facilitator API keys must be distinct");
+    if (env.HEDERA_NETWORK === "testnet" && !managedMasterKey(env.HEDERA_MANAGED_AGENT_MASTER_KEY)) throw new Error("Production Hedera testnet managed agents require HEDERA_MANAGED_AGENT_MASTER_KEY");
+    if (env.HEDERA_NETWORK === "mainnet" && env.HEDERA_MANAGED_AGENT_MASTER_KEY) throw new Error("Deterministic managed-agent keys are testnet-only");
     if (canonicalPrivateKeyInput(env.HEDERA_OPERATOR_KEY) === canonicalPrivateKeyInput(env.HEDERA_PAYER_KEY)) {
-      throw new Error("Production settlement and managed payer keys must be distinct");
+      throw new Error("Production settlement and contract payer keys must be distinct");
     }
   }
   if (env.APP_ENV !== "production" && env.HEDERA_NETWORK === "mainnet") throw new Error("Mainnet is prohibited outside production");
@@ -94,6 +107,23 @@ export function createHederaApp(env: HederaFacilitatorEnv): { app: Hono; network
   const payerKey = parsePrivateKey(env.HEDERA_PAYER_KEY, env.HEDERA_PAYER_KEY_TYPE);
   const caipNetwork = `hedera:${env.HEDERA_NETWORK}`;
   const managedClientSigner = createClientHederaSigner(env.HEDERA_PAYER_ID, payerKey, { network: caipNetwork });
+  const master = managedMasterKey(env.HEDERA_MANAGED_AGENT_MASTER_KEY);
+
+  function managedAgentKey(agentId: string) {
+    if (env.HEDERA_NETWORK !== "testnet") throw new Error("MANAGED_AGENT_SIGNING_TESTNET_ONLY");
+    if (!master) throw new Error("HEDERA_MANAGED_AGENT_MASTER_KEY_REQUIRED");
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(agentId)) throw new Error("MANAGED_AGENT_ID_INVALID");
+    const seed = createHmac("sha256", master).update(`agentpay-managed-v1|${caipNetwork}|${agentId}`).digest("hex");
+    return PrivateKey.fromStringED25519(seed);
+  }
+
+  async function assertManagedAccount(agentId: string, accountId: string) {
+    const key = managedAgentKey(agentId);
+    const info = await new AccountInfoQuery().setAccountId(AccountId.fromString(accountId)).execute(client);
+    if (!info.key || info.key.toString() !== key.publicKey.toString()) throw new Error("MANAGED_AGENT_IDENTITY_MISMATCH");
+    return key;
+  }
+
   const x402Signer = toFacilitatorHederaSigner({
     getAddresses: () => [env.HEDERA_OPERATOR_ID],
     signAndSubmitTransaction: createHederaSignAndSubmitTransaction((network) => createHederaClient(network), operatorKey),
@@ -105,11 +135,55 @@ export function createHederaApp(env: HederaFacilitatorEnv): { app: Hono; network
   const contractAllowlist = contractAllowlistSchema.parse(JSON.parse(env.CONTRACT_ALLOWLIST_JSON));
   const contractRequestSchema = z.object({contractId:z.string().regex(/^0\.0\.\d+$/),functionSelector:z.string().regex(/^0x[0-9a-fA-F]{8}$/),calldata:z.string().regex(/^0x[0-9a-fA-F]*$/),gas:z.number().int().min(21000).max(15000000),payableAtomic:z.string().regex(/^\d+$/),transactionId:z.string().min(8).max(160)});
   const x402Request = z.object({paymentPayload:z.custom<PaymentPayload>(),paymentRequirements:z.custom<PaymentRequirements>()});
+  const managedIdentityRequest = z.object({ agentId: z.string().uuid(), network: z.literal("hedera:testnet") });
+  const managedSignRequest = z.object({ agentId: z.string().uuid(), payerAccountId: z.string().regex(/^0\.0\.\d+$/), paymentRequirements: z.custom<PaymentRequirements>() });
 
   const app = new Hono();
-  app.get("/health", c => c.json({ status: "ok", network: env.HEDERA_NETWORK, x402Version: 2 }));
+  app.get("/health", c => c.json({ status: "ok", network: env.HEDERA_NETWORK, x402Version: 2, managedIdentity: env.HEDERA_NETWORK === "testnet" ? "isolated-per-agent" : "disabled" }));
   app.get("/supported", c => c.json({ kinds: [{ x402Version: 2, scheme: "exact", network: caipNetwork, extra: x402Scheme.getExtra(caipNetwork) }] }));
+
+  app.post("/managed-identity", async c => {
+    if (!authorized(env.MANAGED_SIGNING_API_KEY, c.req.header("authorization"))) return c.json({ code: "UNAUTHORIZED" }, 401);
+    if (env.HEDERA_NETWORK !== "testnet") return c.json({ code: "MANAGED_AGENT_SIGNING_TESTNET_ONLY" }, 403);
+    try {
+      const { agentId } = managedIdentityRequest.parse(await boundedJson(c.req.raw));
+      const key = managedAgentKey(agentId);
+      const transaction = await new AccountCreateTransaction()
+        .setKey(key.publicKey)
+        .setInitialBalance(Hbar.fromTinybars(env.HEDERA_MANAGED_AGENT_INITIAL_TINYBAR))
+        .setAccountMemo(`agentpay:${agentId}`)
+        .execute(client);
+      const receipt = await transaction.getReceipt(client);
+      if (!receipt.accountId) throw new Error("HEDERA_MANAGED_ACCOUNT_ID_MISSING");
+      return c.json({ accountId: receipt.accountId.toString(), publicKey: key.publicKey.toString(), signerRef: `agent:${agentId}` });
+    } catch (error) {
+      const failure = publicFailure(error, "MANAGED_IDENTITY_PROVISIONING_FAILED", 500);
+      logFailure("managed_identity_failed", error);
+      return c.json({ code: failure.code }, failure.status);
+    }
+  });
+
+  app.post("/managed-agent-sign", async c => {
+    if (!authorized(env.MANAGED_SIGNING_API_KEY, c.req.header("authorization"))) return c.json({ code: "UNAUTHORIZED" }, 401);
+    if (env.HEDERA_NETWORK !== "testnet") return c.json({ code: "MANAGED_AGENT_SIGNING_TESTNET_ONLY" }, 403);
+    try {
+      const { agentId, payerAccountId, paymentRequirements } = managedSignRequest.parse(await boundedJson(c.req.raw));
+      if (paymentRequirements.network !== caipNetwork) return c.json({ code: "NETWORK_MISMATCH" }, 422);
+      const key = await assertManagedAccount(agentId, payerAccountId);
+      const signer = createClientHederaSigner(payerAccountId, key, { network: caipNetwork });
+      const transaction = await signer.createPartiallySignedTransferTransaction(paymentRequirements);
+      const inspected = inspectHederaTransaction(transaction);
+      const paymentPayload: PaymentPayload = { x402Version: 2, accepted: paymentRequirements, payload: { transaction } };
+      return c.json({ paymentPayload, transactionId: inspected.transactionId });
+    } catch (error) {
+      const failure = publicFailure(error, "SIGNING_FAILED", 422);
+      logFailure("managed_agent_sign_failed", error);
+      return c.json({ code: failure.code }, failure.status);
+    }
+  });
+
   app.post("/managed-sign", async c => {
+    if (env.APP_ENV === "production") return c.json({ code: "SHARED_MANAGED_SIGNING_DISABLED" }, 410);
     if (!authorized(env.MANAGED_SIGNING_API_KEY, c.req.header("authorization"))) return c.json({ code: "UNAUTHORIZED" }, 401);
     try {
       const { paymentRequirements } = z.object({ paymentRequirements: z.custom<PaymentRequirements>() }).parse(await boundedJson(c.req.raw));
@@ -120,7 +194,7 @@ export function createHederaApp(env: HederaFacilitatorEnv): { app: Hono; network
       return c.json({ paymentPayload, transactionId: inspected.transactionId });
     } catch (error) {
       const failure = publicFailure(error, "SIGNING_FAILED", 500);
-      logFailure("managed_sign_failed", error);
+      logFailure("legacy_managed_sign_failed", error);
       return c.json({ code: failure.code }, failure.status);
     }
   });

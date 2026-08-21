@@ -10,6 +10,8 @@ function explorerFor(network: string | undefined, transactionId: string | null) 
   if (network === "hedera:mainnet") return { url: `https://hashscan.io/mainnet/transaction/${transactionId}`, label: "HashScan" };
   if (network === "hedera:testnet") return { url: `https://hashscan.io/testnet/transaction/${transactionId}`, label: "HashScan" };
   if (network === "eip155:5042002") return { url: `https://testnet.arcscan.app/tx/${transactionId}`, label: "ArcScan" };
+  if (network === "cardano:preprod") return { url: `https://preprod.cardanoscan.io/transaction/${transactionId}`, label: "Cardanoscan" };
+  if (network === "cardano:mainnet") return { url: `https://cardanoscan.io/transaction/${transactionId}`, label: "Cardanoscan" };
   return { url: null, label: null };
 }
 
@@ -58,23 +60,19 @@ export async function GET(request: Request) {
       return [{ assetId: asset.id, symbol: asset.symbol, network: asset.network, amount: formatAtomic(row._sum.amountAtomic.toString(), asset.decimals) }];
     });
 
-    const orgSpendByAsset = new Map<string, bigint>();
     const agentSpendByAsset = new Map<string, bigint>();
     for (const reservation of dailyReservations) {
-      const amount = BigInt(reservation.amountAtomic.toString());
-      orgSpendByAsset.set(reservation.assetId, (orgSpendByAsset.get(reservation.assetId) ?? 0n) + amount);
       const key = `${reservation.agentId}:${reservation.assetId}`;
-      agentSpendByAsset.set(key, (agentSpendByAsset.get(key) ?? 0n) + amount);
+      agentSpendByAsset.set(key, (agentSpendByAsset.get(key) ?? 0n) + BigInt(reservation.amountAtomic.toString()));
     }
 
+    // Managed agents now have isolated payment identities and independent spend
+    // reservations. Dashboard budget reporting must therefore remain per-agent
+    // for every custody mode; sharing a facilitator does not create a treasury.
     const budgetRows = agents.flatMap((agent) => {
       const policy = agent.effectivePolicy;
       if (agent.status !== "ACTIVE" || !policy) return [];
-      const account = agent.accounts.find((candidate) => candidate.status === "ACTIVE" && candidate.network === agent.network);
-      const sharedTreasury = account?.custodyType === "PLATFORM_MANAGED_TESTNET";
-      const spent = sharedTreasury
-        ? (orgSpendByAsset.get(policy.assetId) ?? 0n)
-        : (agentSpendByAsset.get(`${agent.id}:${policy.assetId}`) ?? 0n);
+      const spent = agentSpendByAsset.get(`${agent.id}:${policy.assetId}`) ?? 0n;
       const limit = BigInt(policy.dailyLimitAtomic.toString());
       const remaining = limit > spent ? limit - spent : 0n;
       const percent = limit > 0n ? Number((spent * 10_000n) / limit) / 100 : 0;

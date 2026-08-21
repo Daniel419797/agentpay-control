@@ -7,21 +7,22 @@ This document defines the security properties AgentPay must preserve in producti
 AgentPay consists of five security domains:
 
 1. **Operator dashboard and API** — authenticates human operators, resolves the active organization, enforces RBAC, policy, approvals, idempotency, emergency-stop state, and persistence.
-2. **Managed facilitator services** — hold blockchain signing capabilities isolated from the dashboard. Hedera and Arc signing, settlement, and contract-execution capabilities use separate API credentials. Production private signing material must live in KMS/HSM/external signing custody when the deployment platform supports it.
+2. **Managed facilitator/signer services** — shared service processes that hold narrowly scoped signing capabilities isolated from the dashboard. A shared service is permitted; a shared agent payment identity is not.
 3. **Resource server / x402 providers** — advertise exact payment requirements, verify signatures, request settlement, and return paid-resource fulfillment evidence.
-4. **External providers and chains** — Hedera Mirror Node, Arc RPC, Stripe, LI.FI/EVM chains, Supabase, Resend, Slack/webhooks, and explorers. Their responses are untrusted until schema-, identity-, amount-, network-, and finality-checked.
-5. **Self-custody wallets** — independently controlled by the user. Exporting a raw transaction leaves the AgentPay control boundary. AgentPay can block new exports but cannot revoke a payload already handed to an external wallet.
+4. **External providers and chains** — Hedera Mirror Node, Arc RPC, Blockfrost, Stripe, LI.FI/EVM chains, Supabase, notifications and explorers. Responses are untrusted until schema-, identity-, amount-, network-, and finality-checked.
+5. **Self-custody wallets** — independently controlled by the user. Exporting/signing a transaction leaves the AgentPay managed-custody boundary; AgentPay can block new exports but cannot revoke an already signed external payload.
 
 ## Protected assets
 
 The highest-value assets are:
 
-- blockchain private keys, signing capability API keys, provider restricted keys, webhook credentials, notification signing secrets, and encryption master keys;
+- blockchain private keys, managed-agent master keys, HSM/KMS key references, signing capability API keys, provider restricted keys, webhook credentials, notification signing secrets, and encryption master keys;
+- per-agent payment identities and the one-to-one binding between identity and `PaymentAccount`;
 - organization membership and role assignments;
 - policy versions, approvals, spend reservations, balance snapshots, payment intents, attempts, settlement evidence, and immutable audit history;
 - virtual-card and fiat-provider state;
 - cross-chain transaction requests and exact source/destination verification evidence;
-- child/provider/customer data stored in the application database and fulfillment payloads;
+- organization/customer data stored in the application database and fulfillment payloads;
 - organization tenancy boundaries and active-workspace selection.
 
 ## Actors
@@ -33,8 +34,8 @@ The highest-value assets are:
 - **Provider Admin** — marketplace/provider administration.
 - **Agent credential** — scoped machine credential; never equivalent to an Owner session.
 - **Internal maintenance worker** — authenticated by the cron secret and permitted to reconcile/expire/retain records.
-- **Facilitator** — isolated managed signer/settler; not a general dashboard credential holder.
-- **External attacker** — unauthenticated or compromised low-privilege principal attempting account takeover, SSRF, cross-tenant access, replay, settlement fraud, or secret disclosure.
+- **Facilitator/signer service** — shared process that services many agents but must derive/resolve a distinct payment identity for each agent.
+- **External attacker** — unauthenticated or compromised low-privilege principal attempting account takeover, SSRF, cross-tenant access, replay, settlement fraud, duplicate identity assignment, or secret disclosure.
 
 ## Mandatory security invariants
 
@@ -49,12 +50,34 @@ The highest-value assets are:
 
 ### Secret handling
 
-- Dashboard production configuration contains no Hedera/Arc private keys.
-- Signing, settlement, and contract-execution API credentials are capability-scoped and mutually distinct across networks.
+- Dashboard production configuration contains no blockchain private keys, signer master keys or HSM/KMS signing credentials.
+- Signing, settlement, contract-execution and claim-store API credentials are capability-scoped and mutually distinct where required.
+- `HEDERA_MANAGED_AGENT_MASTER_KEY`, `ARC_MANAGED_AGENT_MASTER_KEY` and `CARDANO_MANAGED_AGENT_MASTER_KEY` are testnet-only signer/facilitator secrets and are never present on mainnet services or Vercel.
 - Hedera raw 64-hex keys require an explicit `ECDSA` or `ED25519` type.
-- Arc payer, relayer, and contract-execution private keys are distinct, including in the combined facilitator.
+- Arc infrastructure payer, relayer and contract-execution private keys remain distinct from one another and from managed-agent identities.
 - Stored sensitive values are encrypted; one-time secrets are never returned by ordinary list/detail APIs.
 - Slack/generic webhook URLs are treated as credentials and redacted from browser/API reads and organization exports.
+
+### Payment identity isolation
+
+- Every active payment identity belongs to exactly one `PaymentAccount` and therefore one agent.
+- EVM identity equality is case-insensitive; Hedera/Cardano identities use their canonical exact representations.
+- The database globally serializes identity claims with a transaction-scoped PostgreSQL advisory-lock trigger and rejects duplicates with a canonical unique index.
+- This invariant applies across organizations, concurrent requests and multiple dashboard replicas. An application-level precheck is not the security boundary.
+- A managed signer request is bound to the immutable Agent ID and expected payer identity. The signer/facilitator rejects a derived/resolved identity that does not match the stored payer.
+- Infrastructure identities such as Hedera operators/contract payers and Arc relayers/contract executors are not agent payment identities and must never be copied into `PaymentAccount.accountId`.
+- Spend reservations, budget reporting and settlement attribution remain per-agent for managed custody. Sharing a facilitator deployment does not create a shared treasury.
+- Legacy agents created under a shared-payer design must fail closed/reprovision. Historical payer/settlement evidence is not rewritten to fabricate isolation retroactively.
+
+### Managed custody by environment
+
+- Current deterministic managed-agent identities are allowed only on supported test networks.
+- Hedera Testnet uses a distinct Ed25519 key/account per Agent ID.
+- Arc Testnet uses a distinct secp256k1 key/address per Agent ID.
+- Cardano Preprod uses a distinct Ed25519 payment key/address per Agent ID.
+- Mainnet deterministic managed-agent master keys are prohibited.
+- Current mainnet agent payments use self custody. Future autonomous mainnet spending requires a separately provisioned per-agent HSM/KMS/delegation key reference and must never fall back to a deployment-wide hot wallet.
+- Rotating a testnet managed-agent master key changes deterministic derivations. Rotation therefore requires controlled reprovision/migration of affected agents, not an in-place secret replacement while agents remain active.
 
 ### Payment authorization
 
@@ -71,6 +94,7 @@ The highest-value assets are:
 - Mirror Node integer amounts are parsed losslessly; values above JavaScript safe-integer range are never rounded.
 - Arc reconciliation requires an exact submitted hash, configured finality threshold, successful receipt, configured USDC contract, exact payer/payee, and exact atomic transfer amount.
 - Arc settlement evidence is request-scoped; concurrent requests cannot overwrite one another's candidate transaction hash.
+- Cardano reconciliation verifies exact network, payer inputs, payee, amount, whitelisted asset behavior, resource binding, transaction hash and confirmation depth.
 - Replay/mismatch incidents and corresponding financial-state transitions are committed atomically.
 - A successful settlement with unrecoverable resource fulfillment remains settled; fulfillment failure is recorded separately and an urgent incident is opened.
 
@@ -94,7 +118,7 @@ The highest-value assets are:
 - Resource URLs are validated against SSRF-sensitive/private address classes in production.
 - New resource endpoints are stored in canonical URL form and resource registration is serialized by canonical endpoint.
 - Pre-launch canonicalization must report zero legacy collisions before traffic is enabled.
-- The resource server advertises only rails with complete asset, payee, facilitator, and Hedera fee-payer configuration.
+- The resource server advertises only rails with complete asset, payee and facilitator/settlement configuration.
 
 ### Audit and operations
 
@@ -108,17 +132,21 @@ The highest-value assets are:
 
 | Threat | Required defense |
 |---|---|
+| Two agents receive the same managed wallet | global canonical unique index + advisory-lock trigger + signer binding to Agent ID/payer |
+| Cross-tenant concurrent identity race | database-global identity lock/unique constraint, not organization-local precheck |
+| Shared service credential becomes shared agent payer | dedicated per-agent signer endpoints; infrastructure payer identities never assigned to agents |
+| Mainnet autonomy silently falls back to hot wallet | deterministic managed keys prohibited on mainnet; self custody until per-agent HSM/KMS exists |
 | Cross-tenant object access | organization-scoped queries + active membership resolution + server RBAC |
 | Operator self-approves payment | immutable initiator evidence + four-eyes approval check |
-| Double spend using stale balance | serialized reservation accounting + unresolved/recent settlement deductions |
+| Double spend using stale balance | serialized per-agent reservation accounting + unresolved/recent settlement deductions |
 | Settlement timeout causes duplicate retry | `SUBMISSION_UNKNOWN`, exact candidate evidence, reconciliation before retry |
 | Concurrent Arc requests swap hashes | request-scoped `AsyncLocalStorage` settlement evidence |
 | Hedera large amount rounds in JS | lossless amount parsing + `BigInt` verification |
 | Malformed 2xx facilitator response treated as safe failure | classify as settlement unknown |
 | SSRF through marketplace/provider URL | safe URL validation, DNS/IP restrictions, canonical endpoint identity |
-| Kill switch bypass | recheck organization state at external side-effect boundaries; fail-closed UI |
+| Kill switch bypass | recheck organization state at external side-effect boundaries; fail closed |
 | Already-exported self-custody transaction after stop | explicit trust-boundary acknowledgement; keep reconciliation active |
-| Workspace deletion reports success before Stripe cancellation | `PROCESSING` deletion saga + provider retry + urgent incident |
+| Workspace deletion reports success before provider cancellation | `PROCESSING` deletion saga + provider retry + urgent incident |
 | Webhook/Slack credential disclosure | encrypted signing secret + destination redaction in reads/exports |
 | Misspelled production environment enables dev defaults | invalid explicit `APP_ENV` is fatal |
 
@@ -127,24 +155,26 @@ The highest-value assets are:
 A production release is not approved until all applicable evidence exists for the immutable release SHA:
 
 1. migrations apply cleanly to PostgreSQL 17 and there are no unfinished Prisma migrations;
-2. `npm run verify` passes for the dashboard;
-3. facilitator, Arc facilitator, combined facilitator, and resource-server tests/builds pass;
-4. container builds pass;
-5. `npm run db:resources:check` reports zero canonicalization changes/collisions after any required `db:resources:canonicalize` maintenance window;
-6. CI, CodeQL, dependency review, and project quality gates are green or each finding is explicitly dispositioned by a qualified reviewer;
-7. secrets are provisioned from an approved secret manager and signing keys are in KMS/HSM/external-signer custody where supported;
-8. DNS/TLS, monitoring, paging/on-call ownership, database PITR, and a recorded restore drill are in place;
-9. Stripe/financial-provider approvals exist before live card/fiat flags are enabled;
-10. funded low-value Hedera/Arc/x402 and applicable cross-chain/fiat canaries are independently verified against provider/explorer evidence;
-11. an independent security assessment has reviewed the trust boundaries and invariants in this document.
+2. the payment-identity isolation verifier proves the canonical unique index, advisory-lock trigger and concurrent cross-organization duplicate rejection;
+3. `npm run verify` passes for the dashboard;
+4. facilitator, Arc facilitator, combined facilitator, Cardano signer and resource-server tests/builds pass;
+5. production container builds pass, including the Cardano signer;
+6. `npm run db:resources:check` reports zero canonicalization changes/collisions after required maintenance;
+7. CI, CodeQL, dependency review and project quality gates are green or every finding is explicitly dispositioned by a qualified reviewer;
+8. managed-agent master keys are provisioned only on the correct testnet signer services and are independent from API capabilities/operator credentials;
+9. legacy shared-payer agents are reprovisioned before the identity-isolation migration is promoted;
+10. DNS/TLS, monitoring, paging/on-call ownership, database PITR and a recorded restore drill are in place;
+11. funded low-value canaries use the **specific agent identity** being tested rather than an operator/shared wallet;
+12. an independent security assessment has reviewed the trust boundaries and invariants in this document.
 
 ## Incident response priorities
 
 If compromise or ambiguity is suspected:
 
 1. activate the organization emergency stop and provider-side freeze/revocation controls;
-2. preserve audit, provider, and chain evidence;
+2. preserve audit, provider and chain evidence;
 3. rotate affected capability/session/provider credentials;
-4. reconcile ambiguous submissions before any retry;
-5. keep spend consumed when successful-chain evidence mismatches the authorized quote;
-6. open an urgent support incident and record remediation against the immutable release SHA.
+4. if a managed-agent master key is compromised, stop all affected managed agents and reprovision identities under a newly generated master key before resuming;
+5. reconcile ambiguous submissions before any retry;
+6. keep spend consumed when successful-chain evidence mismatches the authorized quote;
+7. open an urgent support incident and record remediation against the immutable release SHA.

@@ -16,6 +16,7 @@ const legacyPaymentResponseSchema = z.object({ transactionId: z.string().optiona
 export type PaymentRequirement = z.infer<typeof paymentRequirementSchema>;
 export type PaymentRequired = z.infer<typeof paymentRequiredSchema>;
 export type PaymentPayload = z.infer<typeof paymentPayloadSchema>;
+export type ManagedSignerIdentity = { agentId: string; payerAccountId: string };
 
 export function parsePaymentRequired(value: unknown) { return paymentRequiredSchema.parse(value); }
 export function parsePaymentPayload(value: unknown) { return paymentPayloadSchema.parse(value); }
@@ -97,13 +98,40 @@ export function selectRequirement(required: PaymentRequired, expected: { network
   return selected;
 }
 
-export function createManagedPaymentPayload(facilitatorUrl: string, requirement: PaymentRequirement, apiKey?: string): Promise<{ paymentPayload: z.infer<typeof paymentPayloadSchema>; transactionId: string }>;
-export function createManagedPaymentPayload(requirement: PaymentRequirement): Promise<{ paymentPayload: z.infer<typeof paymentPayloadSchema>; transactionId: string }>;
-export async function createManagedPaymentPayload(facilitatorUrlOrRequirement: string | PaymentRequirement, requirement?: PaymentRequirement, apiKey?: string) {
-  let url: string; let req: PaymentRequirement; let key: string | undefined;
-  if (typeof facilitatorUrlOrRequirement === "string" && requirement) { url = facilitatorUrlOrRequirement; req = requirement; key = apiKey; }
-  else { req = facilitatorUrlOrRequirement as PaymentRequirement; const route = getNetworkRouter().getRoute(req.network); url = route.facilitatorUrl; key = route.facilitatorApiKey; }
-  const response = await fetch(`${url}/managed-sign`, { method: "POST", redirect: "manual", signal: AbortSignal.timeout(15_000), headers: { "content-type": "application/json", accept: "application/json", ...(key ? { authorization: `Bearer ${key}` } : {}) }, body: JSON.stringify({ paymentRequirements: req }) });
+export function createManagedPaymentPayload(facilitatorUrl: string, requirement: PaymentRequirement, identity: ManagedSignerIdentity, apiKey?: string): Promise<{ paymentPayload: z.infer<typeof paymentPayloadSchema>; transactionId: string }>;
+export function createManagedPaymentPayload(requirement: PaymentRequirement, identity: ManagedSignerIdentity): Promise<{ paymentPayload: z.infer<typeof paymentPayloadSchema>; transactionId: string }>;
+export async function createManagedPaymentPayload(
+  facilitatorUrlOrRequirement: string | PaymentRequirement,
+  requirementOrIdentity: PaymentRequirement | ManagedSignerIdentity,
+  identityOrApiKey?: ManagedSignerIdentity | string,
+  apiKey?: string,
+) {
+  let url: string;
+  let req: PaymentRequirement;
+  let identity: ManagedSignerIdentity;
+  let key: string | undefined;
+
+  if (typeof facilitatorUrlOrRequirement === "string") {
+    url = facilitatorUrlOrRequirement;
+    req = requirementOrIdentity as PaymentRequirement;
+    identity = identityOrApiKey as ManagedSignerIdentity;
+    key = apiKey;
+  } else {
+    req = facilitatorUrlOrRequirement;
+    identity = requirementOrIdentity as ManagedSignerIdentity;
+    const route = getNetworkRouter().getRoute(req.network);
+    url = route.facilitatorUrl;
+    key = route.facilitatorApiKey;
+  }
+
+  if (!identity?.agentId || !identity.payerAccountId) throw new Error("MANAGED_SIGNER_IDENTITY_REQUIRED");
+  const response = await fetch(`${url.replace(/\/$/, "")}/managed-agent-sign`, {
+    method: "POST",
+    redirect: "manual",
+    signal: AbortSignal.timeout(15_000),
+    headers: { "content-type": "application/json", accept: "application/json", ...(key ? { authorization: `Bearer ${key}` } : {}) },
+    body: JSON.stringify({ paymentRequirements: req, agentId: identity.agentId, payerAccountId: identity.payerAccountId }),
+  });
   if (!response.ok) throw new Error(`FACILITATOR_SIGNING_${response.status}`);
   const body = await response.json() as { paymentPayload?: unknown; transactionId?: unknown };
   if (typeof body.transactionId !== "string" || body.transactionId.length < 8) throw new Error("FACILITATOR_TRANSACTION_ID_MISSING");

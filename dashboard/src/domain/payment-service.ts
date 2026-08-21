@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { getConfig } from "@/lib/config";
 import { evaluatePolicy, policyScheduleViolation } from "@/domain/policy";
 import { paymentFingerprint } from "@/domain/fingerprint";
-import { managedPayerMatches, paymentAccountForNetwork, providerPayeeForNetwork, x402AssetIdentifier } from "@/domain/payment-routing";
+import { paymentAccountForNetwork, providerPayeeForNetwork, x402AssetIdentifier } from "@/domain/payment-routing";
 import { getNetworkRouter } from "@/domain/network-router";
 import { createManagedPaymentPayload, discoverX402, fulfillX402Resource, parsePaymentPayload, parsePaymentRequired, selectRequirement, X402SubmissionUnknownError, type PaymentPayload } from "@/domain/x402-client";
 import { assertSafeResourceUrl } from "@/lib/safe-url";
@@ -27,8 +27,7 @@ export type PaidRequestContext = { initiatedByUserId?: string };
 function hash(value: unknown) { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
 
 function isManagedSigningAccount(account: { custodyType: string; signingMode: string }) {
-  return (account.custodyType === "PLATFORM_MANAGED_TESTNET" && account.signingMode === "AUTONOMOUS_MANAGED")
-    || (account.custodyType === "EXTERNAL_DELEGATED" && account.signingMode === "BOUNDED_DELEGATION");
+  return account.custodyType === "PLATFORM_MANAGED_TESTNET" && account.signingMode === "AUTONOMOUS_MANAGED";
 }
 
 async function failBeforeSigning(intentId: string, organizationId: string, code: string) {
@@ -117,7 +116,11 @@ export async function executeAuthorizedIntent(intentId: string) {
   const account = paymentAccountForNetwork(intent.agent.accounts, intent.quote!.network);
   if (!isManagedSigningAccount(account)) throw new Error("MANAGED_SIGNER_REQUIRED");
   const config = getConfig();
-  if (!managedPayerMatches(account, config)) throw new Error("MANAGED_PAYER_MISMATCH");
+  const duplicateIdentity = await db.paymentAccount.findFirst({
+    where: { network: account.network, accountId: account.accountId, status: "ACTIVE", agentId: { not: intent.agent.id } },
+    select: { id: true },
+  });
+  if (duplicateIdentity) throw new Error("MANAGED_IDENTITY_NOT_ISOLATED");
   const route = getNetworkRouter().getRoute(account.network);
   if (config.APP_ENV === "production" && !route.facilitatorApiKey) throw new Error("LIVE_FACILITATOR_REQUIRED");
 
@@ -136,7 +139,7 @@ export async function executeAuthorizedIntent(intentId: string) {
 
   let confirmedSettlement: { transactionId: string; network: string } | undefined;
   try {
-    const signed = await createManagedPaymentPayload(requirement);
+    const signed = await createManagedPaymentPayload(requirement, { agentId: intent.agent.id, payerAccountId: account.accountId });
     await db.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "SIGNED", signatureFingerprint: hash(signed.paymentPayload), candidateTransactionId: signed.transactionId } });
 
     const fulfillment = await fulfillX402Resource(intent.resourceUrl, requirement, signed.paymentPayload, config.APP_ENV === "production");
@@ -288,8 +291,7 @@ export async function createPaidRequest(
     const dayStart = new Date(now); dayStart.setUTCHours(0, 0, 0, 0);
     const hourStart = new Date(now); hourStart.setUTCMinutes(0, 0, 0);
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-    const sharedTreasury = isManagedSigningAccount(account);
-    const scope = sharedTreasury ? { agent: { organizationId: agent.organizationId } } : { agentId };
+    const scope = { agentId };
     const spentStatuses = ["ACTIVE", "CONSUMED", "SETTLED"] as const;
     const [daily, hourly, monthly, balanceCommitted, lastReservation] = await Promise.all([
       tx.spendReservation.aggregate({ where: { ...scope, assetId: policy.assetId, createdAt: { gte: dayStart }, status: { in: [...spentStatuses] } }, _sum: { amountAtomic: true } }),
@@ -353,30 +355,17 @@ export async function createPaidRequest(
         maxConfidenceBps: catalyst.oracle.maxConfidenceBps,
         nowSeconds: Math.floor(now.getTime() / 1000),
       });
-      const usdRows = sharedTreasury
-        ? await tx.$queryRaw<Array<{ hourlyUsdMicros: bigint; dailyUsdMicros: bigint; monthlyUsdMicros: bigint }>>`
-            SELECT
-              COALESCE(SUM(u."usdMicros") FILTER (WHERE r."createdAt" >= ${hourStart}), 0)::bigint AS "hourlyUsdMicros",
-              COALESCE(SUM(u."usdMicros") FILTER (WHERE r."createdAt" >= ${dayStart}), 0)::bigint AS "dailyUsdMicros",
-              COALESCE(SUM(u."usdMicros") FILTER (WHERE r."createdAt" >= ${monthStart}), 0)::bigint AS "monthlyUsdMicros"
-            FROM "UsdSpendReservationSnapshot" u
-            JOIN "SpendReservation" r ON r."id" = u."spendReservationId"
-            JOIN "Agent" a ON a."id" = r."agentId"
-            WHERE a."organizationId" = ${agent.organizationId}::uuid
-              AND r."status" IN ('ACTIVE', 'CONSUMED', 'SETTLED')
-              AND r."createdAt" >= ${monthStart}
-          `
-        : await tx.$queryRaw<Array<{ hourlyUsdMicros: bigint; dailyUsdMicros: bigint; monthlyUsdMicros: bigint }>>`
-            SELECT
-              COALESCE(SUM(u."usdMicros") FILTER (WHERE r."createdAt" >= ${hourStart}), 0)::bigint AS "hourlyUsdMicros",
-              COALESCE(SUM(u."usdMicros") FILTER (WHERE r."createdAt" >= ${dayStart}), 0)::bigint AS "dailyUsdMicros",
-              COALESCE(SUM(u."usdMicros") FILTER (WHERE r."createdAt" >= ${monthStart}), 0)::bigint AS "monthlyUsdMicros"
-            FROM "UsdSpendReservationSnapshot" u
-            JOIN "SpendReservation" r ON r."id" = u."spendReservationId"
-            WHERE r."agentId" = ${agentId}::uuid
-              AND r."status" IN ('ACTIVE', 'CONSUMED', 'SETTLED')
-              AND r."createdAt" >= ${monthStart}
-          `;
+      const usdRows = await tx.$queryRaw<Array<{ hourlyUsdMicros: bigint; dailyUsdMicros: bigint; monthlyUsdMicros: bigint }>>`
+        SELECT
+          COALESCE(SUM(u."usdMicros") FILTER (WHERE r."createdAt" >= ${hourStart}), 0)::bigint AS "hourlyUsdMicros",
+          COALESCE(SUM(u."usdMicros") FILTER (WHERE r."createdAt" >= ${dayStart}), 0)::bigint AS "dailyUsdMicros",
+          COALESCE(SUM(u."usdMicros") FILTER (WHERE r."createdAt" >= ${monthStart}), 0)::bigint AS "monthlyUsdMicros"
+        FROM "UsdSpendReservationSnapshot" u
+        JOIN "SpendReservation" r ON r."id" = u."spendReservationId"
+        WHERE r."agentId" = ${agentId}::uuid
+          AND r."status" IN ('ACTIVE', 'CONSUMED', 'SETTLED')
+          AND r."createdAt" >= ${monthStart}
+      `;
       const spend = usdRows[0] ?? { hourlyUsdMicros: 0n, dailyUsdMicros: 0n, monthlyUsdMicros: 0n };
       const usdDecision = evaluateUsdPolicy({ requestedUsdMicros: oracleValuation.usdMicros, spend, limits: catalyst.oracle, overLimitAction: policy.overLimitAction });
       combined = combinePolicyOutcomes(combined, usdDecision);
