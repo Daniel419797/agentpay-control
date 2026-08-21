@@ -12,9 +12,10 @@ const envSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3100"),
   DATABASE_URL: z.string().min(1).default("postgresql://agentpay:agentpay@localhost:54329/agentpay?schema=public"),
   AUTH_SECRET: z.string().min(32).default("development-only-secret-change-before-deploy"),
-  HEDERA_NETWORK: z.enum(["testnet", "mainnet"]).default("testnet"),
+  HEDERA_NETWORK: z.enum(appEnvironments.includes("production") ? ["testnet", "mainnet"] : ["testnet", "mainnet"]).default("testnet"),
   HEDERA_OPERATOR_ID: z.string().optional(),
   HEDERA_OPERATOR_KEY: z.string().optional(),
+  // Infrastructure/contract payer only. Managed agents never inherit this ID.
   HEDERA_PAYER_ACCOUNT_ID: z.string().regex(hederaAccountId).optional(),
   HEDERA_PROVIDER_ACCOUNT_ID: z.string().regex(hederaAccountId).default("0.0.98765"),
   HEDERA_MAINNET_PROVIDER_ACCOUNT_ID: z.string().regex(hederaAccountId).optional(),
@@ -37,6 +38,7 @@ const envSchema = z.object({
   ARC_FACILITATOR_CONTRACT_API_KEY: z.string().min(32).optional(),
   ARC_RPC_URL: z.string().url().optional(),
   ARC_PROVIDER_ADDRESS: z.string().regex(evmAddress).transform((value) => value.toLowerCase()).optional(),
+  // Legacy deployment value retained for compatibility; never assigned to an agent.
   ARC_PAYER_ADDRESS: z.string().regex(evmAddress).transform((value) => value.toLowerCase()).optional(),
   ARC_USDC_ADDRESS: z.string().regex(evmAddress).transform((value) => value.toLowerCase()).default("0x3600000000000000000000000000000000000000"),
   CARDANO_SETTLEMENT_STORE_API_KEY: z.string().min(32).optional(),
@@ -44,6 +46,7 @@ const envSchema = z.object({
   CARDANO_PREPROD_FACILITATOR_API_KEY: z.string().min(32).optional(),
   CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY: z.string().min(32).optional(),
   CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY: z.string().min(32).optional(),
+  // Legacy deployment values retained for compatibility; isolated managed agents use per-agent addresses.
   CARDANO_PREPROD_PAYER_ADDRESS: z.string().regex(cardanoPreprodAddress).optional(),
   CARDANO_PREPROD_PROVIDER_ADDRESS: z.string().regex(cardanoPreprodAddress).optional(),
   CARDANO_PREPROD_BLOCKFROST_URL: z.string().url().default("https://cardano-preprod.blockfrost.io/api/v0"),
@@ -154,7 +157,8 @@ export function productionConfigErrors(config: AppConfig): string[] {
   if (!config.ARC_FACILITATOR_CONTRACT_API_KEY) errors.push("ARC_FACILITATOR_CONTRACT_API_KEY");
   if (!config.ARC_RPC_URL) errors.push("ARC_RPC_URL");
   if (!config.ARC_PROVIDER_ADDRESS) errors.push("ARC_PROVIDER_ADDRESS");
-  if (!config.ARC_PAYER_ADDRESS) errors.push("ARC_PAYER_ADDRESS");
+  // HEDERA_PAYER_ACCOUNT_ID is a contract-execution infrastructure identity,
+  // never a managed-agent wallet. Keep it required while contract execution is enabled.
   if (!config.HEDERA_PAYER_ACCOUNT_ID) errors.push("HEDERA_PAYER_ACCOUNT_ID");
   if (!isExactBase64Url32(config.KEY_ENCRYPTION_MASTER_KEY)) errors.push("KEY_ENCRYPTION_MASTER_KEY must be exactly 32 random bytes encoded as unpadded base64url");
   if (!config.SUPABASE_URL || !config.SUPABASE_ANON_KEY) errors.push("SUPABASE_URL / SUPABASE_ANON_KEY");
@@ -164,7 +168,6 @@ export function productionConfigErrors(config: AppConfig): string[] {
     config.CARDANO_PREPROD_FACILITATOR_URL,
     config.CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY,
     config.CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY,
-    config.CARDANO_PREPROD_PAYER_ADDRESS,
     config.CARDANO_PREPROD_PROVIDER_ADDRESS,
     config.CARDANO_PREPROD_BLOCKFROST_PROJECT_ID,
   ]);
@@ -172,7 +175,6 @@ export function productionConfigErrors(config: AppConfig): string[] {
     config.CARDANO_MAINNET_FACILITATOR_URL,
     config.CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY,
     config.CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY,
-    config.CARDANO_MAINNET_PAYER_ADDRESS,
     config.CARDANO_MAINNET_PROVIDER_ADDRESS,
     config.CARDANO_MAINNET_BLOCKFROST_PROJECT_ID,
   ]);
@@ -181,7 +183,6 @@ export function productionConfigErrors(config: AppConfig): string[] {
     ["CARDANO_PREPROD_FACILITATOR_URL", config.CARDANO_PREPROD_FACILITATOR_URL],
     ["CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY", config.CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY],
     ["CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY", config.CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY],
-    ["CARDANO_PREPROD_PAYER_ADDRESS", config.CARDANO_PREPROD_PAYER_ADDRESS],
     ["CARDANO_PREPROD_PROVIDER_ADDRESS", config.CARDANO_PREPROD_PROVIDER_ADDRESS],
     ["CARDANO_PREPROD_BLOCKFROST_PROJECT_ID", config.CARDANO_PREPROD_BLOCKFROST_PROJECT_ID],
   ], errors);
