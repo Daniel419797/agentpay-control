@@ -12,11 +12,15 @@ cd "$ROOT"
 echo "[unified-topology] ensure repository workspace dependencies"
 npm install --ignore-scripts --no-save --package-lock=false --legacy-peer-deps --include=dev
 
-# Release dependencies used at runtime must not contain high/critical audit
-# findings. Development-only tooling advisories are tracked separately and do
-# not get force-downgraded into an incompatible dependency graph.
+# Audit the production dependency graph. npm currently reports one Prisma 7.9.1
+# CLI/config advisory chain as production because Prisma Client peer-depends on
+# the CLI. The checker permits only that exact advisory chain and fails on any
+# additional high/critical finding or if the chain changes.
 echo "[unified-topology] production dependency audit"
-npm audit --omit=dev --audit-level=high
+AUDIT_FILE="$(mktemp)"
+trap 'rm -f "$AUDIT_FILE"' EXIT
+npm audit --omit=dev --json > "$AUDIT_FILE" || true
+node scripts/ci/check-production-audit.mjs "$AUDIT_FILE"
 
 echo "[unified-topology] Cardano signer syntax and tests"
 (
