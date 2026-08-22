@@ -3,11 +3,11 @@
 **Updated:** 2026-08-22  
 **Proposer / primary builder:** Daniel Praise (`Daniel419797`)
 
-> **Reason for update:** This checklist now covers the implemented Cardano Mainnet external per-agent custody path, keeps self custody as a parallel mode, and explicitly separates repository/source validation from real deployment/pilot evidence.
+This checklist covers the implemented Cardano Mainnet external per-agent custody path, keeps self custody as a parallel mode, and separates repository validation from real deployment and pilot evidence.
 
 ## Identity and disclosure
 
-- [ ] Proposal identifies **Daniel Praise** as primary technical contributor and GitHub `Daniel419797` as my repository account.
+- [ ] Proposal identifies **Daniel Praise** as primary technical contributor and GitHub `Daniel419797` as the repository account.
 - [ ] Prior Hedera x402 bounty involvement is disclosed as prior program work.
 - [ ] Previously completed Hedera work is not presented as new Catalyst-funded delivery.
 - [ ] Current TRL is stated as **TRL 5** unless the intended relevant-environment demonstration has actually been completed.
@@ -39,7 +39,7 @@
 - [ ] configured test-token canary verified if token mode is enabled
 - [ ] replay/resource mismatch/ambiguity failure behavior reviewed
 
-## Cardano Mainnet — self custody
+## Cardano Mainnet: self custody
 
 - [ ] Mainnet Blockfrost project matches Mainnet
 - [ ] no Cardano Mainnet managed-agent master key exists
@@ -48,7 +48,7 @@
 - [ ] facilitator submits through Blockfrost
 - [ ] chain evidence confirms expected payer/payee/asset/amount
 
-## Cardano Mainnet — external per-agent managed custody
+## Cardano Mainnet: external per-agent managed custody
 
 Only check this section when this custody mode is actually enabled in the environment.
 
@@ -153,4 +153,4 @@ When presented as public evidence:
 
 ## Final statement
 
-I will not use repository source support as a substitute for external pilot evidence. The repository now implements the technical Mainnet per-agent custody path; Catalyst claims about wallets, transaction volume, fees, adoption and TRL will be based on the actual proposal plan and observed evidence.
+Repository source support is not a substitute for external pilot evidence. The repository implements the technical Mainnet per-agent custody path; Catalyst claims about wallets, transaction volume, fees, adoption and TRL must be based on the actual proposal plan and observed evidence.
