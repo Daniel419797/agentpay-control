@@ -4,8 +4,6 @@
 **Updated:** 2026-08-22  
 **Primary builder:** Daniel Praise (`Daniel419797`)
 
-> **Reason for update:** This README was reviewed as part of the repository-wide documentation synchronization. Dune remains a read-only public Cardano observability surface; the update makes that boundary explicit and aligns the analytics wording with the current Cardano Mainnet custody/submission architecture without implying that publishing configuration is already live.
-
 These queries expose **public Cardano settlement activity only**. Dune is not in the payment authorization, policy, signing, submission, custody or reconciliation critical path.
 
 ## Where Dune sits in the architecture
@@ -98,9 +96,5 @@ Do not publish private AgentPay data to Dune, including:
 The checked-in templates identify public Cardano activity using configured public addresses/assets. They do not prove customer adoption, exact business volume, pilot conversion or production readiness by themselves.
 
 Public-chain transaction counts, distinct wallets and observed fees may be useful Catalyst evidence **only when derived from real qualifying activity and clearly reported as observed values**. Proposal targets are separate planning commitments.
-
-## Update provenance
-
-Reviewed/updated on 2026-08-22 as part of the complete AgentPay documentation pass. No payment authority was added to Dune; the reason for this update is to ensure the analytics documentation matches the current implementation and evidence discipline.
 
 See [`../../docs/catalyst-submission.md`](../../docs/catalyst-submission.md) and [`../../docs/production-readiness.md`](../../docs/production-readiness.md).
