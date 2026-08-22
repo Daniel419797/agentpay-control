@@ -2,10 +2,6 @@
 
 **Updated:** 2026-08-22
 
-## Revision note
-
-AgentPay now implements Cardano Mainnet external per-agent Ed25519 custody in addition to self custody. This policy reflects the current multi-rail trust boundaries so vulnerability reporting and production security requirements cover the signer, facilitator and external-custody architecture.
-
 AgentPay controls payment credentials, spending policy, approvals, settlement workflows and multiple blockchain and provider boundaries. Security reports should be handled privately and should include enough evidence to reproduce and assess the issue without exposing real credentials or funds.
 
 ## Supported versions
