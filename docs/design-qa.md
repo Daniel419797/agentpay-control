@@ -1,5 +1,10 @@
 # AgentPay monogram integration QA
 
+**Status:** Visual implementation record; reviewed 2026-08-22  
+**Primary builder:** Daniel Praise (`Daniel419797`)
+
+> **Why this document was updated:** This file is specifically a visual/brand QA record, not a system-architecture specification. The original logo QA findings remain valid, so they are preserved below. I added this scope note to prevent the older Hedera-testnet screenshot context from being mistaken for the current product/network architecture. For current system status see `implementation-status.md` and `02-software-design-document.md`.
+
 ## Evidence
 
 - Source visual truth: `C:\Users\HomePC\.codex\generated_images\019f867d-e7fd-7ff3-afaf-9c36faac352d\call_3shPVREqBTbTC4oX3r34rJHn.png`
@@ -9,8 +14,10 @@
 - Viewport: 1280 x 576 CSS pixels at device scale factor 1.5
 - Source pixels: 1536 x 1024
 - Implementation screenshot pixels: 1280 x 576
-- State: authenticated dashboard overview, desktop sidebar, live Hedera testnet
+- State at time of visual QA: authenticated dashboard overview, desktop sidebar, Hedera testnet
 - Density normalization: both source and implementation were resized into equal 700-pixel-wide comparison panels; the focused comparison uses the rendered 248 x 82 CSS-pixel sidebar region.
+
+> The “Hedera testnet” line above records the screenshot state used for this visual comparison only. It does not describe the current supported-network set. AgentPay now includes the multi-rail implementation documented elsewhere.
 
 ## Findings
 
@@ -55,4 +62,4 @@ The focused side-by-side comparison confirms the same interlocking AP geometry, 
 - [x] Replace the application favicon.
 - [x] Verify lint, typecheck, production build, and browser rendering.
 
-final result: passed
+Final visual-QA result: **passed**.
