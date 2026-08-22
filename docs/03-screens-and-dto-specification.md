@@ -4,10 +4,6 @@
 **Updated:** 2026-08-22  
 **Primary builder:** Daniel Praise (`Daniel419797`)
 
-## Revision note
-
-The original July specification described the Hedera-focused MVP UI and DTOs. The current product supports multiple rails, richer policies, Cardano Preprod/Mainnet custody modes, Masumi/Pyth/KERI controls, reconciliation, incidents and broader operations. This version replaces the obsolete MVP-only view with a current functional map. The earlier specification remains in Git history.
-
 ## 1. UI surface
 
 The authenticated application is a Next.js dashboard/API control plane. Current functional areas include:
