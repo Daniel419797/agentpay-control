@@ -31,6 +31,14 @@ services:
       - key: CARDANO_PREPROD_MANAGED_AGENT_MASTER_KEY
         sync: false
 
+      # Mainnet managed agents never use a deployment-wide derivation secret.
+      # The external custody adapter must resolve a distinct Ed25519 identity per
+      # immutable Agent ID and sign only the supplied transaction-body hash.
+      - key: CARDANO_MAINNET_AGENT_CUSTODY_URL
+        sync: false
+      - key: CARDANO_MAINNET_AGENT_CUSTODY_API_KEY
+        sync: false
+
       # Network-specific Blockfrost credentials. The two project IDs must be
       # created for the matching Blockfrost networks and must not be reused.
       - key: CARDANO_PREPROD_BLOCKFROST_URL
@@ -218,8 +226,8 @@ services:
         generateValue: true
       - key: CARDANO_PREPROD_SETTLEMENT_API_KEY
         generateValue: true
-      # Mainnet capability is transaction-preparation only. Managed deterministic
-      # agent signing remains rejected by both facilitator and signer.
+      # Mainnet capability authorizes transaction preparation and the isolated
+      # per-agent managed routes. It is not a payer key or custody credential.
       - key: CARDANO_MAINNET_MANAGED_SIGNING_API_KEY
         generateValue: true
       - key: CARDANO_MAINNET_SETTLEMENT_API_KEY

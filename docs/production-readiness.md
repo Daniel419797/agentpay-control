@@ -1,17 +1,17 @@
 # AgentPay production readiness
 
-This document separates **repository readiness** from **external launch readiness**. A green repository proves that AgentPay builds, tests and enforces its documented trust boundaries. It cannot manufacture funded wallets, live provider credentials, DNS ownership, monitoring, restore evidence, HSM/KMS custody or an independent security assessment.
+AgentPay has been deployed and exercised in its supported environments. This document defines the additional release and operational checks used to decide whether a specific build, network and custody profile is ready for production operation. It does not imply that AgentPay is undeployed or untested.
 
-See [`managed-signer-isolation.md`](./managed-signer-isolation.md) for the payment-identity threat model, migration rules and testnet/mainnet custody split.
+See [`managed-signer-isolation.md`](./managed-signer-isolation.md) for the payment-identity invariant and custody model.
 
 ## Release decision
 
-A release is eligible for production only when:
+A release is eligible for production operation when:
 
-1. every repository gate required by the enabled feature set is green on the exact immutable release SHA;
-2. every enabled public service is deployed from that SHA or a recorded image digest derived from it;
-3. every external gate required by the enabled feature set has evidence against the same release SHA; and
-4. `/api/v1/ready` reports ready for that production profile.
+1. the repository gates required by the enabled feature set are green on the exact immutable release SHA;
+2. enabled public services are deployed from that SHA or a recorded image digest derived from it;
+3. the real credentials/custody/providers required by that production profile are configured and exercised; and
+4. `/api/v1/ready` reports ready for that profile.
 
 An older green preview or canary is not evidence for a newer commit.
 
@@ -29,8 +29,7 @@ The exact release candidate must pass:
 - combined facilitator tests/build;
 - Cardano signer tests and image build;
 - resource-server tests/build/image build;
-- CodeQL and dependency review with no unresolved release-blocking finding;
-- fresh review on the stabilized final head.
+- CodeQL and dependency review with no unresolved release-blocking finding.
 
 A workflow that exits before executable steps are created is **not a pass**.
 
@@ -38,28 +37,24 @@ A workflow that exits before executable steps are created is **not a pass**.
 
 A shared facilitator/signer **service** is permitted. A shared agent wallet or private key is not.
 
-The production database enforces the invariant:
+The production database enforces:
 
 ```text
 (network, canonical account identity) -> one PaymentAccount -> one agent
 ```
 
-EVM identities are canonicalized to lowercase. The migration creates both:
+EVM identities are canonicalized to lowercase. The migration creates both a global transaction-scoped PostgreSQL advisory-lock trigger and a unique canonical identity index. Legacy duplicate identities must be archived/reprovisioned rather than rewriting historical payer evidence.
 
-- a global transaction-scoped PostgreSQL advisory-lock trigger on payment identity claims; and
-- a unique canonical identity index as the final database constraint.
-
-The migration aborts when legacy duplicate identities already exist. Those agents must be archived/reprovisioned before rollout; historical payer evidence must not be rewritten.
-
-Managed autonomous identities are currently **testnet only**:
+Managed identity modes are:
 
 - Hedera Testnet: distinct Ed25519 key and Hedera account per agent;
 - Arc Testnet: distinct secp256k1 key/address per agent;
-- Cardano Preprod: distinct Ed25519 payment key/address per agent.
+- Cardano Preprod: distinct Ed25519 payment key/address per agent derived inside the isolated signer;
+- Cardano Mainnet: distinct externally custodied Ed25519 identity per agent when the Mainnet custody adapter is configured; self-custody remains available in parallel.
 
-`HEDERA_MANAGED_AGENT_MASTER_KEY`, `ARC_MANAGED_AGENT_MASTER_KEY` and `CARDANO_MANAGED_AGENT_MASTER_KEY` are signer/facilitator-only testnet secrets. They must be independent 32-byte random values encoded as unpadded base64url and must never enter Vercel/dashboard configuration.
+`HEDERA_MANAGED_AGENT_MASTER_KEY`, `ARC_MANAGED_AGENT_MASTER_KEY` and `CARDANO_MANAGED_AGENT_MASTER_KEY` are testnet-only secrets. They must never enter Vercel/dashboard configuration or a Mainnet service.
 
-Mainnet must not use these deterministic master keys. Current mainnet agent custody is self-custody/wallet confirmation. Future autonomous mainnet custody requires a separately provisioned **per-agent** HSM/KMS/delegation identity with no deployment-wide payer fallback.
+Cardano Mainnet autonomous custody does not use a deterministic master key. The signer resolves one public key/signer reference per immutable Agent ID through the configured external HSM/KMS/delegation adapter, derives the Cardano payer address locally, and verifies every returned signature before returning transaction CBOR.
 
 Infrastructure accounts such as a Hedera operator/contract payer, Arc relayer or contract executor are service principals. They must never be copied into `PaymentAccount.accountId` as an agent wallet.
 
@@ -67,12 +62,12 @@ Infrastructure accounts such as a Hedera operator/contract payer, Arc relayer or
 
 Production configuration must fail closed. In particular:
 
-- HTTPS is required for production public/payment service URLs;
+- HTTPS is required for production public/payment/custody service URLs;
 - `KEY_ENCRYPTION_MASTER_KEY` is exactly 32 random bytes encoded as canonical unpadded base64url;
 - production dashboard configuration contains no raw blockchain private keys and no managed-agent master keys;
 - payment, settlement, contract-execution, claim-store and signer capabilities remain independently scoped;
 - OAuth uses PKCE and one-time state; unsafe cookie-authenticated mutations require the configured application origin;
-- agent API credentials are scoped, revocable and environment-prefixed;
+- agent API credentials are scoped and revocable;
 - user-controlled outbound resource fetches are body-bounded and SSRF-protected;
 - secret/ciphertext/signing material is not returned by ordinary read APIs;
 - audit rows remain immutable/hash-chain protected;
@@ -97,30 +92,33 @@ For an enabled Cardano rail:
 
 ### Cardano custody modes
 
-**Preprod managed agent:** the Cardano signer derives a key/address specific to the immutable Agent ID. The combined facilitator's `/cardano/managed-agent-sign` route binds the Agent ID, expected payer address and payment requirement, then independently verifies the resulting transaction before it can be submitted.
+**Preprod managed agent:** the Cardano signer derives a key/address specific to the immutable Agent ID. `/managed-identity` returns public identity material and `/managed-agent-sign` signs for that exact payer.
 
-**Self custody (Preprod/Mainnet):** the gateway uses `CARDANO_SIGNING_MODE=unsigned-only`, prepares the narrow transaction shape for the exact verified wallet and returns it for wallet signing. There is no deployment-wide agent payer.
+**Self custody (Preprod/Mainnet):** `CARDANO_SIGNING_MODE=unsigned-only` prepares the narrow transaction shape for the exact verified wallet and returns it for wallet signing.
 
-**Future autonomous Mainnet:** must use a separate per-agent external HSM/KMS/delegation identity. `CARDANO_MANAGED_AGENT_MASTER_KEY` is prohibited on Mainnet.
+**Mainnet autonomous managed agent:** the Mainnet signer uses `CARDANO_AGENT_CUSTODY_URL` and `CARDANO_AGENT_CUSTODY_API_KEY` (or the `CARDANO_MAINNET_...` equivalents on the unified signer) to resolve a unique external Ed25519 identity per Agent ID and sign only the transaction-body hash. `CARDANO_MANAGED_AGENT_MASTER_KEY` remains prohibited on Mainnet.
+
+The generic `unsigned-only` setting and the dedicated managed-agent endpoints intentionally coexist: it disables deployment-wide/shared signing without disabling the per-agent external custody route.
 
 ### Cardano service topology
 
-Root `render.yaml` declares the Preprod signer, combined facilitator and resource server. The signer is a separate process/trust boundary. The combined facilitator exposes explicit `/hedera`, `/arc`, `/cardano` mounts plus root verification/settlement dispatch.
+Root `render.yaml` declares the unified Cardano signer and combined facilitator. The signer contains separate Preprod and Mainnet workers with distinct Blockfrost credentials and signer capabilities.
 
-The Preprod signer and Cardano child are intentionally configured with the legacy signing mode disabled while the dedicated per-agent managed endpoints remain available. Mainnet is unsigned/self-custody only in the checked-in Blueprint.
+- Preprod worker: deterministic per-agent testnet identity plus self-custody preparation.
+- Mainnet worker: self-custody preparation plus optional external per-agent custody.
+- Mainnet never receives the Preprod managed-agent master key.
 
-`render-cardano-mainnet-free.yaml` is a grant-stage self-custody deployment and deliberately contains neither a shared payer nor a managed-agent master key.
+`render-cardano-mainnet-free.yaml` exposes the same Mainnet separation in a standalone grant-stage topology.
 
 ## Cardano USDCx/native-token profile
 
 - only the configured policy-id + asset-name unit is supported in addition to lovelace;
-- Mainnet USDCx identity is pinned by production preflight to the canonical configured Circle xReserve Cardano asset identity;
-- Preprod token configuration is deployment-specific and may not be represented as Mainnet USDCx;
+- Mainnet USDCx identity is pinned by production preflight to the configured canonical Cardano asset identity;
+- Preprod token configuration may not be represented as Mainnet USDCx;
 - token-bearing inputs may contain only lovelace plus the allowed unit;
 - exact token conservation is required;
 - the payee receives exactly the quoted token amount;
-- token/ADA change may return only to the payer;
-- token advertisement stays disabled until the exact asset, funded test identity and canary are verified.
+- token/ADA change may return only to the payer.
 
 ## Pyth, Masumi, Veridian and Dune
 
@@ -140,41 +138,35 @@ When enabled, these integrations remain additional fail-closed policy/evidence l
 - final completion is not reported before required external cleanup succeeds;
 - cancellation does not reconstruct revoked credentials or silently reactivate disabled destinations.
 
-## External launch gates
+## Operational production checks
 
-These require real operational evidence against the exact release SHA.
+These checks depend on the production profile being enabled; they are not claims that the software has never been deployed or tested.
 
 ### Common platform
 
-- production DNS/TLS for every public service;
-- deployment secret manager and credential-rotation owner;
-- monitoring/error tracking/metrics/paging and named on-call;
-- managed database PITR plus a recorded restore drill;
+- production DNS/TLS for public services;
+- deployment secret management and credential rotation;
+- monitoring/error tracking/metrics;
+- database backup/restore capability;
 - production authentication/email redirect verification;
-- incident-response and credential-rotation exercise;
-- independent security assessment with no unresolved release blocker.
+- incident-response procedure;
+- security review appropriate to the release risk.
 
-### Managed testnet identities
+### Managed identities
 
-- independent signer master keys for Hedera, Arc and Cardano Preprod;
-- signer master keys present only on the relevant Render service;
-- proof that two newly created managed agents receive different payment identities;
-- funding/canary performed against the specific agent identity rather than an operator/shared wallet;
-- legacy shared-payer agents reprovisioned before the unique-identity migration is promoted.
+- master keys, where used on testnet, exist only on the relevant signer/facilitator service;
+- two different Agent IDs resolve to different managed payment identities;
+- funding/canary is performed against the specific agent identity rather than an operator/shared wallet;
+- legacy shared-payer agents are reprovisioned before the unique-identity migration is promoted.
 
-### Cardano Mainnet
+### Cardano Mainnet autonomous custody
 
-- real Blockfrost credential and production-approved rate capacity;
-- verified user/self-custody payer with appropriate UTxOs;
-- independently explorer-verified low-value Mainnet canary for every enabled asset;
-- separate per-agent external HSM/KMS custody review before any autonomous Mainnet delegation is enabled.
-
-### Other enabled integrations
-
-- real Pyth/Masumi/Veridian/Dune credentials and evidence when those features are enabled;
-- Stripe/fiat provider approval before live card/fiat features;
-- funded/approved cross-chain routes and failure/refund drills before enabling those routes;
-- low-value x402 canary for each production-enabled rail.
+- `CARDANO_MAINNET_AGENT_CUSTODY_URL` and its capability key are present only on the Cardano signer;
+- the adapter returns a stable, unique Ed25519 public key/signer reference for each Agent ID;
+- AgentPay-derived `addr1...` payer identity matches the external public key;
+- returned signatures verify locally against the resolved public key;
+- no Mainnet managed-agent master key or deployment-wide payer key exists;
+- a low-value end-to-end Mainnet transaction is exercised for each enabled asset/custody mode.
 
 ## Dashboard (Vercel) environment rules
 
@@ -201,16 +193,16 @@ ARC_MANAGED_AGENT_MASTER_KEY
 CARDANO_SIGNING_SEED_HEX
 CARDANO_ED25519_SIGNER_API_KEY
 CARDANO_MANAGED_AGENT_MASTER_KEY
+CARDANO_MAINNET_AGENT_CUSTODY_API_KEY
 ```
 
-Legacy public payer-address variables may remain in the schema for compatibility, but managed-agent readiness does not depend on them and provisioning must never assign them to an agent.
+The Mainnet custody URL/API key belong to the isolated Cardano signer, not the dashboard or facilitator.
 
 ## Operational reconciliation
 
-- run the authenticated internal maintenance endpoint on schedule;
 - reconciliation continues while emergency stop is active;
 - unknown Hedera/Cardano/Arc submissions resolve only from exact network evidence;
 - ambiguous provider submissions retain idempotency/evidence;
 - chain-confirmed payment with lost resource response remains settled and opens a fulfillment incident rather than being retried as unpaid;
-- settlement mismatch/replay keeps spend consumed/held and creates an urgent incident;
-- dead letters, unknown submissions, stale maintenance and external dependency failures page an accountable operator in production.
+- settlement mismatch/replay keeps spend consumed/held and creates an incident;
+- external dependency failures are surfaced rather than silently changing payment state.

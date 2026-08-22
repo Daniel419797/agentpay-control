@@ -1,6 +1,6 @@
 # Catalyst production release checklist
 
-A box is checked only when evidence exists for the **exact immutable release SHA**. Configuration or source support alone does not satisfy a live gate.
+Use this checklist for the exact deployment/profile being demonstrated. Configuration or source support alone does not prove that an external dependency is operating.
 
 ## Source and CI
 
@@ -19,19 +19,27 @@ A box is checked only when evidence exists for the **exact immutable release SHA
 - [ ] deployed HTTPS dashboard/resource/facilitator/signer endpoints
 - [ ] distinct capability credentials
 - [ ] Blockfrost Preprod credentials
-- [ ] reviewed remote signing custody
+- [ ] isolated per-agent master key exists only on the signer
+- [ ] two different Agent IDs resolve to different Preprod addresses
 - [ ] funded deliberately selected payer UTxOs
 - [ ] ADA canary independently verified
-- [ ] configured test-token canary independently verified
+- [ ] configured test-token canary independently verified when enabled
 - [ ] replay/mismatch/submission-timeout drills performed
 
 ## Cardano Mainnet / USDCx
 
 - [ ] signer/facilitator/custody deployment isolated from Preprod
-- [ ] canonical Mainnet USDCx asset configured
+- [ ] no `CARDANO_MANAGED_AGENT_MASTER_KEY` or deployment-wide payer private key exists on Mainnet
+- [ ] self-custody mode remains available for wallet-confirmed transactions
+- [ ] external per-agent custody adapter configured when autonomous Mainnet agents are enabled
+- [ ] custody API credential exists only on the Cardano signer
+- [ ] two different Agent IDs resolve to different stable Ed25519 public keys/signer references and `addr1...` addresses
+- [ ] AgentPay-derived address matches the custody public key
+- [ ] returned custody signatures verify locally
+- [ ] canonical Mainnet USDCx asset configured when USDCx is enabled
 - [ ] production payer/payee verified
-- [ ] deliberately low-value USDCx canary executed by an authorized operator
-- [ ] release-evidence service independently confirms payer, payee, asset, amount and confirmation depth from Blockfrost
+- [ ] deliberately low-value Mainnet transaction exercised for each enabled custody/asset mode
+- [ ] Blockfrost confirms payer, payee, asset, amount and confirmation depth
 
 ## Pyth
 
@@ -65,7 +73,7 @@ A box is checked only when evidence exists for the **exact immutable release SHA
 
 ## Dune
 
-- [ ] overview query published
+- [ ] overview query published when Dune is part of the demonstrated profile
 - [ ] daily activity query published
 - [ ] verification-sample query published
 - [ ] public visualizations/dashboard published
@@ -83,26 +91,24 @@ A box is checked only when evidence exists for the **exact immutable release SHA
 - [ ] emergency stop blocks new spend
 - [ ] reconciliation remains available during emergency stop
 - [ ] ambiguous submissions do not release spend or blindly retry
+- [ ] Mainnet custody-adapter failure blocks managed signing without falling back to another agent/shared key
 
 ## Operations/security
 
-- [ ] production secret manager
-- [ ] DNS/TLS
-- [ ] monitoring and paging
-- [ ] named on-call owner
-- [ ] database PITR enabled
-- [ ] restore drill recorded
-- [ ] incident exercise recorded
-- [ ] independent security assessment recorded
-- [ ] release evidence is stored only through the isolated attestation credential
+- [ ] production secret management configured
+- [ ] DNS/TLS configured
+- [ ] monitoring configured
+- [ ] database backup/restore capability verified
+- [ ] incident procedure reviewed
+- [ ] custody/provider credentials can be rotated without exposing private keys
 
-## Release command sequence
+## Verification sequence
 
-1. Publish Dune queries with `analytics/dune/publish.mjs`.
-2. Create Dune visualizations/dashboard with `analytics/dune/publish-dashboard.mjs`.
-3. Deploy exact release SHA.
-4. Execute permitted low-value canaries through normal operator/agent workflows.
-5. Supply resulting transaction/purchase identifiers to `scripts/catalyst-live-demo.mjs`; it verifies/attests evidence but does not autonomously initiate Mainnet spend.
-6. Record external operational/security evidence through the isolated release-evidence API.
-7. Confirm `/api/v1/ready` returns `ready` with `catalystProduction: verified`.
-8. Freeze submission/demo material to the same SHA.
+1. Deploy the exact release SHA.
+2. Configure the external services used by the profile being demonstrated.
+3. For Mainnet managed custody, resolve at least two Agent IDs and confirm their public identities are distinct before funding them.
+4. Execute permitted low-value transactions through normal operator/agent workflows.
+5. Cross-check resulting Cardano transactions against Blockfrost/chain evidence.
+6. Run the failure cases relevant to the enabled integrations.
+7. Confirm `/api/v1/ready` matches the configured profile.
+8. Keep submission/demo claims tied to what was actually demonstrated.

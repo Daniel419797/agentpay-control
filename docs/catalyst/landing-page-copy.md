@@ -6,10 +6,8 @@
 
 Give software agents the ability to pay without giving them unrestricted wallets. AgentPay combines Cardano x402 payments, USDCx/ADA settlement, Pyth-valued budgets, Masumi counterparty trust, optional Veridian/KERI credentials, approvals, reconciliation and emergency controls.
 
-Primary CTA: **See the live Cardano demo**
+Primary CTA: **See the Cardano demo**
 Secondary CTA: **View public Dune analytics**
-
-Proof line: **Real chain evidence only. No synthetic “live” metrics.**
 
 ## Problem
 
@@ -38,7 +36,13 @@ Configure:
 
 ### Direct x402 when speed matters
 
-AgentPay supports Cardano `exact` x402 with exact resource, payer, payee, asset and amount binding. ADA uses `lovelace`; Mainnet USDCx is pinned to its canonical Cardano asset identity. Signing is isolated from the dashboard and settlement is independently reconciled from chain evidence.
+AgentPay supports Cardano `exact` x402 with exact resource, payer, payee, asset and amount binding. ADA uses `lovelace`; Mainnet USDCx is pinned to its configured Cardano asset identity. Signing is isolated from the dashboard and settlement is independently reconciled from chain evidence.
+
+### Mainnet autonomy without a shared platform wallet
+
+Cardano Mainnet supports verified self custody and external per-agent managed custody. For an autonomous managed agent, the signer resolves a distinct Ed25519 public key and signer reference for that immutable Agent ID. AgentPay derives the `addr1...` payer address locally, sends only the transaction-body hash for signing and verifies the returned signature. The private key remains inside the external HSM/KMS/delegation boundary.
+
+There is no Cardano Mainnet `CARDANO_MANAGED_AGENT_MASTER_KEY` and no deployment-wide agent payer.
 
 ## Masumi escrow
 
@@ -64,7 +68,7 @@ Dune shows public Cardano settlement activity. AgentPay's authenticated analytic
 
 A network timeout after submission does not mean a payment failed. AgentPay records the candidate transaction and reconciles it independently instead of blindly retrying and risking double spend.
 
-Other controls include isolated credentials, idempotency, resource-specific replay binding, exact settlement verification, immutable audit evidence and release-SHA canary verification.
+Other controls include isolated credentials, per-agent payment identities, idempotency, resource-specific replay binding, exact settlement verification and immutable audit evidence.
 
 ## Closing CTA
 

@@ -33,13 +33,14 @@ The exact release candidate must verify:
 
 ## Production trust boundaries
 
-- **Vercel dashboard/API:** policy, tenancy, approvals, audit, reconciliation and database access. No blockchain private keys or managed-agent master keys.
+- **Vercel dashboard/API:** policy, tenancy, approvals, audit, reconciliation and database access. No blockchain private keys, managed-agent master keys or Mainnet custody API credentials.
 - **agentpay-facilitator:** one public multi-rail service with network-scoped credentials. It serves Hedera Testnet/Mainnet, Arc Testnet and Cardano Preprod/Mainnet facilitator paths.
-- **agentpay-cardano-signer:** one Render service, internally split into isolated Preprod and Mainnet workers. Preprod may derive isolated managed-agent keys; Mainnet is self-custody/unsigned-only.
+- **agentpay-cardano-signer:** one Render service, internally split into isolated Preprod and Mainnet workers. Preprod may derive isolated managed-agent keys. Mainnet supports unsigned self-custody plus external per-agent Ed25519 custody when configured.
+- **Cardano Mainnet external custody adapter:** resolves a distinct public key/signer reference for each immutable Agent ID and signs only Cardano transaction-body hashes. Private keys stay outside AgentPay.
 - **PostgreSQL/Supabase:** authoritative control-plane state and global payment-identity uniqueness.
 - **External providers/resource servers:** separate from the canonical two-service Render Blueprint.
 
-One Render Blueprint deployment does not collapse the facilitator and Cardano signer into one security process. The signer remains a separate runtime service so compromise of the public facilitator does not automatically expose the Cardano managed-agent master key.
+One Render Blueprint deployment does not collapse the facilitator and Cardano signer into one security process. The Mainnet custody API key exists only on the signer and the deterministic Cardano managed-agent master key remains testnet-only.
 
 ## Global payment identity migration
 
@@ -61,12 +62,10 @@ This protects against simultaneous requests across organizations and application
 
 ## Canonical Render topology
 
-Only root `render.yaml` is the production Blueprint entrypoint. It creates:
+Root `render.yaml` is the production Blueprint entrypoint. It creates:
 
 - `agentpay-cardano-signer`
 - `agentpay-facilitator`
-
-Older `render-*.yaml` files are standalone/historical deployment helpers and must not be treated as the canonical production release topology.
 
 The facilitator exposes:
 
@@ -80,29 +79,31 @@ The facilitator exposes:
 
 Root `/verify` and `/settle` route by the exact network bound in both x402 requirement and payment payload. `/supported` aggregates every active child rail. `/ready` additionally verifies the Cardano signer service.
 
-Arc public Mainnet is intentionally not declared until a public Mainnet exists and has its own asset/chain/canary review.
+Arc public Mainnet is intentionally not declared until a public Mainnet exists and has its own asset/chain review.
 
 ## Mainnet custody rule
 
-Network support is separate from platform custody.
+Network support is separate from custody mode.
 
 - Hedera Mainnet agents remain self-custody; facilitator operator/payer keys are infrastructure identities, not agent wallets.
-- Cardano Mainnet remains self-custody/unsigned-only and receives no deterministic managed-agent master key.
-- Never restore autonomous Mainnet support by assigning multiple agents a deployment-wide hot wallet.
+- Cardano Mainnet self-custody remains available through unsigned transaction preparation.
+- Cardano Mainnet autonomous agents use the dedicated `/managed-identity` and `/managed-agent-sign` path backed by the external per-agent custody adapter.
+- `CARDANO_MANAGED_AGENT_MASTER_KEY` and deployment-wide agent payer keys remain prohibited on Cardano Mainnet.
+- The custody adapter must not return a shared key for multiple agents; AgentPay derives the payer address and database uniqueness rejects duplicate payment identities.
 
 ## Promotion sequence
 
 1. Open/finalize the release PR.
-2. Run exact-head repository checks. Inspect whether jobs actually executed.
+2. Run exact-head repository checks and verify jobs actually executed.
 3. Verify Vercel prebuild output includes successful Cardano signer, Hedera, Arc and combined-facilitator checks.
 4. Ensure no legacy duplicate payment identities block the production migration.
-5. Sync root `render.yaml` and populate every `sync: false` secret.
+5. Sync root `render.yaml` and populate required `sync: false` values for the selected profile.
 6. Verify signer `/health` reports both Cardano networks.
-7. Verify facilitator `/health`, `/supported` and `/ready`.
-8. Configure Vercel `AGENTPAY_FACILITATOR_ORIGIN` plus the matching network capability values from Render.
-9. Apply database migrations before enabling new managed-agent provisioning.
-10. Canary Hedera Testnet, Arc Testnet and Cardano Preprod with separate managed agents and separate funded identities.
-11. Canary Mainnet self-custody flows separately with low-value funds and independent explorer/provider verification.
-12. Retire old per-network services only after the new topology has real settlement evidence and a rollback window has passed.
+7. If Mainnet managed custody is enabled, verify the Mainnet worker reports `external-per-agent` identity support and that two different Agent IDs resolve to different addresses.
+8. Verify facilitator `/health`, `/supported` and `/ready`.
+9. Configure Vercel `AGENTPAY_FACILITATOR_ORIGIN` plus matching network capability values from Render.
+10. Apply database migrations before enabling new managed-agent provisioning.
+11. Exercise low-value transactions for the custody/network modes being enabled.
+12. Retire old per-network services only after the new topology is verified and a rollback window has passed.
 
-Repository checks cannot manufacture external production facts. DNS/TLS, credentials, funded accounts, provider approvals, monitoring/on-call, database PITR/restore evidence, incident exercises and independent security review remain deployment gates.
+Repository checks cannot manufacture external production inputs such as real custody credentials, funded accounts or provider access. Those are supplied by the deployment environment, not by source code.

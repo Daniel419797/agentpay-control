@@ -11,11 +11,12 @@ The Cardano path has separate trust boundaries:
 1. **Dashboard / control plane** — policy, approvals, spend reservations, exact resource/payee/amount binding, durable settlement claims and reconciliation. It never stores a Cardano signing secret or managed-agent master key.
 2. **Resource server** — advertises exact Cardano requirements, including `extra.resourceBinding`, the SHA-256 binding to the canonical paid-resource URL.
 3. **Combined facilitator** — validates signed CBOR, payer inputs, outputs, whitelisted asset, amount, fee, TTL, resource binding, nonce/replay state and settlement evidence before submission.
-4. **Cardano signer gateway** — builds the deliberately narrow transaction shape using current chain/protocol data. On Preprod it can also derive a distinct managed-agent payment key/address from an immutable Agent ID. On Mainnet it is unsigned/self-custody only in the checked-in deployment.
-5. **Blockfrost** — independent chain/protocol/evidence provider used for construction and reconciliation.
-6. **Pyth / Masumi / Dune** — optional policy, seller-trust and observability integrations outside the signer custody boundary.
+4. **Cardano signer gateway** — builds the deliberately narrow transaction shape using current chain/protocol data. On Preprod it derives a distinct managed-agent payment key/address from an immutable Agent ID. On Mainnet it supports unsigned self-custody plus autonomous per-agent signing through an external custody adapter; it never uses a Mainnet deployment-wide derivation key.
+5. **External Mainnet custody adapter** — resolves one stable Ed25519 public key/signer reference per immutable Agent ID and signs only transaction-body hashes. The private key remains inside the external HSM/KMS/delegation boundary.
+6. **Blockfrost** — independent chain/protocol/evidence provider used for construction and reconciliation.
+7. **Pyth / Masumi / Dune** — optional policy, seller-trust and observability integrations outside the signer custody boundary.
 
-A shared signer **service** does not imply a shared payer. Every managed Preprod agent has its own address/key. Mainnet has no deployment-wide agent payer.
+A shared signer **service** does not imply a shared payer. Every managed agent has its own Cardano address. Mainnet has no deployment-wide agent payer or managed-agent master key.
 
 ## Payment identity and custody
 
@@ -35,24 +36,44 @@ A managed signing request is bound to all of:
 
 The combined facilitator independently verifies the resulting signed transaction before accepting the payload.
 
-The legacy deployment-wide `/managed-sign` flow is disabled in production. Preprod is deployed with `CARDANO_SIGNING_MODE=unsigned-only` for legacy routes while the dedicated `/managed-identity` and `/managed-agent-sign` paths handle isolated testnet managed agents.
+The legacy deployment-wide `/managed-sign` flow is disabled in production. Preprod is deployed with `CARDANO_SIGNING_MODE=unsigned-only` for legacy routes while the dedicated `/managed-identity` and `/managed-agent-sign` paths handle isolated managed agents.
 
 ### Self custody
 
-For self-custody agents, `/prepare` builds an unsigned transaction for the exact verified wallet address. The wallet signs it. This applies to Cardano Mainnet and may also be used on Preprod.
+For self-custody agents, `/prepare` builds an unsigned transaction for the exact verified wallet address. The wallet signs it. This remains available on Cardano Mainnet and may also be used on Preprod.
 
-### Mainnet
+### Autonomous Cardano Mainnet
 
 `CARDANO_MANAGED_AGENT_MASTER_KEY` is prohibited on Mainnet. `CARDANO_SIGNING_SEED_HEX` is also prohibited in production.
 
-The checked-in Mainnet Blueprint uses:
+The checked-in Mainnet deployment keeps:
 
 ```text
 CARDANO_NETWORK=mainnet
 CARDANO_SIGNING_MODE=unsigned-only
 ```
 
-There is no `CARDANO_PAYER_ADDRESS`, no shared payment public key and no deterministic managed-agent master key. Autonomous Mainnet custody must remain disabled until a separately provisioned **per-agent** external HSM/KMS/delegation identity is implemented and reviewed.
+for the generic/shared signing route. That does **not** disable the dedicated per-agent routes. Mainnet `/managed-identity` and `/managed-agent-sign` use the external custody adapter configured on the signer with:
+
+```text
+CARDANO_AGENT_CUSTODY_URL=https://...
+CARDANO_AGENT_CUSTODY_API_KEY=...
+```
+
+In the unified production signer these are supplied as:
+
+```text
+CARDANO_MAINNET_AGENT_CUSTODY_URL=https://...
+CARDANO_MAINNET_AGENT_CUSTODY_API_KEY=...
+```
+
+The gateway passes them only to the Mainnet child signer.
+
+Identity resolution is `POST /identity` on the custody adapter. The adapter returns a stable Ed25519 `publicKeyHex` and `signerRef` for the immutable Agent ID. AgentPay derives the `addr1...` payer address locally from that public key and rejects a provider-supplied address if it does not match.
+
+Signing is `POST /sign` on the custody adapter. The request contains the exact Agent ID, resolved signer reference, derived payer address and the 32-byte Cardano transaction-body hash. AgentPay verifies the returned Ed25519 signature against the resolved public key before returning signed CBOR.
+
+The external adapter therefore supplies custody, not transaction policy. It does not receive a raw AgentPay master key, and AgentPay does not receive the private key.
 
 ## Supported payment invariants
 
@@ -139,17 +160,25 @@ The master key belongs only to this signer service. New managed agents are inten
 
 ## Mainnet deployment
 
-`render-cardano-mainnet-free.yaml` and the Mainnet services in `render.yaml` intentionally use unsigned/self-custody mode. Before enabling `cardano:mainnet`:
+`render-cardano-mainnet-free.yaml` and the Mainnet worker inside `render.yaml` keep ordinary wallet signing in unsigned/self-custody mode while enabling the dedicated external per-agent custody path.
 
-- verify the exact user/self-custody wallet and network;
+Required Mainnet custody configuration for autonomous managed agents:
+
+- a custody adapter that exposes the documented `/identity` and `/sign` contract;
+- a unique external Ed25519 key/signer reference for each immutable Agent ID;
+- `CARDANO_AGENT_CUSTODY_URL` + `CARDANO_AGENT_CUSTODY_API_KEY` on the standalone Mainnet signer, or the `CARDANO_MAINNET_...` equivalents on the unified signer;
+- capability credentials isolated from the facilitator and Blockfrost credentials;
+- no `CARDANO_MANAGED_AGENT_MASTER_KEY`, shared hot-wallet seed or deployment-wide payer private key.
+
+Operational checks for an enabled Mainnet rail include:
+
+- verify the exact self-custody or managed agent wallet and network;
 - configure real Blockfrost credentials and capacity;
 - independently verify the Mainnet provider/Masumi seller payee;
 - independently verify the canonical USDCx asset when USDCx is enabled;
-- fund the exact user wallet with deliberately suitable UTxOs;
-- verify a low-value end-to-end x402 canary for every enabled asset;
-- record transaction hash, payer, payee, asset, amount and confirmation depth against the immutable release SHA;
-- test provider rejection, submission timeout, pending confirmation, evidence mismatch, cross-resource replay and signer unavailability;
-- provision and review a unique per-agent HSM/KMS/delegation identity before enabling autonomous Mainnet custody.
+- fund the exact agent/user wallet with deliberately suitable UTxOs;
+- verify a low-value end-to-end x402 canary for every enabled asset/custody mode;
+- test provider rejection, submission timeout, pending confirmation, evidence mismatch, cross-resource replay, signer unavailability and custody-adapter failure.
 
 Do not solve Mainnet autonomy by adding a shared hot wallet or by setting `CARDANO_MANAGED_AGENT_MASTER_KEY` on a Mainnet service.
 
@@ -171,4 +200,4 @@ Maintenance resolves the exact candidate transaction using chain evidence. A con
 
 ## Release gate
 
-Source support is not production evidence. The exact release must pass migrations, the concurrent identity-isolation verification, dashboard/service tests and builds, Cardano signer tests/image build, browser smoke tests, security/dependency gates, operational readiness, and real low-value canaries for enabled live rails.
+The repository implements both Mainnet self-custody and external per-agent managed custody. Production operation of a specific custody provider still depends on its real endpoint/credentials, funded agent wallet and successful end-to-end checks for the exact deployment.

@@ -4,13 +4,14 @@ This document defines the security properties AgentPay must preserve in producti
 
 ## System and trust boundaries
 
-AgentPay consists of five security domains:
+AgentPay consists of six security domains:
 
 1. **Operator dashboard and API** — authenticates human operators, resolves the active organization, enforces RBAC, policy, approvals, idempotency, emergency-stop state, and persistence.
 2. **Managed facilitator/signer services** — shared service processes that hold narrowly scoped signing capabilities isolated from the dashboard. A shared service is permitted; a shared agent payment identity is not.
-3. **Resource server / x402 providers** — advertise exact payment requirements, verify signatures, request settlement, and return paid-resource fulfillment evidence.
-4. **External providers and chains** — Hedera Mirror Node, Arc RPC, Blockfrost, Stripe, LI.FI/EVM chains, Supabase, notifications and explorers. Responses are untrusted until schema-, identity-, amount-, network-, and finality-checked.
-5. **Self-custody wallets** — independently controlled by the user. Exporting/signing a transaction leaves the AgentPay managed-custody boundary; AgentPay can block new exports but cannot revoke an already signed external payload.
+3. **External per-agent custody** — for Cardano Mainnet autonomous agents, an HSM/KMS/delegation adapter resolves a distinct Ed25519 public key/signer reference per immutable Agent ID and signs only transaction-body hashes. Private keys remain inside that boundary.
+4. **Resource server / x402 providers** — advertise exact payment requirements, verify signatures, request settlement, and return paid-resource fulfillment evidence.
+5. **External providers and chains** — Hedera Mirror Node, Arc RPC, Blockfrost, Stripe, LI.FI/EVM chains, Supabase, notifications and explorers. Responses are untrusted until schema-, identity-, amount-, network-, and finality-checked.
+6. **Self-custody wallets** — independently controlled by the user. Exporting/signing a transaction leaves the AgentPay managed-custody boundary; AgentPay can block new exports but cannot revoke an already signed external payload.
 
 ## Protected assets
 
@@ -35,6 +36,7 @@ The highest-value assets are:
 - **Agent credential** — scoped machine credential; never equivalent to an Owner session.
 - **Internal maintenance worker** — authenticated by the cron secret and permitted to reconcile/expire/retain records.
 - **Facilitator/signer service** — shared process that services many agents but must derive/resolve a distinct payment identity for each agent.
+- **External custody adapter** — holds or delegates one distinct Cardano Mainnet Ed25519 key per agent and signs only for the requested signer reference/body hash.
 - **External attacker** — unauthenticated or compromised low-privilege principal attempting account takeover, SSRF, cross-tenant access, replay, settlement fraud, duplicate identity assignment, or secret disclosure.
 
 ## Mandatory security invariants
@@ -53,6 +55,7 @@ The highest-value assets are:
 - Dashboard production configuration contains no blockchain private keys, signer master keys or HSM/KMS signing credentials.
 - Signing, settlement, contract-execution and claim-store API credentials are capability-scoped and mutually distinct where required.
 - `HEDERA_MANAGED_AGENT_MASTER_KEY`, `ARC_MANAGED_AGENT_MASTER_KEY` and `CARDANO_MANAGED_AGENT_MASTER_KEY` are testnet-only signer/facilitator secrets and are never present on mainnet services or Vercel.
+- `CARDANO_MAINNET_AGENT_CUSTODY_API_KEY` exists only on the Cardano signer and is distinct from signer/facilitator capabilities. It is an adapter credential, not a private payment key.
 - Hedera raw 64-hex keys require an explicit `ECDSA` or `ED25519` type.
 - Arc infrastructure payer, relayer and contract-execution private keys remain distinct from one another and from managed-agent identities.
 - Stored sensitive values are encrypted; one-time secrets are never returned by ordinary list/detail APIs.
@@ -71,13 +74,15 @@ The highest-value assets are:
 
 ### Managed custody by environment
 
-- Current deterministic managed-agent identities are allowed only on supported test networks.
+- Deterministic managed-agent master-key derivation is allowed only on supported test networks.
 - Hedera Testnet uses a distinct Ed25519 key/account per Agent ID.
 - Arc Testnet uses a distinct secp256k1 key/address per Agent ID.
 - Cardano Preprod uses a distinct Ed25519 payment key/address per Agent ID.
 - Mainnet deterministic managed-agent master keys are prohibited.
-- Current mainnet agent payments use self custody. Future autonomous mainnet spending requires a separately provisioned per-agent HSM/KMS/delegation key reference and must never fall back to a deployment-wide hot wallet.
+- Cardano Mainnet supports self custody and a separate autonomous per-agent external custody path. The external adapter returns a stable Ed25519 public key and signer reference for the immutable Agent ID; AgentPay derives the payer address locally and verifies every returned signature against that public key.
+- Cardano Mainnet external custody must never fall back to a deployment-wide hot wallet, shared key reference, or deterministic AgentPay master key.
 - Rotating a testnet managed-agent master key changes deterministic derivations. Rotation therefore requires controlled reprovision/migration of affected agents, not an in-place secret replacement while agents remain active.
+- Rotating a Mainnet external agent key requires reprovisioning that agent's `PaymentAccount` to the new public identity; historical settlement identity is never rewritten.
 
 ### Payment authorization
 
@@ -135,7 +140,8 @@ The highest-value assets are:
 | Two agents receive the same managed wallet | global canonical unique index + advisory-lock trigger + signer binding to Agent ID/payer |
 | Cross-tenant concurrent identity race | database-global identity lock/unique constraint, not organization-local precheck |
 | Shared service credential becomes shared agent payer | dedicated per-agent signer endpoints; infrastructure payer identities never assigned to agents |
-| Mainnet autonomy silently falls back to hot wallet | deterministic managed keys prohibited on mainnet; self custody until per-agent HSM/KMS exists |
+| Mainnet custody adapter returns a shared/wrong key | derive address locally from returned public key + global identity uniqueness + bind signer reference to Agent ID + verify every signature locally |
+| Mainnet autonomy falls back to a hot wallet/master key | deterministic managed keys prohibited on mainnet; external per-agent signer reference required for managed route |
 | Cross-tenant object access | organization-scoped queries + active membership resolution + server RBAC |
 | Operator self-approves payment | immutable initiator evidence + four-eyes approval check |
 | Double spend using stale balance | serialized per-agent reservation accounting + unresolved/recent settlement deductions |
@@ -150,22 +156,21 @@ The highest-value assets are:
 | Webhook/Slack credential disclosure | encrypted signing secret + destination redaction in reads/exports |
 | Misspelled production environment enables dev defaults | invalid explicit `APP_ENV` is fatal |
 
-## Release evidence required
+## Release checks
 
-A production release is not approved until all applicable evidence exists for the immutable release SHA:
+Before operating a production release, verify the checks applicable to the selected profile:
 
-1. migrations apply cleanly to PostgreSQL 17 and there are no unfinished Prisma migrations;
+1. migrations apply cleanly and there are no unfinished Prisma migrations;
 2. the payment-identity isolation verifier proves the canonical unique index, advisory-lock trigger and concurrent cross-organization duplicate rejection;
-3. `npm run verify` passes for the dashboard;
+3. dashboard verification passes;
 4. facilitator, Arc facilitator, combined facilitator, Cardano signer and resource-server tests/builds pass;
 5. production container builds pass, including the Cardano signer;
-6. `npm run db:resources:check` reports zero canonicalization changes/collisions after required maintenance;
-7. CI, CodeQL, dependency review and project quality gates are green or every finding is explicitly dispositioned by a qualified reviewer;
+6. resource canonicalization reports no unresolved collisions;
+7. CI/security findings are reviewed;
 8. managed-agent master keys are provisioned only on the correct testnet signer services and are independent from API capabilities/operator credentials;
-9. legacy shared-payer agents are reprovisioned before the identity-isolation migration is promoted;
-10. DNS/TLS, monitoring, paging/on-call ownership, database PITR and a recorded restore drill are in place;
-11. funded low-value canaries use the **specific agent identity** being tested rather than an operator/shared wallet;
-12. an independent security assessment has reviewed the trust boundaries and invariants in this document.
+9. Cardano Mainnet external custody credentials exist only on the Cardano signer, and different Agent IDs resolve to different stable public identities;
+10. legacy shared-payer agents are reprovisioned before the identity-isolation migration is promoted;
+11. low-value payment checks use the specific agent identity being tested rather than an operator/shared wallet.
 
 ## Incident response priorities
 
@@ -174,7 +179,8 @@ If compromise or ambiguity is suspected:
 1. activate the organization emergency stop and provider-side freeze/revocation controls;
 2. preserve audit, provider and chain evidence;
 3. rotate affected capability/session/provider credentials;
-4. if a managed-agent master key is compromised, stop all affected managed agents and reprovision identities under a newly generated master key before resuming;
-5. reconcile ambiguous submissions before any retry;
-6. keep spend consumed when successful-chain evidence mismatches the authorized quote;
-7. open an urgent support incident and record remediation against the immutable release SHA.
+4. if a testnet managed-agent master key is compromised, stop all affected managed agents and reprovision identities under a newly generated master key before resuming;
+5. if a Cardano Mainnet external agent signer is compromised, disable that signer reference, preserve its historical identity, provision a replacement per-agent key and update the agent only through the normal identity-isolation workflow;
+6. reconcile ambiguous submissions before any retry;
+7. keep spend consumed when successful-chain evidence mismatches the authorized quote;
+8. open an urgent support incident and record remediation.

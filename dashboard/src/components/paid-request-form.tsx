@@ -60,8 +60,8 @@ function explorerTransactionUrl(network: string | undefined, transactionId: stri
 
 function supportsManagedRequest(account: AgentAccount | undefined) {
   if (!account) return false;
-  return (account.custodyType === "PLATFORM_MANAGED_TESTNET" && account.signingMode === "AUTONOMOUS_MANAGED")
-    || (account.custodyType === "EXTERNAL_DELEGATED" && account.signingMode === "BOUNDED_DELEGATION");
+  return account.signingMode === "AUTONOMOUS_MANAGED"
+    && (account.custodyType === "PLATFORM_MANAGED_TESTNET" || account.custodyType === "EXTERNAL_DELEGATED");
 }
 
 function supportsWalletRequest(account: AgentAccount | undefined) {
@@ -192,6 +192,7 @@ export function PaidRequestForm({ agents, defaultAgentId }: { agents: Agent[]; d
         </select>
         {isPaused && <div className="form-error" style={{ marginTop: 4 }}>Agent is paused. Resume it before sending requests.</div>}
         {activeAgent && walletRequest && <div className="form-help" style={{ marginTop: 6 }}>This account requires wallet confirmation. AgentPay will show the exact payment authorization or transaction after policy approval.</div>}
+        {activeAgent && managedRequest && activeAccount?.custodyType === "EXTERNAL_DELEGATED" && <div className="form-help" style={{ marginTop: 6 }}>This Mainnet agent signs through its isolated external signer identity after AgentPay policy authorization.</div>}
         {activeAgent && !supportedRequest && <div className="form-help" style={{ marginTop: 6 }}>This wallet rail is not yet available for direct paid requests.</div>}
       </div>
 

@@ -1,11 +1,10 @@
-# Grant-stage Cardano Mainnet self-custody services. Free instances can
-# cold-start and are not an availability SLA; production validation remains on.
+# Grant-stage Cardano Mainnet services. Free instances can cold-start and are
+# not an availability SLA; production validation remains on.
 #
 # Mainnet deliberately has NO deployment-wide payer and NO
-# CARDANO_MANAGED_AGENT_MASTER_KEY. The signer gateway prepares unsigned
-# transactions for the exact verified wallet; the wallet owner signs them.
-# Autonomous mainnet custody must use a separately provisioned per-agent
-# external HSM/KMS/delegation identity before it can be enabled.
+# CARDANO_MANAGED_AGENT_MASTER_KEY. Ordinary wallet flows remain unsigned/self-
+# custody. Autonomous managed agents use a separately provisioned per-agent
+# external custody adapter through CARDANO_AGENT_CUSTODY_URL.
 # yaml-language-server: $schema=https://render.com/schema/render.yaml.json
 previews:
   generation: off
@@ -33,6 +32,10 @@ services:
         sync: false
       - key: CARDANO_SIGNER_API_KEY
         generateValue: true
+      - key: CARDANO_AGENT_CUSTODY_URL
+        sync: false
+      - key: CARDANO_AGENT_CUSTODY_API_KEY
+        sync: false
       - key: CARDANO_MIN_OUTPUT_LOVELACE
         value: "1000000"
       - key: CARDANO_TOKEN_OUTPUT_LOVELACE
@@ -82,7 +85,8 @@ services:
         value: https://agentpay-zeta.vercel.app/api/v1/internal/cardano-settlement-claims
       - key: CARDANO_SETTLEMENT_STORE_API_KEY
         sync: false
-      # Used as a control-plane capability for /prepare; it is not a payer key.
+      # Used as a control-plane capability for /prepare and per-agent managed
+      # signing routes. It is not a payer key and cannot derive agent keys.
       - key: MANAGED_SIGNING_API_KEY
         sync: false
       - key: SETTLEMENT_API_KEY

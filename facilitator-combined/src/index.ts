@@ -148,7 +148,7 @@ app.post("/settle", (c) => dispatchPayment(c.req.raw));
 
 function registerCardanoManagedRoutes(basePath: string, cardano: { app: Hono; network: string }, cardanoEnv: CardanoNativeEnv, managedAgentsEnabled: boolean) {
   app.post(`${basePath}/managed-identity`, async (c) => {
-    if (!managedAgentsEnabled) return c.json({ code: "CARDANO_MANAGED_AGENT_SIGNING_TESTNET_ONLY" }, 403);
+    if (!managedAgentsEnabled) return c.json({ code: "CARDANO_MANAGED_AGENT_SIGNING_DISABLED" }, 403);
     if (!secretMatches(cardanoEnv.MANAGED_SIGNING_API_KEY ?? cardanoEnv.FACILITATOR_API_KEY, c.req.header("authorization"))) return c.json({ code: "UNAUTHORIZED" }, 401);
     try {
       const body = await boundedJson(c.req.raw);
@@ -157,12 +157,12 @@ function registerCardanoManagedRoutes(basePath: string, cardano: { app: Hono; ne
       return c.json(identity);
     } catch (error) {
       const code = error instanceof Error ? error.message.slice(0, 120) : "CARDANO_MANAGED_IDENTITY_FAILED";
-      return c.json({ code }, code.includes("PROVIDER_") || code.includes("SIGNER_") ? 502 : 422);
+      return c.json({ code }, code.includes("PROVIDER_") || code.includes("SIGNER_") || code.includes("CUSTODY_") ? 502 : 422);
     }
   });
 
   app.post(`${basePath}/managed-agent-sign`, async (c) => {
-    if (!managedAgentsEnabled) return c.json({ code: "CARDANO_MANAGED_AGENT_SIGNING_TESTNET_ONLY" }, 403);
+    if (!managedAgentsEnabled) return c.json({ code: "CARDANO_MANAGED_AGENT_SIGNING_DISABLED" }, 403);
     if (!secretMatches(cardanoEnv.MANAGED_SIGNING_API_KEY ?? cardanoEnv.FACILITATOR_API_KEY, c.req.header("authorization"))) return c.json({ code: "UNAUTHORIZED" }, 401);
     try {
       const body = await boundedJson(c.req.raw);
@@ -197,7 +197,7 @@ function registerCardanoManagedRoutes(basePath: string, cardano: { app: Hono; ne
       return c.json({ paymentPayload, transactionId: signed.transactionId });
     } catch (error) {
       const code = error instanceof Error ? error.message.slice(0, 120) : "CARDANO_MANAGED_SIGNING_FAILED";
-      return c.json({ code }, code.includes("PROVIDER_") || code.includes("SIGNER_") ? 502 : 422);
+      return c.json({ code }, code.includes("PROVIDER_") || code.includes("SIGNER_") || code.includes("CUSTODY_") ? 502 : 422);
     }
   });
 
@@ -205,7 +205,7 @@ function registerCardanoManagedRoutes(basePath: string, cardano: { app: Hono; ne
 }
 
 registerCardanoManagedRoutes(paths.cardanoPreprod, cardanoPreprod, cardanoPreprodEnv, true);
-registerCardanoManagedRoutes(paths.cardanoMainnet, cardanoMainnet, cardanoMainnetEnv, false);
+registerCardanoManagedRoutes(paths.cardanoMainnet, cardanoMainnet, cardanoMainnetEnv, true);
 
 for (const basePath of [paths.cardanoPreprod, paths.cardanoMainnet]) {
   app.use(`${basePath}/*`, async (c, next) => {
