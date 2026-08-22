@@ -1,104 +1,154 @@
-# AgentPay Catalyst architecture
+# AgentPay Catalyst Architecture
+
+**Updated:** 2026-08-22  
+**Primary builder:** Daniel Praise (`Daniel419797`)
+
+## Revision note
+
+This architecture mirrors the implemented code rather than the earlier Mainnet self-custody-only state. Policy and reservations live in the control plane, the Cardano signer constructs and signs, the facilitator independently verifies, submits and confirms, and external Mainnet custody holds the per-agent private keys.
 
 ## Product boundary
 
-AgentPay is the financial-control and treasury layer for autonomous software agents. It does not claim to have invented x402, Masumi, Pyth, USDCx, KERI, or Dune. It composes those systems around a policy engine that limits what an autonomous agent may spend, with whom, on which network/asset, and under what approval conditions.
+AgentPay is the policy, treasury and settlement-control layer for autonomous software agents. It composes existing ecosystem primitives rather than claiming to replace them.
+
+## Current architecture
 
 ```mermaid
 flowchart TD
-  Org[Organization] --> AP[AgentPay control plane]
-  AP --> Policy[Budgets / policy / approvals / emergency stop]
-  AP --> Identity[Masumi registry + Veridian/KERI trust]
-  AP --> Oracle[Pyth USD valuation]
-  AP --> Agent[Autonomous agent credential]
-  Agent -->|HTTP x402 exact| Resource[x402 resource]
-  Agent -->|Masumi MIP-003 job| Seller[Masumi seller agent]
-  Policy --> Direct[Direct Cardano x402 rail]
-  Policy --> Escrow[Masumi escrow purchase rail]
-  Direct --> Signer[Isolated Cardano signer gateway]
-  Signer --> Preprod[Preprod per-agent signer]
-  Signer --> Mainnet[Mainnet per-agent external custody]
-  Mainnet --> HSM[HSM / KMS / delegation key]
-  Direct --> Facilitator[Independent Cardano facilitator]
-  Facilitator --> Cardano[Cardano]
+  Human[Human users\nOwners / Operators / Approvers] -->|HTTPS| CP[AgentPay Control Plane\nNext.js on Vercel]
+  Agent[Autonomous agents\nSDK / API / MCP] -->|Scoped credentials| CP
+
+  CP --> DB[(PostgreSQL / Prisma)]
+  CP --> Policy[Policy / approvals / reservations\naudit / emergency stop]
+  Policy --> Pyth[Pyth Hermes]
+  Policy --> Registry[Masumi Registry]
+  Policy --> KERIA[Veridian / KERIA]
+
+  Policy -->|ALLOW / approved| Direct[Direct x402]
+  Policy -->|ALLOW / approved| Escrow[Masumi escrow]
+
+  Direct --> Resource[x402 Resource Server]
   Escrow --> MasumiPay[Masumi Payment Service]
-  MasumiPay --> Cardano
-  Cardano --> Blockfrost[Blockfrost reconciliation evidence]
+
+  Resource --> Fac[Unified Facilitator\nRender]
+  MasumiPay --> Cardano[(Cardano)]
+
+  Fac --> Hedera[Hedera Testnet/Mainnet]
+  Fac --> Arc[Arc Testnet]
+  Fac --> Signer[Cardano Signer Gateway\nRender web service]
+
+  Signer --> Preprod[Preprod worker\nper-agent deterministic testnet identity]
+  Signer --> Mainnet[Mainnet worker\nself custody + external per-agent custody]
+  Mainnet --> Custody[External HSM/KMS/delegation\nidentity + body-hash signing]
+
+  Signer -->|UTxO / protocol data| Blockfrost[Blockfrost]
+  Fac -->|submit / confirmation evidence| Blockfrost
+  Blockfrost --> Cardano
+  Cardano --> Recon[Reconciliation]
   Cardano --> Dune[Dune public analytics]
-  Blockfrost --> AP
-  Dune --> AP
+  Recon --> CP
 ```
 
-## Trust boundaries
+## Control plane responsibilities
 
-1. **Dashboard/control plane**: tenant identity, policy, approvals, spend reservations, immutable audit and reconciliation. No Cardano private signing key.
-2. **Cardano signer gateway**: builds only the narrow supported ADA/whitelisted-native-token transaction shape. Production raw seeds are prohibited.
-3. **Preprod managed signer**: derives a unique testnet Ed25519 identity per immutable Agent ID from the signer-only testnet master key.
-4. **Mainnet external per-agent custody**: resolves a distinct Ed25519 public key and opaque signer reference per immutable Agent ID. AgentPay derives the `addr1...` address locally, sends only the transaction-body hash for signing, and verifies the returned signature. No Mainnet managed-agent master key or shared payer is used.
-5. **Facilitator**: independently decodes and verifies CBOR, payer credential, inputs, outputs, resource binding, asset conservation, fee, TTL and replay state before submission.
-6. **Masumi Registry**: agent identity/discovery and seller payment information. AgentPay pins trusted RegistrySource policy IDs and verifies the seller Cardano address payment credential against the reported payment-key hash.
-7. **Masumi Payment Service**: separate escrow lifecycle. It is never silently treated as direct x402.
-8. **Pyth Hermes**: optional USD valuation dependency. Failure/staleness/uncertainty can only make an oracle-governed payment more restrictive.
-9. **Veridian/KERIA**: cryptographic KERI/ACDC verification authority. AgentPay pins allowed issuers and schemas instead of reimplementing KERI/CESR cryptography.
-10. **Dune**: public read-only Cardano analytics. It cannot authorize, sign or settle payments.
-11. **Blockfrost**: independent Cardano chain/protocol evidence used for transaction construction, reconciliation and canary verification.
+The Vercel application owns:
 
-## Cardano custody modes
+- authentication/tenancy/RBAC;
+- agent and payment-account lifecycle;
+- scoped agent credentials;
+- immutable financial policy;
+- approvals;
+- spend reservations/idempotency;
+- Pyth/Masumi/KERI trust composition;
+- payment intent/attempt state;
+- audit/incidents/reconciliation;
+- emergency stop and operational controls.
 
-### Preprod managed
+The control plane does not hold Cardano private keys.
 
-A distinct `addr_test...` payment identity is derived for each immutable Agent ID inside the isolated Cardano signer. The deterministic master-key mechanism is testnet-only.
+## Direct x402 boundary
 
-### Mainnet self custody
+The x402 Resource Server issues the payment requirement and, after receiving the payment payload, uses the facilitator protocol to verify and settle before returning paid content.
 
-AgentPay builds the exact unsigned transaction for the verified wallet. The wallet owner signs it. This path remains available in parallel with autonomous custody.
+For Cardano, the requirement is bound to the canonical resource URL and exact network, payee, asset and amount.
 
-### Mainnet autonomous managed custody
+## Masumi boundary
 
-The Mainnet signer calls the configured external custody adapter to resolve a stable public key/signer reference for the Agent ID. The private key stays in the external HSM/KMS/delegation boundary. AgentPay locally derives the payer address and verifies every returned Ed25519 signature before the facilitator can submit the transaction.
+Masumi has two distinct roles:
 
-## Cardano payment modes
+- registry and counterparty trust may constrain direct x402;
+- Masumi Payment Service provides the separate escrow, job, refund and result lifecycle.
 
-### Direct x402
+Direct x402 is not labeled as escrow.
 
-- `cardano:preprod` and `cardano:mainnet`
-- scheme `exact`
-- ADA uses `lovelace`
-- one explicitly whitelisted native token may be enabled
-- Mainnet `USDCX` is pinned to the configured canonical Circle xReserve Cardano asset identity
-- every requirement carries SHA-256 resource binding
-- server submission and explicit L1 confirmation policy
-- payer-only inputs and change
-- no scripts, minting, certificates, withdrawals, collateral, bootstrap witnesses, auxiliary data or unrelated native assets
+## Unified facilitator boundary
 
-### Masumi escrow
+The Render facilitator contains child rails for:
 
-- MIP-003 seller job startup/status
-- exact Masumi agent identity and Cardano seller credential verification
-- policy evaluation before purchase creation
-- durable AgentPay purchase state
-- ambiguous provider submission remains reconcilable
-- `FundsLockingRequested → FundsLocked → ResultSubmitted → Completed`
-- refund/dispute states tracked separately
-- result hash verified against the exact returned result string before completion is considered verified
-- completed/refund/dispute outcomes feed AgentPay's evidence-backed seller reputation score
+- Hedera Testnet;
+- Hedera Mainnet;
+- Arc Testnet;
+- Cardano Preprod;
+- Cardano Mainnet.
 
-## Policy composition
+For Cardano it independently verifies the final signed transaction, manages replay and settlement claims, submits via Blockfrost and reconciles confirmation evidence. It does not possess the Cardano payer private key.
 
-A payment may require all of the following simultaneously:
+## Cardano signer boundary
 
-- atomic asset limit
-- USD Pyth-valued transaction/hour/day/month limits
-- merchant/resource allowlist
-- Cardano network/asset allowlist
-- verified Masumi agent identifier/capability
-- minimum observed completed-purchase history
-- minimum observed Masumi escrow reputation score
-- trusted KERI credential issuer/schema
-- human approval threshold
+The signer is a separate Render web-service gateway with isolated Preprod and Mainnet workers.
 
-The final outcome is the most restrictive of the applicable controls.
+### Preprod
 
-## Observability
+Per-agent Ed25519 test identities are deterministically derived inside the signer from a testnet-only master secret.
 
-Public Dune data and private AgentPay aggregates are deliberately separated. Dune shows public chain facts. AgentPay's authenticated analytics can show logical agent count, provider count, policy denials, approvals, verified Masumi outcomes and settlement latency without publishing private tenant identities.
+### Mainnet
+
+Two modes coexist:
+
+- self custody: return the exact unsigned transaction for external wallet signing;
+- external per-agent managed custody: resolve a distinct Ed25519 public key and signer reference for the immutable Agent ID, derive the payer address locally, sign only the transaction-body hash through the external provider, then verify the returned signature locally.
+
+There is no Mainnet managed-agent master key or deployment-wide autonomous-agent payer.
+
+## External custody trust boundary
+
+The external HSM/KMS/delegation provider is not hosted by AgentPay and retains the Mainnet private keys.
+
+Bounded contract:
+
+```text
+POST /identity
+POST /sign
+```
+
+A provider failure or identity/signature mismatch fails closed and cannot fall back to another agent or shared key.
+
+## Blockfrost boundary
+
+Blockfrost serves different code paths:
+
+- signer: UTxOs and protocol data for transaction construction;
+- facilitator: Cardano submission and independent transaction/latest-block confirmation evidence.
+
+It is not a policy authority.
+
+## Public/private observability split
+
+Dune is public, read-only chain analytics. Private tenant identities, prompts, organization policy, credentials and resource contents remain in AgentPay's private control-plane data.
+
+## Architecture invariants
+
+- one managed payment identity per agent;
+- no Cardano Mainnet shared master key;
+- private Mainnet agent keys remain outside AgentPay;
+- policy and approval before signing;
+- body-hash-only external Mainnet signing;
+- local signature verification;
+- independent facilitator transaction verification;
+- facilitator, not signer, submits Cardano transactions;
+- ambiguous submission is reconciled rather than blindly retried;
+- required Pyth, Masumi or KERI evidence may tighten policy but not silently weaken it.
+
+## Provenance
+
+**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor. AgentPay was originally built for the Hedera x402 bounty and later extended to this multi-rail architecture. This document reflects the implementation current as of 2026-08-22.

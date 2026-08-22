@@ -1,4 +1,11 @@
-# AgentPay monogram integration QA
+# AgentPay Monogram Integration QA
+
+**Status:** Visual implementation record; reviewed 2026-08-22  
+**Primary builder:** Daniel Praise (`Daniel419797`)
+
+## Scope note
+
+This file is a visual and brand QA record, not a system-architecture specification. The original logo QA findings remain valid and are preserved below. The older Hedera Testnet screenshot context records the visual state at the time of comparison and should not be read as the current product or network architecture. For current system status see `implementation-status.md` and `02-software-design-document.md`.
 
 ## Evidence
 
@@ -9,8 +16,10 @@
 - Viewport: 1280 x 576 CSS pixels at device scale factor 1.5
 - Source pixels: 1536 x 1024
 - Implementation screenshot pixels: 1280 x 576
-- State: authenticated dashboard overview, desktop sidebar, live Hedera testnet
+- State at time of visual QA: authenticated dashboard overview, desktop sidebar, Hedera Testnet
 - Density normalization: both source and implementation were resized into equal 700-pixel-wide comparison panels; the focused comparison uses the rendered 248 x 82 CSS-pixel sidebar region.
+
+The Hedera Testnet line above records the screenshot state used for this visual comparison only. It does not describe the current supported-network set. AgentPay now includes the multi-rail implementation documented elsewhere.
 
 ## Findings
 
@@ -20,7 +29,7 @@ No actionable P0, P1, or P2 differences remain.
 - Spacing and layout rhythm: the lockup is vertically centered in the existing brand slot with sufficient clear space above the navigation.
 - Colors and visual tokens: the selected monochrome identity is correctly inverted to white for the navy sidebar. No new decorative color was introduced.
 - Image quality and asset fidelity: the production PNG has transparent edges, clean antialiasing, and no visible light halo against the dark sidebar. The AP geometry and wordmark remain faithful to the selected direction.
-- Copy and content: the visible brand reads “AgentPay,” matching the selected logo. Existing product and navigation copy is unchanged.
+- Copy and content: the visible brand reads `AgentPay`, matching the selected logo. Existing product and navigation copy is unchanged.
 
 ## Full-view comparison
 
@@ -55,4 +64,4 @@ The focused side-by-side comparison confirms the same interlocking AP geometry, 
 - [x] Replace the application favicon.
 - [x] Verify lint, typecheck, production build, and browser rendering.
 
-final result: passed
+Final visual QA result: **passed**.

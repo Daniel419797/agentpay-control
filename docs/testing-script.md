@@ -1,198 +1,322 @@
-# AgentPay Control — Full Feature Testing Script
+# AgentPay: Current Feature Testing Script
 
-**Total time:** ~6:45
-**Purpose:** End-to-end testing of every feature with exact pages and steps
+**Status:** Current implementation verification guide  
+**Updated:** 2026-08-22
 
----
+## Revision note
 
-## Complete Feature List
+The previous testing script centered the original Hedera flow and did not test the implemented Cardano Mainnet external per-agent custody or the current unified topology. This version covers the control plane, identity isolation, Cardano, trust and reconciliation behavior while keeping optional provider features conditional on configuration.
 
-| Category | Features |
-|---|---|
-| **Auth** | Email OTP, Google OAuth, Hedera wallet sign-in, agent credentials (API keys) |
-| **Agents** | Create, list, detail, pause/resume, archive, balances, network filter |
-| **Policies** | Per-tx/daily/hourly/monthly limits, merchant allow/deny, schedule windows, cooldown, over-limit actions (DENY/REQUIRE_APPROVAL), versioning |
-| **Payments** | x402 paid requests, facilitator signing/settlement, HashScan evidence, idempotency |
-| **Approvals** | Approval queue, approve/reject votes, threshold-based auto-settle |
-| **Transactions** | Payment intent lifecycle, wallet payments, transaction detail, HashScan links |
-| **Audit** | Immutable chain-linked audit log, CSV/JSON export, event filtering |
-| **Virtual Cards** | Cardholder creation, card issuance, freeze/unfreeze/cancel, ephemeral display keys, real-time authorization via Stripe webhooks |
-| **Fiat Rails** | Fiat accounts, deposits/withdrawals, reconciliation, Stripe Money Management v2 |
-| **Cross-Chain** | Bridge quotes, wallet-signed transfers between EVM networks |
-| **Invoices** | Agent-to-agent invoicing, line items, send/pay/void, x402 collection |
-| **Marketplace** | Browse verified resources, ratings, health status, reviews |
-| **Resources** | Provider registration, resource listings, pricing, endpoint verification |
-| **Automations** | Triggers (manual/schedule/balance/webhook/invoice), actions (contract/x402/invoice), execution log |
-| **Intelligence** | 30-day spend forecasts, anomaly detection, budget recommendations |
-| **Settings** | Org management, members/roles, notification endpoints, data retention, kill switch, contract allowlist |
-| **Notifications** | Webhook/Slack/email delivery, outbox pattern, secret rotation |
-| **SDK/MCP/LangChain** | TypeScript SDK, MCP server (4 tools), LangChain tool factory |
-| **Facilitator** | Hedera + Arc chain settlement, managed signing, contract execution |
-| **Resource Server** | x402-protected endpoints (market data, files, inference, research) |
-| **Maintenance** | Payment retries, retention cleanup, reconciliation, Prometheus metrics |
+## 1. Repository baseline
 
----
+From the exact release head, execute the applicable repository checks rather than relying on deployment status alone.
 
-## Testing Script
+### Dashboard
 
-### 0:00–0:30 — Auth & Login
+```bash
+cd dashboard
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
 
-| Step | Action | Page / URL |
-|---|---|---|
-| 1 | Go to sign-in page | `/sign-in` |
-| 2 | Sign in with email OTP or Google OAuth | `/sign-in` |
-| 3 | Confirm dashboard loads with metrics | `/app/overview` |
+### Payment-identity isolation
 
-### 0:30–1:00 — Agent Creation
+Use only the disposable test or local database intended by the verification script:
 
-| Step | Action | Page / URL |
-|---|---|---|
-| 4 | Create a new agent | `/app/agents/new` |
-| 5 | Set name, Hedera Testnet, platform-managed, HBAR asset | `/app/agents/new` |
-| 6 | Confirm status is ACTIVE, account connected | `/app/agents/[agentId]` |
+```bash
+cd dashboard
+npm run verify:identity-isolation
+```
 
-### 1:00–1:30 — Policy Setup
+Expected: competing claims for the same canonical payment identity cannot both succeed.
 
-| Step | Action | Page / URL |
-|---|---|---|
-| 7 | Open agent policy page | `/app/agents/[agentId]/policy` |
-| 8 | Publish policy: per-tx 100 HBAR, daily 500 HBAR, over-limit = REQUIRE_APPROVAL, merchant mode = ALLOWLIST_ONLY, add trusted host | `/app/agents/[agentId]/policy` |
-| 9 | Confirm policy version shows "Published v1" | `/app/agents/[agentId]` |
+### Cardano signer
 
-### 1:30–2:15 — Paid Request (x402 Flow)
+Run the checked-in signer tests, image and build path used by the repository workflow. Verify the suite covers network guards, transaction construction and managed-agent identity and signature behavior.
 
-| Step | Action | Page / URL |
-|---|---|---|
-| 10 | Open agent credentials page | `/app/agents/[agentId]/credentials` |
-| 11 | Click **Create credential**, enter label, select scopes, confirm | `/app/agents/[agentId]/credentials` |
-| 12 | Copy the secret (shown once), dismiss | `/app/agents/[agentId]/credentials` |
-| 13 | Go to agent detail, click **Send payment** | `/app/agents/[agentId]` |
-| 14 | Select resource (e.g. ETH Market Data), click **Send paid request** | `/app/agents/[agentId]/pay` |
-| 15 | Confirm result shows SETTLED status with HashScan link | `/app/agents/[agentId]/pay` |
-| 16 | Confirm transaction appears in list | `/app/transactions` |
-| 17 | Open transaction detail, click HashScan link, verify on-chain | `/app/transactions/[transactionId]` |
+### Facilitators and resource server
 
-### 2:15–2:45 — Budget Tracking
+Run Hedera, Arc, combined facilitator and resource-server tests and builds applicable to the release.
 
-| Step | Action | Page / URL |
-|---|---|---|
-| 18 | Confirm "Remaining daily budget" shows reduced amount, "% used today" updated | `/app/overview` |
+## 2. Authentication and tenancy
 
-### 2:45–3:15 — Approval Flow
+Verify:
 
-| Step | Action | Page / URL |
-|---|---|---|
-| 19 | Go to Send payment page, select a resource that exceeds per-tx limit | `/app/agents/[agentId]/pay` |
-| 20 | Click **Send paid request**, confirm APPROVAL_PENDING result | `/app/agents/[agentId]/pay` |
-| 21 | Confirm pending approval appears in queue | `/app/approvals` |
-| 22 | Review detail, click **Approve** | `/app/approvals/[approvalId]` |
-| 23 | Confirm new SETTLED transaction from approved request | `/app/transactions` |
+- dashboard sign-in works using configured authentication method;
+- organization-scoped pages and API calls require authentication;
+- users cannot read or mutate another organization's records by guessing IDs;
+- Owner, Operator, Approver and Viewer permissions are enforced server-side;
+- agent credentials reject invalid, expired, revoked or missing scopes.
 
-### 3:15–3:45 — Deny & Pause
+## 3. Agent and payment-identity provisioning
 
-| Step | Action | Page / URL |
-|---|---|---|
-| 24 | Go to Send payment, enter a custom URL for a host NOT in the allowlist | `/app/agents/[agentId]/pay` |
-| 25 | Click **Send paid request**, confirm DENIED result | `/app/agents/[agentId]/pay` |
-| 26 | Confirm DENIED status in transactions | `/app/transactions` |
-| 27 | Click **Pause** on agent | `/app/agents/[agentId]` |
-| 28 | Try to send another request, confirm agent paused error | `/app/agents/[agentId]/pay` |
-| 29 | Click **Resume** on agent | `/app/agents/[agentId]` |
+### Hedera Testnet
 
-### 3:45–4:15 — Virtual Cards (Sandbox)
+Create two managed agents and verify distinct Hedera payment identities.
 
-| Step | Action | Page / URL |
-|---|---|---|
-| 30 | Open cards & fiat page | `/app/cards` |
-| 31 | Create cardholder (name, email, address) | `/app/cards` |
-| 32 | Issue virtual card (select agent, currency, spending limit) | `/app/cards` |
-| 33 | Confirm card appears with status ACTIVE | `/app/cards` |
-| 34 | Freeze card, confirm FROZEN status | `/app/cards` |
-| 35 | Unfreeze, confirm ACTIVE again | `/app/cards` |
+### Arc Testnet
 
-### 4:15–4:30 — Fiat Accounts
+Create two managed agents and verify distinct EVM addresses.
 
-| Step | Action | Page / URL |
-|---|---|---|
-| 36 | Open fiat account section | `/app/cards` |
-| 37 | Create fiat account (USD) | `/app/cards` |
-| 38 | Submit deposit, confirm PENDING status | `/app/cards` |
+### Cardano Preprod
 
-### 4:30–4:45 — Automations
+Create two managed agents and verify:
 
-| Step | Action | Page / URL |
-|---|---|---|
-| 39 | Open automations page | `/app/automations` |
-| 40 | Create rule: trigger = "Schedule (daily)", action = "x402 payment" | `/app/automations` |
-| 41 | Activate rule, confirm status changes to ACTIVE | `/app/automations` |
+- both use `addr_test1...`;
+- addresses differ;
+- payment accounts are stored as distinct canonical identities;
+- testnet master secret is not present in Vercel.
 
-### 4:45–5:00 — Invoices
+### Cardano Mainnet external delegated
 
-| Step | Action | Page / URL |
-|---|---|---|
-| 42 | Create invoice: issuer agent, recipient agent, line items | `/app/invoices/new` |
-| 43 | Send invoice | `/app/invoices/[invoiceId]` |
-| 44 | Pay invoice, confirm settlement | `/app/invoices/[invoiceId]` |
+Only run live if external custody is actually configured.
 
-### 5:00–5:15 — Marketplace & Resources
+Create two agents and verify:
 
-| Step | Action | Page / URL |
-|---|---|---|
-| 45 | Browse resources, confirm prices and health shown | `/app/marketplace` |
-| 46 | View owned resources | `/app/resources` |
+- both use `addr1...`;
+- each resolves to its own external Ed25519 identity;
+- public keys and signer references differ;
+- local derived address matches the external public key;
+- no Mainnet managed-agent master key exists;
+- custody API credential exists only on the signer.
 
-### 5:15–5:30 — Intelligence
+Negative cases:
 
-| Step | Action | Page / URL |
-|---|---|---|
-| 47 | Confirm forecasts, anomalies, recommendations visible | `/app/intelligence` |
+- same external identity returned for a second agent -> duplicate identity rejected;
+- invalid public key -> provisioning rejected;
+- claimed address mismatch -> rejected;
+- custody unavailable -> fail closed.
 
-### 5:30–5:45 — Audit Log
+## 4. Policy tests
 
-| Step | Action | Page / URL |
-|---|---|---|
-| 48 | Confirm events logged for all actions above | `/app/audit` |
-| 49 | Export CSV, confirm download | `/app/audit` |
+Publish a restrictive policy and test:
 
-### 5:45–6:00 — Settings
+- within-limit -> `ALLOW`;
+- over-limit with deny behavior -> `DENY`;
+- over-limit with approval behavior -> `REQUIRE_APPROVAL`;
+- merchant and resource allow or deny rule;
+- schedule activation and expiry;
+- velocity and cooldown where configured;
+- immutable published version behavior.
 
-| Step | Action | Page / URL |
-|---|---|---|
-| 50 | Toggle kill switch ON, confirm payments blocked | `/app/settings` |
-| 51 | Toggle kill switch OFF | `/app/settings` |
-| 52 | Add notification endpoint (webhook URL) | `/app/settings` |
-| 53 | Invite member with VIEWER role | `/app/settings` |
+Confirm denied requests do not reach signing.
 
-### 6:00–6:15 — Cross-Chain
+## 5. Approval tests
 
-| Step | Action | Page / URL |
-|---|---|---|
-| 54 | Create bridge quote, confirm route displayed | `/app/cross-chain` |
+- create an approval-required request;
+- verify `APPROVAL_PENDING`;
+- verify an unauthorized user cannot decide it;
+- verify self-approval is blocked where applicable;
+- approve through a valid approver;
+- verify execution resumes once;
+- reject a separate request and verify no signing or submission.
 
-### 6:15–6:30 — SDK & MCP (Terminal)
+## 6. Spend reservation and idempotency tests
 
-| Step | Action | Command |
-|---|---|---|
-| 55 | Run SDK tests | `cd dashboard/packages/sdk && npm test` |
-| 56 | Start MCP server, confirm tools listed | `cd dashboard/packages/mcp && node src/server.mjs` |
+Verify:
 
-### 6:30–6:45 — Health & Metrics
+- authorized intent creates or uses a durable spend reservation;
+- duplicate idempotency key with identical request returns existing intent;
+- same idempotency key with different request causes conflict;
+- stale balance data cannot ignore active, consumed or recently settled commitments;
+- failed-before-submission behavior releases or updates reservation according to state;
+- ambiguous post-sign or submission outcome does not behave like clean pre-sign failure.
 
-| Step | Action | Command |
-|---|---|---|
-| 57 | Health check | `curl http://localhost:3100/api/v1/health` |
-| 58 | Readiness check | `curl http://localhost:3100/api/v1/ready` |
-| 59 | Prometheus metrics | `curl http://localhost:3100/api/v1/internal/metrics` |
+## 7. Direct x402 resource test
 
----
+Use a registered x402 resource.
 
-## Preparation Checklist
+Expected path:
 
-- [ ] Fund HashPack wallet on testnet (use faucet)
-- [ ] Deploy/reset seed data: `npm run db:seed`
-- [ ] Start facilitator: `cd facilitator && npm run dev`
-- [ ] Start resource server: `cd resource-server && npm run dev`
-- [ ] Start dashboard: `cd dashboard && npm run dev -- -p 3100`
-- [ ] Set `VIRTUAL_CARDS_ENABLED=true` and `CARD_PROVIDER=SANDBOX` in `.env` for card testing
-- [ ] Pre-warm all services
-- [ ] Total time check: < 6:45
+```text
+GET resource
+ -> 402 Payment Required
+ -> select exact requirement
+ -> policy/trust evaluation
+ -> reserve spend
+ -> sign/prepare
+ -> request resource with payment payload
+ -> resource verify/settle
+ -> paid response
+```
+
+Validate resource URL canonicalization and SSRF restrictions.
+
+## 8. Cardano Preprod direct x402 test
+
+Use a deliberately funded low-value agent.
+
+Verify:
+
+- requirement network is `cardano:preprod`;
+- scheme is `exact`;
+- `resourceBinding` matches canonical URL;
+- payer address matches the agent's managed identity;
+- signer constructs valid CBOR;
+- facilitator independently verifies transaction;
+- facilitator submits via Blockfrost;
+- chain evidence confirms payer, payee, asset and amount;
+- AgentPay settlement state becomes confirmed or settled.
+
+## 9. Cardano Mainnet self-custody test
+
+Only use a deliberately low-value verified wallet.
+
+Verify:
+
+- unsigned transaction prepared for exact payer;
+- wallet or provider signs outside AgentPay;
+- signed transaction satisfies facilitator checks;
+- submission is performed by facilitator, not signer;
+- resulting transaction is independently confirmed.
+
+## 10. Cardano Mainnet external per-agent managed test
+
+Run only if a real external custody adapter is configured.
+
+Expected sequence:
+
+```text
+AgentPay
+ -> facilitator /managed-agent-sign
+ -> signer resolves /identity
+ -> signer constructs transaction
+ -> signer hashes transaction body
+ -> custody /sign exact signerRef
+ -> signer verifies Ed25519 signature locally
+ -> facilitator independently verifies CBOR
+ -> facilitator submits through Blockfrost
+ -> confirmation evidence
+```
+
+Negative cases:
+
+- changed signer reference -> reject;
+- changed public key -> reject;
+- invalid signature -> reject;
+- custody timeout or unavailable -> reject and fail closed;
+- no fallback to another agent or shared payer.
+
+## 11. Cardano asset and profile tests
+
+### ADA
+
+Verify exact `lovelace` amount, payer-only change, fee and value conservation.
+
+### Configured native token or USDCx
+
+When enabled, verify:
+
+- exact configured asset identity;
+- no unrelated native assets;
+- exact token conservation;
+- exact payee token amount;
+- change only to payer;
+- Preprod token is never presented as Mainnet USDCx.
+
+Reject unsupported scripts, minting, certificates, withdrawals, collateral, bootstrap witnesses, auxiliary data and unrelated outputs.
+
+## 12. Replay and resource-binding tests
+
+- same resource and idempotent retry remains safe;
+- same price and payee but different canonical resource URL must not reuse binding;
+- conflicting settlement claim for same transaction ID must reject;
+- spent or unavailable UTxO nonce must reject when a new claim is attempted.
+
+## 13. Ambiguous submission test
+
+In a safe environment, force a timeout or uncertain response after submission could have occurred.
+
+Expected:
+
+- candidate transaction ID retained where known;
+- state becomes pending or `SUBMISSION_UNKNOWN`;
+- spend reservation not blindly released;
+- no blind resubmission;
+- reconciliation queries independent chain evidence;
+- confirmed evidence transitions to settled.
+
+## 14. Pyth policy tests
+
+When enabled:
+
+- valid fresh observation -> conservative USD valuation;
+- stale observation -> fail closed;
+- future timestamp -> fail closed;
+- non-positive price -> fail closed;
+- excessive confidence width -> fail closed;
+- oracle failure does not relax atomic policy.
+
+## 15. Masumi tests
+
+### Registry and direct trust
+
+Verify network, registry policy, agent identifier, capability, seller address, payment credential and freshness.
+
+### Escrow
+
+When configured, verify:
+
+```text
+PREPARED
+ -> FundsLockingRequested
+ -> FundsLocked
+ -> ResultSubmitted
+ -> Completed
+```
+
+Confirm returned result hash matches the exact result before counting completion as verified.
+
+Exercise a separate refund or dispute path where appropriate.
+
+## 16. KERI/Veridian tests
+
+When configured:
+
+- valid verified credential passes required policy;
+- untrusted issuer or schema fails;
+- stale, expired or revoked credential fails;
+- Masumi-agent identity binding mismatch fails.
+
+## 17. Emergency stop
+
+- enable organization emergency stop;
+- attempt new payment or risky side effect -> blocked;
+- verify reconciliation and evidence access continues;
+- restore through authenticated administrative control;
+- confirm audit events exist.
+
+## 18. Audit, reconciliation and analytics
+
+Verify:
+
+- payment, policy, approval and security events are recorded;
+- transaction detail contains correct chain evidence;
+- reconciliation status is visible for ambiguous outcomes;
+- Dune, if enabled, contains public-chain facts only and is not needed for payment success.
+
+## 19. Optional product surfaces
+
+Virtual cards, fiat, cross-chain, invoices, marketplace, automations, notifications and financial-intelligence pages should be tested only against the provider and configuration mode actually enabled. Sandbox or fixture behavior must not be described as live production-provider evidence.
+
+## 20. Final release checklist
+
+- [ ] exact release SHA recorded
+- [ ] expected CI jobs actually executed
+- [ ] migrations pass
+- [ ] concurrent identity-isolation check passes
+- [ ] dashboard lint, typecheck, tests and build pass
+- [ ] facilitator, signer and resource checks pass
+- [ ] selected network and custody canary succeeds
+- [ ] chain evidence independently verified
+- [ ] negative and fail-closed cases exercised
+- [ ] no secrets exposed in logs or screenshots
+- [ ] observed metrics clearly separated from proposal targets and fixtures
+
+## Update provenance
+
+Updated on 2026-08-22 because the previous script did not cover the implemented Cardano Mainnet external per-agent custody architecture or current multi-rail topology.
+
+Primary builder: **Daniel Praise** (`Daniel419797`).

@@ -1,113 +1,164 @@
-# Catalyst live demo runbook
+# AgentPay Catalyst Live Demo Runbook
+
+**Updated:** 2026-08-22  
+**Presenter / primary builder:** Daniel Praise (`Daniel419797`)
+
+## Revision note
+
+This script reflects the Cardano Mainnet external per-agent custody implementation. It describes the current signer and facilitator flow, identifies the primary builder correctly, and distinguishes live evidence from source or configuration support.
 
 ## Demo objective
 
-Prove one coherent story: an autonomous agent can hire a verified agent/service on Cardano while AgentPay keeps enforceable control over budget, counterparties, assets, approvals, settlement state and emergency shutdown.
+Prove that an autonomous agent can purchase a service on Cardano while AgentPay keeps enforceable control over budget, counterparty trust, custody identity, approvals, settlement state and emergency shutdown.
 
 ## Preconditions
 
-Use the exact release being demonstrated and real credentials for the integrations shown. For a Cardano Mainnet autonomous-agent demo, configure the external per-agent custody adapter and fund only the specific `addr1...` identity provisioned for that agent. Do not put `CARDANO_MANAGED_AGENT_MASTER_KEY` on Mainnet.
+Use the exact release being demonstrated and real credentials only for integrations claimed as live.
 
-## Scene 1 — policy and agent identity
+For a live Cardano Mainnet managed-agent demonstration:
 
-Show the Research Agent and its active policy:
+- configure the external per-agent custody adapter on the isolated signer;
+- provision and fund only the exact `addr1...` identity for the demonstrated Agent ID;
+- do not configure `CARDANO_MANAGED_AGENT_MASTER_KEY` on Mainnet;
+- use deliberately low-value funds.
 
-- network: Cardano
-- custody mode: Preprod managed, Mainnet external delegated, or self custody
-- assets: ADA and USDCx/configured stable asset
-- maximum autonomous payment
-- USD daily/monthly limit
-- Pyth valuation enabled when used
-- Masumi seller identity required when used
-- approval threshold
+## Scene 1: Introduce the project
 
-For Mainnet external custody, show the agent's distinct `addr1...` payment address. Explain that AgentPay stores public identity material only; the private key remains in the external HSM/KMS/delegation boundary.
+Suggested narration:
 
-## Scene 2 — counterparty verification
+AgentPay was originally built for the Hedera x402 bounty and later extended into a multi-rail control plane, including the Cardano implementation shown here.
 
-Open the provider/resource identity evidence.
+Show the AgentPay dashboard and active Cardano agent.
+
+## Scene 2: Agent and policy
 
 Show:
 
-- Masumi `agentIdentifier`
-- trusted RegistrySource policy ID
-- capability
-- seller address
-- seller payment-key hash
-- Cardano address/payment-key credential match
-- latest verification time/expiry
-- optional Veridian/KERI credential SAID, issuer AID and schema SAID
+- immutable Agent ID;
+- network and custody mode;
+- per-agent payment account;
+- active policy;
+- transaction, daily or configured USD limits;
+- approval threshold;
+- optional Masumi, Pyth or KERI requirements.
 
-Do not display API keys or private credential bodies.
+Explain that the agent requests spend but cannot alter the published policy or retrieve the payment private key.
 
-## Scene 3 — agent hires agent
+## Scene 3: Mainnet custody identity
 
-Use a real agent credential to initiate a policy-controlled purchase for a verified resource.
+If demonstrating external Mainnet custody live, show the agent's distinct `addr1...` address.
 
-For direct x402, the expected path is:
+Explain:
 
-`Agent request → policy → managed signer → facilitator verification → Cardano → reconciliation`
+1. the signer resolves a public Ed25519 key and signer reference for the exact Agent ID;
+2. AgentPay derives `addr1...` locally;
+3. only a transaction-body hash is sent for signing;
+4. returned signatures are verified locally;
+5. the private key remains in the external HSM/KMS/delegation boundary;
+6. there is no deployment-wide Mainnet agent master key or shared payer.
 
-For Mainnet external delegated custody, point out that the signer resolves the public key/signer reference for the exact Agent ID, builds the transaction, sends only the transaction-body hash to that signer reference, verifies the returned Ed25519 signature locally, and then passes the transaction to the independent facilitator.
+If the external provider is not live in the demo environment, describe this as implemented source capability rather than claiming a completed Mainnet managed demo.
 
-For Masumi escrow, show the lifecycle:
+## Scene 4: Verify the counterparty
 
-`PREPARED → FundsLockingRequested → FundsLocked → ResultSubmitted → Completed`
+Where configured, show real Masumi evidence:
 
-At completion show the purchase/job identifier, result hash, policy decision and audit trail. Explain that AgentPay verifies the returned result against the submitted result hash before counting the purchase as verified-complete.
+- agent identifier;
+- trusted registry source and policy;
+- capability;
+- seller Cardano address and payment-key facts;
+- verification freshness.
 
-## Scene 4 — direct x402 transaction
+If KERI is part of the live profile, show non-secret credential evidence such as issuer, schema, SAID and validity state.
 
-Show a Cardano `exact` x402 resource challenge and payment.
+## Scene 5: Direct x402 purchase
 
-Point out:
+Run a deliberately low-value registered resource request.
 
-- exact network
-- resource SHA-256 binding
-- exact payer/payee
-- exact asset/amount
-- per-agent custody identity
-- facilitator verification
-- transaction hash and Cardano explorer evidence
+Narrate:
 
-If demonstrating Mainnet, use a deliberately low-value payment from the exact provisioned agent address. The demo may use self custody or the configured external per-agent managed path; describe the mode actually being shown.
+```text
+Resource returns 402
+ -> AgentPay verifies exact requirement/resource binding
+ -> policy + trust evaluation
+ -> spend reservation
+ -> signing/preparation
+ -> Cardano signer constructs transaction
+ -> external/Preprod signer signs exact body hash as applicable
+ -> facilitator independently verifies signed CBOR
+ -> facilitator submits through Blockfrost
+ -> Cardano confirmation evidence
+ -> resource fulfillment
+```
 
-## Scene 5 — policy denial
+Show the resulting transaction ID and chain evidence.
 
-Submit a request that is deliberately over the active policy limit or above the caller-provided maximum.
+## Scene 6: Policy denial
 
-Expected result: `DENY` / `MAX_AMOUNT_EXCEEDED` / applicable policy reason. Show that no transaction is submitted.
+Submit a request deliberately outside policy.
 
-## Scene 6 — human approval
+Expected:
 
-Submit a payment inside the broader budget but above the autonomous threshold.
+```text
+DENY
+no signing
+no settlement side effect
+```
 
-Expected result: `APPROVAL_PENDING`.
+## Scene 7: Human approval
 
-Use a different Owner/Approver account from the initiator. Approve the request and show execution continuing through the correct payment scheme. Self-approval must remain blocked.
+Submit a request configured to require approval.
 
-## Scene 7 — custody failure
+Show:
 
-For a Mainnet external-delegated agent, demonstrate or describe the fail-closed behavior when the custody adapter is unavailable or returns an invalid identity/signature.
+- `APPROVAL_PENDING`;
+- a valid approver reviewing the request;
+- no self-approval where separation is enforced;
+- execution continuing once after valid approval.
 
-Expected result: managed signing fails. AgentPay must not fall back to a shared key, another agent's identity or a deployment-wide payer.
+## Scene 8: Custody failure safety
 
-## Scene 8 — refund lifecycle
+For Mainnet managed custody, safely demonstrate or explain an adapter failure or invalid signature case.
 
-Use a dedicated escrow purchase whose result is eligible for refund. Request the refund as buyer, authorize as the provider organization, reconcile and show `RefundAuthorized` plus the corresponding spend state. Keep this separate from the primary successful purchase.
+Expected: managed signing fails closed. AgentPay must not fall back to a shared key, another agent's signer identity or a deployment-wide payer.
 
-## Scene 9 — emergency stop
+## Scene 9: Masumi escrow
 
-Enable the organization emergency stop through the normal operator UI/API. Attempt a new payment and show it is rejected. Then show that reconciliation/defensive evidence processing remains operational. Restore the organization only through the normal authenticated administrative control.
+Only if a real escrow environment is configured, show the separate lifecycle:
 
-## Scene 10 — analytics
+```text
+PREPARED
+ -> FundsLockingRequested
+ -> FundsLocked
+ -> ResultSubmitted
+ -> Completed
+```
 
-Open `/app/analytics/cardano` and, if configured, the public Dune dashboard.
+At completion show result-hash verification. Use a separate eligible purchase for a refund demonstration where appropriate.
 
-Dune should show only public chain facts. AgentPay's authenticated analytics can show logical metrics such as unique paying agents/providers, policy denials, approval-required events, settlement success/latency and verified Masumi outcomes.
+## Scene 10: Ambiguous settlement safety
 
-Never substitute planning targets or example numbers for observed values.
+Explain or show that an uncertain post-submission response stays pending or reconciliation-required. The candidate transaction is preserved and checked against independent chain evidence instead of being blindly retried.
+
+## Scene 11: Emergency stop
+
+Enable the organization emergency stop through normal authenticated controls. Attempt a new payment and show it is blocked. Confirm defensive reconciliation and evidence access still works.
+
+## Scene 12: Analytics and public evidence
+
+Show chain evidence and, only if actually published and configured, the Dune dashboard.
+
+Dune is read-only and must not contain private prompts, credentials, organization policy or private resource content.
 
 ## Closing line
 
-“AgentPay lets agents remain autonomous without becoming financially unrestricted: every Mainnet managed agent can have its own external signing identity, Cardano moves the value, and AgentPay enforces the organization's financial boundary.”
+AgentPay lets agents remain autonomous without becoming financially unrestricted. Policy controls the decision, each managed agent has isolated payment authority, Cardano carries settlement, and AgentPay independently verifies and reconciles what actually happened.
+
+## Evidence discipline
+
+- Do not substitute proposal targets for observed numbers.
+- Do not describe synthetic resources as live customer or market evidence.
+- Do not claim an external provider is active if only its integration code or configuration exists.
+- Do not claim TRL 6 solely because the Mainnet custody source path is implemented.
+
+For Catalyst purposes, AgentPay remains **TRL 5** until the intended Mainnet and pilot configuration is demonstrated in a relevant environment.
