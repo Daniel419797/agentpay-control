@@ -4,6 +4,8 @@ import { getNetworkRouter } from "@/domain/network-router";
 
 export const managedTestnetNetworks = ["hedera:testnet", "eip155:5042002", "cardano:preprod"] as const;
 export type ManagedTestnetNetwork = (typeof managedTestnetNetworks)[number];
+export const managedAgentNetworks = [...managedTestnetNetworks, "cardano:mainnet"] as const;
+export type ManagedAgentNetwork = (typeof managedAgentNetworks)[number];
 
 const managedIdentitySchema = z.object({
   accountId: z.string().min(3).max(200),
@@ -13,25 +15,30 @@ const managedIdentitySchema = z.object({
 
 export type ManagedAgentIdentity = z.infer<typeof managedIdentitySchema>;
 
-function assertManagedAccountId(network: ManagedTestnetNetwork, accountId: string) {
+function assertManagedAccountId(network: ManagedAgentNetwork, accountId: string) {
   if (network === "hedera:testnet" && !/^0\.0\.\d+$/.test(accountId)) throw new Error("MANAGED_IDENTITY_INVALID");
   if (network === "eip155:5042002" && !/^0x[0-9a-fA-F]{40}$/.test(accountId)) throw new Error("MANAGED_IDENTITY_INVALID");
   if (network === "cardano:preprod" && !/^addr_test1[0-9a-z]+$/.test(accountId)) throw new Error("MANAGED_IDENTITY_INVALID");
+  if (network === "cardano:mainnet" && !/^addr1[0-9a-z]+$/.test(accountId)) throw new Error("MANAGED_IDENTITY_INVALID");
 }
 
 export function isManagedTestnetNetwork(network: string): network is ManagedTestnetNetwork {
   return (managedTestnetNetworks as readonly string[]).includes(network);
 }
 
+export function isManagedAgentNetwork(network: string): network is ManagedAgentNetwork {
+  return (managedAgentNetworks as readonly string[]).includes(network);
+}
+
 /**
- * Provision a public payment identity for one managed testnet agent.
+ * Provision the public payment identity for one managed agent.
  *
- * Private signing material never crosses this boundary. The rail-specific
- * signer/facilitator owns the key derivation/custody and returns only the
- * on-chain account/address plus an opaque signer reference.
+ * Testnet rails may derive the identity inside their signer/facilitator.
+ * Cardano Mainnet resolves a unique external Ed25519 signer identity for the
+ * immutable Agent ID. Private signing material never crosses this boundary.
  */
 export async function provisionManagedAgentIdentity(network: string, agentId: string): Promise<ManagedAgentIdentity> {
-  if (!isManagedTestnetNetwork(network)) throw new Error("MANAGED_SIGNER_TESTNET_ONLY");
+  if (!isManagedAgentNetwork(network)) throw new Error("MANAGED_SIGNER_NETWORK_UNSUPPORTED");
 
   const route = getNetworkRouter().getRoute(network);
   if (!route.facilitatorApiKey) throw new Error("MANAGED_SIGNER_CAPABILITY_REQUIRED");
