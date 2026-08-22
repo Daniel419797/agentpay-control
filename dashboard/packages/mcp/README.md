@@ -2,8 +2,6 @@
 
 **Updated:** 2026-08-22
 
-> **Reason for update:** The MCP bridge is network-agnostic and now fronts the current multi-rail AgentPay control plane rather than a Hedera-only product. This README was synchronized so AI clients understand that they receive scoped AgentPay credentials, while custody/signing details remain behind the same policy-controlled API regardless of the selected rail.
-
 AgentPay MCP bridge for AI clients that prefer a local stdio server.
 
 The bridge forwards MCP JSON-RPC messages to the hosted AgentPay MCP endpoint, so local and remote clients use the same authentication, policy, approval, reservation, payment and settlement logic.
