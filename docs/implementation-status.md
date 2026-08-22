@@ -4,7 +4,9 @@
 **Updated:** 2026-08-22  
 **Primary builder:** Daniel Praise (`Daniel419797`)
 
-> **Why this document was updated:** This inventory now reflects the merged Cardano Mainnet external per-agent custody implementation and distinguishes implemented source behavior from deployment-specific provider/configuration facts. Older self-custody-only Mainnet wording is obsolete.
+## Revision note
+
+This inventory reflects the Cardano Mainnet external per-agent custody implementation and distinguishes implemented source behavior from deployment-specific provider and configuration facts. Older self-custody-only Mainnet wording is obsolete.
 
 ## Product/control plane
 
@@ -95,31 +97,31 @@ Implemented as a Render web-service gateway with isolated Preprod/Mainnet worker
 - local Ed25519 signature verification;
 - fail-closed provider behavior.
 
-The Cardano signer constructs/signs but does **not** submit transactions on-chain.
+The Cardano signer constructs and signs but does **not** submit transactions on-chain.
 
 ## Cardano facilitator
 
 Implemented responsibilities include:
 
-- network-scoped managed identity/signing routes;
-- independent signed-CBOR parsing/verification;
-- exact payer/payee/asset/amount checks;
-- supported-asset/conservation/change rules;
-- fee/TTL/nonce/resource-binding validation;
-- durable settlement claim/replay protection;
+- network-scoped managed identity and signing routes;
+- independent signed-CBOR parsing and verification;
+- exact payer, payee, asset and amount checks;
+- supported-asset, conservation and change rules;
+- fee, TTL, nonce and resource-binding validation;
+- durable settlement claim and replay protection;
 - Blockfrost `/tx/submit`;
-- transaction/latest-block evidence and confirmation polling;
-- pending/ambiguous/definitive settlement classification.
+- transaction and latest-block evidence and confirmation polling;
+- pending, ambiguous and definitive settlement classification.
 
 ## Pyth
 
 Implemented optional policy integration:
 
 - Hermes price fetch;
-- freshness/confidence validation;
+- freshness and confidence validation;
 - positive-price checks;
 - conservative USD-micro valuation;
-- per-transaction/hour/day/month USD policy;
+- per-transaction, hourly, daily and monthly USD policy;
 - fail-closed behavior where required.
 
 ## Masumi
@@ -128,80 +130,80 @@ Implemented roles are intentionally separate:
 
 ### Registry/direct-payee trust
 
-- registry source/network verification;
-- agent identifier/capability checks;
-- seller settlement address/payment-key evidence;
-- freshness/online requirements.
+- registry source and network verification;
+- agent identifier and capability checks;
+- seller settlement address and payment-key evidence;
+- freshness and online requirements.
 
 ### Escrow lifecycle
 
-- purchase creation/reconciliation;
-- funds-locking/funds-locked/result/completion states;
+- purchase creation and reconciliation;
+- funds-locking, funds-locked, result and completion states;
 - exact result-hash verification;
-- refund request/authorization;
-- dispute/failure tracking;
+- refund request and authorization;
+- dispute and failure tracking;
 - seller reputation based on AgentPay-observed linked outcomes.
 
 ## Veridian/KERI
 
-Implemented optional integration delegates cryptographic credential verification to configured KERIA and applies AgentPay issuer/schema/subject/freshness/revocation/identity-binding policy.
+Implemented optional integration delegates cryptographic credential verification to configured KERIA and applies AgentPay issuer, schema, subject, freshness, revocation and identity-binding policy.
 
 ## Dune
 
-Implemented read-only Cardano analytics assets include checked-in SQL/publishing support. Dune is outside payment authorization, signing, settlement and reconciliation authority. Real public query/dashboard identifiers are deployment facts.
+Implemented read-only Cardano analytics assets include checked-in SQL and publishing support. Dune is outside payment authorization, signing, settlement and reconciliation authority. Real public query and dashboard identifiers are deployment facts.
 
 ## x402 resource server
 
 Implemented demonstration resource server provides x402-protected resource flows and participates in the `402 -> payment payload -> verify/settle -> paid response` lifecycle.
 
-Synthetic/demo content must be described as synthetic; it must not be presented as live customer, market, model or research evidence unless it actually is.
+Synthetic or demo content must be described as synthetic. It must not be presented as live customer, market, model or research evidence unless it actually is.
 
 ## Security/operational controls
 
 Implemented source includes controls for:
 
-- tenant/RBAC boundaries;
+- tenant and RBAC boundaries;
 - scoped credentials;
-- SSRF-safe/bounded resource fetches;
-- immutable policy/audit behavior;
+- SSRF-safe and bounded resource fetches;
+- immutable policy and audit behavior;
 - spend reservations and stale-balance protection;
 - approval separation;
 - emergency stop;
 - payment identity isolation;
-- signer/facilitator capability separation;
-- production HTTPS/secret guards;
+- signer and facilitator capability separation;
+- production HTTPS and secret guards;
 - raw Cardano production signing-seed rejection;
-- reconciliation/incident handling;
-- CI/security/dependency validation configuration.
+- reconciliation and incident handling;
+- CI, security and dependency validation configuration.
 
 ## Source implementation versus deployment facts
 
-The repository implementing a feature means the code path/configuration contract exists. It does **not** by itself prove that every external provider credential, funded account or production dependency is currently configured in a particular deployment.
+The repository implementing a feature means the code path and configuration contract exist. It does **not** by itself prove that every external provider credential, funded account or production dependency is currently configured in a particular deployment.
 
 Examples of external deployment facts:
 
-- real Mainnet custody provider URL/API key;
+- real Mainnet custody provider URL and API key;
 - funded external agent addresses;
-- real Pyth/Masumi/KERIA credentials;
-- published Dune query/dashboard IDs;
-- exact release deployed to Vercel/Render;
-- pilot/user activity.
+- real Pyth, Masumi and KERIA credentials;
+- published Dune query and dashboard IDs;
+- exact release deployed to Vercel and Render;
+- pilot and user activity.
 
 These should be reported from the actual environment rather than fabricated from fixtures.
 
-## Catalyst maturity/provenance
+## Catalyst maturity and provenance
 
-I am **Daniel Praise** (`Daniel419797`), the repository owner and primary technical contributor. I originally built AgentPay for the Hedera x402 bounty and subsequently extended it into the current multi-rail architecture.
+**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor. AgentPay was originally built for the Hedera x402 bounty and subsequently extended into the current multi-rail architecture.
 
-For Catalyst I currently use **TRL 5** until the intended Cardano Mainnet/pilot configuration is demonstrated in a relevant environment. The Mainnet external per-agent custody implementation removes the prior code limitation, but source implementation alone is not a TRL 6 demonstration.
+For Catalyst purposes, AgentPay remains **TRL 5** until the intended Cardano Mainnet and pilot configuration is demonstrated in a relevant environment. The Mainnet external per-agent custody implementation removes the prior code limitation, but source implementation alone is not a TRL 6 demonstration.
 
 ## Update summary
 
 Updated 2026-08-22 to:
 
 - record Mainnet external per-agent custody as implemented;
-- preserve Mainnet self-custody as a separate supported mode;
-- identify the actual primary builder;
-- distinguish source capability from real deployment/pilot evidence;
+- preserve Mainnet self custody as a separate supported mode;
+- identify the primary builder;
+- distinguish source capability from real deployment and pilot evidence;
 - make signer versus facilitator responsibilities explicit;
 - align the feature inventory with the merged code.
