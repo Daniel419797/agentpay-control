@@ -14,8 +14,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const config = getConfig();
   return (
     <AppShell
-      // Mainnet remains selectable for self-custody wallet linking even while
-      // managed settlement is fail-closed pending facilitator readiness.
+      // Mainnet remains selectable for self-custody and, on Cardano, the
+      // isolated external per-agent custody path when that signer is configured.
       mainnetEnabled
       arcEnabled={isManagedArcEnabled(config)}
       cardanoPreprodEnabled={isManagedCardanoPreprodEnabled(config)}
