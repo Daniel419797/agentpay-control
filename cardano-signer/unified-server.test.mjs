@@ -76,8 +76,8 @@ test("unified signer keeps Preprod and Mainnet workers isolated", { timeout: 30_
       headers: { "content-type": "application/json", authorization: `Bearer ${MAINNET_KEY}` },
       body: JSON.stringify({ agentId: AGENT_ID, network: "cardano:mainnet" }),
     });
-    assert.equal(mainnetManaged.status, 422);
-    assert.equal((await mainnetManaged.json()).code, "CARDANO_MANAGED_AGENT_SIGNING_TESTNET_ONLY");
+    assert.equal(mainnetManaged.status, 502);
+    assert.equal((await mainnetManaged.json()).code, "CARDANO_AGENT_CUSTODY_REQUIRED");
 
     const crossedCapability = await fetch(`http://127.0.0.1:${PORT}/mainnet/unsigned`, {
       method: "POST",
