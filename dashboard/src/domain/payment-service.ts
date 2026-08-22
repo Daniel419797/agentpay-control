@@ -27,7 +27,8 @@ export type PaidRequestContext = { initiatedByUserId?: string };
 function hash(value: unknown) { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
 
 function isManagedSigningAccount(account: { custodyType: string; signingMode: string }) {
-  return account.custodyType === "PLATFORM_MANAGED_TESTNET" && account.signingMode === "AUTONOMOUS_MANAGED";
+  return account.signingMode === "AUTONOMOUS_MANAGED"
+    && (account.custodyType === "PLATFORM_MANAGED_TESTNET" || account.custodyType === "EXTERNAL_DELEGATED");
 }
 
 async function failBeforeSigning(intentId: string, organizationId: string, code: string) {
@@ -188,9 +189,6 @@ export async function createPaidRequest(
 
   const required = await discoverX402(resourceUrl, config.APP_ENV === "production");
 
-  // External oracle/registry calls happen before entering the serializable
-  // transaction. Their exact facts are then revalidated and persisted inside
-  // the transaction so no network call holds a database lock.
   const preflightAgent = await db.agent.findUniqueOrThrow({
     where: { id: agentId },
     include: { effectivePolicy: { include: { asset: true } } },
