@@ -3,10 +3,6 @@
 **Updated:** 2026-08-22  
 **Proposer / primary builder:** Daniel Praise (`Daniel419797`)
 
-## Revision note
-
-The pitch identifies Daniel Praise as the primary builder, discloses the Hedera x402 origin directly, and reflects the Cardano Mainnet per-agent external custody implementation now in the repository. TRL and pilot claims remain conservative and are not inferred from source changes alone.
-
 ## 30-second pitch
 
 AgentPay is the financial-control layer for autonomous agents on Cardano. Instead of handing software an unrestricted wallet, it combines policy, approvals, verified counterparties, isolated per-agent payment identities and independent settlement verification. Cardano Mainnet agents can use self custody or their own externally custodied Ed25519 signer identity, so there is no shared Mainnet agent master key.
