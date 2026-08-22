@@ -1,10 +1,12 @@
-# AgentPay Control — Detailed Workflows
+# AgentPay Control: Detailed Workflows
 
 **Status:** Current implementation workflows  
 **Updated:** 2026-08-22  
 **Primary builder:** Daniel Praise (`Daniel419797`)
 
-> **Why this document was updated:** The original workflow document described the July 2026 Hedera MVP. I have replaced that obsolete single-rail view with the payment, custody, trust and reconciliation flows that are currently implemented. The original workflow document remains available in Git history.
+## Revision note
+
+The original workflow document described the July 2026 Hedera MVP. This version documents the payment, custody, trust and reconciliation flows currently implemented. The original workflow document remains available in Git history.
 
 ## 1. Agent provisioning
 
@@ -293,8 +295,8 @@ A workflow that terminates before test/build steps are created is infrastructure
 
 ## 17. Provenance and current maturity
 
-I am **Daniel Praise** (`Daniel419797`), repository owner and primary technical contributor. I originally built AgentPay for the Hedera x402 bounty. The workflows above document the multi-rail system that now exists after the Cardano, custody, trust and operational extensions.
+**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor. AgentPay was originally built for the Hedera x402 bounty. The workflows above document the multi-rail system that now exists after the Cardano, custody, trust and operational extensions.
 
-For Catalyst I state the current maturity as **TRL 5** until the intended Cardano Mainnet/pilot configuration is demonstrated in a relevant environment. Mainnet external per-agent custody is now implemented in source; that implementation is one prerequisite for, not a substitute for, a TRL 6 demonstration.
+For Catalyst purposes, the current maturity remains **TRL 5** until the intended Cardano Mainnet/pilot configuration is demonstrated in a relevant environment. Mainnet external per-agent custody is now implemented in source; that implementation is one prerequisite for, not a substitute for, a TRL 6 demonstration.
 
 See [`02-software-design-document.md`](02-software-design-document.md), [`cardano-production.md`](cardano-production.md), [`production-readiness.md`](production-readiness.md), and [`implementation-status.md`](implementation-status.md).
