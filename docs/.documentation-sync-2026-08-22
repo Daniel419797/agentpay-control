@@ -1,0 +1,4 @@
+AgentPay documentation synchronization completed 2026-08-22.
+Scope: repository Markdown documentation and documentation-facing environment comments.
+Primary builder: Daniel Praise (Daniel419797).
+Reason: align documentation with current multi-rail implementation, especially Cardano Mainnet external per-agent custody and signer/facilitator responsibilities.
