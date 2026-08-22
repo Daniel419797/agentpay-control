@@ -2,6 +2,13 @@
 
 This document is the reproducible product/demo narrative for the Cardano-focused AgentPay implementation. It deliberately separates **implemented source behavior** from **external launch evidence**. Do not replace missing canary, credential, deployment, custody, monitoring or audit evidence with screenshots or prose.
 
+## Prior program, contributor and maturity disclosure
+
+- **Prior program involvement:** AgentPay was built originally for the Hedera x402 bounty and was later extended into a multi-rail payment control plane with a Cardano-specific implementation. Any Catalyst application must disclose that prior program involvement rather than represent AgentPay as originating solely from Catalyst work.
+- **Primary technical contributor:** [`Daniel419797`](https://github.com/Daniel419797) is the repository owner and primary engineering contributor. Any Catalyst team section must identify the person behind this account and their technical role.
+- **Current Cardano maturity:** AgentPay should be represented as **TRL 5** at the current repository state. Managed autonomous Cardano identities are available on Cardano Preprod; the checked-in Cardano Mainnet path is unsigned/self-custody. TRL 6 should only be claimed after relevant-environment evidence exists for the exact release being assessed.
+- **Funding boundary:** Previously completed Hedera work is prior work and must not be represented as new Catalyst-funded delivery. Catalyst scope should describe only the Cardano-specific and pilot work that remains to be completed.
+
 ## One-line product
 
 **AgentPay is a policy, trust and settlement control plane that lets autonomous software agents spend on Cardano without giving the agent unrestricted wallet authority.**
@@ -43,7 +50,7 @@ flowchart LR
     X --> R[Resource Server]
     R --> F[Combined Facilitator\nroot network-bound dispatcher]
     F --> S[Cardano Signer Gateway]
-    S --> H[Remote Ed25519 HSM/KMS boundary]
+    S --> H[Preprod isolated signer\nfuture Mainnet HSM/KMS]
     F --> C[(Cardano)]
     F --> Q[(Durable settlement claim store)]
     C --> REC[Independent reconciliation]
@@ -59,8 +66,8 @@ flowchart LR
 ## Security invariants demonstrated by the implementation
 
 - The dashboard does not need a production Cardano private signing seed.
-- Production signer configuration rejects `CARDANO_SIGNING_SEED_HEX`; signing is delegated to a separate Ed25519/HSM-style boundary.
-- The remote signer receives only the transaction-body hash, not the transaction policy/context.
+- Managed Cardano signing is currently a Preprod/testnet capability. Cardano Mainnet uses unsigned/self-custody mode; future autonomous Mainnet signing requires a separately reviewed per-agent HSM/KMS/delegation identity.
+- The managed signer receives only the transaction-body hash, not the transaction policy/context.
 - The signer constructs a narrow phase-1 payment and the facilitator independently decodes/verifies it before submission.
 - The Cardano payment requirement includes a SHA-256 binding of the canonical resource URL.
 - Durable settlement binding includes the complete resource-bound requirement, payer and UTxO nonce.
@@ -240,4 +247,4 @@ A safe submission statement is:
 
 > AgentPay implements the complete source architecture for policy-controlled Cardano x402 payments, isolated signing, Pyth-valued limits, Masumi escrow/refunds/reputation, optional Veridian/KERI identity and Dune observability. Production enablement remains fail-closed until the exact release SHA passes repository/deployment checks and the applicable external credentials, funded canaries, custody review, monitoring, restore drill and independent security evidence are recorded.
 
-Do not shorten this to “production ready” unless those external gates are actually satisfied for the release being demonstrated.
+Current maturity for Catalyst submission purposes is **TRL 5**. Do not claim TRL 6 or “production ready” unless the relevant external gates have been satisfied and evidenced for the exact release being assessed.
