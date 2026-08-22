@@ -1,10 +1,12 @@
-# AgentPay Control — Screens and DTO Specification
+# AgentPay Control: Screens and DTO Specification
 
 **Status:** Current implementation-facing UI/API reference  
 **Updated:** 2026-08-22  
 **Primary builder:** Daniel Praise (`Daniel419797`)
 
-> **Why this document was updated:** The original July specification described the Hedera-focused MVP UI and DTOs. The current product supports multiple rails, richer policies, Cardano Preprod/Mainnet custody modes, Masumi/Pyth/KERI controls, reconciliation, incidents and broader operations. I replaced the obsolete MVP-only view with a current functional map. The earlier specification remains in Git history.
+## Revision note
+
+The original July specification described the Hedera-focused MVP UI and DTOs. The current product supports multiple rails, richer policies, Cardano Preprod/Mainnet custody modes, Masumi/Pyth/KERI controls, reconciliation, incidents and broader operations. This version replaces the obsolete MVP-only view with a current functional map. The earlier specification remains in Git history.
 
 ## 1. UI surface
 
@@ -200,7 +202,7 @@ Escrow state is modeled separately from direct x402 and includes provider purcha
 
 ### KERI/Veridian
 
-Expose non-secret verification evidence such as credential SAID, issuer AID, schema SAID, verification/freshness status and binding result—not private credential/key material.
+Expose non-secret verification evidence such as credential SAID, issuer AID, schema SAID, verification/freshness status and binding result, not private credential/key material.
 
 ## 12. Operational screens
 
@@ -228,6 +230,6 @@ Operators need transaction candidate ID, network, error/reason, current evidence
 
 ## 14. Provenance
 
-I am **Daniel Praise** (`Daniel419797`), repository owner and primary technical contributor. I originally built the first AgentPay UI/API around the Hedera x402 bounty, then expanded it to the current multi-rail implementation. This document now describes the current functional contracts rather than the original Hedera-only screen plan.
+**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor. The first AgentPay UI/API was originally built around the Hedera x402 bounty and later expanded into the current multi-rail implementation. This document describes the current functional contracts rather than the original Hedera-only screen plan.
 
 See [`implementation-status.md`](implementation-status.md), [`04-detailed-workflows.md`](04-detailed-workflows.md), [`cardano-production.md`](cardano-production.md), and the code under `dashboard/src/` for authoritative implementation details.
