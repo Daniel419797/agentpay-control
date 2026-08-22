@@ -4,8 +4,6 @@
 **Updated:** 2026-08-22  
 **Primary builder:** Daniel Praise (`Daniel419797`)
 
-> **Reason for update:** The signer now implements Cardano Mainnet external per-agent Ed25519 custody in addition to self custody. This README was synchronized with the merged code so it clearly states the current Preprod/Mainnet custody modes and the division of responsibility between signer and facilitator.
-
 This service is the isolated Cardano transaction-builder/signing gateway used by the combined x402 facilitator. It deliberately has no application database access and no AgentPay operator/session credentials.
 
 ## Service topology
