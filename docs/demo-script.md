@@ -1,64 +1,161 @@
-# AgentPay Control — Live Demo Script
+# AgentPay — Current Product Demo Script
 
-**Target:** < 5 minutes  
-**Bounty:** Hedera x402 ($1,000 prize)
+**Status:** Current implementation demo  
+**Updated:** 2026-08-22  
+**Presenter/builder:** Daniel Praise (`Daniel419797`)
 
-## Script (4:55 target)
+> **Why this document was updated:** The previous script was the original Hedera x402 bounty demo and no longer represented the current product. I replaced it with a multi-rail/Cardano-focused script that demonstrates the features now implemented without pretending that planning targets or unconfigured external providers are live evidence.
 
-### 0:00-0:25 — Problem & Solution
-> "AI agents need to buy data, compute, and APIs autonomously — but they can't swipe a card. HTTP 402 has been a status code without a standard. x402 changes that. AgentPay Control is a policy-controlled payment OS that lets agents spend within policy using x402 on Hedera, where settlements cost $0.001 and finalize in seconds."
+## Demo objective
 
-Show: Dashboard login screen → overview
+Show one coherent story: an autonomous agent can request a paid service while AgentPay enforces policy, isolates payment identity, controls signing authority, verifies settlement and preserves audit/reconciliation evidence.
 
-### 0:25-0:55 — Agent & Policy
-> "Here's an existing agent with a funded testnet account and a published spending policy — per-transaction limit of 100 HBAR, daily limit of 500 HBAR, and an allowlist of trusted resource providers."
+## 0:00–0:30 — Introduction
 
-Show: Agent detail (balance, status), Policy page (limits, merchant rules)
+Suggested narration:
 
-### 0:55-2:20 — Canonical Purchase
-> "Let's purchase ETH market data. The agent sends a paid request — the resource returns 402 with x402 payment requirements, policy evaluates and allows the spend, the facilitator signs and submits to Hedera, and the resource returns the data with a settlement receipt."
+> “I’m Daniel Praise, the primary builder of AgentPay. I originally built AgentPay for the Hedera x402 bounty and later extended it into a multi-rail financial control plane for autonomous agents. The current system supports Hedera, Arc and Cardano, with Cardano-specific policy, identity, signing, reconciliation and ecosystem integrations.”
 
-Show: API call (terminal or curl) → 402 response → policy allow → facilitator submission → 200 with data
+Show the dashboard overview.
 
-### 2:20-2:55 — On-Chain Evidence
-> "Every settlement has a HashScan link. Let's open it — you can see the exact transfer, the consensus timestamp, and the finality."
+## 0:30–1:00 — Agent identity and policy
 
-Show: Transaction detail in dashboard → click HashScan link → browser shows HashScan with the testnet transaction
+Open an active agent and show:
 
-### 2:55-3:45 — Approval Flow
-> "What about over-limit requests? Let's trigger one — policy requires approval. The operator gets a notification, reviews the request, and approves it. The system settles exactly once."
+- immutable Agent ID;
+- selected network/payment account;
+- custody mode;
+- current policy;
+- transaction/daily or other configured limits;
+- approval behavior;
+- relevant trust controls.
 
-Show: Request over limit → approval pending in dashboard → Approve → settled → HashScan evidence
+Explain that managed payment identity is isolated per agent and the agent does not receive the unrestricted signing key.
 
-### 3:45-4:25 — Budget Updated
-> "After settlement, the daily budget reflects the spend. The agent can continue operating within its remaining policy limits."
+## 1:00–1:40 — Cardano custody modes
 
-Show: Overview dashboard showing updated spend, remaining daily budget, transaction list
+For Cardano show the implemented distinction:
 
-### 4:25-4:45 — Deny & Pause
-> "Policy can also deny — if a merchant isn't allowed, or if the agent is paused, no signing occurs and no funds move."
+### Preprod managed
 
-Show: Denied request (no transaction) → Pause agent → another request fails with agent paused error
+- unique `addr_test1...` per Agent ID;
+- signing derives inside the isolated signer from a testnet-only master secret.
 
-### 4:45-4:55 — Repository & Wrap
-> "The full open-source repo is at github.com/Daniel419797/agentpay-control — all the code, docs, SDK, MCP server, and LangChain tools. Built for the Hedera x402 bounty."
+### Mainnet self custody
 
-Show: GitHub repo page briefly
+- AgentPay prepares the narrow transaction;
+- wallet/provider signs externally.
 
----
+### Mainnet external per-agent managed custody
 
-## Preparation Checklist
+- one external Ed25519 public key/signer reference per Agent ID;
+- AgentPay derives the `addr1...` address locally;
+- only transaction-body hash is sent to the external signer;
+- returned signature is verified locally;
+- no Mainnet managed-agent master key/shared platform payer.
 
-- [ ] Fund HashPack wallet on testnet (use faucet)
-- [ ] Deploy/reset seed data: `npm run db:seed`
-- [ ] Start facilitator: `cd facilitator && npm run dev`
-- [ ] Start resource server: `cd resource-server && npm run dev`
-- [ ] Start dashboard: `cd dashboard && npm run dev -- -p 3100`
-- [ ] Create organization and agent
-- [ ] Fund agent account with testnet HBAR
-- [ ] Publish policy (per-tx: 100 HBAR, daily: 500 HBAR)
-- [ ] Create API key for terminal demo
-- [ ] Pre-warm all services
-- [ ] Record at 1080p, minimize browser chrome, hide secrets
-- [ ] Keep HashScan URLs ready for close-up shots
-- [ ] Total time check: < 5:00
+If the external custody provider is not actually configured in the demo environment, describe the implemented source path rather than claiming a live Mainnet managed signing demonstration.
+
+## 1:40–2:40 — Direct x402 purchase
+
+Use a registered x402 resource.
+
+Show/narrate:
+
+1. resource returns HTTP 402 requirements;
+2. AgentPay verifies exact resource/network/payee/asset/amount;
+3. policy evaluates the request;
+4. spend reservation is created;
+5. signing/preparation uses the selected custody mode;
+6. Cardano signer constructs the transaction;
+7. facilitator independently verifies the signed transaction;
+8. facilitator submits via Blockfrost;
+9. settlement is confirmed/reconciled;
+10. paid resource response and transaction evidence are shown.
+
+For Cardano point out the SHA-256 resource binding and exact payer/payee/asset/amount verification.
+
+## 2:40–3:10 — Policy denial
+
+Submit a request that intentionally violates the active policy.
+
+Expected result:
+
+```text
+DENY
+no signing
+no on-chain submission
+```
+
+Do not change the policy just to make the demo pass.
+
+## 3:10–3:40 — Human approval
+
+Submit a request that requires approval.
+
+Show:
+
+- `APPROVAL_PENDING`;
+- approver context;
+- approve/reject control;
+- initiator separation where configured;
+- execution resumes once after valid approval.
+
+## 3:40–4:15 — Trust controls
+
+Show only integrations actually configured in the environment.
+
+Possible evidence:
+
+- Pyth price/confidence/freshness used for USD policy;
+- Masumi registry identity/capability/seller payment-key evidence;
+- Masumi escrow lifecycle and result-hash evidence;
+- Veridian/KERIA verified credential evidence.
+
+If an integration is not live, identify it as implemented/configurable rather than demonstrating synthetic data as production evidence.
+
+## 4:15–4:45 — Ambiguous settlement safety
+
+Explain or safely demonstrate the failure behavior:
+
+> “A network timeout after possible submission is not automatically treated as failure. AgentPay retains the candidate transaction and spend state and reconciles independent chain evidence rather than blindly retrying.”
+
+Show `SUBMISSION_UNKNOWN`/reconciliation state if available.
+
+## 4:45–5:15 — Emergency stop and audit
+
+Enable the organization emergency stop and demonstrate a new risky action being blocked while reconciliation/evidence access remains available.
+
+Open audit/transaction detail and show the decision/settlement trail.
+
+## 5:15–5:40 — Public evidence/analytics
+
+Show:
+
+- Cardano chain/explorer or Blockfrost-backed transaction evidence;
+- Dune public dashboard only if real query/dashboard IDs are configured.
+
+Explain that Dune is read-only and receives only public-chain facts, not private AgentPay policy/prompts/credentials.
+
+## 5:40–6:00 — Closing
+
+Suggested narration:
+
+> “AgentPay gives agents bounded financial autonomy. Policy and approvals live in the control plane, signing is isolated, Cardano Mainnet managed agents can use separate external signer identities, the facilitator independently verifies and submits transactions, and ambiguous outcomes are reconciled from chain evidence.”
+
+## Preparation checklist
+
+- [ ] Use the exact release SHA being demonstrated.
+- [ ] Verify Vercel/Render services are from the intended release.
+- [ ] Verify database migrations are current.
+- [ ] Use low-value funded accounts for the network/custody mode shown.
+- [ ] Verify Blockfrost credentials for the correct Cardano network.
+- [ ] If Mainnet external custody is shown live, verify its signer-only URL/API key and distinct agent identities first.
+- [ ] Configure only the Pyth/Masumi/KERIA/Dune integrations actually shown.
+- [ ] Hide API keys, private credentials and sensitive tenant data.
+- [ ] Keep chain evidence links ready.
+- [ ] Do not use proposal targets as if they were observed metrics.
+
+## Provenance
+
+This script supersedes the old Hedera-bounty-only demo script. That original remains in Git history. The update is necessary because the current repository includes Cardano Preprod/Mainnet, external per-agent Mainnet custody, Masumi/Pyth/KERI integrations, stronger policy/reconciliation controls and a unified multi-rail facilitator.
