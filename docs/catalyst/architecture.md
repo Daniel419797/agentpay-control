@@ -3,7 +3,9 @@
 **Updated:** 2026-08-22  
 **Primary builder:** Daniel Praise (`Daniel419797`)
 
-> **Reason for update:** This architecture now mirrors the implemented code rather than the earlier Mainnet self-custody-only state. It also corrects component responsibilities: policy/reservations live in the control plane, the Cardano signer constructs/signs, the facilitator independently verifies/submits/confirms, and external Mainnet custody holds the per-agent private keys.
+## Revision note
+
+This architecture mirrors the implemented code rather than the earlier Mainnet self-custody-only state. Policy and reservations live in the control plane, the Cardano signer constructs and signs, the facilitator independently verifies, submits and confirms, and external Mainnet custody holds the per-agent private keys.
 
 ## Product boundary
 
@@ -66,16 +68,16 @@ The control plane does not hold Cardano private keys.
 
 ## Direct x402 boundary
 
-The x402 Resource Server issues the payment requirement and, after receiving the payment payload, uses the facilitator protocol to verify/settle before returning paid content.
+The x402 Resource Server issues the payment requirement and, after receiving the payment payload, uses the facilitator protocol to verify and settle before returning paid content.
 
-For Cardano, the requirement is bound to the canonical resource URL and exact network/payee/asset/amount.
+For Cardano, the requirement is bound to the canonical resource URL and exact network, payee, asset and amount.
 
 ## Masumi boundary
 
 Masumi has two distinct roles:
 
-- registry/counterparty trust may constrain direct x402;
-- Masumi Payment Service provides the separate escrow/job/refund/result lifecycle.
+- registry and counterparty trust may constrain direct x402;
+- Masumi Payment Service provides the separate escrow, job, refund and result lifecycle.
 
 Direct x402 is not labeled as escrow.
 
@@ -89,11 +91,11 @@ The Render facilitator contains child rails for:
 - Cardano Preprod;
 - Cardano Mainnet.
 
-For Cardano it independently verifies the final signed transaction, manages replay/settlement claims, submits via Blockfrost and reconciles confirmation evidence. It does not possess the Cardano payer private key.
+For Cardano it independently verifies the final signed transaction, manages replay and settlement claims, submits via Blockfrost and reconciles confirmation evidence. It does not possess the Cardano payer private key.
 
 ## Cardano signer boundary
 
-The signer is a separate Render web-service gateway with isolated Preprod/Mainnet workers.
+The signer is a separate Render web-service gateway with isolated Preprod and Mainnet workers.
 
 ### Preprod
 
@@ -104,7 +106,7 @@ Per-agent Ed25519 test identities are deterministically derived inside the signe
 Two modes coexist:
 
 - self custody: return the exact unsigned transaction for external wallet signing;
-- external per-agent managed custody: resolve a distinct Ed25519 public key/signer reference for the immutable Agent ID, derive the payer address locally, sign only the transaction-body hash through the external provider, then verify the returned signature locally.
+- external per-agent managed custody: resolve a distinct Ed25519 public key and signer reference for the immutable Agent ID, derive the payer address locally, sign only the transaction-body hash through the external provider, then verify the returned signature locally.
 
 There is no Mainnet managed-agent master key or deployment-wide autonomous-agent payer.
 
@@ -119,13 +121,13 @@ POST /identity
 POST /sign
 ```
 
-A provider failure or identity/signature mismatch fails closed and cannot fall back to another agent/shared key.
+A provider failure or identity/signature mismatch fails closed and cannot fall back to another agent or shared key.
 
 ## Blockfrost boundary
 
 Blockfrost serves different code paths:
 
-- signer: UTxOs/protocol data for transaction construction;
+- signer: UTxOs and protocol data for transaction construction;
 - facilitator: Cardano submission and independent transaction/latest-block confirmation evidence.
 
 It is not a policy authority.
@@ -139,14 +141,14 @@ Dune is public, read-only chain analytics. Private tenant identities, prompts, o
 - one managed payment identity per agent;
 - no Cardano Mainnet shared master key;
 - private Mainnet agent keys remain outside AgentPay;
-- policy/approval before signing;
+- policy and approval before signing;
 - body-hash-only external Mainnet signing;
 - local signature verification;
 - independent facilitator transaction verification;
 - facilitator, not signer, submits Cardano transactions;
 - ambiguous submission is reconciled rather than blindly retried;
-- required Pyth/Masumi/KERI evidence may tighten policy but not silently weaken it.
+- required Pyth, Masumi or KERI evidence may tighten policy but not silently weaken it.
 
 ## Provenance
 
-I am **Daniel Praise** (`Daniel419797`), the repository owner and primary technical contributor. I originally built AgentPay for the Hedera x402 bounty and then extended it to this multi-rail architecture. This diagram/document is updated specifically to match the implementation merged on 2026-08-22.
+**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor. AgentPay was originally built for the Hedera x402 bounty and later extended to this multi-rail architecture. This document reflects the implementation current as of 2026-08-22.
