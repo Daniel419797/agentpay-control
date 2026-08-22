@@ -1,10 +1,12 @@
-# AgentPay Control — Software Design Document
+# AgentPay Control: Software Design Document
 
 **Status:** Current implementation architecture  
 **Updated:** 2026-08-22  
 **Primary builder:** Daniel Praise (`Daniel419797`)
 
-> **Why this document was updated:** The July 2026 design was written for the original Hedera x402 MVP and contained now-obsolete statements such as Mainnet being disabled pending a future custody migration. I have replaced those current-state assumptions with the architecture actually implemented after the Cardano Mainnet external per-agent custody merge. The original design remains in Git history.
+## Revision note
+
+The July 2026 design was written for the original Hedera x402 MVP and contained now-obsolete statements such as Mainnet being disabled pending a future custody migration. This version reflects the architecture implemented after the Cardano Mainnet external per-agent custody merge. The original design remains in Git history.
 
 ## 1. Design intent
 
@@ -241,9 +243,9 @@ Authoritative source of final settlement evidence.
 
 ## 14. Current maturity and provenance
 
-I am **Daniel Praise** (`Daniel419797`), repository owner and primary technical contributor. I originally built AgentPay for the Hedera x402 bounty and later extended it to the implemented multi-rail architecture described here.
+**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor. AgentPay was originally built for the Hedera x402 bounty and later extended to the implemented multi-rail architecture described here.
 
-For Catalyst submission purposes I keep the current maturity at **TRL 5** until the intended Cardano Mainnet/pilot configuration is demonstrated in a relevant environment. The source now implements external per-agent Mainnet custody, but implementation is not by itself a TRL 6 demonstration.
+For Catalyst submission purposes, the current maturity remains **TRL 5** until the intended Cardano Mainnet/pilot configuration is demonstrated in a relevant environment. The source now implements external per-agent Mainnet custody, but implementation is not by itself a TRL 6 demonstration.
 
 ## 15. Current authoritative references
 
