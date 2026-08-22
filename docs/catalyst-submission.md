@@ -1,13 +1,22 @@
-# AgentPay Catalyst submission package
+# AgentPay Catalyst Submission Package
 
-This document is the reproducible product/demo narrative for the Cardano-focused AgentPay implementation. It distinguishes implemented source behavior from deployment-specific operational evidence so proposal claims stay tied to what has actually been demonstrated.
+**Status:** Current proposal-support narrative  
+**Updated:** 2026-08-22  
+**Proposer / primary builder:** Daniel Praise (`Daniel419797`)
 
-## Prior program, contributor and maturity disclosure
+> **Why I updated this document:** The earlier Catalyst narrative predated the completed Cardano Mainnet external per-agent custody path and identified me only by my GitHub handle. I updated it to state my identity and prior Hedera program involvement plainly, to reflect the current code, and to keep TRL/adoption claims separate from unproven planning assumptions.
 
-- **Prior program involvement:** AgentPay was built originally for the Hedera x402 bounty and was later extended into a multi-rail payment control plane with a Cardano-specific implementation. Any Catalyst application must disclose that prior program involvement rather than represent AgentPay as originating solely from Catalyst work.
-- **Primary technical contributor:** [`Daniel419797`](https://github.com/Daniel419797) is the repository owner and primary engineering contributor. Any Catalyst team section must identify the person behind this account and their technical role.
-- **Current Cardano maturity:** AgentPay should still be represented conservatively as **TRL 5** until the Mainnet external-custody path and the intended pilot profile are demonstrated with the relevant operational evidence. The repository now implements Cardano Mainnet per-agent external custody in addition to self-custody; implementation alone is not the same as a completed relevant-environment demonstration.
-- **Funding boundary:** Previously completed Hedera work is prior work and must not be represented as new Catalyst-funded delivery. Catalyst scope should describe only the Cardano-specific and pilot work that remains to be completed.
+## Required disclosure
+
+I am **Daniel Praise**, GitHub account [`Daniel419797`](https://github.com/Daniel419797), repository owner and primary technical contributor.
+
+I originally built AgentPay for the **Hedera x402 bounty** and later extended it into the current multi-rail control plane. I therefore disclose that prior program involvement explicitly. I do not present previously completed Hedera work as new Catalyst-funded delivery; Catalyst scope should cover the Cardano-specific/pilot work that remains.
+
+## Current maturity
+
+I describe the current project conservatively as **TRL 5** for Catalyst purposes.
+
+The repository now implements Cardano Mainnet external per-agent custody in addition to self-custody. That removes the earlier source-code limitation under which Mainnet was unsigned/self-custody-only. However, source implementation alone is not the same as a completed relevant-environment pilot/demonstration, so I do not use the code change by itself to claim TRL 6.
 
 ## One-line product
 
@@ -15,236 +24,191 @@ This document is the reproducible product/demo narrative for the Cardano-focused
 
 ## Problem
 
-Autonomous agents can discover services and initiate work, but production money movement needs controls that model/tool runtimes do not provide by themselves:
+Autonomous agents can discover services and initiate work, but organizations still need controls around money movement:
 
-- deterministic spend limits and approvals
-- strong seller/payee identity
-- exact payment-resource binding and replay safety
-- narrow signing authority rather than raw private keys in the application
-- safe handling of ambiguous submissions
-- escrow/refund/result-verification when direct payment is insufficient
-- auditable public-chain evidence without publishing private prompts, organization data or credentials
+- deterministic spend limits;
+- human approvals where required;
+- counterparty identity/trust;
+- isolated payment identities/signing authority;
+- exact resource/payment binding;
+- replay protection;
+- safe treatment of ambiguous submissions;
+- escrow/result/refund evidence where direct payment is insufficient;
+- private organizational policy off-chain with auditable public settlement evidence.
 
 ## Solution
 
-AgentPay places a deterministic policy and trust layer between an autonomous agent and payment execution. On Cardano it supports two separate settlement modes:
+AgentPay places a deterministic policy/trust layer between an autonomous agent and payment execution.
 
-1. **Direct x402 `exact`.** A resource issues an exact Cardano requirement. AgentPay evaluates policy, creates/reserves spend, signs through an isolated gateway, independently verifies signed CBOR in the facilitator, submits, reconciles and only then reports settlement.
-2. **Masumi escrow.** AgentPay verifies a Masumi resource identity/pricing surface, applies the same spending policy plus optional reputation and Veridian/KERI constraints, creates the escrow purchase, starts the job, reconciles lifecycle state, verifies result hash evidence and supports refund request/authorization.
+On Cardano it supports two separate settlement modes:
 
-Pyth can express policy ceilings in conservative USD values. Dune can publish aggregate/public settlement evidence, but Dune is never an authorization dependency.
+1. **Direct x402 `exact`:** resource challenge -> policy/reservation -> signing/preparation -> independent facilitator verification -> Blockfrost submission -> Cardano confirmation/reconciliation -> paid resource response.
+2. **Masumi escrow:** verified Masumi identity -> AgentPay policy -> purchase/job lifecycle -> result-hash verification -> completion/refund/dispute evidence.
 
-## Architecture
+Pyth may express policy ceilings in conservative USD values. Optional Veridian/KERIA evidence can further constrain counterparty identity. Dune is read-only public analytics and is never an authorization dependency.
 
-```mermaid
-flowchart LR
-    A[Autonomous Agent / SDK / Operator] --> D[AgentPay Dashboard + API]
-    D --> P[Immutable Policy Engine]
-    P --> PY[Pyth Hermes\nprice/confidence evidence]
-    P --> M[Masumi Registry + Payment Node]
-    P --> K[Veridian / KERIA verifier]
+## Implemented architecture
 
-    P -->|ALLOW or approved| X[Direct x402 path]
-    P -->|ALLOW or approved| E[Masumi escrow path]
+```text
+Autonomous agent / operator
+        |
+        v
+AgentPay control plane (Vercel)
+ policy / approvals / reservations / audit / trust
+        |
+   +----+----------------------+
+   |                           |
+Direct x402                Masumi escrow
+   |                           |
+x402 resource             Masumi Payment Service
+   |                           |
+   +----------+----------------+
+              |
+      Unified facilitator (Render)
+ Hedera / Arc / Cardano Preprod+Mainnet
+              |
+      Cardano signer gateway (Render)
+         /                 \
+ Preprod per-agent      Mainnet self custody
+ derived signer         + external per-agent custody
+                              |
+                       HSM/KMS/delegation provider
+                              |
+                       private key stays external
 
-    X --> R[Resource Server]
-    R --> F[Combined Facilitator\nroot network-bound dispatcher]
-    F --> S[Cardano Signer Gateway]
-    S --> T[Preprod per-agent signer]
-    S --> H[Mainnet per-agent\nexternal HSM/KMS/delegation]
-    F --> C[(Cardano)]
-    F --> Q[(Durable settlement claim store)]
-    C --> REC[Independent reconciliation]
-
-    E --> MP[Masumi Purchase / Job APIs]
-    MP --> C
-    MP --> RES[Result hash / refund lifecycle]
-
-    C --> DU[Dune public analytics\nread-only to payment plane]
-    D --> DB[(PostgreSQL\naudit + reservations + evidence)]
+Cardano facilitator -> Blockfrost -> Cardano
+                         |
+                    reconciliation
 ```
 
-## Security invariants demonstrated by the implementation
+## Cardano Mainnet managed custody
 
-- The dashboard does not need a production Cardano private signing seed.
-- Cardano Preprod managed agents use isolated per-agent identities derived inside the signer.
-- Cardano Mainnet supports self-custody and a separate per-agent external custody path. Mainnet never accepts `CARDANO_MANAGED_AGENT_MASTER_KEY`.
-- For Mainnet managed agents, the custody adapter returns only a stable public key/signer reference for the immutable Agent ID and receives only the transaction-body hash for signing.
-- AgentPay derives the Mainnet payer address locally from the returned public key and verifies every Ed25519 signature before returning signed CBOR.
-- The signer constructs a narrow phase-1 payment and the facilitator independently decodes/verifies it before submission.
-- The Cardano payment requirement includes a SHA-256 binding of the canonical resource URL.
-- Durable settlement binding includes the complete resource-bound requirement, payer and UTxO nonce.
-- Same-resource retries are idempotent; a different resource gets a different binding even when price/payee match.
-- An ambiguous submission does not automatically release reserved spend and is not blindly resubmitted.
-- Pyth failure/staleness/confidence failure cannot relax a policy.
-- Masumi direct-payee trust and Masumi escrow are distinct modes; direct x402 is not mislabeled as escrow.
-- Settlement-derived reputation counts only AgentPay-observed terminal escrow outcomes, with completed reputation requiring a verified result hash.
-- KERI/ACDC cryptography is verified by the configured KERIA authority; AgentPay narrows that trust with issuer/schema/identity/freshness rules.
-- Dune receives only public-chain observability inputs and cannot approve or settle a payment.
+The implemented Mainnet path does **not** use a shared/deployment-wide managed-agent master key.
 
-## Demo prerequisites
+For each immutable Agent ID:
 
-For a demo used as evidence of a particular production profile, record the exact release SHA and use the real services/credentials for the features being shown. A minimum Cardano path includes:
-
-1. exact dashboard release SHA built and deployed;
-2. signer/facilitator/resource-server services deployed over HTTPS;
-3. a funded Cardano payer with suitable UTxOs;
-4. real Blockfrost credentials;
-5. for Mainnet autonomous custody, a configured external custody adapter with a unique signer identity for the demonstrated Agent ID;
-6. a low-value successful Cardano settlement independently verified on-chain;
-7. real Pyth/Masumi/KERIA configuration only when those integrations are shown;
-8. if Dune is shown, published query/dashboard IDs plus a sample transaction cross-check.
-
-A synthetic resource-server payload is valid for demonstrating payment plumbing, but the narration must call it a synthetic fixture rather than live market/research/model data.
-
-## Demo script
-
-### Scene 1 — Controlled agent
-
-Open an active Cardano agent. Show its payment account/network and published policy. Explain that the agent can request spend but cannot override the immutable policy or obtain the signing private key.
-
-### Scene 2 — Publish a restrictive policy
-
-Publish a new policy version with:
-
-- a small atomic per-transaction and daily limit;
-- optional hourly/monthly/velocity/cooldown constraints;
-- a merchant or category rule;
-- Pyth USD ceiling, when a real feed is configured;
-- Masumi verified identity requirement;
-- a minimum verified-completion history/reputation threshold when real escrow history exists;
-- Veridian/KERI issuer/schema/freshness constraints when a real credential is configured.
-
-Show the newly published version and explain that selected extensions are attached before the version becomes active.
-
-### Scene 3 — Verify the seller
-
-On the resource detail page:
-
-1. refresh/bind the Masumi identity;
-2. show exact agent identifier, capability and settlement wallet evidence;
-3. if KERI is part of the demo, verify and bind the real ACDC credential through KERIA;
-4. show issuer/schema/subject/freshness evidence without exposing credentials or secrets beyond what is safe for the demo.
-
-### Scene 4A — Direct x402
-
-Send a low-value direct x402 request to a registered Cardano resource.
-
-Narrate the sequence:
-
-1. resource returns exact x402 requirements containing the resource binding;
-2. AgentPay evaluates policy and reserves spend;
-3. signer gateway builds the Cardano transaction;
-4. the selected custody mode signs only the transaction body;
-5. facilitator independently verifies CBOR/witness/payer/payee/amount/asset/change/TTL/fee/nonce;
-6. durable claim prevents replay/resubmission ambiguity;
-7. facilitator submits;
-8. AgentPay reconciles independent chain evidence;
-9. transaction detail links to the Cardano explorer.
-
-If the request exceeds policy, demonstrate DENY or REQUIRE_APPROVAL rather than changing the policy to make the demo pass.
-
-### Scene 4B — Masumi escrow
-
-Choose a verified Masumi resource, provide bounded JSON job input and start the escrow purchase.
-
-Show lifecycle transitions as real evidence becomes available:
-
-`PREPARED → FundsLockingRequested → FundsLocked → ResultSubmitted → Completed`
-
-At completion, show that the result hash is verified before the outcome contributes to completed reputation.
-
-For the refund drill, use a separate eligible low-value purchase:
-
-`FundsLocked/ResultSubmitted → RefundRequested → RefundAuthorized`
-
-The buyer requests the refund; the seller/provider workspace authorizes it. Do not simulate a refund by editing local state.
-
-### Scene 5 — Public evidence
-
-Open the chain explorer for the demo transaction. If Dune publication evidence exists, open the public dashboard and cross-check the same transaction/sample against the query output.
-
-Explain that Dune contains public-chain settlement facts only and no private prompts, organization policy, credential material or hidden agent input.
-
-### Scene 6 — Failure safety
-
-Demonstrate one fail-closed case, for example:
-
-- stale/uncertain Pyth observation;
-- below-threshold Masumi reputation;
-- missing/stale KERI credential;
-- policy limit exceeded;
-- custody adapter unavailable;
-- emergency stop enabled.
-
-The desired result is a blocked new side effect with an auditable reason—not a successful payment.
-
-## Suggested 60-second pitch
-
-AgentPay gives autonomous agents a controlled way to spend on Cardano. Instead of handing an AI agent an unrestricted wallet, we put deterministic policy, approvals, identity and independent settlement verification in front of every payment. Direct x402 payments are cryptographically bound to the exact paid resource and reconciled from chain evidence. Preprod agents use isolated per-agent signing, while Mainnet can use self-custody or a separate external signer identity for each agent, so AgentPay never needs a deployment-wide Mainnet private key. For jobs that need stronger buyer protection, the same agent can use Masumi escrow with result-hash verification and refunds. Pyth lets policy stay meaningful in USD, Veridian/KERI can strengthen seller identity, and Dune exposes public settlement evidence without putting private agent data on-chain.
-
-## Landing-page copy
-
-### Hero
-
-**Autonomous agents can spend. They should not control the treasury.**
-
-AgentPay applies immutable spend policy, approvals, verified counterparties, isolated signing and independent settlement evidence to agent payments across Cardano and other configured rails.
-
-Primary CTA: **Open AgentPay**
-Secondary CTA: **View payment architecture**
-
-### Cardano section
-
-**Cardano-native agent payments with exact resource binding.**
-
-Every Cardano x402 payment is tied to the resource being purchased, verified before submission and reconciled from independent chain evidence. ADA is supported directly; explicitly configured native-token support is constrained by exact asset and conservation rules.
-
-### Trust section
-
-**Price, identity and reputation can tighten policy—not bypass it.**
-
-Pyth provides conservative USD valuation. Masumi verifies seller discovery/payment facts and supports escrow, result verification and refunds. Veridian/KERI can require a cryptographically verified identity credential. If required evidence is missing, stale or inconsistent, AgentPay denies the new spend.
-
-### Evidence section
-
-**Public settlement evidence without public private data.**
-
-Cardano explorer links and optional Dune analytics expose public transaction facts. Prompts, job input, organization policy, user data and signing secrets stay out of public analytics.
-
-## Metrics to report without fabrication
-
-Report only values produced by actual stored evidence for the release/demo period. Useful measures include:
-
-- total payment intents by terminal status;
-- direct Cardano x402 settled / denied / approval-required / submission-unknown counts;
-- Cardano settlement confirmation latency where timestamps are recorded;
-- number of distinct externally controlled/managed wallets actually used;
-- Masumi escrow completed-with-verified-result count;
-- Masumi refund-authorized and disputed counts;
-- seller reputation observation count and computed score;
-- policy denial reason distribution;
-- approval decision count and time-to-decision where timestamps permit;
-- number of published Dune sample transactions successfully cross-checked.
-
-Do not invent TPS, customer counts, volume, savings, accuracy, uptime, adoption or revenue numbers from demo fixtures.
-
-## Dune publication
-
-The repository includes reproducible SQL and publishing scripts. With real write credentials/query IDs:
-
-```bash
-cd analytics/dune
-node publish.mjs
-node publish-dashboard.mjs
+```text
+external custody /identity
+ -> publicKeyHex + signerRef
+ -> AgentPay derives addr1... locally
+ -> exact transaction constructed
+ -> transaction body hashed
+ -> external custody /sign exact signerRef
+ -> returned Ed25519 signature verified locally
+ -> signed CBOR independently verified by facilitator
+ -> facilitator submits via Blockfrost
 ```
 
-Record the resulting query/dashboard identifiers, then independently verify at least one known Cardano settlement against the public query result before describing the dashboard as validated.
+The external custody provider is a deployment dependency; its private keys are not stored by AgentPay.
 
-## Production-readiness statement for submission
+Self-custody remains available in parallel.
 
-A safe submission statement is:
+## Security properties implemented
 
-> AgentPay implements policy-controlled Cardano x402 payments, isolated per-agent Preprod signing, Cardano Mainnet self-custody and external per-agent HSM/KMS/delegation signing, Pyth-valued limits, Masumi escrow/refunds/reputation, optional Veridian/KERI identity and Dune observability. Mainnet managed custody does not use a shared master key or deployment-wide payer; the private key remains in the external custody boundary and AgentPay verifies the returned public identity and signatures locally.
+- dashboard has no Cardano private signing key;
+- one managed payment identity per agent;
+- database canonical identity uniqueness and concurrent claim protection;
+- testnet deterministic master secrets prohibited on Mainnet;
+- external Mainnet signer identity bound to immutable Agent ID;
+- local payer-address derivation from custody public key;
+- body-hash-only external signing;
+- local Ed25519 signature verification;
+- independent facilitator transaction verification;
+- signer constructs/signs but does not submit Cardano transactions;
+- facilitator submits and confirms through Blockfrost;
+- canonical resource SHA-256 binding;
+- exact payer/payee/asset/amount/conservation/change validation;
+- durable settlement claims and UTxO nonce replay controls;
+- ambiguous submissions retained for reconciliation rather than blindly retried;
+- Pyth/Masumi/KERI required evidence fails closed;
+- Dune cannot authorize or settle payments;
+- emergency stop blocks new risky side effects while defensive reconciliation remains available.
 
-Current maturity for Catalyst submission purposes remains **TRL 5** until the intended Mainnet/pilot configuration has been demonstrated in the relevant environment. TRL 6 should be claimed only after that demonstration exists.
+## Demo evidence rules
+
+When I present a demo as evidence, I will identify what is actually live in that exact environment.
+
+Minimum Cardano evidence for a specific demonstrated profile should include:
+
+1. exact release SHA;
+2. deployed dashboard/facilitator/signer endpoints;
+3. deliberately funded payer for the custody mode shown;
+4. real Blockfrost network credentials;
+5. for autonomous Mainnet custody, a real configured external per-agent custody adapter;
+6. low-value transaction confirmed independently on Cardano;
+7. real Pyth/Masumi/KERIA configuration only if those integrations are shown as live;
+8. real Dune query/dashboard IDs only if Dune is shown as published evidence.
+
+Synthetic resource fixtures may demonstrate payment plumbing but must be called synthetic.
+
+## Suggested demo sequence
+
+### 1. Agent and policy
+
+Show the agent's immutable payment identity, custody mode and published financial/trust policy.
+
+### 2. Counterparty trust
+
+Show Masumi seller/capability/payment-key evidence and optional KERI evidence if actually configured.
+
+### 3. Direct x402
+
+Show 402 challenge, policy result, signing path, facilitator verification/submission, chain confirmation and paid resource response.
+
+### 4. Approval/denial
+
+Show one deliberately over-policy request being denied or routed to approval.
+
+### 5. Mainnet custody failure safety
+
+If Mainnet external custody is part of the environment, demonstrate or explain that an unavailable/invalid custody response blocks signing rather than falling back to a shared key.
+
+### 6. Escrow
+
+If real Masumi escrow is configured, show purchase/job/result evidence and a separate refund path where appropriate.
+
+### 7. Public evidence
+
+Show Cardano transaction evidence and Dune only when real public query IDs exist.
+
+## Metrics and adoption claims
+
+I will report **observed** metrics from actual stored/published evidence separately from **proposal targets**.
+
+Useful observed metrics include:
+
+- settled Cardano transaction count;
+- distinct external wallets actually used;
+- actual network fees from confirmed transactions;
+- policy-denied/approval-required counts;
+- confirmation latency where recorded;
+- verified Masumi completion/refund/dispute outcomes;
+- public Dune sample cross-checks.
+
+I will not infer customer counts, transaction volume, fees, revenue, uptime or adoption from synthetic fixtures.
+
+Any Catalyst pilot target for wallets, transactions, fees or first-two-week adoption must be internally consistent with the actual acquisition model written in the proposal. Those planning commitments belong in the proposal/pilot plan; this repository does not invent them as completed facts.
+
+## Suggested short pitch
+
+> “I built AgentPay to give autonomous agents bounded financial authority instead of unrestricted wallets. On Cardano, AgentPay applies immutable policy, approvals and counterparty trust before payment. Preprod managed agents use isolated per-agent identities, while Mainnet can use self custody or a distinct external Ed25519 signer identity for each agent. AgentPay constructs the payment, verifies returned signatures locally, independently verifies the final Cardano transaction in the facilitator, submits through Blockfrost and reconciles chain evidence. For jobs needing stronger buyer protection, the same control plane can use Masumi escrow, with optional Pyth-valued budgets and KERI identity constraints.”
+
+## Production/readiness wording
+
+A safe current statement is:
+
+> AgentPay has been deployed and exercised in supported environments. The repository implements policy-controlled Cardano x402, Preprod per-agent managed signing, Mainnet self custody and external per-agent Ed25519 custody, Pyth-valued policy, Masumi trust/escrow/refunds/reputation, optional KERI identity and Dune observability. Readiness for a specific production/pilot profile depends on the exact release and external configuration being operated.
+
+For Catalyst I keep the current maturity at **TRL 5** until the intended Mainnet/pilot configuration is demonstrated in a relevant environment.
+
+## Update summary
+
+Updated 2026-08-22 to:
+
+- identify me as Daniel Praise, not only `Daniel419797`;
+- disclose the Hedera x402 origin in first person;
+- record Cardano Mainnet external per-agent custody as implemented;
+- remove obsolete Mainnet self-custody-only implications;
+- keep TRL 5 until relevant-environment demonstration;
+- separate real observed evidence from proposal targets and synthetic fixtures;
+- clarify signer construction versus facilitator submission responsibilities.
