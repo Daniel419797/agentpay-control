@@ -1,15 +1,17 @@
-# AgentPay — Catalyst Submission
+# AgentPay: Catalyst Submission
 
 **Updated:** 2026-08-22  
 **Proposer / primary builder:** Daniel Praise (`Daniel419797`)
 
-> **Reason for update:** I synchronized this proposal-facing summary with the implementation now on `master`, especially Cardano Mainnet external per-agent custody. I also made my prior Hedera x402 involvement and contributor identity explicit and removed wording that could confuse source implementation with completed pilot evidence.
+## Revision note
 
-## Who I am and prior work
+This proposal-facing summary reflects the current implementation, especially Cardano Mainnet external per-agent custody. It also states the prior Hedera x402 involvement and contributor identity directly and separates source implementation from completed pilot evidence.
 
-I am **Daniel Praise**, the owner of the GitHub account `Daniel419797` and the primary technical contributor to AgentPay.
+## Proposer and prior work
 
-I originally built AgentPay for the **Hedera x402 bounty**. I later extended it into a multi-rail payment control plane with a Cardano-specific implementation. I disclose that prior involvement directly. Completed Hedera work is prior work and should not be presented as new Catalyst-funded delivery.
+**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor to AgentPay.
+
+AgentPay was originally built for the **Hedera x402 bounty** and later extended into a multi-rail payment control plane with a Cardano-specific implementation. That prior involvement is disclosed directly. Completed Hedera work is prior work and should not be presented as new Catalyst-funded delivery.
 
 ## One-line description
 
@@ -31,11 +33,11 @@ AgentPay currently combines:
 - Cardano Mainnet self custody;
 - Cardano Mainnet external per-agent Ed25519 custody;
 - Pyth-backed conservative USD policy limits;
-- Masumi registry/counterparty verification;
-- separate Masumi escrow/refund/result-verification lifecycle;
+- Masumi registry and counterparty verification;
+- separate Masumi escrow, refund and result-verification lifecycle;
 - seller reputation derived from AgentPay-observed escrow outcomes;
 - optional Veridian/KERIA credential verification;
-- Blockfrost construction/submission/evidence integration;
+- Blockfrost construction, submission and evidence integration;
 - read-only Dune public Cardano analytics;
 - AgentPay policy, approvals, reservations, idempotency, emergency stop, audit and reconciliation.
 
@@ -57,38 +59,36 @@ The private key stays in the external HSM/KMS/delegation system. Self custody re
 
 ## Why AgentPay is different
 
-AgentPay is not claiming to invent x402, Cardano, Masumi, Pyth, KERI or Dune. It composes those systems into an organizational treasury/control layer that answers:
-
-> How can software act autonomously without becoming financially unrestricted?
+AgentPay does not claim to invent x402, Cardano, Masumi, Pyth, KERI or Dune. It composes those systems into an organizational treasury and control layer that answers a practical question: how can software act autonomously without becoming financially unrestricted?
 
 ## Demo story
 
-The primary demo is an agent purchasing a verified resource/service:
+The primary demo is an agent purchasing a verified resource or service:
 
-1. agent has a Cardano policy and isolated payment identity;
-2. AgentPay verifies the requested resource/counterparty;
-3. optional Pyth/Masumi/KERI controls contribute to policy;
+1. the agent has a Cardano policy and isolated payment identity;
+2. AgentPay verifies the requested resource and counterparty;
+3. optional Pyth, Masumi and KERI controls contribute to policy;
 4. AgentPay allows, requires approval or denies;
-5. direct x402 uses the isolated Cardano signing/facilitator path, or a separate Masumi escrow path is used;
-6. final settlement/result evidence is independently reconciled;
+5. direct x402 uses the isolated Cardano signing and facilitator path, or a separate Masumi escrow path is used;
+6. final settlement and result evidence is independently reconciled;
 7. public chain evidence can be shown without exposing private business context.
 
 A deliberately oversized payment should be denied, and emergency stop should block new risky side effects.
 
 ## Current maturity
 
-I currently state **TRL 5**.
+AgentPay is currently described as **TRL 5**.
 
-The code now implements Mainnet external per-agent custody, so the earlier source limitation is addressed. I will only claim TRL 6 after the intended Mainnet/pilot configuration is demonstrated in a relevant environment; source code alone does not prove that milestone.
+The code now implements Mainnet external per-agent custody, so the earlier source limitation is addressed. TRL 6 should only be claimed after the intended Mainnet and pilot configuration is demonstrated in a relevant environment. Source code alone does not prove that milestone.
 
 ## Metrics and pilot targets
 
 Observed metrics and proposal targets must be kept separate.
 
-I will report actual confirmed transaction counts, distinct external wallets, network fees and other pilot outcomes from real evidence. I will not present synthetic demo activity as adoption.
+Actual confirmed transaction counts, distinct external wallets, network fees and other pilot outcomes must be reported from real evidence. Synthetic demo activity must not be presented as adoption.
 
 Any planned wallet, transaction, fee, conversion or first-two-week target in the Catalyst form must be mathematically consistent with the stated acquisition plan and must be presented as a target, not as something the repository has already achieved.
 
 ## Requested evaluation frame
 
-Evaluate AgentPay on whether it turns Cardano's machine-payment primitives into a safer operating model for autonomous agents: programmable financial boundaries, isolated per-agent authority, verifiable counterparties, exact settlement verification and independently reconcilable execution.
+AgentPay should be evaluated on whether it turns Cardano's machine-payment primitives into a safer operating model for autonomous agents: programmable financial boundaries, isolated per-agent authority, verifiable counterparties, exact settlement verification and independently reconcilable execution.
