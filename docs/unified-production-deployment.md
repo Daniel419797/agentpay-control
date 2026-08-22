@@ -1,59 +1,80 @@
-# Unified production deployment
+# AgentPay Unified Production Deployment
 
-This is the canonical AgentPay production topology.
+**Status:** Current canonical deployment topology  
+**Updated:** 2026-08-22
+
+> **Why this document was updated:** The production topology now includes implemented Cardano Mainnet external per-agent custody behind the isolated signer. This guide was synchronized with `render.yaml`, the combined facilitator and the unified Cardano signer so secret placement and service responsibilities match the code.
+
+## Canonical deployment
 
 ```text
-GitHub
+GitHub release
    |
-   +----------------------> Vercel
-   |                         `-- AgentPay Next.js dashboard/API
+   |-- Vercel
+   |    `-- AgentPay Next.js dashboard/API
    |
-   `----------------------> Render Blueprint (render.yaml)
-                             |-- agentpay-facilitator
-                             |    |-- Hedera Testnet
-                             |    |-- Hedera Mainnet
-                             |    |-- Arc Testnet
-                             |    |-- Cardano Preprod facilitator
-                             |    `-- Cardano Mainnet facilitator
-                             `-- agentpay-cardano-signer
-                                  |-- Cardano Preprod worker
-                                  `-- Cardano Mainnet worker
-                                       `-- external per-agent custody adapter
+   `-- Render Blueprint
+        |-- agentpay-facilitator
+        `-- agentpay-cardano-signer
+             |-- Preprod worker
+             `-- Mainnet worker
+                  `-- optional external per-agent custody
 ```
 
-`render.yaml` is the production Render entrypoint. Older standalone Render YAML files are retained for isolated deployment/testing where applicable.
+PostgreSQL, Blockfrost, x402 resource servers and enabled Pyth/Masumi/KERIA/Dune/custody providers are external dependencies, not additional canonical Blueprint services.
 
-## Security boundaries
+## Vercel control plane
 
-The two Render services are separate runtime trust boundaries even though one Blueprint deploys them together.
+Responsibilities:
 
-- `agentpay-facilitator` is the public x402/protocol boundary. It routes by exact CAIP network and has network-scoped capability credentials.
-- `agentpay-cardano-signer` is the Cardano transaction/signing boundary. It runs independent Preprod and Mainnet workers behind `/preprod/*` and `/mainnet/*`.
-- Cardano Preprod may derive one isolated testnet key/address per managed agent from `CARDANO_PREPROD_MANAGED_AGENT_MASTER_KEY`.
-- Cardano Mainnet never receives that master key. It supports unsigned self-custody plus per-agent external custody through `CARDANO_MAINNET_AGENT_CUSTODY_URL` and `CARDANO_MAINNET_AGENT_CUSTODY_API_KEY`.
-- The external Mainnet custody adapter owns/delegates a distinct Ed25519 key for each immutable Agent ID. AgentPay receives only public identity material and signatures.
-- Hedera Testnet may use an isolated managed-agent master key. Hedera Mainnet does not.
-- Arc managed identities are Testnet only. Do not invent an Arc Mainnet route before a public mainnet is actually available and separately reviewed.
-- No managed-agent master key or external custody credential belongs in Vercel.
-- Deployment-wide infrastructure payer/operator identities are never assigned as agent wallets.
+- authentication/session;
+- organizations/RBAC;
+- agents/credentials;
+- policy and approvals;
+- reservations/idempotency;
+- payments/resources;
+- audit/incidents/reconciliation;
+- analytics/financial intelligence;
+- export/deletion/settings.
 
-## Public facilitator routes
+Do not place blockchain private keys, testnet managed-agent master keys or Cardano Mainnet custody credentials in Vercel.
 
-The one facilitator origin exposes:
+## `agentpay-facilitator`
 
-| Network | CAIP network | Route |
-|---|---|---|
-| Hedera Testnet | `hedera:testnet` | `/hedera/testnet` |
-| Hedera Mainnet | `hedera:mainnet` | `/hedera/mainnet` |
-| Arc Testnet | `eip155:5042002` | `/arc/testnet` |
-| Cardano Preprod | `cardano:preprod` | `/cardano/preprod` |
-| Cardano Mainnet | `cardano:mainnet` | `/cardano/mainnet` |
+One public Render web service mounts:
 
-Root `/verify` and `/settle` inspect the x402 payload and requirement and dispatch only when both bind the same supported network. Root `/supported` aggregates every active child rail. `/health` reports loaded rails. `/ready` also requires the unified Cardano signer to be reachable.
+```text
+/hedera/testnet
+/hedera/mainnet
+/arc/testnet
+/cardano/preprod
+/cardano/mainnet
+```
 
-## Cardano signer routes
+Root endpoints include `/verify`, `/settle`, `/supported`, `/health` and `/ready` according to the combined application.
 
-The signer service exposes one public gateway and two network namespaces:
+For Cardano it:
+
+- forwards per-agent identity/sign requests to the signer;
+- independently verifies signed transaction CBOR;
+- controls replay/durable settlement claims;
+- submits through Blockfrost;
+- checks transaction/latest-block evidence and confirmation depth.
+
+It does not hold the Cardano payer private key.
+
+## `agentpay-cardano-signer`
+
+This is a Render **web service gateway**, not a background-only worker. It starts isolated Preprod and Mainnet child signer processes.
+
+Public network namespaces:
+
+```text
+/preprod/*
+/mainnet/*
+```
+
+Relevant routes include:
 
 ```text
 /preprod/health
@@ -67,132 +88,118 @@ The signer service exposes one public gateway and two network namespaces:
 /mainnet/unsigned
 ```
 
-The gateway forwards only to fixed loopback workers; callers cannot select an arbitrary upstream. Mainnet managed routes fail closed if the external custody adapter is not configured or unavailable.
+The gateway keeps network-specific signer capability keys distinct.
 
-## Render deployment
+## Preprod signer environment
 
-Create or update one Render Blueprint from repository root `render.yaml`.
+Required/typical signer-only values include:
 
-The Blueprint creates exactly:
-
-1. `agentpay-cardano-signer`
-2. `agentpay-facilitator`
-
-Populate every required `sync: false` value for the profile being operated. Use different credentials for Testnet and Mainnet and different secrets for every capability.
-
-Generate 32 random bytes as unpadded base64url when a **testnet** managed-agent master key is required:
-
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+```text
+CARDANO_PREPROD_BLOCKFROST_URL
+CARDANO_PREPROD_BLOCKFROST_PROJECT_ID
+CARDANO_PREPROD_SIGNER_API_KEY
+CARDANO_PREPROD_MANAGED_AGENT_MASTER_KEY
+CARDANO_PREPROD_USDCX_ASSET_ID   # only when configured
 ```
 
-Use different output for each master key. Never reuse a managed-agent master key as an API key, database encryption key, operator key or settlement credential. Do not create a Cardano Mainnet managed-agent master key.
+The Preprod master key is testnet-only and derives a different Ed25519 identity for each immutable Agent ID.
 
-### Required Cardano signer secrets
+## Mainnet signer environment
 
-For Preprod managed agents:
+Mainnet uses:
 
-- `CARDANO_PREPROD_MANAGED_AGENT_MASTER_KEY`
-- `CARDANO_PREPROD_BLOCKFROST_PROJECT_ID`
-
-For Mainnet:
-
-- `CARDANO_MAINNET_BLOCKFROST_PROJECT_ID`
-- `CARDANO_MAINNET_AGENT_CUSTODY_URL` and `CARDANO_MAINNET_AGENT_CUSTODY_API_KEY` when autonomous managed agents are enabled
-
-The Blueprint generates separate Preprod/Mainnet signer API capabilities. Mainnet has no managed-agent master key.
-
-### Mainnet custody adapter contract
-
-The configured adapter must support:
-
-- `POST /identity` — resolve a stable `publicKeyHex` and `signerRef` for the immutable Agent ID.
-- `POST /sign` — sign the supplied 32-byte Cardano transaction-body hash for that exact signer reference.
-
-AgentPay derives the Cardano `addr1...` address locally from the returned public key and verifies the returned Ed25519 signature locally. The adapter must not return or expose private key material.
-
-### Required facilitator secrets
-
-Hedera Testnet:
-
-- operator ID/key/key type
-- infrastructure payer ID/key/key type
-- managed-agent master key
-
-Hedera Mainnet:
-
-- separate Mainnet operator ID/key/key type
-- separate Mainnet infrastructure payer ID/key/key type
-- no managed-agent master key
-
-Arc Testnet:
-
-- payer private key
-- relayer private key
-- contract-execution private key
-- managed-agent master key
-- provider address
-
-All three Arc private keys must be distinct.
-
-Cardano:
-
-- `CARDANO_SETTLEMENT_STORE_URL` must be the production Vercel settlement-claim endpoint.
-- The Blueprint generates the durable settlement-store capability plus separate Preprod/Mainnet facilitator capabilities.
-
-## Vercel configuration
-
-Vercel hosts only the Next.js dashboard/API. Set:
-
-```env
-AGENTPAY_FACILITATOR_ORIGIN=https://<agentpay-facilitator>.onrender.com
+```text
+CARDANO_MAINNET_BLOCKFROST_URL
+CARDANO_MAINNET_BLOCKFROST_PROJECT_ID
+CARDANO_MAINNET_SIGNER_API_KEY
+CARDANO_MAINNET_USDCX_ASSET_ID   # when enabled
 ```
 
-Do not put Render signer master keys, Cardano Mainnet custody API credentials or blockchain private keys in Vercel.
+For autonomous managed agents it additionally uses signer-only:
 
-Render-generated capability values must be copied into the matching Vercel variables because Render `fromService` references do not cross into Vercel:
+```text
+CARDANO_MAINNET_AGENT_CUSTODY_URL
+CARDANO_MAINNET_AGENT_CUSTODY_API_KEY
+```
 
-| Vercel | Same value as Render |
-|---|---|
-| `FACILITATOR_SIGNING_API_KEY` | `HEDERA_TESTNET_MANAGED_SIGNING_API_KEY` |
-| `FACILITATOR_SETTLEMENT_API_KEY` | `HEDERA_TESTNET_SETTLEMENT_API_KEY` |
-| `FACILITATOR_CONTRACT_API_KEY` | `HEDERA_TESTNET_CONTRACT_EXECUTION_API_KEY` |
-| `HEDERA_MAINNET_FACILITATOR_CONTRACT_API_KEY` | `HEDERA_MAINNET_CONTRACT_EXECUTION_API_KEY` |
-| `ARC_FACILITATOR_SIGNING_API_KEY` | `ARC_TESTNET_MANAGED_SIGNING_API_KEY` |
-| `ARC_FACILITATOR_SETTLEMENT_API_KEY` | `ARC_TESTNET_SETTLEMENT_API_KEY` |
-| `ARC_FACILITATOR_CONTRACT_API_KEY` | `ARC_TESTNET_CONTRACT_EXECUTION_API_KEY` |
-| `CARDANO_PREPROD_FACILITATOR_SIGNING_API_KEY` | `CARDANO_PREPROD_MANAGED_SIGNING_API_KEY` |
-| `CARDANO_PREPROD_FACILITATOR_SETTLEMENT_API_KEY` | `CARDANO_PREPROD_SETTLEMENT_API_KEY` |
-| `CARDANO_MAINNET_FACILITATOR_SIGNING_API_KEY` | `CARDANO_MAINNET_MANAGED_SIGNING_API_KEY` |
-| `CARDANO_MAINNET_FACILITATOR_SETTLEMENT_API_KEY` | `CARDANO_MAINNET_SETTLEMENT_API_KEY` |
-| `CARDANO_SETTLEMENT_STORE_API_KEY` | `CARDANO_SETTLEMENT_STORE_API_KEY` |
+There is deliberately no `CARDANO_MAINNET_MANAGED_AGENT_MASTER_KEY`.
 
-The Mainnet external custody API key is **not** copied to Vercel or the facilitator.
+## Mainnet external custody contract
 
-## Mainnet custody rules
+The external system is not hosted by AgentPay.
 
-Production support does not mean unrestricted platform custody.
+```text
+POST /identity
+  input: Agent ID + Cardano Mainnet/Ed25519 purpose
+  output: stable publicKeyHex + signerRef
 
-- Hedera Mainnet agents: self-custody. The facilitator's operator/payer keys are infrastructure identities, not agent wallets.
-- Cardano Mainnet self-custody: unsigned transaction preparation for the exact verified wallet.
-- Cardano Mainnet autonomous managed custody: a unique external Ed25519 signer identity per immutable Agent ID, with local address derivation/signature verification and no shared AgentPay Mainnet key.
-- Arc: current implementation is Testnet only until a public Mainnet exists and undergoes its own chain/asset review.
+POST /sign
+  input: Agent ID + signerRef + payerAddress + transaction-body hash
+  output: Ed25519 signature
+```
 
-## Migration from old multi-service deployment
+AgentPay derives the payer address locally and verifies returned signatures. Private keys stay in the external HSM/KMS/delegation boundary.
 
-1. Keep the existing production deployment serving traffic.
-2. Sync `render.yaml` into the target Render account and populate the required values for the selected profile.
-3. Verify `agentpay-cardano-signer/health` reports both `cardano:preprod` and `cardano:mainnet` healthy.
-4. When Mainnet managed custody is enabled, verify Mainnet health reports `external-per-agent` managed identity support.
-5. Verify `agentpay-facilitator/health`, `/supported`, and `/ready`.
-6. Set `AGENTPAY_FACILITATOR_ORIGIN` and matching capabilities in Vercel Production.
-7. Redeploy Vercel from the exact verified Git SHA.
-8. Test managed-agent provisioning/payment on the enabled networks. For Cardano Mainnet, verify two different Agent IDs resolve to distinct addresses and execute only low-value funded tests.
-9. Confirm `/api/v1/ready`, chain providers and settlement records agree.
-10. Retire old per-network Render services only after the new topology is verified.
+## Cardano data flow
 
-## Release verification
+```text
+Control plane
+  -> combined facilitator /managed-agent-sign
+  -> Cardano signer
+       -> Blockfrost UTxOs/protocol data
+       -> construct transaction
+       -> Preprod local derived signer OR Mainnet external per-agent signer
+  -> signed CBOR returned to facilitator
+  -> facilitator independently verifies
+  -> durable claim/replay control
+  -> Blockfrost /tx/submit
+  -> Cardano
+  -> Blockfrost confirmation evidence
+  -> reconciliation/control plane
+```
 
-`scripts/ci/verify-unified-topology.sh` is the executable topology check. It runs signer syntax/tests and typecheck/tests/build for Hedera, Arc and the combined facilitator. The Vercel dashboard build runs this script as `prebuild`, so a frontend release cannot compile successfully while the checked-in backend topology is type-invalid or its unit tests fail.
+The signer does not submit the transaction.
 
-Source-level tests cannot supply external custody credentials, funded wallets or network/provider access; those are deployment inputs for the production profile being operated.
+## Facilitator Cardano capabilities
+
+Use separate capabilities for managed signing/preparation and settlement. These are protocol authorization keys; they are not payer private keys and not the external custody credential.
+
+The Mainnet managed-signing capability may authorize the dedicated per-agent identity/signing routes even though the generic/shared signing mode stays `unsigned-only`.
+
+## Dashboard environment mapping
+
+Vercel should normally use one public facilitator origin and network-specific capability keys. It may contain public/provider configuration such as Blockfrost project IDs where the control plane requires them, but must never contain:
+
+```text
+CARDANO_PREPROD_MANAGED_AGENT_MASTER_KEY
+CARDANO_MAINNET_AGENT_CUSTODY_API_KEY
+blockchain private keys
+raw Cardano signing seeds
+```
+
+## Deployment sequence
+
+1. choose exact release SHA;
+2. ensure required repository checks execute;
+3. confirm DB backup/migration state;
+4. deploy Cardano signer;
+5. verify both signer workers;
+6. if Mainnet managed custody enabled, verify `/identity` for multiple Agent IDs produces distinct stable identities;
+7. deploy combined facilitator;
+8. verify `/health`, `/supported`, `/ready` and signer connectivity;
+9. apply production database migrations;
+10. deploy Vercel dashboard/API;
+11. verify Vercel has no signer/custody secrets;
+12. exercise low-value transactions for intended network/custody modes;
+13. independently confirm resulting chain evidence;
+14. only retire older services after the unified topology is verified and rollback is understood.
+
+## Arc/Hedera notes
+
+Hedera Testnet/Mainnet and Arc Testnet remain child rails within the unified facilitator. Arc public Mainnet is not declared until an actual supported public network/profile is reviewed. Hedera Mainnet agent custody remains self-custody under the documented current model; its operator/payer infrastructure identities are not agent wallets.
+
+## Update provenance
+
+Updated on 2026-08-22 to reflect the merged Cardano Mainnet per-agent external custody implementation and the actual two-service Render topology. The reason is to eliminate older wording that treated Mainnet autonomous custody as future-only and to make secret placement and submission responsibility unambiguous.
+
+Primary builder: **Daniel Praise** (`Daniel419797`).
