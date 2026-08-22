@@ -10,6 +10,8 @@ const MANAGED_ENV_KEYS = [
   "CARDANO_PAYMENT_PUBLIC_KEY_HEX",
   "CARDANO_SIGNING_SEED_HEX",
   "CARDANO_MANAGED_AGENT_MASTER_KEY",
+  "CARDANO_AGENT_CUSTODY_URL",
+  "CARDANO_AGENT_CUSTODY_API_KEY",
 ];
 
 function withProductionEnv(overrides, callback) {
@@ -57,6 +59,26 @@ test("production mainnet unsigned-only mode requires no private or remote signin
   assert.equal(config.payerAddress, undefined);
   assert.equal(config.remoteSignerUrl, undefined);
   assert.equal(config.agentMasterKey, undefined);
+  assert.equal(config.agentCustodyUrl, undefined);
+});
+
+test("production mainnet accepts isolated per-agent external custody", () => {
+  const config = withProductionEnv({
+    CARDANO_PAYER_ADDRESS: undefined,
+    CARDANO_AGENT_CUSTODY_URL: "https://custody.example.com/cardano",
+    CARDANO_AGENT_CUSTODY_API_KEY: "agent-custody-capability-secret-1234567890",
+  }, () => configFromEnv());
+  assert.equal(config.network, "cardano:mainnet");
+  assert.equal(config.agentMasterKey, undefined);
+  assert.equal(config.agentCustodyUrl, "https://custody.example.com/cardano");
+  assert.equal(config.agentCustodyApiKey, "agent-custody-capability-secret-1234567890");
+});
+
+test("production mainnet rejects incomplete external custody configuration", () => {
+  assert.throws(
+    () => withProductionEnv({ CARDANO_AGENT_CUSTODY_URL: "https://custody.example.com/cardano" }, () => configFromEnv()),
+    /CARDANO_AGENT_CUSTODY_CONFIG_INCOMPLETE/,
+  );
 });
 
 test("production preprod requires an isolated per-agent master key", () => {
