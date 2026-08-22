@@ -1,77 +1,128 @@
-# AgentPay landing-page copy — Catalyst edition
+# AgentPay Landing-Page Copy — Catalyst
+
+**Updated:** 2026-08-22
+
+> **Reason for update:** The copy now reflects the implemented Cardano Mainnet external per-agent custody model, current service responsibilities and transparent project provenance. It avoids obsolete self-custody-only wording and does not present proposal targets or unconfigured providers as achieved results.
 
 ## Hero
 
 ### Financial infrastructure for autonomous AI agents on Cardano
 
-Give software agents the ability to pay without giving them unrestricted wallets. AgentPay combines Cardano x402 payments, USDCx/ADA settlement, Pyth-valued budgets, Masumi counterparty trust, optional Veridian/KERI credentials, approvals, reconciliation and emergency controls.
+Give software agents the ability to pay without giving them unrestricted wallets. AgentPay combines Cardano x402 settlement, policy-controlled budgets, approvals, counterparty trust, isolated signing and independent reconciliation.
 
-Primary CTA: **See the Cardano demo**
-Secondary CTA: **View public Dune analytics**
+**Primary CTA:** See the Cardano demo  
+**Secondary CTA:** Review the architecture
+
+## Builder / provenance
+
+### Built by Daniel Praise
+
+I am **Daniel Praise** (`Daniel419797`), the repository owner and primary technical contributor. I originally built AgentPay for the Hedera x402 bounty, then extended it into the current multi-rail control plane and Cardano implementation.
 
 ## Problem
 
-### Autonomy without a financial boundary is not enterprise-ready
+### Autonomy needs a financial boundary
 
-An agent may need to buy data, inference, research or another agent's service in seconds. A normal wallet answers “can this key sign?” It does not answer “should this agent spend this amount, with this provider, in this asset, under this organization's policy?”
+An autonomous agent may need to buy data, inference, research or another agent's service in seconds. A wallet answers whether a key can sign. It does not decide whether that agent should spend that amount, with that provider, in that asset, under the organization's policy.
 
-AgentPay answers that second question before money moves.
+AgentPay makes that decision before money moves and reconciles what happened afterward.
 
 ## Control layer
 
-### Every agent gets a programmable financial boundary
+### Programmable financial boundaries per agent
 
-Configure:
+Configure and enforce:
 
-- per-transaction, hourly, daily and monthly limits
-- USD-denominated limits using Pyth
-- allowed Cardano assets and networks
-- trusted Masumi agents and capabilities
-- minimum observed escrow history/reputation
-- optional trusted KERI credential issuers/schemas
-- human approval thresholds
-- emergency stop
+- per-transaction/hour/day/month limits;
+- approval thresholds;
+- merchant/resource rules;
+- transaction velocity/cooldown;
+- emergency stop;
+- optional Pyth-valued USD ceilings;
+- verified Masumi counterparties/capabilities;
+- observed escrow history/reputation requirements;
+- optional KERI issuer/schema/freshness requirements.
 
-## Cardano settlement
+Published policy is server-side and cannot be rewritten by the autonomous agent.
 
-### Direct x402 when speed matters
+## Cardano direct settlement
 
-AgentPay supports Cardano `exact` x402 with exact resource, payer, payee, asset and amount binding. ADA uses `lovelace`; Mainnet USDCx is pinned to its configured Cardano asset identity. Signing is isolated from the dashboard and settlement is independently reconciled from chain evidence.
+### Exact x402 with resource binding
 
-### Mainnet autonomy without a shared platform wallet
+AgentPay's Cardano path binds the payment to the exact resource, network, payer, payee, asset and amount. The supported transaction shape is deliberately narrow and independently verified before submission.
 
-Cardano Mainnet supports verified self custody and external per-agent managed custody. For an autonomous managed agent, the signer resolves a distinct Ed25519 public key and signer reference for that immutable Agent ID. AgentPay derives the `addr1...` payer address locally, sends only the transaction-body hash for signing and verifies the returned signature. The private key remains inside the external HSM/KMS/delegation boundary.
+ADA is supported as `lovelace`. An explicitly configured native asset may be enabled; Mainnet USDCx must match the configured canonical asset identity.
 
-There is no Cardano Mainnet `CARDANO_MANAGED_AGENT_MASTER_KEY` and no deployment-wide agent payer.
+## Mainnet custody
+
+### Autonomous Mainnet agents without a shared platform wallet
+
+Cardano Mainnet supports both self custody and external per-agent managed custody.
+
+For an externally managed agent:
+
+1. the custody provider resolves a distinct Ed25519 public key/signer reference for that Agent ID;
+2. AgentPay derives the `addr1...` payer address locally;
+3. the Cardano signer constructs the transaction;
+4. only the transaction-body hash is sent to the external signer;
+5. AgentPay verifies the returned signature locally;
+6. the facilitator independently verifies the signed transaction;
+7. the facilitator submits through Blockfrost and reconciles confirmation evidence.
+
+There is no Cardano Mainnet managed-agent master key or deployment-wide autonomous-agent payer. Private keys remain inside the external HSM/KMS/delegation system.
 
 ## Masumi escrow
 
-### Agent-to-agent work with result and refund evidence
+### Separate escrow when direct payment is not enough
 
-For jobs that need escrow, AgentPay uses Masumi as a separate purchase lifecycle rather than pretending escrow is direct x402. AgentPay tracks locking, result submission, completion, refunds and disputes, verifies the returned result hash, and turns observed outcomes into an auditable seller reputation signal.
+AgentPay treats Masumi escrow as a separate purchase/job lifecycle. It can track funds locking, result submission, verified completion, refunds and disputes. Verified result hashes and observed terminal outcomes can feed AgentPay's policy-level seller reputation signal.
 
-## Identity
+## Identity and trust
 
-### Know which agent and payment key you are trusting
+### Know which provider you are paying
 
-AgentPay verifies the Masumi registry source, agent identity, capability, seller address and Cardano payment credential. Organizations can additionally require a Veridian/KERI ACDC credential from a trusted issuer and schema.
+AgentPay can verify Masumi registry source, agent identifier, capability, seller Cardano payment facts and freshness. Organizations can additionally require configured Veridian/KERIA credential evidence from trusted issuers/schemas.
 
-## Analytics
+## Pyth-valued policy
 
-### Public chain facts, private business context
+### Business budgets in USD, settlement on Cardano
 
-Dune shows public Cardano settlement activity. AgentPay's authenticated analytics show privacy-safe logical metrics such as paying agents, providers, policy denials, approval events, settlement latency and verified escrow outcomes. Tenant identities, prompts and resource content are not published to Dune.
+Where enabled, AgentPay uses a fresh confidence-bounded Pyth observation to calculate a conservative USD value before authorizing spend. Oracle failure cannot silently make policy less restrictive.
 
 ## Safety
 
-### Ambiguity is not failure
+### Ambiguity is not automatically failure
 
-A network timeout after submission does not mean a payment failed. AgentPay records the candidate transaction and reconciles it independently instead of blindly retrying and risking double spend.
+A timeout after possible Cardano submission does not prove the payment failed. AgentPay preserves the candidate transaction and reconciles independent chain evidence instead of blindly retrying.
 
-Other controls include isolated credentials, per-agent payment identities, idempotency, resource-specific replay binding, exact settlement verification and immutable audit evidence.
+Other controls include:
+
+- one managed payment identity per agent;
+- spend reservations/idempotency;
+- exact transaction verification;
+- replay/resource binding;
+- emergency stop;
+- immutable audit evidence;
+- fail-closed custody/provider behavior.
+
+## Analytics
+
+### Public settlement facts, private business context
+
+Dune may expose public Cardano chain facts. AgentPay's private analytics can track logical agent/provider/policy outcomes without publishing tenant identities, prompts, credentials or private resource content.
+
+Dune is never an authorization/signing/settlement dependency.
+
+## Current maturity
+
+For Catalyst I currently state **TRL 5**. The repository implements Cardano Mainnet external per-agent custody, but the TRL 6 milestone requires the intended Mainnet/pilot configuration to be demonstrated in a relevant environment.
+
+## Evidence discipline
+
+Observed transaction counts, external-wallet counts, fees and adoption metrics should come from real activity. Proposal targets should be clearly labelled as targets and should be mathematically consistent with the stated acquisition plan; synthetic demo activity is not customer adoption.
 
 ## Closing CTA
 
 ### Let agents act. Keep the financial boundary.
 
-**Explore AgentPay on Cardano** · **Open Dune analytics** · **Review the architecture**
+**Explore AgentPay on Cardano** · **Review the architecture** · **Inspect public settlement evidence when available**
