@@ -1,10 +1,12 @@
-# AgentPay Control — Software Requirements Document
+# AgentPay Control: Software Requirements Document
 
 **Status:** Current implementation-aligned requirements  
 **Updated:** 2026-08-22  
 **Primary builder:** Daniel Praise (`Daniel419797`)
 
-> **Why this document was updated:** I originally wrote the July 2026 requirements around the Hedera x402 bounty MVP. AgentPay has since become a multi-rail control plane and now includes Cardano Preprod managed signing, Cardano Mainnet self-custody and external per-agent custody, Arc, expanded policy/trust integrations, durable reconciliation, and broader operational controls. This version replaces obsolete Hedera-only/current-state assumptions. The original July baseline remains available in Git history.
+## Revision note
+
+The July 2026 requirements were written around the original Hedera x402 bounty MVP. AgentPay has since become a multi-rail control plane and now includes Cardano Preprod managed signing, Cardano Mainnet self custody and external per-agent custody, Arc, expanded policy and trust integrations, durable reconciliation, and broader operational controls. This version replaces obsolete Hedera-only assumptions. The original July baseline remains available in Git history.
 
 ## 1. Product purpose
 
@@ -221,9 +223,9 @@ A workflow that fails before executable steps are created is infrastructure-bloc
 
 ## 10. Current maturity and proposal boundary
 
-For Catalyst purposes, I describe the current implementation conservatively as **TRL 5** until the intended Cardano Mainnet/pilot configuration is demonstrated in a relevant environment. The repository now contains the Mainnet external per-agent custody path, but source implementation alone is not a TRL 6 demonstration.
+For Catalyst purposes, the current implementation is described conservatively as **TRL 5** until the intended Cardano Mainnet/pilot configuration is demonstrated in a relevant environment. The repository now contains the Mainnet external per-agent custody path, but source implementation alone is not a TRL 6 demonstration.
 
-I am **Daniel Praise** (`Daniel419797`), the repository owner and primary technical contributor. I originally built AgentPay for the Hedera x402 bounty and later extended it into the current multi-rail system. Prior Hedera work is prior work; Catalyst scope must describe only the Cardano-specific/pilot work being proposed rather than retroactively treating completed Hedera work as Catalyst-funded delivery.
+**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor. AgentPay was originally built for the Hedera x402 bounty and later extended into the current multi-rail system. Prior Hedera work remains prior work. Catalyst scope should describe only the Cardano-specific and pilot work being proposed rather than retroactively treating completed Hedera work as Catalyst-funded delivery.
 
 ## 11. Authoritative companion documents
 
