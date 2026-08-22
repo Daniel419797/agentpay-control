@@ -51,12 +51,18 @@ function publicConfig() {
     "CARDANO_PREPROD_MANAGED_AGENT_MASTER_KEY",
     process.env.CARDANO_PREPROD_MANAGED_AGENT_MASTER_KEY ?? process.env.CARDANO_MANAGED_AGENT_MASTER_KEY,
   );
+  const mainnetAgentCustodyUrl = process.env.CARDANO_MAINNET_AGENT_CUSTODY_URL;
+  const mainnetAgentCustodyApiKey = process.env.CARDANO_MAINNET_AGENT_CUSTODY_API_KEY;
+  if (Boolean(mainnetAgentCustodyUrl) !== Boolean(mainnetAgentCustodyApiKey)) throw new Error("CARDANO_MAINNET_AGENT_CUSTODY_CONFIG_INCOMPLETE");
+  if (mainnetAgentCustodyApiKey && mainnetAgentCustodyApiKey.length < 32) throw new Error("CARDANO_MAINNET_AGENT_CUSTODY_API_KEY_TOO_SHORT");
+  if (mainnetAgentCustodyApiKey && (mainnetAgentCustodyApiKey === mainnetApiKey || mainnetAgentCustodyApiKey === preprodApiKey)) throw new Error("CARDANO_MAINNET_AGENT_CUSTODY_KEY_MUST_BE_DISTINCT");
 
   const preprodBlockfrostUrl = required("CARDANO_PREPROD_BLOCKFROST_URL", process.env.CARDANO_PREPROD_BLOCKFROST_URL ?? "https://cardano-preprod.blockfrost.io/api/v0");
   const mainnetBlockfrostUrl = required("CARDANO_MAINNET_BLOCKFROST_URL", process.env.CARDANO_MAINNET_BLOCKFROST_URL ?? "https://cardano-mainnet.blockfrost.io/api/v0");
   if (appEnv === "production") {
     https("CARDANO_PREPROD_BLOCKFROST_URL", preprodBlockfrostUrl);
     https("CARDANO_MAINNET_BLOCKFROST_URL", mainnetBlockfrostUrl);
+    if (mainnetAgentCustodyUrl) https("CARDANO_MAINNET_AGENT_CUSTODY_URL", mainnetAgentCustodyUrl);
     if (process.env.CARDANO_MAINNET_MANAGED_AGENT_MASTER_KEY) throw new Error("CARDANO_MAINNET_MANAGED_AGENT_MASTER_KEY_PROHIBITED");
     if (process.env.CARDANO_SIGNING_SEED_HEX || process.env.CARDANO_PREPROD_SIGNING_SEED_HEX || process.env.CARDANO_MAINNET_SIGNING_SEED_HEX) {
       throw new Error("CARDANO_RAW_SIGNING_SEED_PROHIBITED_IN_PRODUCTION");
@@ -70,6 +76,8 @@ function publicConfig() {
     preprodMasterKey,
     preprodBlockfrostUrl,
     mainnetBlockfrostUrl,
+    mainnetAgentCustodyUrl,
+    mainnetAgentCustodyApiKey,
   };
 }
 
@@ -82,6 +90,8 @@ export function childEnvironmentFor(network, source = process.env) {
   const blockfrostProjectId = source[`${prefix}_BLOCKFROST_PROJECT_ID`];
   const usdcxAssetId = source[`${prefix}_USDCX_ASSET_ID`];
   const preprodMasterKey = source.CARDANO_PREPROD_MANAGED_AGENT_MASTER_KEY ?? source.CARDANO_MANAGED_AGENT_MASTER_KEY;
+  const mainnetAgentCustodyUrl = source.CARDANO_MAINNET_AGENT_CUSTODY_URL;
+  const mainnetAgentCustodyApiKey = source.CARDANO_MAINNET_AGENT_CUSTODY_API_KEY;
 
   return {
     PATH: source.PATH,
@@ -96,6 +106,7 @@ export function childEnvironmentFor(network, source = process.env) {
     CARDANO_SIGNER_API_KEY: apiKey,
     ...(usdcxAssetId ? { CARDANO_USDCX_ASSET_ID: usdcxAssetId } : {}),
     ...(network === "preprod" && preprodMasterKey ? { CARDANO_MANAGED_AGENT_MASTER_KEY: preprodMasterKey } : {}),
+    ...(network === "mainnet" && mainnetAgentCustodyUrl && mainnetAgentCustodyApiKey ? { CARDANO_AGENT_CUSTODY_URL: mainnetAgentCustodyUrl, CARDANO_AGENT_CUSTODY_API_KEY: mainnetAgentCustodyApiKey } : {}),
     CARDANO_MIN_OUTPUT_LOVELACE: source.CARDANO_MIN_OUTPUT_LOVELACE ?? "1000000",
     CARDANO_TOKEN_OUTPUT_LOVELACE: source.CARDANO_TOKEN_OUTPUT_LOVELACE ?? "2000000",
     CARDANO_MIN_CHANGE_LOVELACE: source.CARDANO_MIN_CHANGE_LOVELACE ?? "2000000",
@@ -109,7 +120,11 @@ function validateChildEnvironment(network, env) {
   const urlName = `${networkPrefix(network)}_BLOCKFROST_URL`;
   if ((process.env.APP_ENV ?? "development") === "production") https(urlName, required(urlName, env.CARDANO_BLOCKFROST_URL));
   if (network === "preprod") exactBase64Url32("CARDANO_PREPROD_MANAGED_AGENT_MASTER_KEY", env.CARDANO_MANAGED_AGENT_MASTER_KEY);
-  if (network === "mainnet" && env.CARDANO_MANAGED_AGENT_MASTER_KEY) throw new Error("CARDANO_MAINNET_MANAGED_AGENT_MASTER_KEY_PROHIBITED");
+  if (network === "mainnet") {
+    if (env.CARDANO_MANAGED_AGENT_MASTER_KEY) throw new Error("CARDANO_MAINNET_MANAGED_AGENT_MASTER_KEY_PROHIBITED");
+    if (Boolean(env.CARDANO_AGENT_CUSTODY_URL) !== Boolean(env.CARDANO_AGENT_CUSTODY_API_KEY)) throw new Error("CARDANO_MAINNET_AGENT_CUSTODY_CONFIG_INCOMPLETE");
+    if (env.CARDANO_AGENT_CUSTODY_URL && (process.env.APP_ENV ?? "development") === "production") https("CARDANO_MAINNET_AGENT_CUSTODY_URL", env.CARDANO_AGENT_CUSTODY_URL);
+  }
 }
 
 function childPort(network) {
@@ -243,7 +258,7 @@ const server = createServer(async (request, response) => {
         },
         custody: {
           "cardano:preprod": "isolated-per-agent-managed-and-self-custody",
-          "cardano:mainnet": "self-custody-unsigned-only",
+          "cardano:mainnet": mainnet?.managedIdentity === "external-per-agent" ? "external-per-agent-managed-and-self-custody" : "self-custody-unsigned-only",
         },
       });
     }
