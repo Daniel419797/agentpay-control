@@ -3,7 +3,9 @@
 **Status:** Current canonical deployment topology  
 **Updated:** 2026-08-22
 
-> **Why this document was updated:** The production topology now includes implemented Cardano Mainnet external per-agent custody behind the isolated signer. This guide was synchronized with `render.yaml`, the combined facilitator and the unified Cardano signer so secret placement and service responsibilities match the code.
+## Revision note
+
+The production topology includes Cardano Mainnet external per-agent custody behind the isolated signer. This guide reflects `render.yaml`, the combined facilitator and the unified Cardano signer so secret placement and service responsibilities match the code.
 
 ## Canonical deployment
 
@@ -21,21 +23,21 @@ GitHub release
                   `-- optional external per-agent custody
 ```
 
-PostgreSQL, Blockfrost, x402 resource servers and enabled Pyth/Masumi/KERIA/Dune/custody providers are external dependencies, not additional canonical Blueprint services.
+PostgreSQL, Blockfrost, x402 resource servers and enabled Pyth, Masumi, KERIA, Dune and custody providers are external dependencies, not additional canonical Blueprint services.
 
 ## Vercel control plane
 
 Responsibilities:
 
-- authentication/session;
-- organizations/RBAC;
-- agents/credentials;
+- authentication and session management;
+- organizations and RBAC;
+- agents and credentials;
 - policy and approvals;
-- reservations/idempotency;
-- payments/resources;
-- audit/incidents/reconciliation;
-- analytics/financial intelligence;
-- export/deletion/settings.
+- reservations and idempotency;
+- payments and resources;
+- audit, incidents and reconciliation;
+- analytics and financial intelligence;
+- export, deletion and settings.
 
 Do not place blockchain private keys, testnet managed-agent master keys or Cardano Mainnet custody credentials in Vercel.
 
@@ -55,11 +57,11 @@ Root endpoints include `/verify`, `/settle`, `/supported`, `/health` and `/ready
 
 For Cardano it:
 
-- forwards per-agent identity/sign requests to the signer;
+- forwards per-agent identity and sign requests to the signer;
 - independently verifies signed transaction CBOR;
-- controls replay/durable settlement claims;
+- controls replay and durable settlement claims;
 - submits through Blockfrost;
-- checks transaction/latest-block evidence and confirmation depth.
+- checks transaction and latest-block evidence and confirmation depth.
 
 It does not hold the Cardano payer private key.
 
@@ -92,7 +94,7 @@ The gateway keeps network-specific signer capability keys distinct.
 
 ## Preprod signer environment
 
-Required/typical signer-only values include:
+Required or typical signer-only values include:
 
 ```text
 CARDANO_PREPROD_BLOCKFROST_URL
@@ -162,13 +164,13 @@ The signer does not submit the transaction.
 
 ## Facilitator Cardano capabilities
 
-Use separate capabilities for managed signing/preparation and settlement. These are protocol authorization keys; they are not payer private keys and not the external custody credential.
+Use separate capabilities for managed signing and preparation and for settlement. These are protocol authorization keys; they are not payer private keys and not the external custody credential.
 
-The Mainnet managed-signing capability may authorize the dedicated per-agent identity/signing routes even though the generic/shared signing mode stays `unsigned-only`.
+The Mainnet managed-signing capability may authorize the dedicated per-agent identity and signing routes even though the generic or shared signing mode stays `unsigned-only`.
 
 ## Dashboard environment mapping
 
-Vercel should normally use one public facilitator origin and network-specific capability keys. It may contain public/provider configuration such as Blockfrost project IDs where the control plane requires them, but must never contain:
+Vercel should normally use one public facilitator origin and network-specific capability keys. It may contain public or provider configuration such as Blockfrost project IDs where the control plane requires them, but must never contain:
 
 ```text
 CARDANO_PREPROD_MANAGED_AGENT_MASTER_KEY
@@ -181,25 +183,25 @@ raw Cardano signing seeds
 
 1. choose exact release SHA;
 2. ensure required repository checks execute;
-3. confirm DB backup/migration state;
+3. confirm DB backup and migration state;
 4. deploy Cardano signer;
 5. verify both signer workers;
-6. if Mainnet managed custody enabled, verify `/identity` for multiple Agent IDs produces distinct stable identities;
+6. if Mainnet managed custody is enabled, verify `/identity` for multiple Agent IDs produces distinct stable identities;
 7. deploy combined facilitator;
 8. verify `/health`, `/supported`, `/ready` and signer connectivity;
 9. apply production database migrations;
-10. deploy Vercel dashboard/API;
-11. verify Vercel has no signer/custody secrets;
-12. exercise low-value transactions for intended network/custody modes;
+10. deploy Vercel dashboard and API;
+11. verify Vercel has no signer or custody secrets;
+12. exercise low-value transactions for intended network and custody modes;
 13. independently confirm resulting chain evidence;
 14. only retire older services after the unified topology is verified and rollback is understood.
 
-## Arc/Hedera notes
+## Arc and Hedera notes
 
-Hedera Testnet/Mainnet and Arc Testnet remain child rails within the unified facilitator. Arc public Mainnet is not declared until an actual supported public network/profile is reviewed. Hedera Mainnet agent custody remains self-custody under the documented current model; its operator/payer infrastructure identities are not agent wallets.
+Hedera Testnet and Mainnet and Arc Testnet remain child rails within the unified facilitator. Arc public Mainnet is not declared until an actual supported public network or profile is reviewed. Hedera Mainnet agent custody remains self custody under the documented current model; its operator and payer infrastructure identities are not agent wallets.
 
 ## Update provenance
 
-Updated on 2026-08-22 to reflect the merged Cardano Mainnet per-agent external custody implementation and the actual two-service Render topology. The reason is to eliminate older wording that treated Mainnet autonomous custody as future-only and to make secret placement and submission responsibility unambiguous.
+Updated on 2026-08-22 to reflect the current Cardano Mainnet per-agent external custody implementation and the two-service Render topology. Older wording that treated Mainnet autonomous custody as future-only has been removed, and secret placement and submission responsibility are now explicit.
 
 Primary builder: **Daniel Praise** (`Daniel419797`).
