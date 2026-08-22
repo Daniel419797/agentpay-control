@@ -1,0 +1,132 @@
+name: Temporary documentation language cleanup
+
+on:
+  push:
+    branches:
+      - docs/sync-current-implementation-2026-08-22
+
+permissions:
+  contents: write
+
+jobs:
+  clean-docs:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/sync-current-implementation-2026-08-22
+          fetch-depth: 0
+
+      - name: Normalize documentation language
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+
+          tracked = subprocess.check_output(
+              ['git', 'ls-files', '*.md', 'facilitator-combined/.env.example'],
+              text=True,
+          ).splitlines()
+
+          literal_replacements = [
+              ('I synchronized the README and every Markdown document under `docs/`', 'The README and repository documentation were synchronized'),
+              ('I synchronized this proposal-facing summary with the implementation now on `master`', 'This proposal-facing summary was synchronized with the current implementation'),
+              ('I added this index during the repository-wide documentation synchronization', 'This index was added during the repository-wide documentation synchronization'),
+              ('I replaced it with a multi-rail/Cardano-focused script', 'It was replaced with a multi-rail/Cardano-focused script'),
+              ('I originally built the first AgentPay UI/API around the Hedera x402 bounty', 'The first AgentPay UI/API was originally built around the Hedera x402 bounty'),
+              ('I originally built AgentPay for the **Hedera x402 bounty**', 'AgentPay was originally built for the **Hedera x402 bounty**'),
+              ('I originally built AgentPay for the Hedera x402 bounty', 'AgentPay was originally built for the Hedera x402 bounty'),
+              ('I later extended it into the current multi-rail AgentPay control plane', 'It was later extended into the current multi-rail AgentPay control plane'),
+              ('I later extended it into the current multi-rail system', 'It was later extended into the current multi-rail system'),
+              ('I later extended it to the implemented multi-rail architecture described here', 'It was later extended to the implemented multi-rail architecture described here'),
+              ('I later extended it to this multi-rail architecture', 'It was later extended to this multi-rail architecture'),
+              ('I later extended AgentPay', 'AgentPay was later extended'),
+              ('I therefore disclose that prior program involvement explicitly.', 'That prior program involvement is explicitly disclosed.'),
+              ('I do not present previously completed Hedera work as new Catalyst-funded delivery', 'Previously completed Hedera work is not presented as new Catalyst-funded delivery'),
+              ('I do not treat that code merge by itself as a TRL 6 demonstration.', 'That code merge alone is not treated as a TRL 6 demonstration.'),
+              ('For Catalyst I currently describe AgentPay as', 'For Catalyst purposes, AgentPay is described as'),
+              ('For Catalyst purposes I currently describe AgentPay as', 'For Catalyst purposes, AgentPay is described as'),
+              ('For Catalyst purposes, I describe the current implementation conservatively as', 'For Catalyst purposes, the current implementation is described conservatively as'),
+              ('For Catalyst I state the current maturity as', 'For Catalyst purposes, the current maturity remains'),
+              ('For Catalyst submission purposes I keep the current maturity at', 'For Catalyst submission purposes, the current maturity remains'),
+              ('When I present a demo as evidence, I will identify', 'Any demo presented as evidence must identify'),
+              ('We are not replacing Cardano ecosystem infrastructure', 'AgentPay does not replace Cardano ecosystem infrastructure'),
+              ('we are composing it into the treasury and control plane organizations need to let agents spend safely', 'it composes that infrastructure into the treasury and control plane organizations need for controlled agent spending'),
+              ('I am **Daniel Praise**, the person behind the GitHub account [`Daniel419797`](https://github.com/Daniel419797) and the primary technical contributor to this repository.', '**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor.'),
+              ('I am **Daniel Praise**, the person behind GitHub account `Daniel419797` and the primary technical contributor.', '**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor.'),
+              ('I am **Daniel Praise** (`Daniel419797`), the repository owner and primary technical contributor.', '**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor.'),
+              ('I am **Daniel Praise** (`Daniel419797`), repository owner and primary technical contributor.', '**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor.'),
+              ('I am **Daniel Praise**, GitHub account [`Daniel419797`](https://github.com/Daniel419797), repository owner and primary technical contributor.', '**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor.'),
+              ('I am **Daniel Praise**, GitHub `Daniel419797`, repository owner and primary technical contributor.', '**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor.'),
+              ('I am **Daniel Praise** (`Daniel419797`), the repository owner and primary technical contributor.', '**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor.'),
+              ('I am **Daniel Praise** (`Daniel419797`), repository owner and primary technical contributor.', '**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor.'),
+              ('“I’m Daniel Praise, the primary builder of AgentPay. I originally built it for the Hedera x402 bounty and later extended it into a multi-rail control plane with the Cardano implementation I’m demonstrating here.”', '"AgentPay was originally built for the Hedera x402 bounty and later extended into the current multi-rail control plane, including the Cardano implementation shown here."'),
+              ('“I’m Daniel Praise, the primary builder of AgentPay. I originally built AgentPay for the Hedera x402 bounty and later extended it into a multi-rail financial control plane for autonomous agents. The current system supports Hedera, Arc and Cardano, with Cardano-specific policy, identity, signing, reconciliation and ecosystem integrations.”', '"AgentPay was originally built for the Hedera x402 bounty and later extended into a multi-rail financial control plane for autonomous agents. The current system supports Hedera, Arc and Cardano, with Cardano-specific policy, identity, signing, reconciliation and ecosystem integrations."'),
+          ]
+
+          regex_replacements = [
+              (r'\bI am \*\*Daniel Praise\*\*[^.\n]*\.', '**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor.'),
+              (r'\bI originally built AgentPay\b', 'AgentPay was originally built'),
+              (r'\bI later extended it\b', 'It was later extended'),
+              (r'\bI later extended AgentPay\b', 'AgentPay was later extended'),
+              (r'\bI currently describe AgentPay as\b', 'AgentPay is currently described as'),
+              (r'\bI describe the current implementation conservatively as\b', 'The current implementation is described conservatively as'),
+              (r'\bI do not treat\b', 'The documentation does not treat'),
+              (r'\bI do not present\b', 'The documentation does not present'),
+              (r'\bI disclose\b', 'The documentation discloses'),
+              (r'\bI synchronized\b', 'The documentation was synchronized'),
+              (r'\bI added\b', 'The documentation added'),
+              (r'\bI replaced\b', 'The document replaced'),
+          ]
+
+          for name in tracked:
+              p = Path(name)
+              text = p.read_text(encoding='utf-8')
+
+              # Plain punctuation. Avoid typography that reads like generated prose.
+              text = text.replace('—', '-')
+              text = text.replace('–', '-')
+              text = text.replace('“', '"').replace('”', '"')
+              text = text.replace('’', "'").replace('‘', "'")
+
+              for old, new in literal_replacements:
+                  text = text.replace(old, new)
+              for pattern, repl in regex_replacements:
+                  text = re.sub(pattern, repl, text)
+
+              # Clean common artifacts created by punctuation normalization.
+              text = text.replace(' -  ', ' - ')
+              text = re.sub(r' {2,}$', '', text, flags=re.MULTILINE)
+
+              p.write_text(text, encoding='utf-8')
+
+          # Fail instead of committing if first-person project narration remains.
+          first_person = re.compile(r"\b(I|I'm|I've|I'll|I'd|my|mine|me|we|we're|we've|we'll|our|ours|us)\b", re.IGNORECASE)
+          problems = []
+          for name in tracked:
+              for i, line in enumerate(Path(name).read_text(encoding='utf-8').splitlines(), 1):
+                  if first_person.search(line):
+                      problems.append(f'{name}:{i}: {line}')
+                  if '—' in line or '–' in line or '“' in line or '”' in line or '’' in line or '‘' in line:
+                      problems.append(f'{name}:{i}: typography remains: {line}')
+
+          if problems:
+              print('\n'.join(problems[:300]))
+              raise SystemExit(f'Found {len(problems)} remaining style issues')
+          PY
+
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No documentation cleanup changes required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- '*.md' facilitator-combined/.env.example
+          git commit -m "Clean documentation language and typography"
+          git push origin HEAD:docs/sync-current-implementation-2026-08-22
