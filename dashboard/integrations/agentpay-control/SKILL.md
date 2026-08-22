@@ -7,8 +7,6 @@ description: Discover and purchase x402 resources through a policy-controlled Ag
 
 **Updated:** 2026-08-22
 
-> **Reason for update:** This skill originally described AgentPay as Hedera-only. AgentPay is now a multi-rail control plane with Hedera, Arc and Cardano support, including Cardano Preprod managed identities and Cardano Mainnet self custody/external per-agent custody. The skill remains network-agnostic and delegates all policy, custody and settlement logic to AgentPay.
-
 Use this skill when a task needs a paid resource through an AgentPay-controlled agent.
 
 1. Read `AGENTPAY_BASE_URL`, `AGENTPAY_AGENT_ID`, and `AGENTPAY_API_KEY` from the runtime environment. Never print the API key.
