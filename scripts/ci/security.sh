@@ -156,13 +156,25 @@ docker run --rm \
 RC=$?
 [[ $RC -eq 0 ]] || record_failure "npm production audit policy" "$RC"
 
-# OSV Scanner checks supported manifests/lockfiles recursively against OSV data.
+# OSV scans the full resolved lock graph. Exit code 1 means vulnerabilities were
+# found and is evaluated by our precise policy checker. Other scanner failures
+# (network/tool/runtime errors) remain hard failures.
 docker run --rm \
   -v "$ROOT_DIR:/src" \
   "$OSV_IMAGE" \
   scan source --recursive --format json --output-file /src/artifacts/security/osv.json /src
+OSV_RC=$?
+if [[ $OSV_RC -ne 0 && $OSV_RC -ne 1 ]]; then
+  record_failure "OSV Scanner" "$OSV_RC"
+fi
+
+docker run --rm \
+  -v "$ROOT_DIR:/workspace" \
+  -w /workspace \
+  "$NODE_IMAGE" \
+  node scripts/ci/check-osv.mjs artifacts/security/osv.json
 RC=$?
-[[ $RC -eq 0 ]] || record_failure "OSV Scanner" "$RC"
+[[ $RC -eq 0 ]] || record_failure "OSV policy" "$RC"
 
 # Semgrep CE blocks source findings from the OWASP Top Ten ruleset.
 docker run --rm \
