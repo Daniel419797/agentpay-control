@@ -122,6 +122,19 @@ printf 'node_image=%s\nosv_image=%s\nsemgrep_image=%s\ngitleaks_image=%s\n' \
   "$NODE_IMAGE" "$OSV_IMAGE" "$SEMGREP_IMAGE" "$GITLEAKS_IMAGE" \
   > "$OUT_DIR/tool-images.txt"
 
+# package.json security overrides are authoritative for the dependency graph.
+# Refresh lock metadata in this ephemeral CI checkout before dependency scans so
+# npm audit and OSV evaluate the graph selected by the current manifests rather
+# than stale resolution metadata. This never runs package lifecycle scripts and
+# any refresh failure remains a hard security-gate failure.
+docker run --rm \
+  -v "$ROOT_DIR:/workspace" \
+  -w /workspace \
+  "$NODE_IMAGE" \
+  bash -lc 'npm install --global npm@11.11.1 >/dev/null && npm install --package-lock-only --ignore-scripts --legacy-peer-deps --include=dev --no-audit --no-fund'
+RC=$?
+[[ $RC -eq 0 ]] || record_failure "dependency graph refresh" "$RC"
+
 # npm audit is retained as an independent ecosystem-specific high-severity gate.
 docker run --rm \
   -v "$ROOT_DIR:/workspace" \
