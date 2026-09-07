@@ -4,11 +4,13 @@ import { db } from "@/lib/db";
 import {
   assertMooveAmount,
   assertMooveOrganization,
+  assertMooveSettlementToken,
   createMoovePaymentLink,
   listAllMoovePaymentLinks,
   mooveConfigFromEnv,
   MooveProviderError,
   retrieveMoovePaymentLink,
+  type MooveConfig,
   type MoovePaymentLink,
   type MoovePublicPaymentLink,
 } from "@/lib/moove";
@@ -57,6 +59,8 @@ export type CreateMooveReceiveInput = {
   actorId: string;
 };
 
+const payableInvoiceStatuses = ["SENT", "VIEWED", "APPROVAL_PENDING", "PAYMENT_PENDING", "OVERDUE"] as const;
+
 function stable(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
@@ -79,6 +83,15 @@ function localStatus(status: MoovePaymentLink["status"]): MooveLocalStatus {
   return "ACTIVE";
 }
 
+function decimalToAtomic(value: string, decimals: number): bigint {
+  if (!/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value)) throw new Error("MOOVE_AMOUNT_INVALID");
+  const [whole, fraction = ""] = value.split(".");
+  if (fraction.length > decimals) throw new Error("MOOVE_AMOUNT_PRECISION_INVALID");
+  const scale = 10n ** BigInt(decimals);
+  const fractional = decimals === 0 ? 0n : BigInt((fraction + "0".repeat(decimals)).slice(0, decimals) || "0");
+  return BigInt(whole!) * scale + fractional;
+}
+
 async function findLocalById(id: string, organizationId: string) {
   const rows = await db.$queryRaw<MoovePaymentLinkRow[]>`
     SELECT * FROM "MoovePaymentLink"
@@ -95,7 +108,7 @@ async function findLocalByIdempotency(organizationId: string, idempotencyKey: st
   return rows[0] ?? null;
 }
 
-async function validateReferences(input: CreateMooveReceiveInput) {
+async function validateReferences(input: CreateMooveReceiveInput, config: MooveConfig) {
   if (input.agentId) {
     const agent = await db.agent.findFirst({ where: { id: input.agentId, organizationId: input.organizationId, status: { not: "ARCHIVED" } }, select: { id: true } });
     if (!agent) throw new Error("AGENT_NOT_FOUND");
@@ -109,8 +122,16 @@ async function validateReferences(input: CreateMooveReceiveInput) {
     if (!rows[0]) throw new Error("MOOVE_RESOURCE_NOT_OWNED");
   }
   if (input.invoiceId) {
-    const invoice = await db.agentInvoice.findFirst({ where: { id: input.invoiceId, issuerOrganizationId: input.organizationId }, select: { id: true } });
-    if (!invoice) throw new Error("MOOVE_INVOICE_NOT_OWNED");
+    const invoice = await db.agentInvoice.findFirst({
+      where: { id: input.invoiceId, issuerOrganizationId: input.organizationId, status: { in: [...payableInvoiceStatuses] } },
+      include: { asset: true },
+    });
+    if (!invoice) throw new Error("MOOVE_INVOICE_NOT_PAYABLE");
+    if (input.agentId && invoice.issuerAgentId !== input.agentId) throw new Error("MOOVE_INVOICE_AGENT_MISMATCH");
+    if (input.maxUsage !== 1) throw new Error("MOOVE_INVOICE_MAX_USAGE_REQUIRED");
+    if (!config.settlement) throw new Error("MOOVE_SETTLEMENT_CONFIG_REQUIRED");
+    if (invoice.asset.network !== config.settlement.network || invoice.asset.symbol.toUpperCase() !== config.settlement.symbol || invoice.asset.decimals !== config.settlement.decimals) throw new Error("MOOVE_INVOICE_ASSET_MISMATCH");
+    if (decimalToAtomic(input.toAmount, invoice.asset.decimals) !== BigInt(invoice.totalAtomic.toString())) throw new Error("MOOVE_INVOICE_AMOUNT_MISMATCH");
   }
 }
 
@@ -127,50 +148,92 @@ async function audit(input: { organizationId: string; actorType: string; actorId
   } });
 }
 
-async function emitCompletion(row: MoovePaymentLinkRow, link: MoovePaymentLink | MoovePublicPaymentLink) {
-  await db.outboxEvent.create({ data: {
-    organizationId: row.organizationId,
-    eventType: "MOOVE_PAYMENT_COMPLETED",
-    aggregateType: "MOOVE_PAYMENT_LINK",
-    aggregateId: row.id,
-    payload: {
-      moovePaymentLinkId: row.id,
-      providerLinkId: link.id,
-      agentId: row.agentId,
-      resourceListingId: row.resourceListingId,
-      invoiceId: row.invoiceId,
-      toAmount: link.toAmount,
-      receivedAmount: link.receivedAmount ?? null,
-      token: link.token,
-      destinationAddress: link.destinationAddress,
-      transactionUrl: link.transactionUrl ?? null,
-    },
-  } });
-  await audit({ organizationId: row.organizationId, actorType: "SYSTEM", action: "MOOVE_PAYMENT_COMPLETED", targetId: row.id, result: "SUCCESS", metadata: { providerLinkId: link.id, receivedAmount: link.receivedAmount ?? null, transactionUrl: link.transactionUrl ?? null } });
+async function markInvoicePending(invoiceId: string, row: MoovePaymentLinkRow) {
+  await db.$transaction(async (tx) => {
+    const changed = await tx.agentInvoice.updateMany({
+      where: { id: invoiceId, issuerOrganizationId: row.organizationId, status: { in: ["SENT", "VIEWED", "APPROVAL_PENDING", "OVERDUE"] } },
+      data: { status: "PAYMENT_PENDING" },
+    });
+    if (changed.count) {
+      await tx.invoiceEvent.create({ data: { invoiceId, actorType: "SYSTEM", action: "INVOICE_MOOVE_PAYMENT_LINK_CREATED", metadata: { moovePaymentLinkId: row.id, providerLinkId: row.providerLinkId } } });
+    }
+  });
 }
 
 async function applyProviderRecord(row: MoovePaymentLinkRow, link: MoovePaymentLink | MoovePublicPaymentLink) {
-  if (row.providerLinkId && row.providerLinkId !== link.id) throw new Error("MOOVE_PROVIDER_LINK_MISMATCH");
-  if (row.providerDescription !== (link.description ?? "")) throw new Error("MOOVE_PROVIDER_DESCRIPTION_MISMATCH");
+  const config = mooveConfigFromEnv();
+  if (config.settlement) assertMooveSettlementToken(link.token, config.settlement);
   const status = localStatus(link.status);
-  const completedNow = status === "COMPLETED" && row.providerStatus !== "COMPLETED";
   const evidence = JSON.stringify(link);
-  await db.$executeRaw`
-    UPDATE "MoovePaymentLink"
-    SET "providerLinkId"=${link.id},
-        "providerUrl"=${link.url},
-        "providerStatus"=${status},
-        "destinationAddress"=${link.destinationAddress},
-        "token"=${evidence}::jsonb->'token',
-        "receivedAmount"=${link.receivedAmount ?? null},
-        "transactionUrl"=${link.transactionUrl ?? null},
-        "providerEvidence"=${evidence}::jsonb,
-        "failureCode"=NULL,
-        "lastReconciledAt"=CURRENT_TIMESTAMP,
-        "completedAt"=CASE WHEN ${status}='COMPLETED' THEN COALESCE("completedAt", CURRENT_TIMESTAMP) ELSE "completedAt" END,
-        "updatedAt"=CURRENT_TIMESTAMP
-    WHERE "id"=${row.id}::uuid AND "organizationId"=${row.organizationId}::uuid`;
-  if (completedNow) await emitCompletion(row, link);
+
+  await db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`moove:${row.id}`}, 0))`;
+    const current = (await tx.$queryRaw<MoovePaymentLinkRow[]>`
+      SELECT * FROM "MoovePaymentLink"
+      WHERE "id"=${row.id}::uuid AND "organizationId"=${row.organizationId}::uuid
+      FOR UPDATE`)[0];
+    if (!current) throw new Error("MOOVE_PAYMENT_LINK_NOT_FOUND");
+    if (current.providerLinkId && current.providerLinkId !== link.id) throw new Error("MOOVE_PROVIDER_LINK_MISMATCH");
+    if (current.providerDescription !== (link.description ?? "")) throw new Error("MOOVE_PROVIDER_DESCRIPTION_MISMATCH");
+    const completedNow = status === "COMPLETED" && current.providerStatus !== "COMPLETED";
+
+    await tx.$executeRaw`
+      UPDATE "MoovePaymentLink"
+      SET "providerLinkId"=${link.id},
+          "providerUrl"=${link.url},
+          "providerStatus"=${status},
+          "destinationAddress"=${link.destinationAddress},
+          "token"=${evidence}::jsonb->'token',
+          "receivedAmount"=${link.receivedAmount ?? null},
+          "transactionUrl"=${link.transactionUrl ?? null},
+          "providerEvidence"=${evidence}::jsonb,
+          "failureCode"=NULL,
+          "lastReconciledAt"=CURRENT_TIMESTAMP,
+          "completedAt"=CASE WHEN ${status}='COMPLETED' THEN COALESCE("completedAt", CURRENT_TIMESTAMP) ELSE "completedAt" END,
+          "updatedAt"=CURRENT_TIMESTAMP
+      WHERE "id"=${current.id}::uuid AND "organizationId"=${current.organizationId}::uuid`;
+
+    if (!completedNow) return;
+
+    if (current.invoiceId) {
+      if (!config.settlement) throw new Error("MOOVE_SETTLEMENT_CONFIG_REQUIRED");
+      const invoice = await tx.agentInvoice.findFirst({ where: { id: current.invoiceId, issuerOrganizationId: current.organizationId }, include: { asset: true } });
+      if (!invoice) throw new Error("MOOVE_INVOICE_NOT_PAYABLE");
+      if (invoice.asset.network !== config.settlement.network || invoice.asset.symbol.toUpperCase() !== config.settlement.symbol || invoice.asset.decimals !== config.settlement.decimals) throw new Error("MOOVE_INVOICE_ASSET_MISMATCH");
+      if (!link.receivedAmount) throw new Error("MOOVE_INVOICE_RECEIVED_AMOUNT_MISSING");
+      if (decimalToAtomic(link.receivedAmount, invoice.asset.decimals) !== BigInt(invoice.totalAtomic.toString())) throw new Error("MOOVE_INVOICE_RECEIVED_AMOUNT_MISMATCH");
+      const changed = await tx.agentInvoice.updateMany({ where: { id: invoice.id, status: { in: [...payableInvoiceStatuses] } }, data: { status: "PAID", paidAt: new Date() } });
+      if (changed.count !== 1 && invoice.status !== "PAID") throw new Error("MOOVE_INVOICE_SETTLEMENT_CONFLICT");
+      if (changed.count === 1) {
+        await tx.invoiceEvent.create({ data: { invoiceId: invoice.id, actorType: "SYSTEM", action: "INVOICE_PAID_VIA_MOOVE", metadata: { moovePaymentLinkId: current.id, providerLinkId: link.id, receivedAmount: link.receivedAmount, transactionUrl: link.transactionUrl ?? null } } });
+        await tx.outboxEvent.create({ data: { organizationId: invoice.recipientOrganizationId, eventType: "AGENT_INVOICE_PAID", aggregateType: "AGENT_INVOICE", aggregateId: invoice.id, payload: { invoiceNumber: invoice.number, settlementProvider: "MOOVE", moovePaymentLinkId: current.id, transactionUrl: link.transactionUrl ?? null } } });
+      }
+    }
+
+    await tx.outboxEvent.create({ data: {
+      organizationId: current.organizationId,
+      eventType: "MOOVE_PAYMENT_COMPLETED",
+      aggregateType: "MOOVE_PAYMENT_LINK",
+      aggregateId: current.id,
+      payload: {
+        moovePaymentLinkId: current.id,
+        providerLinkId: link.id,
+        agentId: current.agentId,
+        resourceListingId: current.resourceListingId,
+        invoiceId: current.invoiceId,
+        toAmount: link.toAmount,
+        receivedAmount: link.receivedAmount ?? null,
+        token: link.token,
+        destinationAddress: link.destinationAddress,
+        transactionUrl: link.transactionUrl ?? null,
+      },
+    } });
+    if (current.resourceListingId) {
+      await tx.outboxEvent.create({ data: { organizationId: current.organizationId, eventType: "MOOVE_RESOURCE_PAYMENT_COMPLETED", aggregateType: "RESOURCE_LISTING", aggregateId: current.resourceListingId, payload: { moovePaymentLinkId: current.id, providerLinkId: link.id, agentId: current.agentId, receivedAmount: link.receivedAmount ?? link.toAmount, token: link.token, transactionUrl: link.transactionUrl ?? null } } });
+    }
+    await tx.auditEvent.create({ data: { organizationId: current.organizationId, actorType: "SYSTEM", action: "MOOVE_PAYMENT_COMPLETED", targetType: "MOOVE_PAYMENT_LINK", targetId: current.id, result: "SUCCESS", metadata: { providerLinkId: link.id, receivedAmount: link.receivedAmount ?? null, transactionUrl: link.transactionUrl ?? null, invoiceId: current.invoiceId, resourceListingId: current.resourceListingId } } });
+  }, { isolationLevel: "Serializable" });
+
   return (await findLocalById(row.id, row.organizationId))!;
 }
 
@@ -191,7 +254,7 @@ export async function createMooveReceivePayment(input: CreateMooveReceiveInput) 
   if (input.description && input.description.length > 450) throw new Error("MOOVE_DESCRIPTION_TOO_LONG");
   if (input.maxUsage !== undefined && (!Number.isInteger(input.maxUsage) || input.maxUsage < 1 || input.maxUsage > 2_147_483_647)) throw new Error("MOOVE_MAX_USAGE_INVALID");
   if (input.expirationDate && (!Number.isFinite(Date.parse(input.expirationDate)) || Date.parse(input.expirationDate) <= Date.now())) throw new Error("MOOVE_EXPIRATION_INVALID");
-  await validateReferences(input);
+  await validateReferences(input, config);
 
   const hash = requestHash({
     organizationId: input.organizationId,
@@ -240,15 +303,22 @@ export async function createMooveReceivePayment(input: CreateMooveReceiveInput) 
       UPDATE "MoovePaymentLink"
       SET "providerLinkId"=${created.id},"providerUrl"=${created.url},"providerStatus"='ACTIVE',"updatedAt"=CURRENT_TIMESTAMP
       WHERE "id"=${row.id}::uuid`;
-    await audit({ organizationId: row.organizationId, actorType: input.actorType, actorId: input.actorId, action: "MOOVE_PAYMENT_LINK_CREATED", targetId: row.id, result: "SUCCESS", metadata: { providerLinkId: created.id, toAmount: input.toAmount, agentId: input.agentId ?? null } });
     const current = (await findLocalById(row.id, row.organizationId))!;
+    if (input.invoiceId) await markInvoicePending(input.invoiceId, current);
+    await audit({ organizationId: row.organizationId, actorType: input.actorType, actorId: input.actorId, action: "MOOVE_PAYMENT_LINK_CREATED", targetId: row.id, result: "SUCCESS", metadata: { providerLinkId: created.id, toAmount: input.toAmount, agentId: input.agentId ?? null, invoiceId: input.invoiceId ?? null, resourceListingId: input.resourceListingId ?? null } });
     try {
       const provider = await retrieveMoovePaymentLink(created.id, config);
       return await applyProviderRecord(current, provider);
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message === "MOOVE_SETTLEMENT_TOKEN_MISMATCH") {
+        await db.$executeRaw`UPDATE "MoovePaymentLink" SET "failureCode"='MOOVE_SETTLEMENT_TOKEN_MISMATCH',"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=${row.id}::uuid`;
+        throw error;
+      }
       return current;
     }
   } catch (error) {
+    const alreadyCreated = Boolean((await findLocalById(row.id, row.organizationId))?.providerLinkId);
+    if (alreadyCreated) throw error;
     const ambiguous = error instanceof MooveProviderError && error.ambiguous;
     const code = error instanceof MooveProviderError ? error.code : error instanceof Error ? error.message : "MOOVE_CREATE_FAILED";
     await db.$executeRaw`
@@ -333,9 +403,15 @@ export async function reconcileMooveReceive(organizationId: string) {
       continue;
     }
     const before = row.providerStatus;
-    await applyProviderRecord(row, match);
-    reconciled += 1;
-    if (before !== "COMPLETED" && match.status === "completed") completed += 1;
+    try {
+      await applyProviderRecord(row, match);
+      reconciled += 1;
+      if (before !== "COMPLETED" && match.status === "completed") completed += 1;
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "MOOVE_RECONCILIATION_FAILED";
+      await db.$executeRaw`UPDATE "MoovePaymentLink" SET "failureCode"=${code},"lastReconciledAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=${row.id}::uuid`;
+      unresolved += 1;
+    }
   }
   return { providerLinksScanned: links.length, localLinksScanned: local.length, reconciled, completed, unresolved, providerScanComplete: complete };
 }
