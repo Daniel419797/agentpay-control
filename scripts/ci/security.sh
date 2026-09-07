@@ -135,15 +135,26 @@ docker run --rm \
 RC=$?
 [[ $RC -eq 0 ]] || record_failure "dependency graph refresh" "$RC"
 
-# npm audit is retained as an independent ecosystem-specific high-severity gate.
+# Capture npm's runtime audit report, then apply the same reviewed production
+# policy used by the Vercel/release topology gate. The checker permits only the
+# exact known Prisma CLI/config advisory chain and fails on every other
+# high/critical finding, malformed report, or changed exception chain.
 docker run --rm \
   -v "$ROOT_DIR:/workspace" \
   -w /workspace \
   "$NODE_IMAGE" \
-  bash -lc 'npm install --global npm@11.11.1 >/dev/null && npm audit --omit=dev --audit-level=high --json' \
+  bash -lc 'npm install --global npm@11.11.1 >/dev/null && npm audit --omit=dev --json || true' \
   > "$OUT_DIR/npm-audit.json"
 RC=$?
-[[ $RC -eq 0 ]] || record_failure "npm audit" "$RC"
+[[ $RC -eq 0 ]] || record_failure "npm audit capture" "$RC"
+
+docker run --rm \
+  -v "$ROOT_DIR:/workspace" \
+  -w /workspace \
+  "$NODE_IMAGE" \
+  node scripts/ci/check-production-audit.mjs artifacts/security/npm-audit.json
+RC=$?
+[[ $RC -eq 0 ]] || record_failure "npm production audit policy" "$RC"
 
 # OSV Scanner checks supported manifests/lockfiles recursively against OSV data.
 docker run --rm \
