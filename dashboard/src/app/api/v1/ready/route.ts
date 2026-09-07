@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { duneReadinessErrors } from "@/lib/dune";
 import { masumiReadinessErrors } from "@/lib/masumi";
 import { masumiPaymentReadinessErrors } from "@/lib/masumi-payment";
+import { mooveReadinessErrors } from "@/lib/moove";
 import { ok, problem } from "@/lib/api";
 import { pythReadinessErrors } from "@/lib/pyth";
 import { veridianReadinessErrors } from "@/lib/veridian-keri";
@@ -27,7 +28,7 @@ export async function GET() {
   try {
     getConfig();
     const router = getNetworkRouter();
-    const blockingConfigErrors = [...cardanoAssetReadinessErrors(process.env), ...pythReadinessErrors(process.env), ...masumiReadinessErrors(process.env), ...masumiPaymentReadinessErrors(process.env), ...veridianReadinessErrors(process.env)];
+    const blockingConfigErrors = [...cardanoAssetReadinessErrors(process.env), ...pythReadinessErrors(process.env), ...masumiReadinessErrors(process.env), ...masumiPaymentReadinessErrors(process.env), ...mooveReadinessErrors(process.env), ...veridianReadinessErrors(process.env)];
     if (blockingConfigErrors.length) throw new Error(`INTEGRATION_CONFIG:${blockingConfigErrors.join(",")}`);
 
     await db.$queryRaw`SELECT 1`;
@@ -50,6 +51,7 @@ export async function GET() {
         pythPolicy: process.env.PYTH_POLICY_ENABLED === "true" ? "configured" : "disabled",
         masumiPolicy: process.env.MASUMI_POLICY_ENABLED === "true" ? "configured" : "disabled",
         masumiEscrow: process.env.MASUMI_ESCROW_ENABLED === "true" ? "configured" : "disabled",
+        mooveReceive: process.env.MOOVE_RECEIVE_ENABLED === "true" ? "configured" : "disabled",
         veridianIdentity: process.env.VERIDIAN_IDENTITY_ENABLED === "true" ? "configured" : "disabled",
         usdcx: process.env.CARDANO_USDCX_ENABLED === "true" ? "configured" : "disabled",
         duneAnalytics: process.env.DUNE_ANALYTICS_ENABLED !== "true" ? "disabled" : duneErrors.length ? "degraded" : "configured",
