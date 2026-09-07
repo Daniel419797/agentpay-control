@@ -13,7 +13,7 @@ const createSchema = z.object({
   invoiceId: z.string().uuid().optional(),
   toAmount: z.string().regex(/^(?:0|[1-9]\d*)(?:\.\d+)?$/).max(100),
   description: z.string().trim().max(450).optional(),
-  maxUsage: z.number().int().min(1).max(2_147_483_647).optional().default(1),
+  maxUsage: z.number().int().min(1).max(2_147_483_647).optional(),
   expirationDate: z.string().datetime({ offset: true }).optional(),
 });
 
