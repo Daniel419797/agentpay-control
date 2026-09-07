@@ -2,12 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   assertMooveAmount,
+  assertMooveSettlementToken,
   createMoovePaymentLink,
   listMoovePaymentLinks,
   mooveConfigFromEnv,
   MooveProviderError,
   retrieveMoovePaymentLink,
   type MooveConfig,
+  type MoovePaymentLink,
 } from "@/lib/moove";
 
 const config: MooveConfig = {
@@ -18,7 +20,7 @@ const config: MooveConfig = {
   maxReconcilePages: 5,
 };
 
-const link = {
+const link: MoovePaymentLink = {
   id: "0c8f2e5a-4b91-4c3e-9d17-2f6a8b0d1e34",
   userId: "9b1d4c77-0a3e-4f52-8c61-77ab2d90ef15",
   toAmount: "49.99",
@@ -56,6 +58,21 @@ describe("Moove Receive API client", () => {
       MOOVE_API_KEY: "mk_live_test_key_1234567890",
       MOOVE_ACCOUNT_ORGANIZATION_ID: config.organizationId,
     })).toThrow("MOOVE_PRODUCTION_HOST_INVALID");
+  });
+
+  it("rejects partially configured invoice settlement identity", () => {
+    expect(() => mooveConfigFromEnv({
+      MOOVE_RECEIVE_ENABLED: "true",
+      MOOVE_API_KEY: "mk_live_test_key_1234567890",
+      MOOVE_ACCOUNT_ORGANIZATION_ID: config.organizationId,
+      MOOVE_SETTLEMENT_NETWORK: "eip155:8453",
+      MOOVE_SETTLEMENT_SYMBOL: "USDC",
+    })).toThrow("MOOVE_SETTLEMENT_CONFIG_INCOMPLETE");
+  });
+
+  it("normalizes an EVM provider chain and verifies the configured settlement token", () => {
+    expect(() => assertMooveSettlementToken(link.token, { network: "eip155:8453", symbol: "USDC", decimals: 6 })).not.toThrow();
+    expect(() => assertMooveSettlementToken(link.token, { network: "eip155:8453", symbol: "USDT", decimals: 6 })).toThrow("MOOVE_SETTLEMENT_TOKEN_MISMATCH");
   });
 
   it("creates a payment link with X-API-Key and preserves decimal strings", async () => {
