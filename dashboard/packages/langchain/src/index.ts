@@ -2,6 +2,7 @@ import type { AgentPayClient, MooveReceivePayment, MooveReceiveRequest, PaidRequ
 
 type ToolResult = { content: string; intent?: PaymentIntent };
 type MooveToolResult = { content: string; payment: MooveReceivePayment };
+type MooveLangChainInput = Omit<MooveReceiveRequest, "agentId"> & { idempotencyKey: string };
 
 function explorerUrl(network: string | undefined, txId: string): string {
   if (network === "eip155:5042002") return `https://testnet.arcscan.app/tx/${txId}`;
@@ -53,7 +54,7 @@ export function createAgentPayMooveReceiveTool(client: AgentPayClient, agentId: 
     name: "agentpay_create_moove_payment_link",
     description:
       "Create a Moove Receive payment link so the agent can accept payment into its organization's configured Moove settlement wallet. " +
-      "The payment is not complete until providerStatus is COMPLETED.",
+      "The payment is not complete until providerStatus is COMPLETED. Reuse idempotencyKey for retries of the same intended link.",
     schema: {
       type: "object",
       properties: {
@@ -62,12 +63,14 @@ export function createAgentPayMooveReceiveTool(client: AgentPayClient, agentId: 
         maxUsage: { type: "integer", minimum: 1, description: "Maximum successful uses; omit for unlimited" },
         expirationDate: { type: "string", description: "Future ISO-8601 expiration; omit for no expiry" },
         resourceListingId: { type: "string", description: "Optional AgentPay resource ID" },
-        invoiceId: { type: "string", description: "Optional AgentPay invoice ID" },
+        invoiceId: { type: "string", description: "Optional AgentPay invoice ID; invoice links must be single-use" },
+        idempotencyKey: { type: "string", minLength: 8, maxLength: 100, description: "Stable unique key for this intended receive request" },
       },
-      required: ["toAmount"],
+      required: ["toAmount", "idempotencyKey"],
     },
-    invoke: async (input: Omit<MooveReceiveRequest, "agentId">): Promise<MooveToolResult> => {
-      const payment = await client.createMooveReceivePayment({ ...input, agentId });
+    invoke: async (input: MooveLangChainInput): Promise<MooveToolResult> => {
+      const { idempotencyKey, ...request } = input;
+      const payment = await client.createMooveReceivePayment({ ...request, agentId }, idempotencyKey);
       const content = payment.providerStatus === "COMPLETED"
         ? `Moove payment completed. Received: ${payment.receivedAmount ?? payment.toAmount}. Transaction: ${payment.transactionUrl ?? "provider-confirmed"}`
         : `Moove payment link ready. Status: ${payment.providerStatus}. Payment URL: ${payment.providerUrl ?? "pending reconciliation"}. AgentPay payment ID: ${payment.id}`;
