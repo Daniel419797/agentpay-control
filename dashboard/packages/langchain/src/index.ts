@@ -1,6 +1,7 @@
-import type { AgentPayClient, PaidRequest, PaymentIntent } from "../../sdk/src/index";
+import type { AgentPayClient, MooveReceivePayment, MooveReceiveRequest, PaidRequest, PaymentIntent } from "../../sdk/src/index";
 
 type ToolResult = { content: string; intent?: PaymentIntent };
+type MooveToolResult = { content: string; payment: MooveReceivePayment };
 
 function explorerUrl(network: string | undefined, txId: string): string {
   if (network === "eip155:5042002") return `https://testnet.arcscan.app/tx/${txId}`;
@@ -43,6 +44,34 @@ export function createAgentPayTool(client: AgentPayClient, agentId: string) {
           content = `Payment status: ${intent.status}. Intent ID: ${intent.id}`;
       }
       return { content, intent };
+    },
+  };
+}
+
+export function createAgentPayMooveReceiveTool(client: AgentPayClient, agentId: string) {
+  return {
+    name: "agentpay_create_moove_payment_link",
+    description:
+      "Create a Moove Receive payment link so the agent can accept payment into its organization's configured Moove settlement wallet. " +
+      "The payment is not complete until providerStatus is COMPLETED.",
+    schema: {
+      type: "object",
+      properties: {
+        toAmount: { type: "string", description: "Positive decimal amount in the configured Moove destination token" },
+        description: { type: "string", description: "Customer-facing payment description" },
+        maxUsage: { type: "integer", minimum: 1, description: "Maximum successful uses; omit for unlimited" },
+        expirationDate: { type: "string", description: "Future ISO-8601 expiration; omit for no expiry" },
+        resourceListingId: { type: "string", description: "Optional AgentPay resource ID" },
+        invoiceId: { type: "string", description: "Optional AgentPay invoice ID" },
+      },
+      required: ["toAmount"],
+    },
+    invoke: async (input: Omit<MooveReceiveRequest, "agentId">): Promise<MooveToolResult> => {
+      const payment = await client.createMooveReceivePayment({ ...input, agentId });
+      const content = payment.providerStatus === "COMPLETED"
+        ? `Moove payment completed. Received: ${payment.receivedAmount ?? payment.toAmount}. Transaction: ${payment.transactionUrl ?? "provider-confirmed"}`
+        : `Moove payment link ready. Status: ${payment.providerStatus}. Payment URL: ${payment.providerUrl ?? "pending reconciliation"}. AgentPay payment ID: ${payment.id}`;
+      return { content, payment };
     },
   };
 }
