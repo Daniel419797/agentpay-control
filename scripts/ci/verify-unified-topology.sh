@@ -12,6 +12,14 @@ cd "$ROOT"
 echo "[unified-topology] ensure repository workspace dependencies"
 npm install --ignore-scripts --no-save --package-lock=false --legacy-peer-deps --include=dev
 
+# Vercel installs this monorepo with package-lock writes disabled during the
+# workspace bootstrap above. Refresh only the lock metadata in the ephemeral
+# build checkout before auditing so npm audit evaluates the dependency graph
+# selected by the current package.json overrides rather than a stale committed
+# resolution. This does not install scripts or weaken the audit policy.
+echo "[unified-topology] refresh audit lock metadata"
+npm install --package-lock-only --ignore-scripts --legacy-peer-deps --include=dev --no-audit --no-fund
+
 # Audit the production dependency graph. npm currently reports one Prisma 7.9.1
 # CLI/config advisory chain as production because Prisma Client peer-depends on
 # the CLI. The checker permits only that exact advisory chain and fails on any
