@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 import { getMooveReceivePayment } from "@/domain/moove-receive-service";
-import { handleApiError, ok, problem } from "@/lib/api";
+import { authorizeAgentRequest, handleApiError, ok, problem } from "@/lib/api";
+import { db } from "@/lib/db";
 import { MooveProviderError } from "@/lib/moove";
 import { workspaceFromRequest, workspaceHasRole } from "@/lib/workspace";
 
@@ -18,13 +19,19 @@ function mapped(error: Error) {
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const workspace = await workspaceFromRequest(request);
-    if (!workspace) return problem(401, "AUTH_REQUIRED", "Sign in before viewing a Moove payment link.");
-    if (!workspaceHasRole(workspace, ["OWNER", "OPERATOR", "APPROVER", "VIEWER", "PROVIDER_ADMIN"])) return problem(403, "ROLE_REQUIRED", "Workspace access is required.");
     const { id } = await params;
     idSchema.parse(id);
+    const identity = (await db.$queryRaw<Array<{ organizationId: string; agentId: string | null }>>`
+      SELECT "organizationId","agentId" FROM "MoovePaymentLink" WHERE "id"=${id}::uuid LIMIT 1`)[0];
+    if (!identity) return problem(404, "MOOVE_PAYMENT_LINK_NOT_FOUND", "Moove payment link not found.");
+
+    const workspace = await workspaceFromRequest(request);
+    const operatorAuthorized = Boolean(workspace && workspace.organization.id === identity.organizationId && workspaceHasRole(workspace, ["OWNER", "OPERATOR", "APPROVER", "VIEWER", "PROVIDER_ADMIN"]));
+    const agentAuthorized = !operatorAuthorized && Boolean(identity.agentId && await authorizeAgentRequest(request, identity.agentId, "payments:read"));
+    if (!operatorAuthorized && !agentAuthorized) return problem(401, "UNAUTHORIZED", "A valid workspace session or owning agent credential is required.");
+
     const refresh = new URL(request.url).searchParams.get("refresh") === "true";
-    return ok(await getMooveReceivePayment({ organizationId: workspace.organization.id, id, refresh }));
+    return ok(await getMooveReceivePayment({ organizationId: identity.organizationId, id, refresh }));
   } catch (error) {
     if (error instanceof Error) {
       const response = mapped(error);
