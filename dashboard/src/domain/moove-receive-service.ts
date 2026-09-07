@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import {
   assertMooveAmount,
@@ -65,6 +66,12 @@ function stable(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
   return `{${Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${stable(item)}`).join(",")}}`;
+}
+
+function toPrismaJson(value: unknown): Prisma.InputJsonValue {
+  const encoded = JSON.stringify(value);
+  if (encoded === undefined) throw new Error("MOOVE_JSON_SERIALIZATION_FAILED");
+  return JSON.parse(encoded) as Prisma.InputJsonValue;
 }
 
 function requestHash(input: Omit<CreateMooveReceiveInput, "actorType" | "actorId">) {
@@ -144,7 +151,7 @@ async function audit(input: { organizationId: string; actorType: string; actorId
     targetType: "MOOVE_PAYMENT_LINK",
     targetId: input.targetId,
     result: input.result,
-    metadata: input.metadata ?? {},
+    metadata: toPrismaJson(input.metadata ?? {}),
   } });
 }
 
@@ -215,7 +222,7 @@ async function applyProviderRecord(row: MoovePaymentLinkRow, link: MoovePaymentL
       eventType: "MOOVE_PAYMENT_COMPLETED",
       aggregateType: "MOOVE_PAYMENT_LINK",
       aggregateId: current.id,
-      payload: {
+      payload: toPrismaJson({
         moovePaymentLinkId: current.id,
         providerLinkId: link.id,
         agentId: current.agentId,
@@ -226,10 +233,10 @@ async function applyProviderRecord(row: MoovePaymentLinkRow, link: MoovePaymentL
         token: link.token,
         destinationAddress: link.destinationAddress,
         transactionUrl: link.transactionUrl ?? null,
-      },
+      }),
     } });
     if (current.resourceListingId) {
-      await tx.outboxEvent.create({ data: { organizationId: current.organizationId, eventType: "MOOVE_RESOURCE_PAYMENT_COMPLETED", aggregateType: "RESOURCE_LISTING", aggregateId: current.resourceListingId, payload: { moovePaymentLinkId: current.id, providerLinkId: link.id, agentId: current.agentId, receivedAmount: link.receivedAmount ?? link.toAmount, token: link.token, transactionUrl: link.transactionUrl ?? null } } });
+      await tx.outboxEvent.create({ data: { organizationId: current.organizationId, eventType: "MOOVE_RESOURCE_PAYMENT_COMPLETED", aggregateType: "RESOURCE_LISTING", aggregateId: current.resourceListingId, payload: toPrismaJson({ moovePaymentLinkId: current.id, providerLinkId: link.id, agentId: current.agentId, receivedAmount: link.receivedAmount ?? link.toAmount, token: link.token, transactionUrl: link.transactionUrl ?? null }) } });
     }
     await tx.auditEvent.create({ data: { organizationId: current.organizationId, actorType: "SYSTEM", action: "MOOVE_PAYMENT_COMPLETED", targetType: "MOOVE_PAYMENT_LINK", targetId: current.id, result: "SUCCESS", metadata: { providerLinkId: link.id, receivedAmount: link.receivedAmount ?? null, transactionUrl: link.transactionUrl ?? null, invoiceId: current.invoiceId, resourceListingId: current.resourceListingId } } });
   }, { isolationLevel: "Serializable" });
