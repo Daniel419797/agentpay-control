@@ -68,12 +68,14 @@ export type MooveCreatePaymentLinkInput = {
   maxUsage?: number;
   expirationDate?: string;
 };
+export type MooveSettlementIdentity = { network: string; symbol: string; decimals: number };
 export type MooveConfig = {
   baseUrl: string;
   apiKey: string;
   organizationId: string;
   timeoutMs: number;
   maxReconcilePages: number;
+  settlement?: MooveSettlementIdentity;
 };
 
 export class MooveProviderError extends Error {
@@ -103,14 +105,28 @@ export function mooveConfigFromEnv(env: NodeJS.ProcessEnv = process.env): MooveC
   const organizationId = env.MOOVE_ACCOUNT_ORGANIZATION_ID || "";
   const timeoutMs = Number(env.MOOVE_TIMEOUT_MS || "10000");
   const maxReconcilePages = Number(env.MOOVE_MAX_RECONCILE_PAGES || "100");
+  const settlementNetwork = env.MOOVE_SETTLEMENT_NETWORK?.trim() || "";
+  const settlementSymbol = env.MOOVE_SETTLEMENT_SYMBOL?.trim().toUpperCase() || "";
+  const settlementDecimalsRaw = env.MOOVE_SETTLEMENT_DECIMALS?.trim() || "";
+  const settlementConfigured = Boolean(settlementNetwork || settlementSymbol || settlementDecimalsRaw);
+
   if (!apiKey || apiKey.length < 16) throw new Error("MOOVE_API_KEY_REQUIRED");
   if (!uuid.test(organizationId)) throw new Error("MOOVE_ACCOUNT_ORGANIZATION_ID_REQUIRED");
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 30000) throw new Error("MOOVE_TIMEOUT_INVALID");
   if (!Number.isInteger(maxReconcilePages) || maxReconcilePages < 1 || maxReconcilePages > 500) throw new Error("MOOVE_MAX_RECONCILE_PAGES_INVALID");
+
+  let settlement: MooveSettlementIdentity | undefined;
+  if (settlementConfigured) {
+    if (!settlementNetwork || !settlementSymbol || !settlementDecimalsRaw) throw new Error("MOOVE_SETTLEMENT_CONFIG_INCOMPLETE");
+    const decimals = Number(settlementDecimalsRaw);
+    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 255) throw new Error("MOOVE_SETTLEMENT_DECIMALS_INVALID");
+    settlement = { network: settlementNetwork, symbol: settlementSymbol, decimals };
+  }
+
   const parsed = new URL(baseUrl);
   if (env.APP_ENV === "production" && parsed.protocol !== "https:") throw new Error("MOOVE_HTTPS_REQUIRED");
   if (env.APP_ENV === "production" && parsed.hostname !== "api.moove.xyz" && env.MOOVE_ALLOW_CUSTOM_BASE_URL !== "true") throw new Error("MOOVE_PRODUCTION_HOST_INVALID");
-  return { baseUrl, apiKey, organizationId, timeoutMs, maxReconcilePages };
+  return { baseUrl, apiKey, organizationId, timeoutMs, maxReconcilePages, settlement };
 }
 
 export function assertMooveOrganization(organizationId: string, config: MooveConfig = mooveConfigFromEnv()) {
@@ -121,6 +137,17 @@ export function assertMooveAmount(value: string) {
   if (!decimal.test(value) || /^0(?:\.0+)?$/.test(value)) throw new Error("MOOVE_AMOUNT_INVALID");
   if (value.length > 100) throw new Error("MOOVE_AMOUNT_INVALID");
   return value;
+}
+
+export function mooveTokenNetwork(token: MoovePaymentLink["token"]): string {
+  if (token.chain.chainType === "EVM" && /^\d+$/.test(token.chain.id)) return `eip155:${token.chain.id}`;
+  return token.chain.id;
+}
+
+export function assertMooveSettlementToken(token: MoovePaymentLink["token"], settlement: MooveSettlementIdentity) {
+  if (mooveTokenNetwork(token) !== settlement.network || token.symbol.toUpperCase() !== settlement.symbol || token.decimals !== settlement.decimals) {
+    throw new Error("MOOVE_SETTLEMENT_TOKEN_MISMATCH");
+  }
 }
 
 function providerError(status: number, payload: unknown) {
