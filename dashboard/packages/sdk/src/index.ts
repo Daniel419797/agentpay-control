@@ -2,6 +2,57 @@ export type AgentPayClientOptions = { baseUrl: string; apiKey: string; fetch?: t
 
 export type PaidRequest = { resourceUrl: string; purpose?: string; maxAmountAtomic?: string; network?: string };
 
+export type CheckoutSecret = "CARD_NUMBER" | "CVC" | "EXP_MONTH" | "EXP_YEAR";
+export type CheckoutStep =
+  | { op: "fill"; selector: string; value: string }
+  | { op: "select"; selector: string; value: string }
+  | { op: "click"; selector: string; timeoutMs?: number }
+  | { op: "check"; selector: string }
+  | { op: "wait"; selector: string; timeoutMs?: number }
+  | { op: "secret"; selector: string; secret: CheckoutSecret }
+  | { op: "frame_secret"; frameSelector: string; selector: string; secret: CheckoutSecret }
+  | { op: "assert"; selector: string; contains: string; timeoutMs?: number };
+
+export type CheckoutPlan = {
+  steps: CheckoutStep[];
+  successUrlPrefix?: string;
+  successText?: { selector: string; contains: string };
+};
+
+export type AutonomousCardPurchaseRequest = {
+  virtualCardId?: string;
+  merchantUrl: string;
+  amountMinor: string;
+  currency: string;
+  merchantCategory?: string;
+  merchantCountry?: string;
+  purpose?: string;
+  checkoutPlan: CheckoutPlan;
+};
+
+export type AutonomousCardPurchase = {
+  id: string;
+  organizationId: string;
+  agentId: string;
+  virtualCardId: string;
+  paymentIntentId: string;
+  idempotencyKey: string;
+  merchantHost: string;
+  amountMinor: string;
+  currency: string;
+  merchantCategory?: string | null;
+  merchantCountry?: string | null;
+  purpose?: string | null;
+  policyVersion: number;
+  status: "APPROVAL_PENDING" | "READY" | "EXECUTING" | "CHECKOUT_SUCCEEDED" | "CHECKOUT_FAILED" | "REQUIRES_HUMAN" | "REJECTED" | "CANCELED" | "EXPIRED";
+  executorAttempt: number;
+  resultCode?: string | null;
+  resultUrl?: string | null;
+  resultSummary?: unknown;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type PaymentIntent = {
   id: string;
   status: "DENIED" | "APPROVAL_PENDING" | "AUTHORIZED" | "SETTLED" | "SETTLEMENT_FAILED" | "FAILED_BEFORE_SUBMISSION" | string;
@@ -94,6 +145,29 @@ export class AgentPayClient {
         body: JSON.stringify(input),
       }
     );
+  }
+
+  createAutonomousCardPurchase(
+    agentId: string,
+    input: AutonomousCardPurchaseRequest,
+    idempotencyKey = crypto.randomUUID()
+  ) {
+    return this.request<{ purchase: AutonomousCardPurchase; approvalId?: string | null; existing: boolean }>(
+      `/api/v1/agents/${agentId}/card-purchases`,
+      {
+        method: "POST",
+        headers: { "idempotency-key": idempotencyKey },
+        body: JSON.stringify(input),
+      }
+    );
+  }
+
+  getAutonomousCardPurchase(purchaseId: string) {
+    return this.request<AutonomousCardPurchase & { paymentIntent?: { id: string; status: string; approval?: { id: string; status: string; expiresAt: string } | null } | null }>(`/api/v1/card-purchases/${purchaseId}`);
+  }
+
+  listAutonomousCardPurchases(agentId: string) {
+    return this.request<AutonomousCardPurchase[]>(`/api/v1/agents/${agentId}/card-purchases`);
   }
 
   getPaymentIntent(intentId: string) {
