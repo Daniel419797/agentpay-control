@@ -47,6 +47,7 @@ CREATE TABLE "autonomous_card_purchase" (
   "lease_token" UUID,
   "lease_expires_at" TIMESTAMPTZ,
   "started_at" TIMESTAMPTZ,
+  "submission_started_at" TIMESTAMPTZ,
   "completed_at" TIMESTAMPTZ,
   "result_code" TEXT,
   "result_url" TEXT,
@@ -66,6 +67,7 @@ CREATE TABLE "autonomous_card_purchase" (
 
 COMMENT ON COLUMN "autonomous_card_purchase"."merchant_url" IS 'AES-256-GCM ciphertext produced by AgentPay secret-box; never plaintext checkout URLs.';
 COMMENT ON COLUMN "autonomous_card_purchase"."checkout_plan_encrypted" IS 'AES-256-GCM ciphertext produced by AgentPay secret-box; never plaintext form plans.';
+COMMENT ON COLUMN "autonomous_card_purchase"."submission_started_at" IS 'Set immediately before the irreversible merchant submit click. Expired leases after this point must never be automatically retried.';
 
 CREATE UNIQUE INDEX "autonomous_card_purchase_idempotency_idx"
   ON "autonomous_card_purchase" ("organization_id", "agent_id", "idempotency_key");
@@ -74,7 +76,7 @@ CREATE INDEX "autonomous_card_purchase_agent_created_idx"
   ON "autonomous_card_purchase" ("agent_id", "created_at" DESC);
 
 CREATE INDEX "autonomous_card_purchase_queue_idx"
-  ON "autonomous_card_purchase" ("status", "lease_expires_at", "created_at");
+  ON "autonomous_card_purchase" ("status", "lease_expires_at", "submission_started_at", "created_at");
 
 CREATE INDEX "autonomous_card_purchase_card_status_idx"
   ON "autonomous_card_purchase" ("virtual_card_id", "status", "created_at");
