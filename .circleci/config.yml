@@ -125,11 +125,15 @@ jobs:
               echo "package-lock.json already matches the manifests."
               exit 0
             fi
+            if [ -z "${CIRCLE_BRANCH:-}" ]; then
+              echo "CIRCLE_BRANCH is unavailable; refusing to guess a push target." >&2
+              exit 1
+            fi
             git config user.name "CircleCI"
             git config user.email "circleci@users.noreply.github.com"
             git add package-lock.json
-            git commit -m "chore: regenerate patched package lock"
-            git push origin HEAD:ai-connections
+            git commit -m "chore(deps): regenerate package lock"
+            git push origin "HEAD:${CIRCLE_BRANCH}"
       - run:
           name: Stage generated lock artifact
           command: |
