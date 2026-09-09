@@ -8,18 +8,29 @@ function required(name) {
 }
 
 const apiOrigin = new URL(required("AGENTPAY_API_ORIGIN"));
+if (apiOrigin.username || apiOrigin.password || apiOrigin.hash || apiOrigin.search) throw new Error("AGENTPAY_API_ORIGIN_INVALID");
 if ((process.env.NODE_ENV ?? "production") === "production" && apiOrigin.protocol !== "https:") throw new Error("AGENTPAY_API_ORIGIN_HTTPS_REQUIRED");
+if (!["http:", "https:"].includes(apiOrigin.protocol)) throw new Error("AGENTPAY_API_ORIGIN_INVALID");
 const sharedSecret = required("CARD_EXECUTOR_SHARED_SECRET");
 if (sharedSecret.length < 32) throw new Error("CARD_EXECUTOR_SHARED_SECRET_TOO_SHORT");
 const concurrency = Math.min(4, Math.max(1, Number(process.env.CARD_EXECUTOR_CONCURRENCY ?? "1") || 1));
 const pollMs = Math.min(10_000, Math.max(250, Number(process.env.CARD_EXECUTOR_POLL_INTERVAL_MS ?? "1000") || 1000));
+let stopping = false;
+
+for (const signal of ["SIGTERM", "SIGINT"]) {
+  process.on(signal, () => {
+    stopping = true;
+    console.log(JSON.stringify({ event: "card_executor_shutdown_requested", signal }));
+  });
+}
 
 function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
 async function agentPay(path, body) {
   const response = await fetch(new URL(path, apiOrigin), {
     method: "POST",
-    headers: { authorization: `Bearer ${sharedSecret}`, "content-type": "application/json" },
+    redirect: "error",
+    headers: { authorization: `Bearer ${sharedSecret}`, "content-type": "application/json", accept: "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(20_000),
   });
@@ -61,7 +72,7 @@ function safeFailureCode(error) {
 async function executeTask(task) {
   if (!task?.purchaseId || !task.leaseToken || !task.externalCardId || !task.checkoutPlan) throw new Error("EXECUTOR_TASK_INVALID");
   let secrets;
-  let submissionStarted = false;
+  let merchantCredentialBoundaryRecorded = false;
   try {
     secrets = await retrieveCardSecrets(task.externalCardId);
     const result = await executeCheckout({
@@ -70,21 +81,21 @@ async function executeTask(task) {
       heartbeat: () => heartbeat(task),
       checkpointSubmission: async () => {
         await checkpointSubmission(task);
-        submissionStarted = true;
+        merchantCredentialBoundaryRecorded = true;
       },
     });
     await complete(task, result);
     console.log(JSON.stringify({ event: "card_purchase_completed", purchaseId: task.purchaseId, status: result.status, resultCode: result.resultCode }));
   } catch (error) {
     const resultCode = safeFailureCode(error);
-    const requiresHuman = submissionStarted || error instanceof SubmissionUnknownError || error instanceof ChallengeRequiredError;
+    const requiresHuman = merchantCredentialBoundaryRecorded || error instanceof SubmissionUnknownError || error instanceof ChallengeRequiredError;
     const result = {
       status: requiresHuman ? "REQUIRES_HUMAN" : "CHECKOUT_FAILED",
-      resultCode: requiresHuman && !(error instanceof ChallengeRequiredError) && !resultCode.startsWith("SUBMISSION_") ? "SUBMISSION_UNKNOWN" : resultCode,
+      resultCode: requiresHuman && !(error instanceof ChallengeRequiredError) && !resultCode.startsWith("SUBMISSION_") && resultCode !== "MERCHANT_CREDENTIAL_OUTCOME_UNKNOWN" ? "SUBMISSION_UNKNOWN" : resultCode,
       challengeType: error instanceof ChallengeRequiredError ? error.challengeType : undefined,
     };
     try { await complete(task, result); }
-    catch { /* a stale submitted lease is recovered server-side as REQUIRES_HUMAN and is never retried */ }
+    catch { /* stale post-boundary leases are recovered server-side as REQUIRES_HUMAN and never retried */ }
     console.log(JSON.stringify({ event: "card_purchase_stopped", purchaseId: task.purchaseId, status: result.status, resultCode: result.resultCode }));
   } finally {
     secrets = null;
@@ -93,16 +104,17 @@ async function executeTask(task) {
 
 async function worker(index) {
   console.log(JSON.stringify({ event: "card_executor_worker_started", worker: index }));
-  while (true) {
+  while (!stopping) {
     try {
       const task = await lease();
       if (!task) { await sleep(pollMs); continue; }
       await executeTask(task);
     } catch (error) {
       console.error(JSON.stringify({ event: "card_executor_loop_error", worker: index, code: safeFailureCode(error) }));
-      await sleep(Math.max(pollMs, 1_000));
+      if (!stopping) await sleep(Math.max(pollMs, 1_000));
     }
   }
+  console.log(JSON.stringify({ event: "card_executor_worker_stopped", worker: index }));
 }
 
 await Promise.all(Array.from({ length: concurrency }, (_, index) => worker(index + 1)));
