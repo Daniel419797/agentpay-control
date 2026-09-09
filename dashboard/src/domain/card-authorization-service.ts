@@ -40,7 +40,7 @@ function intervalStart(interval: string | null, now: Date) {
     start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7));
     return start;
   }
-  if (interval === "monthly") return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  if (interval === "monthly") return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 0, 1));
   if (interval === "yearly") return new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
   return new Date(0);
 }
@@ -74,7 +74,7 @@ export type RecordCardAuthorizationInput = {
   requestedAt: Date;
 };
 
-type ExecutingPurchaseRow = {
+type SubmittedPurchaseRow = {
   id: string;
   payment_intent_id: string;
   amount_minor: unknown;
@@ -92,16 +92,21 @@ export async function recordCardAuthorization(input: RecordCardAuthorizationInpu
     });
     if (!card) throw new Error("CARD_NOT_FOUND");
 
-    const executing = await tx.$queryRaw<ExecutingPurchaseRow[]>`
+    const candidateSince = new Date(input.requestedAt.getTime() - 30 * 60_000);
+    const candidateUntil = new Date(input.requestedAt.getTime() + 5 * 60_000);
+    const submitted = await tx.$queryRaw<SubmittedPurchaseRow[]>`
       SELECT "id", "payment_intent_id", "amount_minor", "currency"
       FROM "autonomous_card_purchase"
       WHERE "virtual_card_id" = ${card.id}::uuid
-        AND "status" = 'EXECUTING'
-        AND "lease_expires_at" > NOW()
-      ORDER BY "started_at" ASC
+        AND "status" IN ('EXECUTING','REQUIRES_HUMAN')
+        AND "submission_started_at" IS NOT NULL
+        AND "submission_started_at" >= ${candidateSince}
+        AND "submission_started_at" <= ${candidateUntil}
+        AND "card_authorization_id" IS NULL
+      ORDER BY "submission_started_at" ASC
       LIMIT 2
     `;
-    const autonomousPurchase = executing.length === 1 ? executing[0]! : null;
+    const autonomousPurchase = submitted.length === 1 ? submitted[0]! : null;
     const reservedRows = await tx.$queryRaw<Array<{ total: unknown }>>`
       SELECT COALESCE(SUM("amount_minor"), 0) AS "total"
       FROM "autonomous_card_purchase"
@@ -141,7 +146,7 @@ export async function recordCardAuthorization(input: RecordCardAuthorizationInpu
     });
     const reasons = decision.reasons[0] === "POLICY_ALLOWED" ? [] : [...decision.reasons];
     if (!currencyMatches) reasons.push("CURRENCY_MISMATCH");
-    if (executing.length > 1) reasons.push("AUTONOMOUS_PURCHASE_AMBIGUOUS");
+    if (submitted.length > 1) reasons.push("AUTONOMOUS_PURCHASE_AMBIGUOUS");
     if (autonomousPurchase) {
       if (BigInt(String(autonomousPurchase.amount_minor)) !== input.amountMinor) reasons.push("AUTONOMOUS_PURCHASE_AMOUNT_MISMATCH");
       if (autonomousPurchase.currency.toUpperCase() !== input.currency.toUpperCase()) reasons.push("AUTONOMOUS_PURCHASE_CURRENCY_MISMATCH");
@@ -174,7 +179,8 @@ export async function recordCardAuthorization(input: RecordCardAuthorizationInpu
         UPDATE "autonomous_card_purchase"
         SET "card_authorization_id" = ${authorization.id}::uuid, "updated_at" = NOW()
         WHERE "id" = ${autonomousPurchase.id}::uuid
-          AND "status" = 'EXECUTING'
+          AND "status" IN ('EXECUTING','REQUIRES_HUMAN')
+          AND "submission_started_at" IS NOT NULL
           AND "card_authorization_id" IS NULL
       `;
     }
