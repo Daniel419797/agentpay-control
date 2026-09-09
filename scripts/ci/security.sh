@@ -122,6 +122,18 @@ printf 'node_image=%s\nosv_image=%s\nsemgrep_image=%s\ngitleaks_image=%s\n' \
   "$NODE_IMAGE" "$OSV_IMAGE" "$SEMGREP_IMAGE" "$GITLEAKS_IMAGE" \
   > "$OUT_DIR/tool-images.txt"
 
+# Materialize the dependency graph represented by the current manifests and
+# security overrides before scanners inspect it. This keeps the release scan
+# from reporting already-patched dependencies solely because a previous commit's
+# lockfile was checked out by the CI worker.
+docker run --rm \
+  -v "$ROOT_DIR:/workspace" \
+  -w /workspace \
+  "$NODE_IMAGE" \
+  bash -lc 'npm install --global npm@11.11.1 >/dev/null && npm install --package-lock-only --ignore-scripts --legacy-peer-deps'
+RC=$?
+[[ $RC -eq 0 ]] || record_failure "dependency graph materialization" "$RC"
+
 # npm audit is retained as an independent ecosystem-specific high-severity gate.
 docker run --rm \
   -v "$ROOT_DIR:/workspace" \
@@ -132,7 +144,7 @@ docker run --rm \
 RC=$?
 [[ $RC -eq 0 ]] || record_failure "npm audit" "$RC"
 
-# OSV Scanner checks supported manifests/lockfiles recursively against OSV data.
+# OSV Scanner checks the regenerated supported manifests/lockfiles recursively.
 docker run --rm \
   -v "$ROOT_DIR:/src" \
   "$OSV_IMAGE" \
