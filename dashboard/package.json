@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": false,
   "license": "MIT",
-  "description": "Policy-controlled x402 payment OS for autonomous software agents across Hedera, Arc and Cardano",
+  "description": "Policy-controlled payment operating system for autonomous software agents",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Daniel419797/agentpay-control.git"
@@ -97,6 +97,12 @@
     "lightningcss-linux-x64-gnu": "^1.31.1"
   },
   "overrides": {
+    "deepmerge-ts@<8.0.0": "8.0.2",
+    "fast-uri@>=2.3.1 <2.4.6": "2.4.6",
+    "fast-uri@>=3.0.0 <3.1.7": "3.1.7",
+    "fast-uri@>=4.0.0 <4.1.4": "4.1.4",
+    "mysql2@<=3.23.0": "3.24.4",
+    "sharp@<0.35.4": "0.35.4",
     "typescript": "5.9.3"
   }
 }
