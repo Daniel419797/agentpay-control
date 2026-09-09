@@ -17,11 +17,13 @@ const createSchema = z.object({
   checkoutPlan: z.unknown(),
 }).strict();
 
-async function authorizeCaller(request: Request, agentId: string, scope: "payments:create" | "payments:read") {
+type CardScope = "cards:purchase" | "cards:read";
+
+async function authorizeCaller(request: Request, agentId: string, scope: CardScope) {
   if (await authorizeAgentRequest(request, agentId, scope)) return { authorized: true as const, rateSubject: `agent:${agentId}`, initiatedByUserId: undefined };
   const workspace = await workspaceFromRequest(request);
   if (!workspace) return { authorized: false as const, response: problem(401, "UNAUTHORIZED", "A valid agent credential or signed-in workspace member is required.") };
-  const roles = scope === "payments:create" ? ["OWNER", "OPERATOR"] as const : ["OWNER", "OPERATOR", "APPROVER", "VIEWER"] as const;
+  const roles = scope === "cards:purchase" ? ["OWNER", "OPERATOR"] as const : ["OWNER", "OPERATOR", "APPROVER", "VIEWER"] as const;
   if (!workspaceHasRole(workspace, [...roles])) return { authorized: false as const, response: problem(403, "ROLE_REQUIRED", "The active workspace role cannot perform this card-purchase operation.") };
   const ownedAgent = await db.agent.findFirst({ where: { id: agentId, organizationId: workspace.organization.id, status: { not: "ARCHIVED" } }, select: { id: true } });
   if (!ownedAgent) return { authorized: false as const, response: problem(404, "AGENT_NOT_FOUND", "Agent not found in the active workspace.") };
@@ -59,7 +61,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
   if (!idempotencyKey || idempotencyKey.length < 8 || idempotencyKey.length > 100) return problem(400, "IDEMPOTENCY_KEY_REQUIRED", "Provide an Idempotency-Key header between 8 and 100 characters.");
   try {
     const { agentId } = await params;
-    const caller = await authorizeCaller(request, agentId, "payments:create");
+    const caller = await authorizeCaller(request, agentId, "cards:purchase");
     if (!caller.authorized) return caller.response;
     const rate = await enforceRateLimit(request, { scope: "agent-card-purchase", subject: caller.rateSubject, limit: 30, windowMs: 60_000 });
     if (!rate.allowed) return rateLimitProblem(rate.retryAfterSeconds);
@@ -75,7 +77,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
 export async function GET(request: Request, { params }: { params: Promise<{ agentId: string }> }) {
   try {
     const { agentId } = await params;
-    const caller = await authorizeCaller(request, agentId, "payments:read");
+    const caller = await authorizeCaller(request, agentId, "cards:read");
     if (!caller.authorized) return caller.response;
     return ok(await listAutonomousCardPurchases(agentId), { headers: { "cache-control": "no-store" } });
   } catch (error) {
