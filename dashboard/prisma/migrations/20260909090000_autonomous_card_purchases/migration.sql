@@ -32,7 +32,7 @@ CREATE TABLE "autonomous_card_purchase" (
   "payment_intent_id" UUID NOT NULL UNIQUE,
   "idempotency_key" TEXT NOT NULL,
   "request_hash" TEXT NOT NULL,
-  "checkout_url_encrypted" TEXT NOT NULL,
+  "merchant_url" TEXT NOT NULL,
   "merchant_host" TEXT NOT NULL,
   "amount_minor" NUMERIC(78,0) NOT NULL,
   "currency" VARCHAR(3) NOT NULL,
@@ -61,6 +61,9 @@ CREATE TABLE "autonomous_card_purchase" (
   CONSTRAINT "autonomous_card_purchase_attempt_check" CHECK ("executor_attempt" >= 0),
   CONSTRAINT "autonomous_card_purchase_lease_pair_check" CHECK (("lease_token" IS NULL) = ("lease_expires_at" IS NULL))
 );
+
+COMMENT ON COLUMN "autonomous_card_purchase"."merchant_url" IS 'AES-256-GCM ciphertext produced by AgentPay secret-box; never plaintext checkout URLs.';
+COMMENT ON COLUMN "autonomous_card_purchase"."checkout_plan_encrypted" IS 'AES-256-GCM ciphertext produced by AgentPay secret-box; never plaintext form plans.';
 
 CREATE UNIQUE INDEX "autonomous_card_purchase_idempotency_idx"
   ON "autonomous_card_purchase" ("organization_id", "agent_id", "idempotency_key");
