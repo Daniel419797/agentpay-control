@@ -25,8 +25,11 @@ export function isPrivateAddress(address) {
 }
 
 export function normalizeHost(value) {
-  const host = value.trim().toLowerCase();
-  if (!host || host.length > 253 || host.includes("/") || host.includes(":") || host.includes("@")) throw new Error("EXECUTOR_HOST_INVALID");
+  const host = value.trim().toLowerCase().replace(/\.$/, "");
+  if (!host || host.length > 253 || host.includes("/") || host.includes(":") || host.includes("@") || host.includes("..")) throw new Error("EXECUTOR_HOST_INVALID");
+  if (isIP(host) === 4) return host;
+  const labels = host.split(".");
+  if (labels.some((label) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))) throw new Error("EXECUTOR_HOST_INVALID");
   return host;
 }
 
@@ -51,6 +54,7 @@ export function assertAllowedUrl(value, allowedHosts) {
   const url = new URL(value);
   if (url.protocol === "data:" || url.protocol === "blob:") return url;
   if (url.protocol !== "https:") throw new Error("EXECUTOR_HTTPS_REQUIRED");
+  if (url.username || url.password) throw new Error("EXECUTOR_URL_CREDENTIALS_REJECTED");
   const host = normalizeHost(url.hostname);
   if (!allowedHosts.has(host)) throw new Error("EXECUTOR_EGRESS_BLOCKED");
   return url;
