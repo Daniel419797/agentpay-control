@@ -20,6 +20,7 @@ export class SubmissionUnknownError extends Error {
 function secretValue(secrets, name) {
   if (name === "CARD_NUMBER") return secrets.number;
   if (name === "CVC") return secrets.cvc;
+  if (name === "CARD_EXPIRY") return `${String(secrets.expMonth).padStart(2, "0")}/${String(secrets.expYear).slice(-2)}`;
   if (name === "EXP_MONTH") return String(secrets.expMonth).padStart(2, "0");
   if (name === "EXP_YEAR") return String(secrets.expYear);
   throw new Error("CHECKOUT_SECRET_UNSUPPORTED");
@@ -29,6 +30,7 @@ function fieldLooksSafe(meta, secret) {
   const haystack = [meta.name, meta.id, meta.placeholder, meta.autocomplete, meta.ariaLabel].filter(Boolean).join(" ").toLowerCase();
   if (secret === "CARD_NUMBER") return meta.autocomplete === "cc-number" || /card.?number|cc.?number/.test(haystack);
   if (secret === "CVC") return meta.autocomplete === "cc-csc" || /cvc|cvv|security.?code|card.?code/.test(haystack);
+  if (secret === "CARD_EXPIRY") return meta.autocomplete === "cc-exp" || /(exp|expiry|expiration).*(date|mm.?yy)|mm\s*[/\-]\s*yy/.test(haystack);
   if (secret === "EXP_MONTH") return meta.autocomplete === "cc-exp-month" || /(exp|expiry|expiration).*(month|mm)|month.*(exp|expiry)/.test(haystack);
   if (secret === "EXP_YEAR") return meta.autocomplete === "cc-exp-year" || /(exp|expiry|expiration).*(year|yy)|year.*(exp|expiry)/.test(haystack);
   return false;
@@ -52,10 +54,7 @@ async function injectSecret(locator, secret, value) {
   if (!["input", "select"].includes(meta.tag) || !fieldLooksSafe(meta, secret)) throw new Error(`CHECKOUT_SECRET_TARGET_REJECTED_${secret}`);
   if (meta.tag === "select") {
     try { await locator.selectOption(value); }
-    catch {
-      const numeric = String(Number(value));
-      await locator.selectOption(numeric);
-    }
+    catch { await locator.selectOption(String(Number(value))); }
   } else {
     await locator.fill(value);
   }
@@ -81,7 +80,7 @@ async function verifySuccess(page, plan) {
       await locator.waitFor({ state: "visible", timeout: 5_000 });
       const text = await locator.innerText();
       if (text.includes(plan.successText.contains)) return "TEXT_ASSERTION";
-    } catch { /* verified below */ }
+    } catch { /* checked by caller */ }
   }
   return null;
 }
@@ -98,6 +97,7 @@ export async function executeCheckout({ task, secrets, heartbeat, checkpointSubm
       "--disable-default-apps",
       "--disable-extensions",
       "--disable-sync",
+      "--no-first-run",
     ],
   });
   const context = await browser.newContext({
@@ -109,7 +109,16 @@ export async function executeCheckout({ task, secrets, heartbeat, checkpointSubm
   context.setDefaultTimeout(Math.min(15_000, task.maxCheckoutSeconds * 1_000));
   const page = await context.newPage();
   const deadline = Date.now() + task.maxCheckoutSeconds * 1_000;
-  let submitted = false;
+  let merchantCredentialBoundaryRecorded = false;
+  let submitClicked = false;
+
+  async function recordCredentialBoundary() {
+    if (merchantCredentialBoundaryRecorded) return;
+    await heartbeat();
+    await checkpointSubmission();
+    merchantCredentialBoundaryRecorded = true;
+  }
+
   try {
     await page.route("**/*", async (route) => {
       try {
@@ -136,24 +145,27 @@ export async function executeCheckout({ task, secrets, heartbeat, checkpointSubm
         const text = await locator.innerText({ timeout });
         if (!text.includes(step.contains)) throw new Error("CHECKOUT_ASSERTION_FAILED");
       } else if (step.op === "secret") {
-        await heartbeat();
+        await recordCredentialBoundary();
         await injectSecret(page.locator(step.selector), step.secret, secretValue(secrets, step.secret));
       } else if (step.op === "frame_secret") {
-        await heartbeat();
+        await recordCredentialBoundary();
         await injectSecret(page.frameLocator(step.frameSelector).locator(step.selector), step.secret, secretValue(secrets, step.secret));
       } else if (step.op === "submit") {
+        await recordCredentialBoundary();
         await heartbeat();
-        await checkpointSubmission();
-        submitted = true;
-        try { await page.locator(step.selector).click({ timeout }); }
-        catch { throw new SubmissionUnknownError("SUBMISSION_CLICK_OUTCOME_UNKNOWN"); }
+        try {
+          await page.locator(step.selector).click({ timeout });
+          submitClicked = true;
+        } catch {
+          throw new SubmissionUnknownError("SUBMISSION_CLICK_OUTCOME_UNKNOWN");
+        }
       }
 
-      if (submitted) {
+      if (submitClicked) {
         await heartbeat();
-        const challenge = await detectChallenge(page);
         const verification = await verifySuccess(page, task.checkoutPlan);
         if (verification) return { status: "CHECKOUT_SUCCEEDED", resultCode: "CHECKOUT_SUCCESS_VERIFIED", verification, finalUrl: page.url() };
+        const challenge = await detectChallenge(page);
         if (challenge) throw new ChallengeRequiredError(challenge);
       }
     }
@@ -162,7 +174,7 @@ export async function executeCheckout({ task, secrets, heartbeat, checkpointSubm
     if (verification) return { status: "CHECKOUT_SUCCEEDED", resultCode: "CHECKOUT_SUCCESS_VERIFIED", verification, finalUrl: page.url() };
     const challenge = await detectChallenge(page);
     if (challenge) throw new ChallengeRequiredError(challenge);
-    if (submitted) throw new SubmissionUnknownError("SUBMISSION_RESULT_UNVERIFIED");
+    if (merchantCredentialBoundaryRecorded) throw new SubmissionUnknownError(submitClicked ? "SUBMISSION_RESULT_UNVERIFIED" : "MERCHANT_CREDENTIAL_OUTCOME_UNKNOWN");
     throw new Error("CHECKOUT_SUCCESS_NOT_VERIFIED");
   } finally {
     await context.close().catch(() => undefined);
