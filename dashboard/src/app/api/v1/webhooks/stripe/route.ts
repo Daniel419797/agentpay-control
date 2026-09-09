@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { recordCardAuthorization } from "@/domain/card-authorization-service";
+import { reconcileAutonomousCardAuthorization } from "@/domain/card-autonomy-provider-reconciliation";
 import { getCardProvider, verifyStripeSignature } from "@/domain/card-provider";
 import { boundedText } from "@/lib/api";
 import { getConfig } from "@/lib/config";
@@ -44,9 +45,7 @@ export async function POST(request: Request) {
   try {
     rawBody = await boundedText(request, MAX_STRIPE_WEBHOOK_BYTES);
   } catch (error) {
-    if (error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE") {
-      return NextResponse.json({ error: "request_body_too_large" }, { status: 413 });
-    }
+    if (error instanceof Error && error.message === "REQUEST_BODY_TOO_LARGE") return NextResponse.json({ error: "request_body_too_large" }, { status: 413 });
     throw error;
   }
   if (!verifyStripeSignature(rawBody, request.headers.get("stripe-signature"), config.STRIPE_WEBHOOK_SECRET)) return NextResponse.json({ error: "invalid_signature" }, { status: 400 });
@@ -62,6 +61,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "event_id_payload_mismatch" }, { status: 409 });
   }
   if (record.status === "PROCESSED" || record.status === "IGNORED") return NextResponse.json({ received: true, duplicate: true });
+
   try {
     if (["issuing_authorization.request", "issuing_authorization.created"].includes(event.type)) {
       const authorization = authorizationSchema.parse(event.data?.object);
@@ -76,23 +76,29 @@ export async function POST(request: Request) {
         merchantCountry: authorization.merchant_data?.country,
         requestedAt: typeof event.created === "number" ? new Date(event.created * 1_000) : event.created ? new Date(event.created) : new Date(),
       });
+      await reconcileAutonomousCardAuthorization(result.id);
       await markEvent(record.id, "PROCESSED");
       if (event.type === "issuing_authorization.request") return NextResponse.json({ approved: result.approved === true });
       return NextResponse.json({ received: true });
     }
+
     if (event.type === "issuing_authorization.updated") {
       const authorization = authorizationSchema.parse(event.data?.object);
       const status = authorization.status === "reversed" ? "REVERSED" : authorization.status === "closed" ? "CLOSED" : authorization.approved === false ? "DECLINED" : authorization.approved === true ? "APPROVED" : "PENDING";
       await db.cardAuthorization.updateMany({ where: { provider: "STRIPE", externalAuthorizationId: authorization.id }, data: { status, approved: authorization.approved, resolvedAt: status === "PENDING" ? null : new Date() } });
+      const local = await db.cardAuthorization.findUnique({ where: { provider_externalAuthorizationId: { provider: "STRIPE", externalAuthorizationId: authorization.id } }, select: { id: true } });
+      if (local) await reconcileAutonomousCardAuthorization(local.id);
       await markEvent(record.id, "PROCESSED");
       return NextResponse.json({ received: true });
     }
+
     if (["issuing_card.created", "issuing_card.updated"].includes(event.type)) {
       const card = cardSchema.parse(event.data?.object);
       await db.virtualCard.updateMany({ where: { provider: "STRIPE", externalCardId: card.id }, data: { status: card.status === "active" ? "ACTIVE" : card.status === "canceled" ? "CANCELED" : "FROZEN", version: { increment: 1 } } });
       await markEvent(record.id, "PROCESSED");
       return NextResponse.json({ received: true });
     }
+
     if (event.type.startsWith("v2.money_management.financial_account.")) {
       if (!event.related_object) throw new Error("MISSING_RELATED_OBJECT");
       const local = await db.fiatAccount.findUnique({ where: { provider_externalAccountId: { provider: "STRIPE", externalAccountId: event.related_object.id } } });
@@ -102,6 +108,7 @@ export async function POST(request: Request) {
       await markEvent(record.id, "PROCESSED");
       return NextResponse.json({ received: true });
     }
+
     if (event.type.startsWith("v2.money_management.inbound_transfer.") || event.type.startsWith("v2.money_management.outbound_transfer.")) {
       if (!event.related_object) throw new Error("MISSING_RELATED_OBJECT");
       const local = await db.fiatTransfer.findUnique({ where: { provider_externalTransferId: { provider: "STRIPE", externalTransferId: event.related_object.id } }, include: { fiatAccount: true } });
@@ -117,6 +124,7 @@ export async function POST(request: Request) {
       await markEvent(record.id, "PROCESSED");
       return NextResponse.json({ received: true });
     }
+
     await markEvent(record.id, "IGNORED");
     return NextResponse.json({ received: true, ignored: true });
   } catch (error) {

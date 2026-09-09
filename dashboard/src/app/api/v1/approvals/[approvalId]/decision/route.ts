@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { executeAuthorizedPayment } from "@/domain/authorized-payment-executor";
+import { rejectAutonomousCardPurchase, resumeApprovedCardPurchase } from "@/domain/card-autonomy-service";
 import { boundedJson, handleApiError, ok, problem } from "@/lib/api";
 import { db } from "@/lib/db";
 import { workspaceFromRequest, workspaceHasRole } from "@/lib/workspace";
@@ -70,11 +71,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ app
     if (result.kind === "NOT_PENDING") return problem(409, "APPROVAL_NOT_PENDING", "Approval is no longer pending.");
     if (result.kind === "INITIATOR_EVIDENCE_MISSING") return problem(409, "APPROVAL_INITIATOR_EVIDENCE_MISSING", "This approval cannot be decided because its immutable initiator evidence is missing or inconsistent. Cancel and recreate the payment request.");
     if (result.kind === "SELF_APPROVAL_FORBIDDEN") return problem(403, "APPROVAL_SEPARATION_REQUIRED", "The operator who initiated this payment cannot approve it. A different Owner or Approver must review the request.");
-    if (result.status === "CONSUMED") return ok(await executeAuthorizedPayment(result.paymentIntentId));
+    if (result.status === "REJECTED") {
+      const cardPurchase = await rejectAutonomousCardPurchase(result.paymentIntentId);
+      return ok(cardPurchase ?? result);
+    }
+    if (result.status === "CONSUMED") {
+      const cardPurchase = await resumeApprovedCardPurchase(result.paymentIntentId);
+      if (cardPurchase) return ok(cardPurchase);
+      return ok(await executeAuthorizedPayment(result.paymentIntentId));
+    }
     return ok(result);
   } catch (error) {
     if (errorCode(error) === "P2002") return problem(409, "APPROVAL_ALREADY_DECIDED", "You have already voted on this approval.");
     if (errorCode(error) === "P2034") return problem(409, "APPROVAL_CONCURRENT_UPDATE", "Another approval vote was recorded. Retry with the latest state.");
+    if (error instanceof Error && ["CARD_AUTONOMY_POLICY_CHANGED", "CARD_PURCHASE_POLICY_CHANGED", "CARD_PURCHASE_APPROVAL_STATE_INVALID"].includes(error.message)) return problem(409, error.message, "The card authorization changed after approval. No checkout was started; create a new request under the current policy.");
     if (error instanceof Error && ["PAYMENT_QUOTE_EXPIRED", "SPEND_RESERVATION_INVALID", "POLICY_CHANGED", "POLICY_NOT_ACTIVE", "POLICY_EXPIRED", "OUTSIDE_POLICY_SCHEDULE"].includes(error.message)) return problem(409, error.message, error.message.replaceAll("_", " "));
     if (error instanceof Error && ["PYTH_VALUATION_INCREASED_AFTER_AUTHORIZATION", "PYTH_FEED_CHANGED_AFTER_AUTHORIZATION", "PYTH_AUTHORIZATION_SNAPSHOT_MISSING"].includes(error.message)) {
       return problem(409, error.message, "The oracle-backed authorization is no longer valid. Recreate the payment request and obtain approval again.");
