@@ -11,6 +11,19 @@ function stripeKey() {
   return key;
 }
 
+function stripeHeaders() {
+  const headers = {
+    authorization: `Bearer ${stripeKey()}`,
+    "user-agent": "agentpay-card-executor/1.0",
+  };
+  const version = process.env.STRIPE_ISSUING_API_VERSION?.trim();
+  if (version) {
+    if (version.length > 80 || !/^[A-Za-z0-9._-]+$/.test(version)) throw new Error("STRIPE_ISSUING_API_VERSION_INVALID");
+    headers["stripe-version"] = version;
+  }
+  return headers;
+}
+
 function pinnedLookup(pin) {
   return (_hostname, options, callback) => {
     if (options?.all) callback(null, [{ address: pin.address, family: pin.family }]);
@@ -30,11 +43,7 @@ async function stripeGet(path) {
       method: "GET",
       lookup: pinnedLookup(pin),
       timeout: 10_000,
-      headers: {
-        authorization: `Bearer ${stripeKey()}`,
-        "user-agent": "agentpay-card-executor/0.1",
-        "stripe-version": process.env.STRIPE_ISSUING_API_VERSION ?? "2026-06-24.dahlia",
-      },
+      headers: stripeHeaders(),
     }, (res) => {
       const chunks = [];
       let size = 0;
