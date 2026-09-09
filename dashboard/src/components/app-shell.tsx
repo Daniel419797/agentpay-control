@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { Route } from "next";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Activity, Bot, Boxes, BrainCircuit, Building2, CircleDollarSign, ClipboardCheck, CreditCard,
@@ -60,6 +60,7 @@ function SignerControl({ operatingState }: { operatingState: OperatingState }) {
 
 function ShellContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [navOpen, setNavOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [operatorEmail, setOperatorEmail] = useState("Loading operator…");
@@ -93,7 +94,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
     if (signingOut) return;
     setSigningOut(true);
     try { await fetch("/api/v1/auth/sign-out", { method: "POST" }); }
-    finally { window.location.assign("/sign-in"); }
+    finally { router.replace("/sign-in"); }
   }
 
   return (
