@@ -37,7 +37,7 @@ export function CardAutonomyControls({ cards, canEdit }: { cards: CardOption[]; 
   const [policy, setPolicy] = useState<Policy>(defaultPolicy);
   const [allowedHosts, setAllowedHosts] = useState("");
   const [deniedHosts, setDeniedHosts] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(Boolean(cards[0]?.id));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -45,7 +45,6 @@ export function CardAutonomyControls({ cards, canEdit }: { cards: CardOption[]; 
   useEffect(() => {
     if (!cardId) return;
     let active = true;
-    setLoading(true); setError(""); setMessage("");
     void fetch(`/api/v1/cards/${cardId}/autonomy`, { cache: "no-store" })
       .then(async (response) => {
         const body = await response.json().catch(() => ({}));
@@ -60,6 +59,14 @@ export function CardAutonomyControls({ cards, canEdit }: { cards: CardOption[]; 
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [cardId]);
+
+  function selectCard(nextCardId: string) {
+    if (nextCardId === cardId) return;
+    setLoading(true);
+    setError("");
+    setMessage("");
+    setCardId(nextCardId);
+  }
 
   async function save() {
     if (!cardId || !canEdit) return;
@@ -98,7 +105,7 @@ export function CardAutonomyControls({ cards, canEdit }: { cards: CardOption[]; 
   return <section className="panel section-gap">
     <div className="panel-header"><div><h2 className="panel-title">Autonomous card spending</h2><p className="panel-description">Control what the assigned AI agent may purchase with this virtual card. PAN and CVC remain inside the isolated executor.</p></div><span className={`status-badge ${policy.mode === "DISABLED" ? "status-error" : "status-settled"}`}>{loading ? "LOADING" : policy.mode.replaceAll("_", " ")}</span></div>
     <div className="app-form">
-      <label>Virtual card<select value={cardId} onChange={(event) => setCardId(event.target.value)}>{cards.map((card) => <option key={card.id} value={card.id}>{card.label} · {card.agentName} · {card.status}</option>)}</select></label>
+      <label>Virtual card<select value={cardId} onChange={(event) => selectCard(event.target.value)}>{cards.map((card) => <option key={card.id} value={card.id}>{card.label} · {card.agentName} · {card.status}</option>)}</select></label>
       <div className="form-grid">
         <label>Autonomy mode<select disabled={!canEdit || loading} value={policy.mode} onChange={(event) => setPolicy((current) => ({ ...current, mode: event.target.value as Policy["mode"] }))}><option value="DISABLED">Disabled</option><option value="APPROVAL_REQUIRED">Every purchase needs approval</option><option value="LIMITED">Autonomous under a per-purchase limit</option><option value="MERCHANT_ALLOWLIST">Approved merchants only</option><option value="BROAD">Broad, still bounded by card policy</option></select></label>
         <label>Autonomous limit (minor units)<input disabled={!canEdit || loading || policy.mode === "DISABLED"} value={policy.perPurchaseAutoLimitMinor ?? ""} onChange={(event) => setPolicy((current) => ({ ...current, perPurchaseAutoLimitMinor: event.target.value || null }))} inputMode="numeric" pattern="[0-9]*" placeholder="5000" /></label>
