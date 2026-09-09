@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { completeLeasedCardPurchaseSafely } from "@/domain/card-autonomy-execution";
+import { completeLeasedCardPurchaseSafely, getCardPurchaseExecutionState } from "@/domain/card-autonomy-execution";
 import { boundedJson, handleApiError, ok, problem } from "@/lib/api";
 import { authorizeCardExecutorRequest } from "@/lib/card-executor-config";
 
@@ -31,7 +31,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ pur
     if (!authorizeCardExecutorRequest(request)) return problem(401, "CARD_EXECUTOR_UNAUTHORIZED", "A valid card executor credential is required.");
     const { purchaseId } = await params;
     const input = schema.parse(await boundedJson(request, 8 * 1024));
-    const purchase = await completeLeasedCardPurchaseSafely({ ...input, purchaseId, resultUrl: sanitizeResultUrl(input.resultUrl) });
+    const state = await getCardPurchaseExecutionState(purchaseId);
+    const providerEvidenceMissing = input.status === "CHECKOUT_SUCCEEDED" && !state?.cardAuthorizationId;
+    const purchase = await completeLeasedCardPurchaseSafely({
+      ...input,
+      purchaseId,
+      status: providerEvidenceMissing ? "REQUIRES_HUMAN" : input.status,
+      resultCode: providerEvidenceMissing ? "PROVIDER_AUTHORIZATION_NOT_OBSERVED" : input.resultCode,
+      resultUrl: sanitizeResultUrl(input.resultUrl),
+    });
     if (!purchase) return problem(409, "CARD_PURCHASE_LEASE_INVALID", "The purchase lease has expired or was already consumed.");
     return ok({ purchaseId: purchase.id, status: purchase.status, resultCode: purchase.resultCode }, { headers: { "cache-control": "no-store" } });
   } catch (error) {
