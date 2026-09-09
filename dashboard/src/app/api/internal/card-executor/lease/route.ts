@@ -1,5 +1,6 @@
-import { cancelLeasedPurchase, leaseCardPurchase } from "@/domain/card-autonomy-repository";
+import { cancelLeasedPurchase } from "@/domain/card-autonomy-repository";
 import { materializeLeasedCardPurchase } from "@/domain/card-autonomy-service";
+import { leaseCrashSafeCardPurchase } from "@/domain/card-autonomy-submission";
 import { handleApiError, problem } from "@/lib/api";
 import { authorizeCardExecutorRequest, getCardExecutorConfig } from "@/lib/card-executor-config";
 
@@ -9,7 +10,7 @@ export async function POST(request: Request) {
   try {
     if (!authorizeCardExecutorRequest(request)) return problem(401, "CARD_EXECUTOR_UNAUTHORIZED", "A valid card executor credential is required.");
     const config = getCardExecutorConfig();
-    const purchase = await leaseCardPurchase({ leaseSeconds: config.CARD_EXECUTOR_LEASE_SECONDS, maxAttempts: config.CARD_EXECUTOR_MAX_ATTEMPTS });
+    const purchase = await leaseCrashSafeCardPurchase({ leaseSeconds: config.CARD_EXECUTOR_LEASE_SECONDS, maxAttempts: config.CARD_EXECUTOR_MAX_ATTEMPTS });
     if (!purchase) return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
     try {
       const task = await materializeLeasedCardPurchase(purchase);
