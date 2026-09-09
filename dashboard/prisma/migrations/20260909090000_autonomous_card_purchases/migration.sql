@@ -32,7 +32,7 @@ CREATE TABLE "autonomous_card_purchase" (
   "payment_intent_id" UUID NOT NULL UNIQUE,
   "idempotency_key" TEXT NOT NULL,
   "request_hash" TEXT NOT NULL,
-  "merchant_url" TEXT NOT NULL,
+  "checkout_url_encrypted" TEXT NOT NULL,
   "merchant_host" TEXT NOT NULL,
   "amount_minor" NUMERIC(78,0) NOT NULL,
   "currency" VARCHAR(3) NOT NULL,
