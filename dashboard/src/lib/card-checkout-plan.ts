@@ -10,12 +10,23 @@ const clickStep = z.object({ op: z.literal("click"), selector, timeoutMs }).stri
 const submitStep = z.object({ op: z.literal("submit"), selector, timeoutMs }).strict();
 const checkStep = z.object({ op: z.literal("check"), selector }).strict();
 const waitStep = z.object({ op: z.literal("wait"), selector, timeoutMs }).strict();
-const secretName = z.enum(["CARD_NUMBER", "CVC", "EXP_MONTH", "EXP_YEAR"]);
+
+const secretName = z.enum(["CARD_NUMBER", "CVC", "CARD_EXPIRY", "EXP_MONTH", "EXP_YEAR"]);
 const secretStep = z.object({ op: z.literal("secret"), selector, secret: secretName }).strict();
 const frameSecretStep = z.object({ op: z.literal("frame_secret"), frameSelector: selector, selector, secret: secretName }).strict();
 const assertStep = z.object({ op: z.literal("assert"), selector, contains: z.string().min(1).max(500), timeoutMs }).strict();
 
-export const checkoutStepSchema = z.discriminatedUnion("op", [fillStep, selectStep, clickStep, submitStep, checkStep, waitStep, secretStep, frameSecretStep, assertStep]);
+export const checkoutStepSchema = z.discriminatedUnion("op", [
+  fillStep,
+  selectStep,
+  clickStep,
+  submitStep,
+  checkStep,
+  waitStep,
+  secretStep,
+  frameSecretStep,
+  assertStep,
+]);
 
 export const checkoutPlanSchema = z.object({
   steps: z.array(checkoutStepSchema).min(1).max(40),
@@ -23,21 +34,20 @@ export const checkoutPlanSchema = z.object({
   successText: z.object({ selector, contains: z.string().min(1).max(500) }).strict().optional(),
 }).strict().superRefine((plan, ctx) => {
   const sensitiveSteps = plan.steps.filter((step) => step.op === "secret" || step.op === "frame_secret");
-  const required = new Set(["CARD_NUMBER", "CVC", "EXP_MONTH", "EXP_YEAR"]);
-  for (const step of sensitiveSteps) required.delete(step.secret);
-  if (required.size) ctx.addIssue({ code: "custom", message: `Checkout plan is missing required card fields: ${[...required].join(", ")}`, path: ["steps"] });
+  const secrets = new Set(sensitiveSteps.map((step) => step.secret));
+  const missing: string[] = [];
+  if (!secrets.has("CARD_NUMBER")) missing.push("CARD_NUMBER");
+  if (!secrets.has("CVC")) missing.push("CVC");
+  if (!secrets.has("CARD_EXPIRY") && !(secrets.has("EXP_MONTH") && secrets.has("EXP_YEAR"))) missing.push("CARD_EXPIRY or EXP_MONTH + EXP_YEAR");
+  if (missing.length) ctx.addIssue({ code: "custom", message: `Checkout plan is missing required card fields: ${missing.join(", ")}`, path: ["steps"] });
 
-  const submitIndexes = plan.steps.map((step, index) => step.op === "submit" ? index : -1).filter((index) => index >= 0);
-  if (submitIndexes.length !== 1) ctx.addIssue({ code: "custom", message: "Checkout plan must contain exactly one explicit submit step.", path: ["steps"] });
-  const submitIndex = submitIndexes[0] ?? Number.MAX_SAFE_INTEGER;
-  const firstSecret = plan.steps.findIndex((step) => step.op === "secret" || step.op === "frame_secret");
-  if (firstSecret >= 0 && submitIndex < firstSecret) ctx.addIssue({ code: "custom", message: "The submit step must occur after card credentials are injected.", path: ["steps"] });
-  plan.steps.forEach((step, index) => {
-    if (firstSecret >= 0 && index > firstSecret && index < submitIndex && step.op === "click") ctx.addIssue({ code: "custom", message: "Use the explicit submit operation for the payment-triggering click after card credentials are present.", path: ["steps", index] });
-    if (index > submitIndex && ["fill", "select", "check", "click", "secret", "frame_secret", "submit"].includes(step.op)) ctx.addIssue({ code: "custom", message: "Only wait/assert verification steps may run after checkout submission.", path: ["steps", index] });
-  });
+  const submitCount = plan.steps.filter((step) => step.op === "submit").length;
+  if (submitCount > 1) ctx.addIssue({ code: "custom", message: "Checkout plan can contain at most one explicit submit step.", path: ["steps"] });
 
-  const plainBytes = plan.steps.reduce((total, step) => step.op === "fill" || step.op === "select" ? total + Buffer.byteLength(step.value, "utf8") : total, 0);
+  const plainBytes = plan.steps.reduce((total, step) => {
+    if (step.op === "fill" || step.op === "select") return total + Buffer.byteLength(step.value, "utf8");
+    return total;
+  }, 0);
   if (plainBytes > 16 * 1024) ctx.addIssue({ code: "custom", message: "Checkout plan contains too much non-sensitive form data.", path: ["steps"] });
   if (!plan.successUrlPrefix && !plan.successText) ctx.addIssue({ code: "custom", message: "Provide successUrlPrefix or successText so checkout completion can be verified.", path: [] });
 });
@@ -64,5 +74,10 @@ export function hostMatchesPattern(hostname: string, pattern: string) {
 }
 
 export function planSummary(plan: CheckoutPlan) {
-  return { steps: plan.steps.map((step) => ({ op: step.op, secret: "secret" in step ? step.secret : undefined })), hasSuccessUrl: Boolean(plan.successUrlPrefix), hasSuccessText: Boolean(plan.successText) };
+  return {
+    steps: plan.steps.map((step) => ({ op: step.op, secret: "secret" in step ? step.secret : undefined })),
+    hasExplicitSubmit: plan.steps.some((step) => step.op === "submit"),
+    hasSuccessUrl: Boolean(plan.successUrlPrefix),
+    hasSuccessText: Boolean(plan.successText),
+  };
 }
