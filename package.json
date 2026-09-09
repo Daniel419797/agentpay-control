@@ -6,7 +6,7 @@
     "node": "22.x",
     "npm": ">=10.9.7 <12"
   },
-  "description": "Policy-controlled x402 payment OS for autonomous software agents across Hedera, Arc and Cardano",
+  "description": "Policy-controlled payment operating system for autonomous software agents",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -43,7 +43,7 @@
     "fast-uri@>=4.0.0 <4.1.4": "4.1.4",
     "hono@>=4.0.0 <4.12.34": "4.12.34",
     "js-yaml@>=4.0.0 <4.3.1": "4.3.1",
-    "mysql2@<=3.23.0": "3.23.2",
+    "mysql2@<=3.23.0": "3.24.4",
     "nanoid@<3.3.18": "3.3.18",
     "postcss@<=8.5.22": "8.5.25",
     "protobufjs": "7.6.5",
