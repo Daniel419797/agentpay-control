@@ -74,6 +74,13 @@ export type RecordCardAuthorizationInput = {
   requestedAt: Date;
 };
 
+type ExecutingPurchaseRow = {
+  id: string;
+  payment_intent_id: string;
+  amount_minor: unknown;
+  currency: string;
+};
+
 export async function recordCardAuthorization(input: RecordCardAuthorizationInput) {
   return db.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`${input.provider}:${input.externalCardId}`}, 0))`;
@@ -84,6 +91,26 @@ export async function recordCardAuthorization(input: RecordCardAuthorizationInpu
       include: { organization: true },
     });
     if (!card) throw new Error("CARD_NOT_FOUND");
+
+    const executing = await tx.$queryRaw<ExecutingPurchaseRow[]>`
+      SELECT "id", "payment_intent_id", "amount_minor", "currency"
+      FROM "autonomous_card_purchase"
+      WHERE "virtual_card_id" = ${card.id}::uuid
+        AND "status" = 'EXECUTING'
+        AND "lease_expires_at" > NOW()
+      ORDER BY "started_at" ASC
+      LIMIT 2
+    `;
+    const autonomousPurchase = executing.length === 1 ? executing[0]! : null;
+    const reservedRows = await tx.$queryRaw<Array<{ total: unknown }>>`
+      SELECT COALESCE(SUM("amount_minor"), 0) AS "total"
+      FROM "autonomous_card_purchase"
+      WHERE "virtual_card_id" = ${card.id}::uuid
+        AND "status" IN ('READY','EXECUTING')
+        AND (${autonomousPurchase?.id ?? null}::uuid IS NULL OR "id" <> ${autonomousPurchase?.id ?? null}::uuid)
+    `;
+    const autonomousReservedMinor = BigInt(String(reservedRows[0]?.total ?? 0));
+
     const window = spendingWindow(card.spendingInterval, input.requestedAt);
     const prior = card.spendingInterval === "per_authorization" ? [] : await tx.cardAuthorization.findMany({
       where: {
@@ -95,7 +122,7 @@ export async function recordCardAuthorization(input: RecordCardAuthorizationInpu
       },
       select: { amountMinor: true },
     });
-    const spentMinor = prior.reduce((sum, item) => sum + BigInt(item.amountMinor.toString()), 0n);
+    const spentMinor = prior.reduce((sum, item) => sum + BigInt(item.amountMinor.toString()), 0n) + (card.spendingInterval === "per_authorization" ? 0n : autonomousReservedMinor);
     const currencyMatches = card.currency.toUpperCase() === input.currency.toUpperCase();
     const decision = evaluateCardAuthorization({
       cardStatus: card.status,
@@ -112,11 +139,19 @@ export async function recordCardAuthorization(input: RecordCardAuthorizationInpu
       merchantCategory: input.merchantCategory,
       merchantCountry: input.merchantCountry,
     });
-    if (!currencyMatches) decision.reasons.push("CURRENCY_MISMATCH");
-    const approved = decision.approved && currencyMatches;
+    const reasons = decision.reasons[0] === "POLICY_ALLOWED" ? [] : [...decision.reasons];
+    if (!currencyMatches) reasons.push("CURRENCY_MISMATCH");
+    if (executing.length > 1) reasons.push("AUTONOMOUS_PURCHASE_AMBIGUOUS");
+    if (autonomousPurchase) {
+      if (BigInt(String(autonomousPurchase.amount_minor)) !== input.amountMinor) reasons.push("AUTONOMOUS_PURCHASE_AMOUNT_MISMATCH");
+      if (autonomousPurchase.currency.toUpperCase() !== input.currency.toUpperCase()) reasons.push("AUTONOMOUS_PURCHASE_CURRENCY_MISMATCH");
+    }
+    const approved = reasons.length === 0;
+    if (approved) reasons.push(autonomousPurchase ? "AUTONOMOUS_PURCHASE_BOUND" : "POLICY_ALLOWED");
+
     const authorization = await tx.cardAuthorization.upsert({
       where: { provider_externalAuthorizationId: { provider: input.provider, externalAuthorizationId: input.externalAuthorizationId } },
-      update: { status: approved ? "APPROVED" : "DECLINED", approved, decisionReasons: decision.reasons, resolvedAt: new Date() },
+      update: { status: approved ? "APPROVED" : "DECLINED", approved, decisionReasons: reasons, resolvedAt: new Date() },
       create: {
         organizationId: card.organizationId,
         virtualCardId: card.id,
@@ -129,13 +164,22 @@ export async function recordCardAuthorization(input: RecordCardAuthorizationInpu
         merchantCategory: input.merchantCategory,
         merchantCountry: input.merchantCountry,
         approved,
-        decisionReasons: decision.reasons,
+        decisionReasons: reasons,
         requestedAt: input.requestedAt,
         resolvedAt: new Date(),
       },
     });
-    await tx.auditEvent.create({ data: { organizationId: card.organizationId, actorType: "PROVIDER", action: approved ? "CARD_AUTHORIZATION_APPROVED" : "CARD_AUTHORIZATION_DECLINED", targetType: "CARD_AUTHORIZATION", targetId: authorization.id, result: approved ? "SUCCESS" : "DENIED", metadata: { cardId: card.id, amountMinor: input.amountMinor.toString(), currency: input.currency.toUpperCase(), reasons: decision.reasons } } });
-    await tx.outboxEvent.create({ data: { organizationId: card.organizationId, eventType: approved ? "CARD_AUTHORIZATION_APPROVED" : "CARD_AUTHORIZATION_DECLINED", aggregateType: "CARD_AUTHORIZATION", aggregateId: authorization.id, payload: { cardId: card.id, amountMinor: input.amountMinor.toString(), currency: input.currency.toUpperCase(), merchantName: input.merchantName ?? null, reasons: decision.reasons } } });
+    if (autonomousPurchase) {
+      await tx.$executeRaw`
+        UPDATE "autonomous_card_purchase"
+        SET "card_authorization_id" = ${authorization.id}::uuid, "updated_at" = NOW()
+        WHERE "id" = ${autonomousPurchase.id}::uuid
+          AND "status" = 'EXECUTING'
+          AND "card_authorization_id" IS NULL
+      `;
+    }
+    await tx.auditEvent.create({ data: { organizationId: card.organizationId, actorType: "PROVIDER", action: approved ? "CARD_AUTHORIZATION_APPROVED" : "CARD_AUTHORIZATION_DECLINED", targetType: "CARD_AUTHORIZATION", targetId: authorization.id, result: approved ? "SUCCESS" : "DENIED", metadata: { cardId: card.id, autonomousCardPurchaseId: autonomousPurchase?.id ?? null, amountMinor: input.amountMinor.toString(), currency: input.currency.toUpperCase(), reasons } } });
+    await tx.outboxEvent.create({ data: { organizationId: card.organizationId, eventType: approved ? "CARD_AUTHORIZATION_APPROVED" : "CARD_AUTHORIZATION_DECLINED", aggregateType: "CARD_AUTHORIZATION", aggregateId: authorization.id, payload: { cardId: card.id, autonomousCardPurchaseId: autonomousPurchase?.id ?? null, amountMinor: input.amountMinor.toString(), currency: input.currency.toUpperCase(), merchantName: input.merchantName ?? null, reasons } } });
     return authorization;
   }, { isolationLevel: "Serializable" });
 }
