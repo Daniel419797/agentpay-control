@@ -1,207 +1,104 @@
-# AgentPay Unified Production Deployment
+# Unified Production Deployment
 
-**Status:** Current canonical deployment topology  
-**Updated:** 2026-08-22
+**Updated:** 2026-09-10
 
-## Revision note
-
-The production topology includes Cardano Mainnet external per-agent custody behind the isolated signer. This guide reflects `render.yaml`, the combined facilitator and the unified Cardano signer so secret placement and service responsibilities match the code.
-
-## Canonical deployment
+## Topology
 
 ```text
-GitHub release
-   |
-   |-- Vercel
-   |    `-- AgentPay Next.js dashboard/API
-   |
-   `-- Render Blueprint
-        |-- agentpay-facilitator
-        `-- agentpay-cardano-signer
-             |-- Preprod worker
-             `-- Mainnet worker
-                  `-- optional external per-agent custody
-```
+                         Internet / agents / users
+                                  |
+                                  v
+                       Vercel AgentPay control plane
+                                  |
+                                  +---- PostgreSQL
+                                  |
+               +------------------+------------------+
+               |                  |                  |
+               v                  v                  v
+         Moove / Stripe      Masumi/Pyth/KERIA   unified facilitator
+                                                      |
+                               +----------------------+----------------+
+                               |                      |                |
+                             Hedera                  Arc            Cardano
+                                                                       |
+                                                             Cardano signer
+                                                              /          \
+                                                          Preprod       Mainnet
+                                                                         |
+                                                               external custody
 
-PostgreSQL, Blockfrost, x402 resource servers and enabled Pyth, Masumi, KERIA, Dune and custody providers are external dependencies, not additional canonical Blueprint services.
+Additional read/data dependencies: Blockfrost, x402 resource servers, Dune.
+```
 
 ## Vercel control plane
 
-Responsibilities:
+Responsibilities include authentication, organizations/RBAC, agents/credentials, policy/approvals/reservations, payments, resources/marketplace, invoices, cards/fiat/cross-chain orchestration, automation, intelligence, audit, notifications, reconciliation, and administrative lifecycle operations.
 
-- authentication and session management;
-- organizations and RBAC;
-- agents and credentials;
-- policy and approvals;
-- reservations and idempotency;
-- payments and resources;
-- audit, incidents and reconciliation;
-- analytics and financial intelligence;
-- export, deletion and settings.
+It may hold server-side credentials for control-plane provider integrations such as Moove/Stripe when required. It must not hold Cardano payer private keys, Cardano managed test derivation secrets, or external Mainnet custody private keys.
 
-Do not place blockchain private keys, testnet managed-agent master keys or Cardano Mainnet custody credentials in Vercel.
+## PostgreSQL
 
-## `agentpay-facilitator`
+The system of record for organization, policy, payment, provider, audit, automation, invoice, and reconciliation state. Run forward migrations before application code requiring the new schema.
 
-One public Render web service mounts:
+The Moove integration includes a raw-SQL-managed table; schema-introspection workflows must preserve it intentionally.
 
-```text
-/hedera/testnet
-/hedera/mainnet
-/arc/testnet
-/cardano/preprod
-/cardano/mainnet
-```
+## Unified facilitator
 
-Root endpoints include `/verify`, `/settle`, `/supported`, `/health` and `/ready` according to the combined application.
+The public facilitator mounts supported Hedera, Arc, and Cardano profiles. It exposes health/readiness/supported capability information and performs network-specific payment verification/settlement duties.
 
-For Cardano it:
+For Cardano it calls the signer, independently verifies returned CBOR, manages replay/settlement claims, submits through Blockfrost, and evaluates confirmation evidence.
 
-- forwards per-agent identity and sign requests to the signer;
-- independently verifies signed transaction CBOR;
-- controls replay and durable settlement claims;
-- submits through Blockfrost;
-- checks transaction and latest-block evidence and confirmation depth.
+## Cardano signer
 
-It does not hold the Cardano payer private key.
+A web-service gateway with isolated Preprod/Mainnet worker contexts. Relevant network-namespaced capabilities include health, managed identity/signing, and unsigned preparation.
 
-## `agentpay-cardano-signer`
+Preprod can hold the test-only per-agent derivation secret. Mainnet can hold the external custody API capability. These credentials are separate from facilitator capabilities.
 
-This is a Render **web service gateway**, not a background-only worker. It starts isolated Preprod and Mainnet child signer processes.
+## Moove
 
-Public network namespaces:
+Moove Receive is called by the control plane. Its API credential is bound to one AgentPay organization. The provider hosts checkout and reports payment-link status/settlement evidence; AgentPay reconciles that evidence before linked business state changes.
 
-```text
-/preprod/*
-/mainnet/*
-```
+## Stripe cards/fiat
 
-Relevant routes include:
+When configured, the control plane calls Stripe Issuing/Money Management APIs through the provider adapter and receives signed provider webhook events. Restricted keys and webhook secrets remain server-side.
 
-```text
-/preprod/health
-/preprod/managed-identity
-/preprod/managed-agent-sign
-/preprod/unsigned
+## Masumi, Pyth, Veridian/KERIA
 
-/mainnet/health
-/mainnet/managed-identity
-/mainnet/managed-agent-sign
-/mainnet/unsigned
-```
+These are optional external integrations used for escrow, trust, pricing, or credential evidence. Each integration is enabled only with complete reviewed configuration.
 
-The gateway keeps network-specific signer capability keys distinct.
+## Blockfrost
 
-## Preprod signer environment
+Cardano signer uses Blockfrost for construction inputs; the facilitator uses Blockfrost for submission and confirmation evidence. Use network-correct project configuration.
 
-Required or typical signer-only values include:
+## Dune
 
-```text
-CARDANO_PREPROD_BLOCKFROST_URL
-CARDANO_PREPROD_BLOCKFROST_PROJECT_ID
-CARDANO_PREPROD_SIGNER_API_KEY
-CARDANO_PREPROD_MANAGED_AGENT_MASTER_KEY
-CARDANO_PREPROD_USDCX_ASSET_ID   # only when configured
-```
+Dune consumes/publicly analyzes chain facts. It is outside the authorization/signing/settlement path and can be unavailable without preventing AgentPay from deciding payment truth.
 
-The Preprod master key is testnet-only and derives a different Ed25519 identity for each immutable Agent ID.
+## Environment ownership
 
-## Mainnet signer environment
+Configuration should be placed according to least authority:
 
-Mainnet uses:
+- application/session/database/provider-orchestration secrets -> control plane;
+- network settlement capabilities -> facilitator;
+- Cardano construction/signing/test derivation/external custody capability -> signer;
+- managed Mainnet private keys -> external custody;
+- public analytics credentials -> analytics tooling only when required.
 
-```text
-CARDANO_MAINNET_BLOCKFROST_URL
-CARDANO_MAINNET_BLOCKFROST_PROJECT_ID
-CARDANO_MAINNET_SIGNER_API_KEY
-CARDANO_MAINNET_USDCX_ASSET_ID   # when enabled
-```
+Never duplicate high-value secrets across services merely for convenience.
 
-For autonomous managed agents it additionally uses signer-only:
+## Deployment order
 
-```text
-CARDANO_MAINNET_AGENT_CUSTODY_URL
-CARDANO_MAINNET_AGENT_CUSTODY_API_KEY
-```
+1. select exact source revision;
+2. run CI/security gates;
+3. verify backup and apply database migrations;
+4. deploy Cardano signer and verify worker readiness;
+5. deploy facilitator and verify rail/signer readiness;
+6. deploy control plane with enabled provider configuration;
+7. configure reconciliation/notification schedulers;
+8. run `/api/v1/ready` plus service readiness;
+9. execute low-value canaries for every enabled financial profile;
+10. monitor before increasing limits or funding.
 
-There is deliberately no `CARDANO_MAINNET_MANAGED_AGENT_MASTER_KEY`.
+## Rollback
 
-## Mainnet external custody contract
-
-The external system is not hosted by AgentPay.
-
-```text
-POST /identity
-  input: Agent ID + Cardano Mainnet/Ed25519 purpose
-  output: stable publicKeyHex + signerRef
-
-POST /sign
-  input: Agent ID + signerRef + payerAddress + transaction-body hash
-  output: Ed25519 signature
-```
-
-AgentPay derives the payer address locally and verifies returned signatures. Private keys stay in the external HSM/KMS/delegation boundary.
-
-## Cardano data flow
-
-```text
-Control plane
-  -> combined facilitator /managed-agent-sign
-  -> Cardano signer
-       -> Blockfrost UTxOs/protocol data
-       -> construct transaction
-       -> Preprod local derived signer OR Mainnet external per-agent signer
-  -> signed CBOR returned to facilitator
-  -> facilitator independently verifies
-  -> durable claim/replay control
-  -> Blockfrost /tx/submit
-  -> Cardano
-  -> Blockfrost confirmation evidence
-  -> reconciliation/control plane
-```
-
-The signer does not submit the transaction.
-
-## Facilitator Cardano capabilities
-
-Use separate capabilities for managed signing and preparation and for settlement. These are protocol authorization keys; they are not payer private keys and not the external custody credential.
-
-The Mainnet managed-signing capability may authorize the dedicated per-agent identity and signing routes even though the generic or shared signing mode stays `unsigned-only`.
-
-## Dashboard environment mapping
-
-Vercel should normally use one public facilitator origin and network-specific capability keys. It may contain public or provider configuration such as Blockfrost project IDs where the control plane requires them, but must never contain:
-
-```text
-CARDANO_PREPROD_MANAGED_AGENT_MASTER_KEY
-CARDANO_MAINNET_AGENT_CUSTODY_API_KEY
-blockchain private keys
-raw Cardano signing seeds
-```
-
-## Deployment sequence
-
-1. choose exact release SHA;
-2. ensure required repository checks execute;
-3. confirm DB backup and migration state;
-4. deploy Cardano signer;
-5. verify both signer workers;
-6. if Mainnet managed custody is enabled, verify `/identity` for multiple Agent IDs produces distinct stable identities;
-7. deploy combined facilitator;
-8. verify `/health`, `/supported`, `/ready` and signer connectivity;
-9. apply production database migrations;
-10. deploy Vercel dashboard and API;
-11. verify Vercel has no signer or custody secrets;
-12. exercise low-value transactions for intended network and custody modes;
-13. independently confirm resulting chain evidence;
-14. only retire older services after the unified topology is verified and rollback is understood.
-
-## Arc and Hedera notes
-
-Hedera Testnet and Mainnet and Arc Testnet remain child rails within the unified facilitator. Arc public Mainnet is not declared until an actual supported public network or profile is reviewed. Hedera Mainnet agent custody remains self custody under the documented current model; its operator and payer infrastructure identities are not agent wallets.
-
-## Update provenance
-
-Updated on 2026-08-22 to reflect the current Cardano Mainnet per-agent external custody implementation and the two-service Render topology. Older wording that treated Mainnet autonomous custody as future-only has been removed, and secret placement and submission responsibility are now explicit.
-
-Primary builder: **Daniel Praise** (`Daniel419797`).
+Keep previous compatible service/application releases available until the new release is verified. Database migrations are forward-oriented; rollback decisions must account for schema compatibility and never discard financial evidence or weaken identity/replay constraints.

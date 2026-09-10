@@ -1,109 +1,94 @@
-# Moove Receive integration
+# Moove Receive
 
-AgentPay integrates the currently live Moove Agentic Payments API as a receive-side commerce rail. AgentPay remains the policy, identity, audit and reconciliation control plane; Moove creates cross-chain/cross-token payment links that settle to the Moove account's configured default wallet and token.
+**Updated:** 2026-09-10
 
-## Supported Moove surface
+AgentPay integrates Moove's production payment-link API as a hosted receive-payment rail. AgentPay remains responsible for organization/agent authorization, durable request identity, resource/invoice binding, reconciliation, audit, and downstream business state. Moove hosts the payer experience and settles according to the configured Moove account.
 
-Implemented against the public Moove API at `https://api.moove.xyz`:
+## Supported API surface
 
-- `POST /v1/payment-link` — create a payment link (`payment_link:create`)
-- `GET /v1/payment-link` — list account payment links (`payment_link:read`)
-- `GET /v1/payment-link/{id}` — retrieve a public payment link
+AgentPay maps the current payment-link surface:
 
-Moove Send, Swap, Bridge and Ramp agent APIs are not represented as available AgentPay rails until Moove publishes live production endpoints for them. Do not add mock provider success paths for unreleased APIs.
+```text
+POST /v1/payment-link       create
+GET  /v1/payment-link       list/reconcile
+GET  /v1/payment-link/{id}  retrieve
+```
+
+The AgentPay integration intentionally documents and exposes only the provider operations that are implemented and supported by the current API contract.
 
 ## Architecture
 
 ```text
-Agent / Operator
-      |
-      v
-AgentPay API / SDK / MCP / LangChain
-      |
-      +-- tenant binding / auth / rate limit
-      +-- idempotency / durable local record
-      +-- invoice + resource bindings
-      |
-      v
-Moove Receive API
-      |
-      v
-Moove payment link
-      |
- customer pays using supported source chain/token
-      |
-      v
-Moove default settlement wallet/token
-      |
-      v
+Agent / application / operator
+        |
+        v
+AgentPay REST / SDK / MCP / LangChain
+        |
+        +-- tenant + scope checks
+        +-- idempotency + durable local state
+        +-- resource/invoice validation
+        |
+        v
+Moove payment-link API
+        |
+        v
+hosted payment URL
+        |
+      payer
+        |
+        v
+Moove account settlement
+        |
+        v
 AgentPay reconciliation
-      |
-      +-- COMPLETED event
-      +-- resource-payment event
-      +-- invoice PAID transition when exact settlement identity matches
-      +-- audit evidence
+        |
+        +-- COMPLETED evidence
+        +-- resource completion event
+        +-- exact invoice settlement/PAID transition
+        +-- audit/outbox evidence
 ```
 
-## Critical tenancy rule
+## Organization/account binding
 
-A Moove API key belongs to one Moove account. Payment-link creation does not accept an arbitrary destination wallet; funds route to the default settlement wallet/token configured on that Moove account.
+A Moove API credential represents an account whose default settlement wallet/token is configured at the provider level. Payment-link creation does not choose an arbitrary AgentPay destination wallet.
 
-AgentPay therefore binds one deployed Moove credential to exactly one AgentPay organization through:
+AgentPay therefore binds the deployed Moove credential to one organization:
 
-```bash
-MOOVE_ACCOUNT_ORGANIZATION_ID=<agentpay-organization-uuid>
+```text
+MOOVE_ACCOUNT_ORGANIZATION_ID=<organization UUID>
 ```
 
-Any other workspace fails with `MOOVE_ORGANIZATION_NOT_CONFIGURED`. Do not remove this check unless credentials become tenant-specific and are stored with equivalent isolation.
+Requests from another organization fail closed. This prevents one tenant from creating links that settle to another tenant's configured Moove account.
 
-## Environment
+## Environment contract
 
-```bash
+Typical configuration:
+
+```text
 MOOVE_RECEIVE_ENABLED=true
 MOOVE_API_BASE_URL=https://api.moove.xyz
-MOOVE_API_KEY=<secret Moove API key>
-MOOVE_ACCOUNT_ORGANIZATION_ID=<AgentPay organization UUID>
+MOOVE_API_KEY=<server-side API key>
+MOOVE_ACCOUNT_ORGANIZATION_ID=<organization UUID>
 MOOVE_TIMEOUT_MS=10000
 MOOVE_MAX_RECONCILE_PAGES=100
 MOOVE_ALLOW_CUSTOM_BASE_URL=false
 ```
 
-Create the Moove API key with both live payment-link scopes:
+The API key requires the payment-link create/read scopes used by the integration. It must never be exposed through `NEXT_PUBLIC_*`, API responses, logs, SDK/MCP/LangChain client configuration, or committed files.
+
+### Invoice settlement identity
+
+Invoice automation additionally requires the configured expected settlement identity:
 
 ```text
-payment_link:create
-payment_link:read
+MOOVE_SETTLEMENT_NETWORK=<canonical network>
+MOOVE_SETTLEMENT_SYMBOL=<asset symbol>
+MOOVE_SETTLEMENT_DECIMALS=<asset decimals>
 ```
 
-The API key is server-side only. It must never be returned by AgentPay APIs, exposed through `NEXT_PUBLIC_*`, sent to an MCP/LangChain client, committed, or logged.
+These values must match the actual Moove account settlement token. Drift causes invoice settlement to fail closed.
 
-### Settlement identity for invoice automation
-
-Generic payment links do not require AgentPay to know the destination token in advance. Automatic AgentPay invoice settlement does, because an invoice must not be marked paid merely because an unrelated token or amount reached the Moove account.
-
-Set all three values when using `invoiceId` bindings:
-
-```bash
-MOOVE_SETTLEMENT_NETWORK=eip155:8453
-MOOVE_SETTLEMENT_SYMBOL=USDC
-MOOVE_SETTLEMENT_DECIMALS=6
-```
-
-These values must describe the actual default settlement token configured in the Moove account. AgentPay verifies the token returned by Moove during reconciliation and fails closed on drift with `MOOVE_SETTLEMENT_TOKEN_MISMATCH`.
-
-Invoice-bound links additionally require:
-
-- the invoice was issued by the configured AgentPay organization
-- the agent, when present, is the invoice issuer agent
-- invoice status is payable
-- `maxUsage=1`
-- invoice asset network/symbol/decimals equals the configured Moove settlement identity
-- requested decimal amount exactly equals the invoice atomic total
-- completed Moove `receivedAmount` exactly equals the invoice atomic total
-
-Only then does AgentPay transition the invoice to `PAID` and emit `INVOICE_PAID_VIA_MOOVE` / `AGENT_INVOICE_PAID` evidence.
-
-## Database
+## Persistence
 
 Migration:
 
@@ -111,27 +96,13 @@ Migration:
 dashboard/prisma/migrations/20260907110000_moove_receive/migration.sql
 ```
 
-The `MoovePaymentLink` table stores:
+`MoovePaymentLink` stores organization/agent ownership, optional resource/invoice binding, idempotency key/request hash, provider IDs/URL/status, requested amount/link controls, provider settlement destination/token evidence, received amount, transaction URL, failure/reconciliation state, and timestamps.
 
-- owning organization / optional agent
-- optional resource and invoice bindings
-- AgentPay idempotency key + canonical request hash
-- Moove provider link ID and URL
-- provider status
-- requested amount and link controls
-- settlement destination/token evidence
-- received amount and transaction URL
-- reconciliation timestamps and failure code
+Important database invariants include unique organization/idempotency identity, unique provider link identity, unique recovery marker, constrained status, and ownership foreign keys.
 
-Important invariants are enforced in PostgreSQL:
+### Prisma schema note
 
-- one idempotency key per organization
-- one local record per Moove provider link
-- one unique AgentPay recovery marker per provider description
-- constrained local provider states
-- foreign keys for organization/agent/resource/invoice bindings
-
-The initial integration accesses this table through parameterized Prisma raw SQL so the migration is authoritative. If the project later introspects/regenerates the Prisma schema, add the table as a first-class Prisma model before generating schema-diff migrations; never accept a generated migration that drops `MoovePaymentLink` as an "unknown" table.
+The initial integration creates/accesses this table through the authoritative SQL migration and parameterized Prisma raw SQL. It is not currently a first-class Prisma schema model. If Prisma introspection or schema-diff generation is used later, add/represent the table deliberately before accepting a generated migration. A migration that attempts to drop `MoovePaymentLink` merely because the Prisma schema does not model it is invalid.
 
 ## AgentPay API
 
@@ -139,120 +110,100 @@ The initial integration accesses this table through parameterized Prisma raw SQL
 
 ```http
 POST /api/v1/moove/payment-links
-Authorization: Bearer <AgentPay credential or operator session>
-Idempotency-Key: <stable 8-100 character key>
+Authorization: Bearer <AgentPay credential/session>
+Idempotency-Key: <stable key>
 Content-Type: application/json
 ```
 
-Example:
+Conceptual body:
 
 ```json
 {
-  "agentId": "00000000-0000-4000-8000-000000000000",
+  "agentId": "<agent UUID>",
   "toAmount": "5.00",
-  "description": "Research job 3821",
+  "description": "Research service",
   "maxUsage": 1,
-  "expirationDate": "2026-09-08T12:00:00Z",
-  "resourceListingId": "00000000-0000-4000-8000-000000000001"
+  "expirationDate": "2026-10-01T12:00:00Z",
+  "resourceListingId": "<optional resource UUID>",
+  "invoiceId": "<optional invoice UUID>"
 }
 ```
 
-Omit `maxUsage` for Moove's unlimited-use behavior. Omit `expirationDate` for a non-expiring link. Invoice-bound links are intentionally stricter and must be single-use.
+Invoice-bound links must satisfy the stricter invoice validation path and be single-use.
 
-Agent credentials require `payments:create`. Operators require `OWNER` or `OPERATOR`.
-
-### List local receive records
+### List
 
 ```http
 GET /api/v1/moove/payment-links?status=ACTIVE&limit=50&offset=0
 ```
 
-This is workspace-scoped local state. It does not leak sibling tenants or the Moove API key.
+Returns organization-scoped local records.
 
-### Read / refresh a receive record
+### Detail / refresh
 
 ```http
-GET /api/v1/moove/payment-links/<internal-agentpay-id>?refresh=true
+GET /api/v1/moove/payment-links/<AgentPay id>?refresh=true
 ```
 
-Workspace users can read their organization. An AgentPay agent can read only a record bound to that exact agent and needs `payments:read`.
-
-`refresh=true` reads the provider's public payment-link detail and applies the latest provider evidence under a serialized database transition.
+`refresh=true` retrieves current provider evidence before returning local state.
 
 ### Reconcile
 
-Scheduled endpoint:
-
 ```http
-GET /api/v1/moove/reconcile
-Authorization: Bearer <CRON_SECRET>
+GET  /api/v1/moove/reconcile   # scheduler/cron secret
+POST /api/v1/moove/reconcile   # authorized operator or cron secret
 ```
 
-Manual operator endpoint:
+Background authority is separated from browser session behavior. Reconciliation is bounded and rate limited according to the route/configuration.
 
-```http
-POST /api/v1/moove/reconcile
-```
+## Idempotency and ambiguous create
 
-`GET` is intentionally cron-secret-only so a browser navigation cannot trigger a state-mutating reconciliation through an operator cookie. `POST` allows an authenticated `OWNER`/`OPERATOR`, rate limited to 10/minute, or the cron secret.
-
-For Vercel Cron, configure this path at an interval allowed by the deployment plan. For an external scheduler, send the same bearer secret. A 1–5 minute interval is appropriate for normal receive-payment UX when the hosting plan supports it; callers may also use detail `refresh=true` for interactive polling.
-
-## Idempotency and ambiguous POSTs
-
-Moove's create endpoint does not expose an idempotency-key parameter. AgentPay therefore must not blindly retry a POST after a timeout, 429/5xx response or network ambiguity.
-
-The safe flow is:
+The create path does not assume provider-side POST idempotency. AgentPay persists its own unique intended request before the irreversible provider call.
 
 ```text
-AgentPay INSERT CREATING row + unique idempotency key
-            |
-            v
-single Moove POST
-   | success               | ambiguous
-   v                       v
-store provider ID       SUBMISSION_UNKNOWN
-   |                       |
-   v                       v
-public detail       list Moove account links
-                           |
-                 exact AP:<local UUID> marker
-                           |
-                           v
-                    recover provider ID
+local CREATING row + request fingerprint
+ -> one provider create POST
+      -> success: persist provider id/url/status
+      -> uncertain response: SUBMISSION_UNKNOWN
+           -> list provider account links
+           -> locate exact AP:<local UUID> marker
+           -> recover original provider link
 ```
 
-Every provider description begins with a unique `AP:<local UUID>` marker. Account-wide list reconciliation can recover a link created by a request whose response was lost without creating a duplicate.
-
-AgentPay only retries safe reads. It applies bounded backoff to network failures, HTTP 429 and HTTP 5xx responses.
+Only safe reads are retried with bounded backoff. An uncertain write is reconciled rather than duplicated.
 
 ## Completion semantics
 
-Do not treat a returned payment URL, an `ACTIVE` provider state, or an HTTP-successful create request as payment.
+The following are not payment proof:
 
-Payment is complete only after Moove reports:
+- receiving a payment URL;
+- provider create returning HTTP success;
+- link being `ACTIVE`;
+- the payer returning to an AgentPay page.
 
-```text
-status = completed
-```
+Completion requires reconciled provider status `COMPLETED`. AgentPay then stores provider destination/token/received-amount/transaction evidence and transitions local state under serialized database control so concurrent refresh/reconciliation cannot emit duplicate completion events.
 
-AgentPay then persists provider evidence and creates completion events in the same serialized database transaction that changes local status to `COMPLETED`. This prevents concurrent polling/reconciliation from emitting duplicate business-completion events.
+## Resource binding
 
-Events:
+A resource-bound payment validates that the resource belongs to the organization before provider creation. Completion emits a durable resource-payment event that downstream resource/workflow logic can consume. Reconciliation itself does not execute arbitrary resource URLs.
 
-```text
-MOOVE_PAYMENT_COMPLETED
-MOOVE_RESOURCE_PAYMENT_COMPLETED   (when resourceListingId is bound)
-AGENT_INVOICE_PAID                 (only after strict invoice verification)
-```
+## Invoice binding
 
-The resource event is the safe automation boundary for a worker to execute/deliver a paid service. Do not automatically invoke arbitrary resource URLs from the reconciliation transaction; job input, retry semantics and fulfillment security belong to the resource/workflow layer, not the payment-provider callback.
+Before a linked invoice can become `PAID`, AgentPay verifies:
+
+- invoice ownership and payable state;
+- agent/issuer relationship where applicable;
+- single-use link requirement;
+- configured settlement network/symbol/decimals;
+- exact requested decimal amount converted with integer-safe arithmetic;
+- exact provider-reported received amount;
+- provider completion evidence.
+
+An unrelated payment to the same Moove account cannot satisfy the invoice simply because it has a similar description.
 
 ## Agent integrations
 
-### SDK
-
-`AgentPayClient` exposes:
+### TypeScript SDK
 
 ```ts
 createMooveReceivePayment(input, idempotencyKey)
@@ -262,51 +213,41 @@ waitForMooveReceivePayment(id)
 
 ### MCP
 
-The AgentPay MCP endpoint exposes:
-
 ```text
 agentpay_create_moove_payment_link
 agentpay_get_moove_payment_status
 ```
 
-Create requires `payments:create`; status requires `payments:read`. The agent never receives the Moove API key.
-
 ### LangChain
 
-`createAgentPayMooveReceiveTool(client, agentId)` exposes payment-link creation with an explicit stable idempotency key.
+`createAgentPayMooveReceiveTool(client, agentId)` creates receive links using an explicit stable idempotency key.
+
+The agent never receives the Moove API key.
 
 ## Security controls
 
-- Moove credential is server-only and organization-bound.
-- Production provider URL is pinned to `api.moove.xyz` unless an explicit reviewed custom-host override is set.
-- Provider JSON is schema-validated with Zod before use.
-- Decimal money values remain decimal strings; JavaScript floating-point arithmetic is not used for invoice matching.
-- Invoice conversions use exact `BigInt` atomic arithmetic.
-- Local reads are tenant-scoped; agent status reads are additionally agent-scoped.
-- Resource/invoice IDs are checked against the owning organization before provider creation.
-- POST creation is locally idempotent and not blindly retried.
-- Completion transitions use a PostgreSQL advisory lock + serializable transaction.
-- Scheduled reconciliation uses constant-time secret comparison.
-- Provider evidence is retained for audit and reconciliation without storing the Moove API key.
-- Readiness fails when Moove is enabled with invalid integration configuration.
+- server-only, organization-bound provider credential;
+- reviewed production provider origin;
+- schema validation for provider payloads;
+- decimal strings and integer-safe invoice matching;
+- tenant/agent-scoped reads;
+- resource/invoice ownership validation before create;
+- no blind write retry;
+- serialized completion transition;
+- constant-time secret handling for scheduler authorization where implemented;
+- retained provider evidence without retained provider secret;
+- readiness failure when enabled configuration is incomplete.
 
-## Operational verification
+## Production verification
 
-Before enabling in production:
-
-1. Apply all Prisma migrations, including `20260907110000_moove_receive`.
-2. Create a dedicated Moove API key with only `payment_link:create` and `payment_link:read`.
-3. Set `MOOVE_ACCOUNT_ORGANIZATION_ID` to the intended AgentPay tenant.
-4. Confirm the Moove account has its handle/default settlement wallet configured.
-5. If invoice automation is used, set and independently verify the settlement network/symbol/decimals.
-6. Set `CRON_SECRET` to at least 32 random characters and schedule reconciliation.
-7. Call `/api/v1/ready`; Moove must report `configured` when enabled.
-8. Create a low-value single-use test link through AgentPay.
-9. Pay it through the Moove-hosted URL.
-10. Verify AgentPay reaches `COMPLETED`, stores received/token/transaction evidence, and emits exactly one completion event.
-11. Repeat using an invoice only after the generic flow succeeds; verify exact asset/amount checks and the invoice `PAID` transition.
-12. Exercise a forced provider timeout in staging and verify the record remains `SUBMISSION_UNKNOWN` and is recovered rather than duplicated.
-
-## Current provider limitation
-
-Moove Receive is a receive-side rail. The live API key cannot be used by AgentPay to redirect/withdraw the account's funds or to perform autonomous sends. AgentPay's existing x402/Masumi/Cardano/Hedera/Arc outgoing rails remain separate. Add future Moove Send/Swap/Ramp rails only after the corresponding public production API contracts exist and receive their own threat-model, custody, policy, idempotency and reconciliation review.
+1. Apply the Moove SQL migration.
+2. Configure a dedicated API credential with the minimum payment-link scopes.
+3. Bind it to the intended AgentPay organization.
+4. Verify the provider account's settlement wallet/token configuration.
+5. Configure exact settlement identity before enabling invoice automation.
+6. Configure and protect reconciliation scheduling.
+7. Verify `/api/v1/ready` reports the intended Moove capability.
+8. Create/pay a deliberately low-value single-use link.
+9. Confirm one local `COMPLETED` transition with token/amount/transaction evidence.
+10. Test an invoice-bound payment separately and verify exact matching.
+11. Simulate an uncertain create in staging and confirm recovery without duplicate link creation.

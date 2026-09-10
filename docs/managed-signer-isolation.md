@@ -1,173 +1,131 @@
-# AgentPay Managed Signer and Payment-Identity Isolation
+# Managed Signer and Payment-Identity Isolation
 
-**Status:** Current implementation  
-**Updated:** 2026-08-22
+**Updated:** 2026-09-10
 
-## Revision note
+## Purpose
 
-AgentPay now supports Cardano Mainnet autonomous managed agents through external per-agent Ed25519 custody. The isolation rule applies consistently across Hedera, Arc and Cardano, and the documentation no longer treats Cardano Mainnet as self-custody-only.
+Managed payment execution requires infrastructure shared by many organizations and agents without sharing the actual autonomous payer identity. AgentPay therefore separates service identity from agent payment identity.
 
 ## Core invariant
 
-A shared service is permitted. A shared managed-agent payment identity is not.
-
 ```text
-(network, canonical account identity)
-          -> one PaymentAccount
-          -> one agent
+(network, canonical payment identity)
+        -> exactly one PaymentAccount
+        -> exactly one agent
 ```
 
-The same blockchain payment identity must not be assigned to two agents, including agents in different organizations or concurrent application replicas.
+A facilitator, signer process, database, or provider service may be multi-tenant. A managed-agent blockchain payer may not be assigned to multiple agents.
 
 ## Database enforcement
 
-Migration `20260821080000_payment_identity_isolation` enforces the invariant with:
+The payment-identity isolation migration and provisioning logic use:
 
-- canonical identity normalization;
-- a unique canonical identity index;
-- a transaction-scoped PostgreSQL advisory lock for competing claims.
+- network-aware canonical normalization;
+- a unique canonical identity constraint/index;
+- transaction-scoped PostgreSQL advisory locking around competing claims.
 
-If legacy duplicate identities exist, migration or provisioning must fail closed. Historical settlement evidence is retained; affected managed agents are archived or reprovisioned rather than having past payer evidence rewritten.
+Application prechecks improve errors but are not the concurrency authority; the database constraint remains final.
 
-## Current managed identity modes
+Legacy duplicate identities are not repaired by rewriting historical settlement evidence. Conflicting managed agents must be retired/reprovisioned under new identities.
 
-### Hedera Testnet
+## Hedera Testnet
 
-Each managed agent receives a distinct Ed25519 identity or account. The testnet derivation secret remains isolated to the appropriate service.
+Managed agents receive distinct Ed25519 test identities/accounts. Infrastructure operator or fee-payer credentials are service principals, not agent accounts.
 
-### Arc Testnet
+## Arc Testnet
 
-Each managed agent receives a distinct secp256k1 address. Infrastructure relayer or contract-execution keys are not agent wallets.
+Managed agents receive distinct secp256k1 addresses. Relayer/contract-executor identities are infrastructure capabilities and must never be copied into an agent `PaymentAccount` as though they were its wallet.
 
-### Cardano Preprod
+## Cardano Preprod
 
-Each managed agent receives a distinct Ed25519 payment identity and address derived inside the isolated signer from the testnet-only master secret.
+The isolated signer derives one Ed25519 identity per immutable Agent ID from a signer-only test secret:
 
 ```text
-immutable Agent ID
-  -> signer-only derivation
-  -> unique Ed25519 key
-  -> unique addr_test1...
+Agent ID -> deterministic test derivation -> public key -> addr_test1...
 ```
 
-### Cardano Mainnet
+The derivation secret never belongs in Vercel and is never valid for Mainnet.
 
-When autonomous managed custody is enabled, each immutable Agent ID resolves to a distinct external Ed25519 public key and signer reference.
+## Cardano Mainnet
+
+Mainnet offers two separate custody modes:
+
+### Self custody
+
+AgentPay prepares a bounded transaction for the verified payer; the user's/provider's wallet signs outside AgentPay.
+
+### External per-agent managed custody
 
 ```text
 Agent ID
-  -> external custody /identity
-  -> publicKeyHex + signerRef
-  -> AgentPay derives addr1... locally
-  -> unique PaymentAccount
+ -> custody /identity
+ -> stable publicKeyHex + signerRef
+ -> AgentPay derives addr1... locally
+ -> unique PaymentAccount
 ```
 
-There is no Cardano Mainnet managed-agent master key or deployment-wide autonomous-agent payer.
+For signing, AgentPay sends the exact Agent ID, signer reference, payer address, and transaction-body hash. It rejects public-key/signer-reference drift and verifies the returned Ed25519 signature locally.
 
-Self-custody Mainnet wallets remain supported separately.
+There is no deployment-wide Mainnet managed-agent master signing key and no fallback to another agent's identity.
 
-## Testnet master secrets
+## Test-only master secrets
 
-The deterministic managed-agent master secrets are testnet-only:
+Managed derivation secrets used for test profiles must be:
+
+- independent per rail;
+- cryptographically random at creation;
+- stored only in the service requiring them;
+- excluded from browser/control-plane logs;
+- prohibited from Mainnet custody profiles.
+
+## Moove account binding
+
+Moove Receive is not a per-agent blockchain wallet model. The Moove API credential represents an account whose settlement destination is configured at the Moove account level.
+
+AgentPay therefore uses a different isolation rule for this rail:
 
 ```text
-HEDERA_MANAGED_AGENT_MASTER_KEY
-ARC_MANAGED_AGENT_MASTER_KEY
-CARDANO_MANAGED_AGENT_MASTER_KEY
+one deployed Moove account credential -> one AgentPay organization
 ```
 
-They must:
+Agents inside that organization can receive only through authorization/scoping rules. Sibling organizations cannot use the credential or attach their invoices/resources to its links.
 
-- be independent from one another;
-- contain 32 cryptographically random bytes encoded as canonical unpadded base64url;
-- remain on the appropriate signer or facilitator service;
-- never be copied to Vercel;
-- never be configured on a Mainnet service.
+## Stripe/provider identities
 
-## Cardano Mainnet custody boundary
-
-Signer-only configuration:
-
-```text
-CARDANO_MAINNET_AGENT_CUSTODY_URL
-CARDANO_MAINNET_AGENT_CUSTODY_API_KEY
-```
-
-The external provider is a separate deployment and security boundary and implements:
-
-```text
-POST /identity
-POST /sign
-```
-
-AgentPay accepts public identity material only. Private keys remain external.
-
-Before signing, AgentPay verifies that the externally resolved public key derives the expected Cardano Mainnet payer address. During signing, only the transaction-body hash is sent to the exact signer reference. Returned signatures are verified locally.
-
-The following are forbidden fallbacks:
-
-- shared Mainnet hot wallet;
-- deterministic Mainnet master key;
-- another agent's signer reference;
-- deployment-wide payer;
-- accepting a changed public key or signer reference without failure.
-
-## Dedicated routes
-
-Managed-agent identity and signing uses dedicated routes rather than a shared deployment-wide signing identity:
-
-```text
-/managed-identity
-/managed-agent-sign
-```
-
-For Cardano these routes are network-namespaced by the combined facilitator and signer topology.
-
-The old generic shared `/managed-sign` path is deliberately disabled for the isolated-agent model.
-
-## Infrastructure identities are not agent wallets
-
-Service principals such as:
-
-- Hedera operator or fee payer;
-- Arc relayer or contract executor;
-- settlement-store capability;
-- Cardano facilitator and signer API credentials;
-
-must never be copied into an agent's `PaymentAccount.accountId` merely because they exist in the same deployment.
-
-## Concurrency behavior
-
-Provisioning two agents concurrently with the same canonical identity must result in at most one successful identity claim. Application-level prechecks are not sufficient; the database-level lock and unique constraint are the authoritative protection.
+Stripe cardholder/card/financial-account identifiers are provider resources, not blockchain managed payment identities. They remain organization-scoped and access-controlled, but are not inserted into the blockchain `PaymentAccount` uniqueness model.
 
 ## Failure behavior
 
-Identity and custody errors fail closed. In particular:
+Fail closed on:
 
-- duplicate canonical identity -> provisioning rejected;
-- Mainnet custody unavailable -> managed provisioning or signing unavailable;
-- invalid external public key -> rejected;
-- externally claimed address mismatch -> rejected;
-- returned signer reference mismatch -> rejected;
-- returned public-key mismatch -> rejected;
-- invalid Ed25519 signature -> rejected.
+- duplicate canonical blockchain identity;
+- mismatched network/address normalization;
+- Mainnet custody outage;
+- invalid custody public key;
+- claimed Cardano address mismatch;
+- changed signer reference/public key;
+- invalid returned signature;
+- use of test master secrets in prohibited production/Mainnet profiles;
+- Moove organization/account binding mismatch.
 
-No failure path may silently assign or sign with a different agent's identity.
+## Rotation and retirement
 
-## Operational verification
+Credential rotation must distinguish:
 
-Before enabling managed agents on a release and profile:
+- application credential rotation;
+- infrastructure API-key rotation;
+- external custody capability rotation;
+- managed payment-identity replacement.
 
-1. run the concurrent identity-isolation verification against a disposable database;
-2. provision two distinct agents;
-3. verify they receive distinct canonical identities;
-4. for Cardano Mainnet, verify distinct `publicKeyHex`, `signerRef` and locally derived `addr1...` values;
-5. verify signer and custody capability credentials are isolated from Vercel;
-6. execute a low-value transaction for the intended profile;
-7. test custody-provider failure and confirm no shared fallback occurs.
+Rotating a service credential should not rewrite historical payer identity. Replacing a managed payment identity creates/attaches a new canonical identity while preserving old settlement evidence for audit and reconciliation.
 
-## Update provenance
+## Verification
 
-This document was updated after the Cardano Mainnet external per-agent custody implementation was merged. The documented isolation invariant now matches the current code and no longer implies that autonomous managed identities stop at testnet.
+Before enabling a managed profile:
 
-Primary builder: **Daniel Praise** (`Daniel419797`).
+1. run the concurrent identity-isolation test against a disposable database;
+2. provision at least two agents and confirm distinct canonical identities;
+3. verify service/operator credentials are not represented as agent wallets;
+4. for Cardano Mainnet managed custody, confirm distinct stable `publicKeyHex`, `signerRef`, and derived `addr1...` values;
+5. test custody/provider failure and verify no shared fallback;
+6. perform a deliberate low-value canary before material funding.

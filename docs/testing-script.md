@@ -1,322 +1,182 @@
-# AgentPay: Current Feature Testing Script
+# AgentPay Verification Guide
 
-**Status:** Current implementation verification guide  
-**Updated:** 2026-08-22
+**Updated:** 2026-09-10
 
-## Revision note
+The objective is to prove both deterministic source behavior and the external evidence paths required by each enabled financial profile.
 
-The previous testing script centered the original Hedera flow and did not test the implemented Cardano Mainnet external per-agent custody or the current unified topology. This version covers the control plane, identity isolation, Cardano, trust and reconciliation behavior while keeping optional provider features conditional on configuration.
+## 1. Repository verification
 
-## 1. Repository baseline
+Install with the pinned supported Node/npm versions and run the repository verification commands from the exact candidate revision.
 
-From the exact release head, execute the applicable repository checks rather than relying on deployment status alone.
-
-### Dashboard
+Typical dashboard checks:
 
 ```bash
-cd dashboard
-npm run lint
-npm run typecheck
-npm test
-npm run build
+npm run lint --workspace=agentpay-control
+npm run typecheck --workspace=agentpay-control
+npm test --workspace=agentpay-control
+npm run build --workspace=agentpay-control
 ```
 
-### Payment-identity isolation
+Also run Hedera, Arc, combined facilitator, resource-server, and Cardano signer checks through the repository CI scripts/workspace commands.
 
-Use only the disposable test or local database intended by the verification script:
+## 2. Test database
 
-```bash
-cd dashboard
-npm run verify:identity-isolation
-```
-
-Expected: competing claims for the same canonical payment identity cannot both succeed.
-
-### Cardano signer
-
-Run the checked-in signer tests, image and build path used by the repository workflow. Verify the suite covers network guards, transaction construction and managed-agent identity and signature behavior.
-
-### Facilitators and resource server
-
-Run Hedera, Arc, combined facilitator and resource-server tests and builds applicable to the release.
-
-## 2. Authentication and tenancy
+DB-backed tests require a reachable disposable/test PostgreSQL instance with the expected migrations. Never point destructive/integration verification at an unreviewed production database.
 
 Verify:
 
-- dashboard sign-in works using configured authentication method;
-- organization-scoped pages and API calls require authentication;
-- users cannot read or mutate another organization's records by guessing IDs;
-- Owner, Operator, Approver and Viewer permissions are enforced server-side;
-- agent credentials reject invalid, expired, revoked or missing scopes.
+- migrations apply cleanly;
+- concurrent payment-identity claims enforce uniqueness;
+- transactional completion/outbox state is consistent;
+- idempotency conflict behavior works;
+- cleanup is bounded to test-owned records.
 
-## 3. Agent and payment-identity provisioning
+Vercel preview builds should not fail because a DB-backed unit/integration test inherited an unreachable external production database; keep that class of test in an environment that provisions its database deliberately.
 
-### Hedera Testnet
+## 3. Authentication/RBAC/tenancy
 
-Create two managed agents and verify distinct Hedera payment identities.
+Test invalid/expired/revoked sessions and agent credentials, missing scopes, role boundaries, guessed cross-tenant IDs, workspace membership changes, and privileged organization actions.
 
-### Arc Testnet
-
-Create two managed agents and verify distinct EVM addresses.
-
-### Cardano Preprod
-
-Create two managed agents and verify:
-
-- both use `addr_test1...`;
-- addresses differ;
-- payment accounts are stored as distinct canonical identities;
-- testnet master secret is not present in Vercel.
-
-### Cardano Mainnet external delegated
-
-Only run live if external custody is actually configured.
-
-Create two agents and verify:
-
-- both use `addr1...`;
-- each resolves to its own external Ed25519 identity;
-- public keys and signer references differ;
-- local derived address matches the external public key;
-- no Mainnet managed-agent master key exists;
-- custody API credential exists only on the signer.
-
-Negative cases:
-
-- same external identity returned for a second agent -> duplicate identity rejected;
-- invalid public key -> provisioning rejected;
-- claimed address mismatch -> rejected;
-- custody unavailable -> fail closed.
-
-## 4. Policy tests
-
-Publish a restrictive policy and test:
-
-- within-limit -> `ALLOW`;
-- over-limit with deny behavior -> `DENY`;
-- over-limit with approval behavior -> `REQUIRE_APPROVAL`;
-- merchant and resource allow or deny rule;
-- schedule activation and expiry;
-- velocity and cooldown where configured;
-- immutable published version behavior.
-
-Confirm denied requests do not reach signing.
-
-## 5. Approval tests
-
-- create an approval-required request;
-- verify `APPROVAL_PENDING`;
-- verify an unauthorized user cannot decide it;
-- verify self-approval is blocked where applicable;
-- approve through a valid approver;
-- verify execution resumes once;
-- reject a separate request and verify no signing or submission.
-
-## 6. Spend reservation and idempotency tests
+## 4. Policy and approvals
 
 Verify:
 
-- authorized intent creates or uses a durable spend reservation;
-- duplicate idempotency key with identical request returns existing intent;
-- same idempotency key with different request causes conflict;
-- stale balance data cannot ignore active, consumed or recently settled commitments;
-- failed-before-submission behavior releases or updates reservation according to state;
-- ambiguous post-sign or submission outcome does not behave like clean pre-sign failure.
+- within-policy authorization;
+- deny behavior;
+- approval-required behavior;
+- merchant/resource/category/network/asset constraints;
+- schedule/velocity/cooldown;
+- immutable published versions;
+- threshold/separation rules;
+- approval cannot be reused for a different operation;
+- kill switch blocks new risky side effects.
 
-## 7. Direct x402 resource test
+## 5. Reservations/idempotency
 
-Use a registered x402 resource.
+Test identical retry, conflicting retry, concurrent spend near limits, failed-before-submission release behavior, and ambiguous post-submission retention. Verify no duplicate side effect occurs merely because the original response is lost.
 
-Expected path:
+## 6. Direct x402
+
+With a controlled resource server:
 
 ```text
-GET resource
- -> 402 Payment Required
- -> select exact requirement
- -> policy/trust evaluation
- -> reserve spend
- -> sign/prepare
- -> request resource with payment payload
- -> resource verify/settle
- -> paid response
+GET -> 402 requirements -> canonical validation -> policy/trust
+ -> reserve/approve -> sign/prepare -> verify/settle
+ -> paid response -> persisted fulfillment
 ```
 
-Validate resource URL canonicalization and SSRF restrictions.
+Test SSRF/private-network rejection, redirects, malformed requirements, amount/payee/network mismatch, oversized responses, and resource-binding mismatch.
 
-## 8. Cardano Preprod direct x402 test
+## 7. Hedera
 
-Use a deliberately funded low-value agent.
+Exercise configured Testnet/Mainnet profiles with low-value accounts. Test exact payer/payee/amount/network validation, credential/custody failures, settlement evidence, and managed Testnet identity isolation.
 
-Verify:
+## 8. Arc
 
-- requirement network is `cardano:preprod`;
-- scheme is `exact`;
-- `resourceBinding` matches canonical URL;
-- payer address matches the agent's managed identity;
-- signer constructs valid CBOR;
-- facilitator independently verifies transaction;
-- facilitator submits via Blockfrost;
-- chain evidence confirms payer, payee, asset and amount;
-- AgentPay settlement state becomes confirmed or settled.
+Exercise Arc Testnet with controlled accounts/contracts. Test network/contract/amount/payee mismatches and settlement evidence. Do not interpret source support as an unconfigured Mainnet profile.
 
-## 9. Cardano Mainnet self-custody test
+## 9. Cardano
 
-Only use a deliberately low-value verified wallet.
+### Preprod managed
 
-Verify:
+Provision multiple agents and verify distinct `addr_test1...` identities. Test transaction construction, independent facilitator CBOR verification, supported asset profile, Blockfrost submission, and chain evidence.
 
-- unsigned transaction prepared for exact payer;
-- wallet or provider signs outside AgentPay;
-- signed transaction satisfies facilitator checks;
-- submission is performed by facilitator, not signer;
-- resulting transaction is independently confirmed.
+### Mainnet self custody
 
-## 10. Cardano Mainnet external per-agent managed test
+With low-value verified wallet, prepare unsigned transaction, sign externally, return signed CBOR, and verify facilitator rejects any mutated transaction.
 
-Run only if a real external custody adapter is configured.
+### Mainnet external custody
 
-Expected sequence:
+Test distinct/stable agent identity, local address derivation, body-hash-only signing, signerRef/publicKey consistency, local Ed25519 signature verification, and fail-closed provider outage/invalid signature.
 
-```text
-AgentPay
- -> facilitator /managed-agent-sign
- -> signer resolves /identity
- -> signer constructs transaction
- -> signer hashes transaction body
- -> custody /sign exact signerRef
- -> signer verifies Ed25519 signature locally
- -> facilitator independently verifies CBOR
- -> facilitator submits through Blockfrost
- -> confirmation evidence
-```
+### Transaction negatives
 
-Negative cases:
+Reject unsupported scripts/minting/certificates/withdrawals/collateral/bootstrap witnesses/auxiliary data, unrelated assets/outputs, excessive fee/inputs, invalid TTL, conservation mismatch, and replay.
 
-- changed signer reference -> reject;
-- changed public key -> reject;
-- invalid signature -> reject;
-- custody timeout or unavailable -> reject and fail closed;
-- no fallback to another agent or shared payer.
+### Ambiguous submission
 
-## 11. Cardano asset and profile tests
+Force an uncertain Blockfrost response after possible submission and verify pending state, retained claim/reservation, independent reconciliation, and no blind resubmit.
 
-### ADA
+## 10. Moove Receive
 
-Verify exact `lovelace` amount, payer-only change, fee and value conservation.
+Unit/integration tests should cover:
 
-### Configured native token or USDCx
+- API-key header and provider schema validation;
+- safe read retries;
+- no blind create retry;
+- durable idempotency/conflict;
+- ambiguous create marker recovery;
+- account-list pagination limits;
+- tenant/agent/resource/invoice ownership;
+- exact decimal/atomic conversion;
+- invoice settlement token/network/decimals/amount mismatch;
+- serialized completion preventing duplicate events.
 
-When enabled, verify:
+Controlled provider smoke:
 
-- exact configured asset identity;
-- no unrelated native assets;
-- exact token conservation;
-- exact payee token amount;
-- change only to payer;
-- Preprod token is never presented as Mainnet USDCx.
+1. create low-value single-use link;
+2. pay through hosted page;
+3. refresh/reconcile;
+4. verify `COMPLETED`, destination/token/received amount/transaction evidence;
+5. verify one completion event;
+6. repeat with invoice binding after generic flow succeeds.
 
-Reject unsupported scripts, minting, certificates, withdrawals, collateral, bootstrap witnesses, auxiliary data and unrelated outputs.
+## 11. Stripe cards and fiat
 
-## 12. Replay and resource-binding tests
+### Sandbox
 
-- same resource and idempotent retry remains safe;
-- same price and payee but different canonical resource URL must not reuse binding;
-- conflicting settlement claim for same transaction ID must reject;
-- spent or unavailable UTxO nonce must reject when a new claim is attempted.
+Verify cardholder/card/account/transfer orchestration without claiming real provider activity. Confirm sandbox display-key request is unavailable.
 
-## 13. Ambiguous submission test
+### Stripe-controlled environment
 
-In a safe environment, force a timeout or uncertain response after submission could have occurred.
+When eligible/configured, test cardholder creation, virtual-card issue/status, spending controls, ephemeral display-key flow, valid/invalid webhook signatures, financial account reads, inbound/outbound movement, and status reconciliation. Confirm AgentPay logs/database contain no raw PAN/CVC.
 
-Expected:
+## 12. Cross-chain
 
-- candidate transaction ID retained where known;
-- state becomes pending or `SUBMISSION_UNKNOWN`;
-- spend reservation not blindly released;
-- no blind resubmission;
-- reconciliation queries independent chain evidence;
-- confirmed evidence transitions to settled.
+Test supported network discovery, quote persistence, expiry/mismatch, prepare state, submit idempotency, source/destination binding, and uncertain-provider response recovery. Real-value test only on explicitly enabled routes.
 
-## 14. Pyth policy tests
+## 13. Invoices/resources/marketplace
 
-When enabled:
+Test provider/resource ownership, canonical endpoint, health state, price listing, marketplace discovery/reviews, invoice item/sequence/lifecycle events, send/collect/pay/void rules, payment association, and fulfillment only after validated settlement.
 
-- valid fresh observation -> conservative USD valuation;
-- stale observation -> fail closed;
-- future timestamp -> fail closed;
-- non-positive price -> fail closed;
-- excessive confidence width -> fail closed;
-- oracle failure does not relax atomic policy.
+## 14. Masumi
 
-## 15. Masumi tests
+Test registry identity/capability/payment facts and freshness. Separately test escrow funds-lock/result-hash/completion/refund/dispute/reconciliation behavior.
 
-### Registry and direct trust
+## 15. Pyth
 
-Verify network, registry policy, agent identifier, capability, seller address, payment credential and freshness.
+Test valid observation plus stale, future, non-positive, and wide-confidence inputs. Required observation failure must never relax base policy.
 
-### Escrow
+## 16. Veridian/KERIA
 
-When configured, verify:
+Test trusted credential plus untrusted issuer/schema, wrong subject/binding, stale/expired/revoked evidence, and verifier failure.
 
-```text
-PREPARED
- -> FundsLockingRequested
- -> FundsLocked
- -> ResultSubmitted
- -> Completed
-```
+## 17. Automation
 
-Confirm returned result hash matches the exact result before counting completion as verified.
+Test manual/webhook triggers, disabled rules, durable execution state, financial policy/approval participation, irreversible boundary checkpoint, decision route, kill switch, and duplicate-trigger/idempotency behavior.
 
-Exercise a separate refund or dispute path where appropriate.
+## 18. Financial intelligence
 
-## 16. KERI/Veridian tests
+Test aggregation/forecast/anomaly/recommendation computation from controlled observations. Confirm intelligence output cannot directly bypass policy or mutate payment authority.
 
-When configured:
+## 19. Audit/notifications/data lifecycle
 
-- valid verified credential passes required policy;
-- untrusted issuer or schema fails;
-- stale, expired or revoked credential fails;
-- Masumi-agent identity binding mismatch fails.
+Test audit integrity/export, outbox retry, endpoint authorization, support case tenancy, usage/entitlements, organization export, retention and deletion authorization. Verify sensitive values are redacted/excluded.
 
-## 17. Emergency stop
+## 20. Security pipeline
 
-- enable organization emergency stop;
-- attempt new payment or risky side effect -> blocked;
-- verify reconciliation and evidence access continues;
-- restore through authenticated administrative control;
-- confirm audit events exist.
+Run/inspect npm audit policy, OSV, Semgrep, Gitleaks, CodeQL, container builds, and dependency lock checks. A newly discovered high/critical issue must be resolved or handled by a narrowly reviewed exception with explicit evidence.
 
-## 18. Audit, reconciliation and analytics
+## 21. Final production canary
 
-Verify:
-
-- payment, policy, approval and security events are recorded;
-- transaction detail contains correct chain evidence;
-- reconciliation status is visible for ambiguous outcomes;
-- Dune, if enabled, contains public-chain facts only and is not needed for payment success.
-
-## 19. Optional product surfaces
-
-Virtual cards, fiat, cross-chain, invoices, marketplace, automations, notifications and financial-intelligence pages should be tested only against the provider and configuration mode actually enabled. Sandbox or fixture behavior must not be described as live production-provider evidence.
-
-## 20. Final release checklist
+For each enabled real financial profile:
 
 - [ ] exact release SHA recorded
-- [ ] expected CI jobs actually executed
-- [ ] migrations pass
-- [ ] concurrent identity-isolation check passes
-- [ ] dashboard lint, typecheck, tests and build pass
-- [ ] facilitator, signer and resource checks pass
-- [ ] selected network and custody canary succeeds
-- [ ] chain evidence independently verified
-- [ ] negative and fail-closed cases exercised
-- [ ] no secrets exposed in logs or screenshots
-- [ ] observed metrics clearly separated from proposal targets and fixtures
-
-## Update provenance
-
-Updated on 2026-08-22 because the previous script did not cover the implemented Cardano Mainnet external per-agent custody architecture or current multi-rail topology.
-
-Primary builder: **Daniel Praise** (`Daniel419797`).
+- [ ] CI/security green
+- [ ] migration/readiness green
+- [ ] scoped provider/network credentials verified
+- [ ] low-value positive path succeeds
+- [ ] key negative/fail-closed path succeeds
+- [ ] external settlement/provider evidence independently checked
+- [ ] no sensitive data exposed
+- [ ] reconciliation handles an ambiguous case safely

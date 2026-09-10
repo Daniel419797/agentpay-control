@@ -1,98 +1,182 @@
-# Security Policy
+# AgentPay Security Policy
 
-**Updated:** 2026-08-22
+AgentPay controls financial authorization, payment identities, provider credentials, settlement state, and autonomous-agent actions. Security issues affecting these boundaries should be reported privately and handled as potentially high impact until triaged.
 
-AgentPay controls payment credentials, spending policy, approvals, settlement workflows and multiple blockchain and provider boundaries. Security reports should be handled privately and should include enough evidence to reproduce and assess the issue without exposing real credentials or funds.
+## Supported version
 
-## Supported versions
-
-Security fixes are applied to the current `master` branch and the latest production release derived from it. Older unreleased commits are not maintained as separate supported versions.
+Security fixes target the current `master` branch and the latest production release derived from it. Older unreleased revisions are not maintained as separate supported versions.
 
 ## Reporting a vulnerability
 
-Do not open a public GitHub issue for a suspected vulnerability, leaked secret, authentication bypass, cross-tenant access issue, signing weakness, payment-identity collision, settlement ambiguity, SSRF path, webhook-verification issue, external-custody weakness or other security-sensitive defect.
+Do not open a public issue for suspected:
 
-Use GitHub's private vulnerability reporting or repository security advisory flow when it is enabled for this repository. If that private flow is unavailable, contact the repository owner privately through GitHub and provide only the minimum information needed to establish a secure reporting channel.
+- authentication or session bypass;
+- cross-tenant data access;
+- role or approval bypass;
+- agent credential leakage or scope escalation;
+- payment-policy bypass;
+- managed payment-identity collision;
+- private-key, card, provider-key, custody, or secret exposure;
+- forged provider webhook acceptance;
+- SSRF or unsafe paid-resource fetching;
+- replay, duplicate payment, or ambiguous-submission handling defects;
+- settlement-evidence mismatch;
+- supply-chain or deployment-secret exposure.
 
-A useful report includes:
+Use GitHub private vulnerability reporting/security advisories when available. Otherwise contact the repository owner privately and establish a secure reporting channel before sending sensitive evidence.
 
-- affected route, component, network or workflow;
-- attacker prerequisites and expected trust boundary;
-- reproducible steps using test accounts and non-production or low-value funds;
-- concrete impact and relevant logs or transaction identifiers with secrets removed;
-- suggested remediation when known.
+A useful report includes the affected route/service, attacker prerequisites, reproducible steps using non-production or low-value accounts, expected versus actual behavior, impact, and redacted logs/identifiers.
 
-Never include private keys, API keys, session cookies, managed-agent master keys, external HSM/KMS/delegation credentials, raw card data, unrestricted provider credentials or other live secrets in an issue, pull request, screenshot or report attachment.
+Never include live private keys, API keys, session cookies, card PAN/CVC, custody credentials, database passwords, webhook secrets, or unrestricted provider credentials in a public report.
 
-## Current high-value trust boundaries
+## Security objectives
 
-### Control plane: Vercel
+AgentPay is designed so an autonomous agent can request financial actions without receiving unrestricted authority over organization funds or payment infrastructure.
 
-Holds organization, policy and payment state. It must not receive blockchain private keys, testnet managed-agent master secrets or Cardano Mainnet custody API credentials.
+The system must prevent an agent or external dependency from:
 
-### Unified facilitator: Render
+- crossing organization boundaries;
+- acting as another agent;
+- bypassing published policy or required approvals;
+- changing the authorized amount, asset, network, payee, or resource after approval;
+- reusing one managed identity across multiple agents;
+- forcing a duplicate payment after an uncertain provider/network response;
+- turning provider request acceptance into false settlement;
+- weakening required price, counterparty, credential, or chain evidence.
 
-Holds rail-scoped protocol and infrastructure capabilities. On Cardano it independently verifies signed transactions, manages settlement claims and replay state, submits via Blockfrost and checks confirmation evidence. It does not hold the Cardano payer private key.
+## High-value trust boundaries
 
-### Cardano signer: Render
+### Next.js control plane
 
-Constructs Cardano transactions and performs the selected signing path. It may hold the Preprod testnet-only derivation secret and, when configured, the Mainnet external-custody API capability. It does not submit Cardano transactions on-chain.
-
-### External Cardano Mainnet custody
-
-Holds the managed-agent Mainnet private keys. AgentPay receives only a per-agent public key and signer reference and sends only the transaction-body hash for signing. Returned signatures are verified locally.
+Holds organization, user, agent, policy, approval, payment, invoice, resource, audit, notification, automation, and reconciliation state. It must not contain blockchain payer private keys or Cardano Mainnet external-custody private keys.
 
 ### PostgreSQL
 
-Enforces organization and payment state and the canonical one-payment-identity-per-agent invariant.
+Authoritative application-state boundary. It enforces transaction consistency, tenant-owned relationships, idempotency records, settlement state, and canonical managed payment-identity uniqueness.
 
-## Payment-identity security requirement
+### Hedera / Arc / combined facilitators
 
-A shared service deployment is permitted; a shared managed-agent payment identity is not.
+Rail-specific verification and settlement services. They must accept only supported payment profiles and must not gain organization-policy authority beyond the execution contract given by the control plane.
+
+### Cardano signer
+
+Constructs bounded Cardano transactions and signs under the selected custody profile. Preprod may hold a test-only derivation secret. Mainnet may hold only the external custody API capability required to resolve/sign for exact agents. The signer never submits Cardano transactions on-chain.
+
+### External Cardano Mainnet custody
+
+Holds managed Mainnet private keys. AgentPay resolves a stable public key/signer reference per agent and sends only the exact transaction-body hash for signing. Returned signatures are verified locally.
+
+### Moove
+
+Moove creates hosted receive-payment links and reports settlement evidence. The Moove API credential is server-only and bound to one AgentPay organization because the configured Moove account controls the settlement destination. A payment link/redirect is not payment proof.
+
+### Stripe card/fiat adapter
+
+Stripe restricted credentials, cardholder/card mutations, financial-account operations, and provider webhooks are a separate provider boundary. AgentPay stores non-secret card/account identifiers and validates Stripe webhook signatures. Raw PAN/CVC is not persisted by AgentPay.
+
+### Masumi, Pyth, Veridian/KERIA, Blockfrost, Dune
+
+Each external system has a narrow authority:
+
+- Pyth: price evidence for policy valuation;
+- Masumi: registry/counterparty evidence and separate escrow lifecycle;
+- Veridian/KERIA: credential-verification evidence;
+- Blockfrost: Cardano chain data/submission/confirmation provider;
+- Dune: read-only public analytics.
+
+No external data source may silently become the organization policy engine.
+
+### Resource URLs and agent clients
+
+Agent inputs, MCP/LangChain requests, browser requests, x402 challenges, and paid-resource URLs are untrusted until authenticated, canonicalized, authorized, and validated.
+
+## Managed payment-identity invariant
+
+A shared service may serve many agents; a shared managed-agent payment identity may not.
 
 ```text
 (network, canonical payment identity) -> one PaymentAccount -> one agent
 ```
 
-Duplicate identities, including concurrent cross-organization claims, must fail closed.
+Canonical normalization, database uniqueness, and transaction-scoped locking protect against concurrent duplicate claims.
 
-## Cardano Mainnet custody requirements
+## Financial side-effect safety
 
-- `CARDANO_MANAGED_AGENT_MASTER_KEY` is prohibited on Mainnet.
-- A deployment-wide autonomous-agent payer or private key is prohibited.
-- Mainnet external custody must resolve a stable per-Agent-ID Ed25519 identity.
-- AgentPay must derive the Cardano payer address locally from the returned public key.
-- Only the exact transaction-body hash may be sent for external signing.
-- Returned public-key or signer-reference changes must fail closed.
-- Returned Ed25519 signatures must verify locally.
-- Custody failure must not fall back to another agent, shared key or platform payer.
-- Custody API credentials must be signer-only and distinct from other signer or facilitator capabilities.
+Financial operations must identify the irreversible boundary and persist state before/after it appropriately.
 
-## Response and remediation
+- Before submission: a verified pre-submission failure may be safely reported.
+- After possible submission: preserve candidate identifiers, reservations, claims, and provider evidence; reconcile before retrying.
+- After settlement: fulfillment/notification failure does not undo the payment.
 
-Security reports are triaged by exploitability and impact. Payment authorization, cross-tenant access, credential disclosure, payment-identity collision, signature and settlement integrity, custody isolation and arbitrary contract execution are high-priority classes.
+Idempotency keys are not optional bookkeeping. They are part of duplicate-payment prevention.
 
-A validated vulnerability should be fixed on a dedicated branch, covered by a regression test when practical, reviewed and deployed from an immutable commit SHA.
+## Webhook security
 
-If active compromise is suspected:
+Provider webhooks must be verified before business state changes. Current Stripe handling validates the signed timestamp/signature with a bounded tolerance. Webhook bodies/signatures are treated as untrusted input until verification succeeds.
 
-1. use the organization emergency stop and provider-side revocation or freeze controls where applicable;
-2. rotate or disable affected credentials or custody capability;
-3. stop funding or using affected payment identities;
-4. preserve audit, provider and chain evidence;
-5. reconcile ambiguous blockchain or fiat submissions before retrying;
-6. restore service only after the affected trust boundary has been reviewed.
+Scheduled/internal reconciliation endpoints use separate secrets/authorization and should not rely on browser cookies for background authority.
 
-## Production security requirements
+## Card and fiat security
 
-Production releases should execute the repository checks required by the enabled profile, including relevant CI, CodeQL, dependency review, migrations, identity-isolation checks, unit and browser tests and container builds. A workflow that fails before executable steps are created is infrastructure-blocked and is not a successful security validation.
+- Use provider-issued restricted credentials with minimum capability.
+- Do not persist or log raw PAN/CVC.
+- Do not expose provider restricted keys to agents, browsers, SDK clients, MCP clients, or LangChain tools.
+- Sandbox card/fiat behavior is development-only and must not be represented as real funds/card evidence.
+- Provider acceptance and terminal transfer success are distinct states.
 
-Production configuration must fail closed when required payment or custody dependencies are absent. Signing, settlement, contract-execution, settlement-claim and custody capabilities must remain scoped and separated.
+## Moove security
 
-Where managed Mainnet private keys are used, they remain in an external HSM/KMS/delegated custody system rather than ordinary AgentPay application configuration.
+- Keep `MOOVE_API_KEY` server-side.
+- Restrict production API traffic to the reviewed Moove API origin unless an explicit environment override is intentionally configured.
+- Bind the account credential to the intended AgentPay organization.
+- Do not blindly retry create-payment-link POST requests after an ambiguous response.
+- Reconcile provider-visible links using the durable AgentPay marker.
+- For invoice automation, verify exact configured settlement network, symbol, decimals, requested amount, and received amount before `PAID`.
 
-## Project contact and provenance
+## Cardano security
 
-The repository owner and primary technical contributor is **Daniel Praise** (`Daniel419797`).
+- `CARDANO_MANAGED_AGENT_MASTER_KEY` is testnet-only and prohibited on Mainnet.
+- No deployment-wide Mainnet managed-agent payer/private key.
+- External custody identity must remain stable per Agent ID.
+- AgentPay derives the expected Cardano address locally from the returned public key.
+- Only the exact transaction-body hash is submitted for external signing.
+- Returned Ed25519 signatures are locally verified.
+- The facilitator independently validates signed transaction CBOR before submission.
+- Unsupported transaction complexity is rejected.
+- Ambiguous Blockfrost submission is reconciled rather than blindly resubmitted.
 
-See [`docs/threat-model.md`](docs/threat-model.md), [`docs/managed-signer-isolation.md`](docs/managed-signer-isolation.md) and [`docs/production-readiness.md`](docs/production-readiness.md) for the current detailed security model.
+## External resource security
+
+Paid-resource fetching must defend against SSRF, redirects to disallowed targets, oversized/unbounded responses, malformed x402 requirements, resource-binding mismatch, and attempts to swap the authorized payee or amount.
+
+## Supply-chain and release security
+
+Production candidates should run the repository's applicable gates, including:
+
+- lint, typecheck, unit/integration tests, and production builds;
+- npm production dependency audit policy;
+- OSV analysis;
+- Semgrep;
+- Gitleaks;
+- CodeQL;
+- Cardano signer tests;
+- production service/container builds;
+- migration and identity-isolation verification;
+- release-evidence generation.
+
+A failed or skipped execution is not equivalent to a passing security check.
+
+## Incident response
+
+If active compromise or incorrect financial behavior is suspected:
+
+1. enable the organization kill switch or provider/network containment appropriate to the incident;
+2. revoke/rotate affected agent, provider, signer, webhook, or custody credentials;
+3. freeze affected cards/accounts or stop funding affected blockchain identities where applicable;
+4. preserve audit, provider, database, and chain evidence;
+5. reconcile every operation whose submission state is uncertain;
+6. identify affected organizations, agents, payment identities, and external capabilities;
+7. deploy a reviewed fix from an exact commit;
+8. restore the affected profile only after readiness and low-value verification succeed.
+
+See [`docs/threat-model.md`](docs/threat-model.md), [`docs/managed-signer-isolation.md`](docs/managed-signer-isolation.md), and [`docs/production-readiness.md`](docs/production-readiness.md).

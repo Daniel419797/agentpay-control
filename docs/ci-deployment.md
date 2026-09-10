@@ -1,122 +1,78 @@
-# AgentPay CI and Deployment
+# CI and Release Pipeline
 
-**Status:** Current release pipeline description  
-**Updated:** 2026-08-22
+**Updated:** 2026-09-10
 
-## Revision note
+AgentPay uses CI as a release gate for a financial control system, not merely as a compile check. The expected jobs must actually execute on the exact candidate SHA.
 
-The release documentation reflects the current Cardano Mainnet external per-agent custody implementation and the Vercel plus two-service Render topology. It also preserves the rule that a GitHub Actions job failing before executable steps are created is infrastructure-blocked, not evidence that application tests failed.
+## Pipeline responsibilities
 
-## Release topology
+Current repository checks include:
 
-One immutable Git commit is promoted to:
+- dependency installation/resolution and lockfile regeneration validation;
+- dashboard lint, Next type generation, TypeScript typecheck, unit tests, and production build;
+- Hedera facilitator typecheck/tests/build;
+- Arc facilitator typecheck/tests/build;
+- combined facilitator typecheck/tests/build;
+- resource-server typecheck/tests/build;
+- Cardano signer validation/tests;
+- production container builds;
+- npm production dependency audit;
+- OSV dependency scanning;
+- Semgrep source scanning;
+- Gitleaks repository-tree scanning;
+- CodeQL;
+- release evidence/artifact generation.
 
-```text
-GitHub commit
-  |-- Vercel: dashboard/API
-  `-- Render Blueprint
-      |-- agentpay-facilitator
-      `-- agentpay-cardano-signer
-```
+## Production dependency audit policy
 
-External providers, PostgreSQL and paid-resource servers are configured around that release but are not collapsed into these two Render services.
+The security pipeline refreshes dependency resolution metadata in the ephemeral CI checkout before scanning so audit tools evaluate the graph selected by the current manifests/overrides rather than stale lock metadata.
 
-## Required repository gates
+Known-advisory exceptions, if ever necessary, must be exact and reviewed. The preferred response is to upgrade/override to a patched compatible dependency and prove compatibility through the full test/build pipeline.
 
-The applicable exact-head release checks include:
+## Lockfile handling
 
-1. PostgreSQL migration validation.
-2. Concurrent global payment-identity isolation verification.
-3. Dashboard lint, typecheck, unit tests and production build.
-4. Cardano signer syntax, tests and image build.
-5. Hedera facilitator typecheck, tests and build.
-6. Arc facilitator typecheck, tests and build.
-7. Combined facilitator typecheck, tests and build.
-8. Resource-server tests and build when included in the release profile.
-9. Browser smoke tests where required.
-10. CodeQL, dependency review and other configured security gates.
-11. Production container build verification.
+`package.json` security overrides are part of the dependency policy. The generated `package-lock.json` should be kept synchronized with manifests using the pinned npm version.
 
-A deployment object or workflow status is not enough; the expected executable checks must actually run.
+The lockfile-regeneration job is validation/evidence tooling; the release branch should ultimately contain a reproducible lockfile rather than relying indefinitely on ephemeral regeneration.
 
-## Infrastructure-blocked workflow rule
+## Vercel build
 
-If GitHub Actions creates no executable job steps and marks a run failed before those steps exist, classify the run as **workflow or infrastructure blocked**. Do not claim that application tests passed, and do not misreport it as a code-test failure without step or log evidence.
+The dashboard build runs repository-wide verification through the configured prebuild before the final Next production build. This intentionally catches failures in sibling payment services that the dashboard relies on.
 
-## Production trust boundaries
+Preview environments must not attempt DB-backed tests against an unavailable production/external database. DB integration tests should run in CI with a reachable disposable database or in a specifically provisioned preview test environment.
 
-### Vercel dashboard and API
+## CircleCI release flow
 
-Policy, tenancy, approvals, spend reservations, audit, reconciliation and database access. No blockchain private keys, managed-agent master keys or Cardano Mainnet custody API credentials.
+The configured production workflow runs verification, security, CodeQL, Cardano signer, container builds, lockfile regeneration, and a release-gate job whose prerequisites require the relevant core checks.
 
-### `agentpay-facilitator`
+A status badge is supporting evidence; the actual executed job/step result for the exact commit is authoritative.
 
-Public multi-rail service for Hedera Testnet and Mainnet, Arc Testnet, and Cardano Preprod and Mainnet. The Cardano path independently verifies transactions, manages replay and claim state, submits via Blockfrost and confirms settlement.
+## Infrastructure-blocked rule
 
-### `agentpay-cardano-signer`
+If a CI platform marks a run failed before the expected executable steps are created, classify it as infrastructure/workflow blocked until logs prove a code/test failure. Do not call it a passing check, and do not modify application code merely to satisfy an infrastructure event without evidence.
 
-Isolated Cardano transaction and signing service with separate Preprod and Mainnet workers. Preprod supports per-agent deterministic testnet identities. Mainnet supports unsigned self custody plus external per-agent Ed25519 custody when configured.
+## Release promotion
 
-### External Cardano Mainnet custody
+1. freeze an exact candidate SHA;
+2. confirm every required job is terminal and successful;
+3. inspect security results, not only aggregate status;
+4. verify migration/lockfile artifacts;
+5. build/deploy services from the same source revision;
+6. apply migrations safely;
+7. verify readiness;
+8. perform low-value profile-specific canaries;
+9. capture release evidence;
+10. promote traffic/limits only after operational verification.
 
-Resolves a distinct public key and signer reference per Agent ID and signs only Cardano transaction-body hashes. Private keys stay outside AgentPay.
+## Failure triage
 
-### PostgreSQL
+- **lint/typecheck/test:** fix source or test contract; never suppress a real failure without understanding it.
+- **dependency audit:** identify exact package/advisory/path; upgrade or apply narrow reviewed resolution.
+- **DB integration:** verify test DB lifecycle/connectivity before changing business code.
+- **provider integration:** distinguish mock/unit failure from unavailable external service.
+- **container build:** verify Docker context, runtime version, native dependencies, and environment assumptions.
+- **Vercel:** inspect the first real failing command in build logs; warnings such as a deliberate Node engine override are not automatically failures.
 
-Authoritative control-plane state and global canonical payment-identity uniqueness.
+## Deployment topology
 
-## Mainnet custody release rule
-
-Network support and custody support are separate dimensions.
-
-Cardano Mainnet currently supports:
-
-- self-custody unsigned transaction preparation;
-- external per-agent autonomous custody through dedicated managed identity and signing routes.
-
-The following remain prohibited:
-
-- Cardano Mainnet managed-agent master key;
-- deployment-wide autonomous-agent payer;
-- silent fallback to a shared key if external custody fails.
-
-## Release promotion sequence
-
-1. finalize release changes;
-2. run exact-head repository checks and confirm steps actually executed;
-3. verify migration and identity-isolation state;
-4. deploy or sync `agentpay-cardano-signer` and required secrets;
-5. verify Preprod and Mainnet signer worker health;
-6. for enabled Mainnet managed custody, verify multiple Agent IDs resolve to distinct identities;
-7. deploy `agentpay-facilitator`;
-8. verify `/health`, `/supported` and `/ready`, including Cardano signer connectivity;
-9. deploy and configure Vercel dashboard and API with matching facilitator capabilities;
-10. apply required production migrations before new managed-agent provisioning;
-11. exercise deliberately low-value transactions for enabled custody and network modes;
-12. cross-check resulting Cardano evidence independently;
-13. retain rollback capability until the new release is stable.
-
-## CI source truth versus external deployment inputs
-
-Repository CI can validate source, migrations, containers and deterministic test behavior. It cannot manufacture:
-
-- real production custody credentials;
-- funded Mainnet agent wallets;
-- external provider accounts;
-- a successful relevant-environment pilot;
-- public Dune query IDs unless supplied;
-- production DNS, TLS or provider state.
-
-Those are deployment facts and should be reported as such.
-
-## Catalyst note
-
-The source now implements the Mainnet external per-agent custody path that was previously absent. For Catalyst purposes, AgentPay remains **TRL 5** until the intended Mainnet and pilot profile is demonstrated in a relevant environment. CI and source implementation should not be used to fabricate that demonstration.
-
-## Related documents
-
-- [`unified-production-deployment.md`](unified-production-deployment.md)
-- [`production-readiness.md`](production-readiness.md)
-- [`production-runbook.md`](production-runbook.md)
-- [`managed-signer-isolation.md`](managed-signer-isolation.md)
-- [`cardano-production.md`](cardano-production.md)
+The release is promoted to Vercel control plane and Render facilitator/signer services, with PostgreSQL and configured external providers around them. See [`unified-production-deployment.md`](unified-production-deployment.md).
