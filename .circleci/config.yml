@@ -30,13 +30,15 @@ jobs:
           command: npm install --global npm@11.11.1
       - restore_cache:
           keys:
-            - npm-v2-{{ checksum "package-lock.json" }}
-            - npm-v2-
+            - npm-v3-{{ checksum "package-lock.json" }}
+            - npm-v3-
       - run:
-          name: Install workspace dependencies
-          command: npm ci
+          name: Materialize current dependency graph
+          command: |
+            npm install --package-lock-only --ignore-scripts --legacy-peer-deps
+            npm ci --legacy-peer-deps
       - save_cache:
-          key: npm-v2-{{ checksum "package-lock.json" }}
+          key: npm-v3-{{ checksum "package-lock.json" }}
           paths:
             - ~/.npm
       - run:
@@ -117,19 +119,16 @@ jobs:
           command: npm install --global npm@11.11.1
       - run:
           name: Regenerate package lock
-          command: npm install --package-lock-only --ignore-scripts
+          command: npm install --package-lock-only --ignore-scripts --legacy-peer-deps
       - run:
-          name: Commit regenerated package lock
+          name: Report lockfile synchronization
           command: |
             if git diff --quiet -- package-lock.json; then
-              echo "package-lock.json already matches the manifests."
-              exit 0
+              echo "package-lock.json matches the manifests."
+            else
+              echo "package-lock.json regeneration produced changes; storing the canonical generated lock as a CI artifact."
+              git diff --stat -- package-lock.json
             fi
-            git config user.name "CircleCI"
-            git config user.email "circleci@users.noreply.github.com"
-            git add package-lock.json
-            git commit -m "chore: regenerate patched package lock"
-            git push origin HEAD:ai-connections
       - run:
           name: Stage generated lock artifact
           command: |

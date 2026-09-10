@@ -122,59 +122,35 @@ printf 'node_image=%s\nosv_image=%s\nsemgrep_image=%s\ngitleaks_image=%s\n' \
   "$NODE_IMAGE" "$OSV_IMAGE" "$SEMGREP_IMAGE" "$GITLEAKS_IMAGE" \
   > "$OUT_DIR/tool-images.txt"
 
-# package.json security overrides are authoritative for the dependency graph.
-# Refresh lock metadata in this ephemeral CI checkout before dependency scans so
-# npm audit and OSV evaluate the graph selected by the current manifests rather
-# than stale resolution metadata. This never runs package lifecycle scripts and
-# any refresh failure remains a hard security-gate failure.
+# Materialize the dependency graph represented by the current manifests and
+# security overrides before scanners inspect it. This keeps the release scan
+# from reporting already-patched dependencies solely because a previous commit's
+# lockfile was checked out by the CI worker.
 docker run --rm \
   -v "$ROOT_DIR:/workspace" \
   -w /workspace \
   "$NODE_IMAGE" \
-  bash -lc 'npm install --global npm@11.11.1 >/dev/null && npm install --package-lock-only --ignore-scripts --legacy-peer-deps --include=dev --no-audit --no-fund'
+  bash -lc 'npm install --global npm@11.11.1 >/dev/null && npm install --package-lock-only --ignore-scripts --legacy-peer-deps'
 RC=$?
-[[ $RC -eq 0 ]] || record_failure "dependency graph refresh" "$RC"
+[[ $RC -eq 0 ]] || record_failure "dependency graph materialization" "$RC"
 
-# Capture npm's runtime audit report, then apply the same reviewed production
-# policy used by the Vercel/release topology gate. The checker permits only the
-# exact known Prisma CLI/config advisory chain and fails on every other
-# high/critical finding, malformed report, or changed exception chain.
+# npm audit is retained as an independent ecosystem-specific high-severity gate.
 docker run --rm \
   -v "$ROOT_DIR:/workspace" \
   -w /workspace \
   "$NODE_IMAGE" \
-  bash -lc 'npm install --global npm@11.11.1 >/dev/null && npm audit --omit=dev --json || true' \
+  bash -lc 'npm install --global npm@11.11.1 >/dev/null && npm audit --omit=dev --audit-level=high --json' \
   > "$OUT_DIR/npm-audit.json"
 RC=$?
-[[ $RC -eq 0 ]] || record_failure "npm audit capture" "$RC"
+[[ $RC -eq 0 ]] || record_failure "npm audit" "$RC"
 
-docker run --rm \
-  -v "$ROOT_DIR:/workspace" \
-  -w /workspace \
-  "$NODE_IMAGE" \
-  node scripts/ci/check-production-audit.mjs artifacts/security/npm-audit.json
-RC=$?
-[[ $RC -eq 0 ]] || record_failure "npm production audit policy" "$RC"
-
-# OSV scans the full resolved lock graph. Exit code 1 means vulnerabilities were
-# found and is evaluated by our precise policy checker. Other scanner failures
-# (network/tool/runtime errors) remain hard failures.
+# OSV Scanner checks the regenerated supported manifests/lockfiles recursively.
 docker run --rm \
   -v "$ROOT_DIR:/src" \
   "$OSV_IMAGE" \
   scan source --recursive --format json --output-file /src/artifacts/security/osv.json /src
-OSV_RC=$?
-if [[ $OSV_RC -ne 0 && $OSV_RC -ne 1 ]]; then
-  record_failure "OSV Scanner" "$OSV_RC"
-fi
-
-docker run --rm \
-  -v "$ROOT_DIR:/workspace" \
-  -w /workspace \
-  "$NODE_IMAGE" \
-  node scripts/ci/check-osv.mjs artifacts/security/osv.json
 RC=$?
-[[ $RC -eq 0 ]] || record_failure "OSV policy" "$RC"
+[[ $RC -eq 0 ]] || record_failure "OSV Scanner" "$RC"
 
 # Semgrep CE blocks source findings from the OWASP Top Ten ruleset.
 docker run --rm \
