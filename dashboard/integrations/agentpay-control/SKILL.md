@@ -1,36 +1,60 @@
 ---
 name: agentpay-control
-description: Discover and purchase x402 resources through a policy-controlled AgentPay payment agent across supported rails.
+description: Use AgentPay to discover and purchase paid resources or create receive-payment links under an agent's organization policy.
 ---
 
-# AgentPay Control
+# AgentPay
 
-**Updated:** 2026-08-22
+Use this skill when an autonomous workflow needs AgentPay-controlled commerce or payment capability.
 
-Use this skill when a task needs a paid resource through an AgentPay-controlled agent.
+## Runtime configuration
 
-1. Read `AGENTPAY_BASE_URL`, `AGENTPAY_AGENT_ID`, and `AGENTPAY_API_KEY` from the runtime environment. Never print the API key.
-2. Discover resources with `GET /api/v1/resources`.
-3. Call `POST /api/v1/agents/{agentId}/paid-requests` with a unique `Idempotency-Key` header and JSON `{ "resourceUrl", "purpose", "maxAmountAtomic" }`.
-4. Let AgentPay select/enforce the agent's configured network, payment account, custody mode, policy, approvals and trust controls. Do not attempt to choose or bypass a private signing key from the skill.
-5. If status is `SETTLED`, use the returned resource result and retain the returned **network-specific transaction/settlement identifier** for audit. Do not assume it is always a Hedera transaction ID.
-6. If status is `APPROVAL_PENDING`, tell the operator what amount, asset, resource and policy reason require review. Poll the payment-intent/status endpoint only at a reasonable interval.
-7. If status is denied or failed before submission, do not retry unchanged input to evade policy. Report the reason codes.
-8. If status is `SUBMISSION_UNKNOWN` or otherwise pending after possible submission, do not create a replacement payment merely because the response is uncertain. AgentPay reconciles independent settlement evidence to avoid blind duplicate payment.
-9. Never bypass limits, split purchases to evade policy, invent settlement IDs, fabricate chain confirmation, expose credentials, or claim a synthetic/demo settlement is real external adoption.
+Read these values from the runtime environment and never print the API key:
 
-## Custody boundary
+```text
+AGENTPAY_BASE_URL
+AGENTPAY_AGENT_ID
+AGENTPAY_API_KEY
+```
 
-The skill receives only a scoped AgentPay application credential. Blockchain private keys, managed-agent master secrets and Cardano Mainnet external-custody credentials remain outside the skill/LLM context.
+The credential authorizes AgentPay API scopes. It is not a blockchain private key or provider restricted key.
 
-Depending on the configured agent, AgentPay may use:
+## Purchase a paid resource
 
-- isolated managed testnet signing;
-- self-custody wallet/provider signing;
-- Cardano Mainnet external per-agent Ed25519 custody.
+1. Discover registered resources with `GET /api/v1/resources` when appropriate.
+2. Call `POST /api/v1/agents/{agentId}/paid-requests` with a stable unique `Idempotency-Key` and the intended resource/purpose/maximum amount.
+3. Let AgentPay resolve payment account, network, custody, policy, approvals, reservations, trust evidence, and settlement.
+4. `SETTLED` means AgentPay accepted the rail-specific settlement evidence; retain network-specific transaction/evidence identifiers for audit.
+5. `APPROVAL_PENDING` requires authorized human decision. Report the amount, asset, resource/purpose, and policy context without bypassing the approval.
+6. If denied or failed before submission, do not retry altered inputs merely to evade policy.
+7. If pending/`SUBMISSION_UNKNOWN`, do not create a replacement payment; query the original intent while AgentPay reconciles authoritative evidence.
 
-The skill should treat those as internal AgentPay payment-authority modes and rely on the API outcome/evidence rather than attempting to reproduce signing behavior.
+## Create a Moove Receive payment link
 
-See `examples/purchase.mjs` for a minimal REST call.
+When the task is to accept payment rather than purchase a resource, use the AgentPay Moove receive API/MCP capability.
 
-Primary builder: **Daniel Praise** (`Daniel419797`).
+Provide:
+
+- exact decimal amount;
+- optional description;
+- optional max usage/expiry;
+- optional AgentPay resource or invoice binding;
+- stable idempotency key for the intended link.
+
+Return/share the hosted `providerUrl` when available, but do not say the payment is received until AgentPay reports `COMPLETED` after reconciliation.
+
+For invoice-bound links, AgentPay performs exact settlement token/network/decimals/amount verification before the invoice can become paid.
+
+## Safety rules
+
+Never:
+
+- expose AgentPay, Moove, Stripe, signer, custody, database, or session credentials;
+- request or reconstruct underlying blockchain private keys;
+- split transactions to evade spend limits;
+- fabricate settlement/provider evidence;
+- equate a payment URL or accepted submission with settlement;
+- automatically duplicate an operation after uncertain submission;
+- present Sandbox/provider-test activity as live production activity.
+
+See `examples/purchase.mjs` for a minimal REST purchase example and the repository documentation for full API behavior.

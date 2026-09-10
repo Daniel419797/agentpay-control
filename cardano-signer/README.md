@@ -1,218 +1,93 @@
 # AgentPay Cardano Signer
 
-**Status:** Current implementation  
-**Updated:** 2026-08-22  
-**Primary builder:** Daniel Praise (`Daniel419797`)
+Isolated Cardano transaction-construction and signing gateway used by AgentPay's Cardano facilitator.
 
-This service is the isolated Cardano transaction-builder/signing gateway used by the combined x402 facilitator. It deliberately has no application database access and no AgentPay operator/session credentials.
+The service deliberately has no AgentPay organization/session database role and does not submit Cardano transactions on-chain.
 
-## Service topology
+## Topology
 
-The canonical production service is a Render **web-service gateway**. It starts separate internal workers for:
+The production gateway hosts isolated network contexts for:
 
 ```text
 cardano:preprod
 cardano:mainnet
 ```
 
-The public gateway exposes network-prefixed routes such as:
+Network-prefixed routes include health, managed identity/signing, and unsigned transaction preparation.
 
-```text
-/preprod/health
-/preprod/managed-identity
-/preprod/managed-agent-sign
-/preprod/unsigned
-
-/mainnet/health
-/mainnet/managed-identity
-/mainnet/managed-agent-sign
-/mainnet/unsigned
-```
-
-The workers use distinct network-scoped Blockfrost and signer credentials.
-
-## Trust boundary
-
-The control plane sends policy-authorized payment requirements through the facilitator. For Cardano, the signer receives the exact network, payer, payee, asset/amount, resource-bound requirement and `submissionMode: server` needed to construct the supported transaction.
-
-The signer supports deliberately narrow transaction shapes:
-
-- **ADA:** x402 asset `lovelace`; eligible payer inputs are ADA-only.
-- **Configured native token:** exactly the configured `CARDANO_USDCX_ASSET_ID` unit plus lovelace; unrelated native assets are not eligible.
+## Responsibilities
 
 The signer:
 
-1. fetches protocol/chain construction data and payer UTxOs from Blockfrost;
-2. filters UTxOs so unrelated assets cannot be consumed;
-3. selects bounded payer inputs;
-4. creates one exact payee transfer plus payer-only change;
-5. calculates fee, TTL and required output/change values;
-6. hashes the transaction body with BLAKE2b-256;
-7. obtains the appropriate Ed25519 signature when managed signing is used;
-8. verifies external signatures locally;
-9. returns signed or unsigned CBOR plus the consumed UTxO nonce/transaction identity.
+1. validates the requested network/payment construction context;
+2. fetches payer UTxOs and protocol inputs from the correct Blockfrost network;
+3. filters unsupported/unrelated assets;
+4. selects bounded payer inputs;
+5. creates the exact payee output plus payer-only change;
+6. calculates fee/TTL/minimum output requirements;
+7. hashes the transaction body;
+8. signs using the configured profile when managed signing is requested;
+9. verifies external Mainnet signatures locally;
+10. returns signed/unsigned CBOR and transaction/nonce information.
 
-**The signer does not submit Cardano transactions on-chain.** The combined facilitator independently decodes/verifies the returned CBOR, manages replay/settlement claims, submits through Blockfrost and reconciles confirmation evidence.
+The combined facilitator then independently parses/verifies the returned transaction, creates the durable settlement claim, submits, and checks confirmation evidence.
 
-## Cardano Preprod managed custody
+## Preprod managed identity
 
-Managed Preprod identities use a signer-only testnet secret:
-
-```text
-CARDANO_MANAGED_AGENT_MASTER_KEY
-```
-
-In the unified production gateway it is supplied from:
+Preprod may use the signer-only test derivation secret to derive one deterministic Ed25519 identity per immutable Agent ID:
 
 ```text
-CARDANO_PREPROD_MANAGED_AGENT_MASTER_KEY
+Agent ID -> unique test seed -> public key -> addr_test1...
 ```
 
-A unique Ed25519 payment identity is deterministically derived from the immutable Agent ID:
+This derivation mechanism is test-profile-only.
 
-```text
-Agent ID -> unique seed -> public key -> addr_test1...
-```
+## Mainnet self custody
 
-This deterministic master-key mechanism is testnet-only.
+Unsigned mode constructs the exact supported transaction for an externally controlled payer. The wallet/provider signs outside AgentPay.
 
-## Cardano Mainnet custody
+## Mainnet external per-agent custody
 
-Mainnet supports two parallel modes.
-
-### Self custody
-
-`CARDANO_SIGNING_MODE=unsigned-only` prepares the exact narrow transaction. The wallet/provider signs outside AgentPay.
-
-### External per-agent managed custody
-
-The Mainnet worker receives these child-process values from the unified gateway:
+The Mainnet worker may receive:
 
 ```text
 CARDANO_AGENT_CUSTODY_URL
 CARDANO_AGENT_CUSTODY_API_KEY
 ```
 
-The gateway obtains them from:
+from the gateway's Mainnet-specific environment mapping.
+
+Identity flow:
 
 ```text
-CARDANO_MAINNET_AGENT_CUSTODY_URL
-CARDANO_MAINNET_AGENT_CUSTODY_API_KEY
+POST /identity
+ -> stable publicKeyHex + signerRef for exact Agent ID
+ -> derive addr1... locally
 ```
 
-There is no Mainnet `CARDANO_MANAGED_AGENT_MASTER_KEY` and no deployment-wide managed-agent payer private key.
-
-### Identity resolution
-
-The signer calls:
+Signing flow:
 
 ```text
-POST <CARDANO_AGENT_CUSTODY_URL>/identity
+build transaction
+ -> BLAKE2b-256 transaction-body hash
+ -> POST /sign with exact agent/signer/payer/message
+ -> Ed25519 signature
+ -> local signature verification
+ -> signed CBOR
 ```
 
-with the immutable Agent ID, `cardano:mainnet`, Ed25519 algorithm and Cardano-payment purpose.
+The private key remains in the external custody/HSM/KMS boundary. Mainnet fails closed on invalid identity, address mismatch, signer-ref/public-key drift, invalid signature, or provider outage. There is no shared-key fallback.
 
-The adapter returns a stable per-agent identity:
+## Supported transaction shape
 
-```json
-{
-  "publicKeyHex": "<32-byte Ed25519 public key>",
-  "signerRef": "<provider-specific per-agent key reference>"
-}
-```
+The signer is intentionally not a generic transaction API. It supports the bounded x402 payment profile documented in [`../docs/cardano-production.md`](../docs/cardano-production.md) and rejects unrelated scripts, minting, certificates, withdrawals, collateral, bootstrap witnesses, auxiliary data, third-party outputs, or unrelated native assets.
 
-AgentPay derives `addr1...` locally from `publicKeyHex`. If the provider also returns `payerAddress`/`accountId`, it must match the locally derived address.
+## Secrets
 
-### Body-hash signing
+Use network-scoped Blockfrost/signer configuration. Keep Preprod derivation material and Mainnet custody capability isolated to this service. Production raw signing seeds and deployment-wide Mainnet managed-agent master keys are prohibited.
 
-After the transaction is built, the signer calls:
+## Verification
 
-```text
-POST <CARDANO_AGENT_CUSTODY_URL>/sign
-```
+Run the checked-in signer tests for the exact release and, for Mainnet external custody, verify multiple distinct agents plus invalid/unavailable custody responses before funding material value.
 
-with:
-
-```json
-{
-  "network": "cardano:mainnet",
-  "agentId": "<immutable Agent ID>",
-  "signerRef": "<resolved signer reference>",
-  "payerAddress": "<locally derived addr1...>",
-  "algorithm": "Ed25519",
-  "messageHex": "<32-byte transaction-body hash>",
-  "purpose": "cardano-transaction-body"
-}
-```
-
-The adapter returns an Ed25519 signature. If it repeats `signerRef` or `publicKeyHex`, those values must match the identity already resolved for the Agent ID. AgentPay verifies the returned signature locally before accepting the signed CBOR.
-
-The private key never enters AgentPay.
-
-## Fail-closed Mainnet rules
-
-Managed Mainnet signing is rejected when:
-
-- the custody URL/key pair is incomplete;
-- the external identity/public key is invalid;
-- the provider-claimed address differs from AgentPay's local derivation;
-- the signer reference changes;
-- the public key changes;
-- the returned signature is invalid;
-- the provider is unavailable.
-
-There is no fallback to a shared hot wallet, another agent identity or deterministic Mainnet master key.
-
-## Legacy non-agent remote signer
-
-The generic non-agent `/sign` path can still use an explicitly configured isolated remote signer:
-
-```text
-CARDANO_PAYMENT_PUBLIC_KEY_HEX
-CARDANO_ED25519_SIGNER_URL
-CARDANO_ED25519_SIGNER_API_KEY
-```
-
-This is separate from the per-agent Mainnet custody model. Production rejects raw `CARDANO_SIGNING_SEED_HEX`.
-
-## Required environment
-
-All worker deployments require:
-
-```text
-APP_ENV
-CARDANO_NETWORK
-CARDANO_BLOCKFROST_URL
-CARDANO_BLOCKFROST_PROJECT_ID
-CARDANO_SIGNER_API_KEY
-```
-
-Additional values depend on the selected mode:
-
-- Preprod managed agent: `CARDANO_MANAGED_AGENT_MASTER_KEY`.
-- Mainnet external managed agent: `CARDANO_AGENT_CUSTODY_URL` + `CARDANO_AGENT_CUSTODY_API_KEY`.
-- self custody: no managed private-key source is required.
-- optional native token: `CARDANO_USDCX_ASSET_ID`.
-
-Transaction limits include:
-
-```text
-CARDANO_MIN_OUTPUT_LOVELACE
-CARDANO_TOKEN_OUTPUT_LOVELACE
-CARDANO_MIN_CHANGE_LOVELACE
-CARDANO_MAX_INPUTS
-```
-
-Do not guess the Mainnet native-asset identity. Treat it as a verified deployment fact.
-
-## Funding guidance
-
-Fund only the specific agent/self-custody address intended for a test or operation. ADA payments should use eligible ADA-only UTxOs. Token payments should use UTxOs containing only lovelace plus the exact configured native asset; UTxOs containing additional native assets are ignored.
-
-## Validation
-
-Run the checked-in signer tests and build path for the exact release. The repository also contains the Cardano signer GitHub Actions workflow and production image build.
-
-For a Mainnet external-custody profile, additionally verify at least two Agent IDs resolve to distinct stable public keys/signer references/addresses and exercise an invalid/unavailable custody response to confirm fail-closed behavior.
-
-See [`../docs/cardano-production.md`](../docs/cardano-production.md), [`../docs/managed-signer-isolation.md`](../docs/managed-signer-isolation.md) and [`../docs/production-readiness.md`](../docs/production-readiness.md).
+See [`../docs/managed-signer-isolation.md`](../docs/managed-signer-isolation.md), [`../docs/cardano-production.md`](../docs/cardano-production.md), and [`../docs/production-readiness.md`](../docs/production-readiness.md).

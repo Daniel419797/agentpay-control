@@ -1,73 +1,57 @@
 # @agentpay/mcp
 
-**Updated:** 2026-08-22
+MCP bridge for AI clients that interact with AgentPay through a local stdio server while delegating all financial authority to the hosted AgentPay control plane.
 
-AgentPay MCP bridge for AI clients that prefer a local stdio server.
+## Configuration
 
-The bridge forwards MCP JSON-RPC messages to the hosted AgentPay MCP endpoint, so local and remote clients use the same authentication, policy, approval, reservation, payment and settlement logic.
-
-## Required environment
-
-```bash
-export AGENTPAY_BASE_URL="https://your-agentpay-deployment.example"
-export AGENTPAY_AGENT_ID="<agent-id>"
-export AGENTPAY_API_KEY="<agent-credential>"
+```text
+AGENTPAY_BASE_URL=https://<agentpay-host>
+AGENTPAY_AGENT_ID=<agent UUID>
+AGENTPAY_API_KEY=<scoped agent credential>
 ```
 
-PowerShell:
+The API key belongs in the MCP runtime environment and must not be printed into model output, committed, or exposed to unrelated tools.
 
-```powershell
-$env:AGENTPAY_BASE_URL = "https://your-agentpay-deployment.example"
-$env:AGENTPAY_AGENT_ID = "<agent-id>"
-$env:AGENTPAY_API_KEY = "<agent-credential>"
-```
-
-Run the bridge from this package:
+Run the bridge:
 
 ```bash
 node src/server.mjs
 ```
 
-When published to a registry it can also be invoked through its `agentpay-mcp` binary.
+## Hosted AgentPay tools
 
-## Tools
+Current tool surface includes:
 
-The hosted AgentPay MCP endpoint provides:
+```text
+agentpay_get_connection_status
+agentpay_list_resources
+agentpay_purchase_resource
+agentpay_get_payment_status
+agentpay_create_moove_payment_link
+agentpay_get_moove_payment_status
+```
 
-- `agentpay_get_connection_status`
-- `agentpay_list_resources`
-- `agentpay_purchase_resource`
-- `agentpay_get_payment_status`
+The hosted endpoint remains authoritative for the exact set of tools and schemas available to a credential.
 
-Purchases require a stable `idempotencyKey`; reuse the same value only when retrying the same intended purchase.
+## Purchase behavior
 
-## Security and custody boundary
+For resource purchases, callers provide a stable idempotency key for the intended operation. AgentPay then authenticates the agent, validates the resource, evaluates policy/trust, reserves spend, requests approval if needed, executes the configured rail/custody mode, and returns persisted settlement/fulfillment state.
 
-The MCP client receives an AgentPay application credential, **not** an underlying blockchain private key.
+Do not interpret `APPROVAL_PENDING`, `AUTHORIZED`, or ambiguous submission state as `SETTLED`.
 
-AgentPay evaluates the agent's published policy and payment-account configuration before a payment can be signed or settled. Depending on the agent/network, the actual payment authority may be:
+## Moove Receive behavior
 
-- an isolated managed testnet identity;
-- a self-custody wallet/provider;
-- Cardano Mainnet external per-agent Ed25519 custody.
+The MCP receive tool creates a Moove-hosted payment link through AgentPay. The Moove API key remains server-side. Link creation is not completion; use `agentpay_get_moove_payment_status` until AgentPay reports reconciled provider completion or a terminal state.
 
-Those signing details stay behind AgentPay's server-side payment flow. An MCP client must not ask for, store or attempt to reconstruct blockchain private keys, managed-agent master secrets or external custody credentials.
+## Custody boundary
 
-## Payment outcomes
+MCP receives an AgentPay application credential, not the underlying financial secret. Depending on the agent/profile, AgentPay may use managed test identities, self custody, external Cardano Mainnet custody, or provider-backed execution. None of those private credentials are required in the MCP client.
 
-Clients should treat AgentPay states accurately:
+## Retry rules
 
-- `SETTLED`: confirmed payment/resource outcome returned by AgentPay;
-- `APPROVAL_PENDING`: operator/approver action is required;
-- denied/failed-before-submission: do not retry unchanged input merely to evade policy;
-- `SUBMISSION_UNKNOWN`/pending: possible side effect is being reconciled; do not create a second payment with a new idempotency key unless the operator intentionally wants a separate purchase.
+- reuse the same idempotency key only for the same intended operation;
+- do not change keys simply to bypass a pending/denied action;
+- do not create a replacement payment after an ambiguous submission without first resolving the original state;
+- poll at bounded intervals.
 
-Transaction/network evidence is rail-specific. Do not assume every settlement has a Hedera transaction ID; Cardano and Arc use their own network identifiers/evidence.
-
-## Current architecture reference
-
-The MCP bridge is only an agent-facing adapter. It does not reimplement policy, custody or settlement logic.
-
-See the repository `README.md`, `docs/04-detailed-workflows.md` and `docs/managed-signer-isolation.md` for the current implementation.
-
-Primary builder: **Daniel Praise** (`Daniel419797`).
+See [`../../../docs/03-screens-and-dto-specification.md`](../../../docs/03-screens-and-dto-specification.md) and [`../../../docs/moove-receive.md`](../../../docs/moove-receive.md).
