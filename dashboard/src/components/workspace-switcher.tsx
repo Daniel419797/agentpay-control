@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type Workspace = {
@@ -11,6 +12,7 @@ type Workspace = {
 };
 
 export function WorkspaceSwitcher({ compact = false }: { compact?: boolean }) {
+  const router = useRouter();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeId, setActiveId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -51,7 +53,8 @@ export function WorkspaceSwitcher({ compact = false }: { compact?: boolean }) {
         throw new Error(body?.detail ?? "Workspace switch failed.");
       }
       setActiveId(organizationId);
-      window.location.assign("/app/overview");
+      router.push("/app/overview");
+      router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Workspace switch failed.");
       setBusy(false);
