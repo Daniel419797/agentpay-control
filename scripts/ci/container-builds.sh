@@ -10,13 +10,15 @@ SERVICES=(
   facilitator-arc
   facilitator-combined
   resource-server
+  card-executor
 )
 
 cd "$ROOT_DIR"
 
-# Production images must use the dependency graph represented by the current
-# manifests and security overrides. Regenerate the lock before building so a
-# stale committed lock cannot retain a vulnerable transitive dependency.
+# Dockerfiles that use the repository workspace must build from a lock generated
+# from the current manifests and security overrides. CI workers start from the
+# committed tree, so materialize the lock once before any image build rather
+# than letting stale dependency metadata leak into production images.
 printf '\n==> Regenerating dependency lock for production image builds\n'
 docker run --rm \
   -v "$ROOT_DIR:/workspace" \
