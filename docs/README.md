@@ -1,72 +1,67 @@
-# AgentPay Documentation Index
+# AgentPay Documentation
 
-**Updated:** 2026-08-22  
-**Primary builder / repository owner:** Daniel Praise (`Daniel419797`)
+This directory contains the engineering and operating documentation for AgentPay. The documentation is organized by responsibility so product behavior, security boundaries, payment-rail behavior, and deployment procedures can be reviewed independently.
 
-This index separates current implementation documents, operational material and Catalyst-facing material. It was added during the August 2026 documentation synchronization after the project expanded beyond the original Hedera x402 MVP.
+## Product and system specification
 
-## Current implementation documents
+- [`01-software-requirements-document.md`](01-software-requirements-document.md) — functional, security, reliability, and operational requirements.
+- [`02-software-design-document.md`](02-software-design-document.md) — system architecture, trust boundaries, data domains, and execution model.
+- [`03-screens-and-dto-specification.md`](03-screens-and-dto-specification.md) — application surfaces, API groups, state conventions, and agent-facing contracts.
+- [`04-detailed-workflows.md`](04-detailed-workflows.md) — end-to-end operational workflows for provisioning, payments, approvals, cards, fiat, invoicing, automation, and reconciliation.
+- [`implementation-status.md`](implementation-status.md) — source capability inventory and deployment-dependent boundaries.
 
-- [`01-software-requirements-document.md`](01-software-requirements-document.md) - current product and security requirements
-- [`02-software-design-document.md`](02-software-design-document.md) - implemented system architecture and trust boundaries
-- [`03-screens-and-dto-specification.md`](03-screens-and-dto-specification.md) - current UI and API data contracts
-- [`04-detailed-workflows.md`](04-detailed-workflows.md) - end-to-end payment, custody and reconciliation flows
-- [`implementation-status.md`](implementation-status.md) - source implementation inventory
-- [`cardano-production.md`](cardano-production.md) - Cardano Preprod and Mainnet transaction and custody architecture
-- [`managed-signer-isolation.md`](managed-signer-isolation.md) - one-agent, one-payment-identity model
-- [`threat-model.md`](threat-model.md) - current threat model
+## Payment rails and custody
+
+- [`cardano-production.md`](cardano-production.md) — Cardano Preprod/Mainnet profiles, signer/facilitator separation, self custody, external custody, and settlement rules.
+- [`managed-signer-isolation.md`](managed-signer-isolation.md) — managed payment-identity isolation across supported networks.
+- [`moove-receive.md`](moove-receive.md) — Moove Receive payment-link integration, idempotency, evidence, invoice/resource binding, and reconciliation.
+- [`../cardano-signer/README.md`](../cardano-signer/README.md) — isolated Cardano signer service.
+- [`../facilitator/README.md`](../facilitator/README.md) — Hedera facilitator service.
+- [`../facilitator-arc/README.md`](../facilitator-arc/README.md) — Arc facilitator service.
+- [`../facilitator-combined/README.md`](../facilitator-combined/README.md) — unified network dispatcher and Cardano facilitator.
+- [`../resource-server/README.md`](../resource-server/README.md) — x402-protected resource server.
+
+## Security and trust
+
+- [`../SECURITY.md`](../SECURITY.md) — vulnerability reporting and top-level security policy.
+- [`threat-model.md`](threat-model.md) — assets, actors, threats, controls, and residual-risk boundaries.
+- [`managed-signer-isolation.md`](managed-signer-isolation.md) — payment identity and custody isolation.
+- [`production-readiness.md`](production-readiness.md) — release criteria for financial functionality.
+
+The security model also covers Pyth price evidence, Masumi registry/escrow evidence, optional Veridian/KERIA verification, provider webhook verification, SSRF-safe resource access, rate limiting, supply-chain checks, and fail-closed external dependencies.
 
 ## Operations and release
 
-- [`production-readiness.md`](production-readiness.md) - criteria for an exact release, network and custody profile
-- [`production-runbook.md`](production-runbook.md) - operating and deployment procedures
-- [`unified-production-deployment.md`](unified-production-deployment.md) - canonical Vercel + Render topology
-- [`ci-deployment.md`](ci-deployment.md) - CI and release promotion rules
-- [`testing-script.md`](testing-script.md) - current verification guide
-- [`demo-script.md`](demo-script.md) - current product demo flow
-- [`design-qa.md`](design-qa.md) - visual and brand QA record; not architecture evidence
+- [`production-readiness.md`](production-readiness.md) — release acceptance criteria.
+- [`production-runbook.md`](production-runbook.md) — deploy, migrate, verify, reconcile, recover, and rollback procedures.
+- [`unified-production-deployment.md`](unified-production-deployment.md) — Vercel, PostgreSQL, Render, and external service topology.
+- [`ci-deployment.md`](ci-deployment.md) — CI/security/release gates and artifact expectations.
+- [`testing-script.md`](testing-script.md) — local, CI, integration, and production smoke verification.
+- [`demo-script.md`](demo-script.md) — product walkthrough for operators, customers, and technical evaluators.
+- [`design-qa.md`](design-qa.md) — product UI and accessibility QA guidance.
 
-## Catalyst-facing material
+## Agent and developer integrations
 
-- [`catalyst-submission.md`](catalyst-submission.md) - long-form Catalyst narrative and disclosure
-- [`catalyst/submission.md`](catalyst/submission.md) - concise proposal-facing summary
-- [`catalyst/architecture.md`](catalyst/architecture.md) - Catalyst architecture
-- [`catalyst/demo-script.md`](catalyst/demo-script.md) - Catalyst demo runbook
-- [`catalyst/pitch.md`](catalyst/pitch.md) - pitch and judge questions
-- [`catalyst/landing-page-copy.md`](catalyst/landing-page-copy.md) - public Catalyst-oriented copy
-- [`catalyst/release-checklist.md`](catalyst/release-checklist.md) - release, demo and pilot evidence checklist
+- [`../dashboard/packages/sdk/README.md`](../dashboard/packages/sdk/README.md) — TypeScript SDK.
+- [`../dashboard/packages/mcp/README.md`](../dashboard/packages/mcp/README.md) — MCP bridge and hosted MCP tools.
+- [`../dashboard/packages/langchain/README.md`](../dashboard/packages/langchain/README.md) — LangChain-compatible AgentPay tools.
+- [`../dashboard/integrations/agentpay-control/SKILL.md`](../dashboard/integrations/agentpay-control/SKILL.md) — agent integration skill and operating rules.
 
-## Repository documentation outside this folder
+All agent adapters are thin clients over the same control plane. Policy, approvals, custody, settlement, reconciliation, and organization controls remain server-side.
 
-- [`../README.md`](../README.md) - authoritative project overview
-- [`../SECURITY.md`](../SECURITY.md) - vulnerability reporting and security boundary
-- [`../cardano-signer/README.md`](../cardano-signer/README.md) - signer implementation and configuration
-- [`../analytics/dune/README.md`](../analytics/dune/README.md) - Dune public analytics boundary
-- [`../dashboard/packages/mcp/README.md`](../dashboard/packages/mcp/README.md) - MCP agent adapter
-- [`../dashboard/integrations/agentpay-control/SKILL.md`](../dashboard/integrations/agentpay-control/SKILL.md) - agent skill and integration instructions
+## Analytics
 
-## Why the 2026-08-22 synchronization was necessary
+- [`../analytics/dune/README.md`](../analytics/dune/README.md) — read-only public Cardano analytics integration. Dune is not an authorization or settlement authority.
 
-The original project documentation was created around the Hedera x402 bounty MVP. AgentPay now implements a broader multi-rail architecture, including:
+## Documentation principles
 
-- Cardano Preprod isolated per-agent managed signing
-- Cardano Mainnet self custody and external per-agent Ed25519 custody
-- separate Cardano signer and facilitator responsibilities
-- canonical one-agent, one-payment-identity database enforcement
-- direct x402 resource binding and replay controls
-- durable ambiguous-submission reconciliation
-- Pyth policy valuation
-- Masumi counterparty trust and separate escrow, refund and result workflows
-- optional Veridian/KERIA identity constraints
-- Dune public-chain analytics
-- unified Vercel + Render deployment and runbooks
+AgentPay documentation follows four rules:
 
-The documentation was updated to describe what is currently implemented instead of retaining obsolete Mainnet self-custody-only or Hedera-only statements.
+1. **Implemented source capability and configured deployment capability are different facts.** Provider-backed features are documented as available only when their required environment and account configuration is present.
+2. **Financial completion requires evidence.** Provider redirects, successful request submission, and optimistic UI state are not settlement proof.
+3. **Secrets stay out of documentation.** Examples use placeholders and never include production private keys, API keys, cookies, card data, or custody credentials.
+4. **Rail-specific behavior is explicit.** A Hedera, Arc, Cardano, Moove, Masumi, card, fiat, or cross-chain operation may have different custody, submission, and evidence rules.
 
-## Provenance and Catalyst disclosure
+## Maintenance
 
-**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor. AgentPay was originally built for the **Hedera x402 bounty** and later extended into the current multi-rail system.
-
-For Catalyst purposes, AgentPay is described as **TRL 5** until the intended Mainnet and pilot profile is demonstrated in a relevant environment. The implemented Mainnet external per-agent custody path resolves the previous source limitation, but source implementation alone is not a TRL 6 demonstration.
-
-Pilot transaction, wallet, fee and adoption targets belong to the proposal plan and must be internally consistent. They are not treated in these documents as already-achieved repository facts.
+When product behavior changes, update the relevant system specification, implementation inventory, operational runbook, and component README in the same change. Record material documentation changes in [`CHANGELOG-DOCS.md`](CHANGELOG-DOCS.md).

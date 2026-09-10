@@ -1,240 +1,275 @@
-# AgentPay Control: Software Requirements Document
+# AgentPay Software Requirements
 
-**Status:** Current implementation-aligned requirements  
-**Updated:** 2026-08-22  
-**Primary builder:** Daniel Praise (`Daniel419797`)
+**Status:** implementation-aligned product and engineering requirements  
+**Updated:** 2026-09-10
 
-## Revision note
+## 1. Purpose
 
-The July 2026 requirements were written around the original Hedera x402 bounty MVP. AgentPay has since become a multi-rail control plane and now includes Cardano Preprod managed signing, Cardano Mainnet self custody and external per-agent custody, Arc, expanded policy and trust integrations, durable reconciliation, and broader operational controls. This version replaces obsolete Hedera-only assumptions. The original July baseline remains available in Git history.
+AgentPay is a policy-controlled financial operating system for autonomous software agents. It enables agents and applications to request payments, purchase paid resources, receive payments, use configured financial-provider capabilities, and participate in controlled commerce without receiving unrestricted treasury or provider authority.
 
-## 1. Product purpose
+The system is responsible for establishing who may act, which agent is acting, what financial policy applies, whether human approval is required, how an operation is executed, and what evidence is required before the operation is considered complete.
 
-AgentPay is a policy-controlled financial operating layer for autonomous software agents. It allows agents to request and execute payments without giving an LLM, tool runtime, or untrusted resource unrestricted treasury authority.
+## 2. Primary actors
 
-The system must enforce organization tenancy, agent identity, immutable policy, approvals, spend reservations, idempotency, isolated signing, transaction verification, settlement reconciliation, audit evidence, and emergency controls around every supported payment rail.
+- **Organization owner:** controls organization-level settings, members, emergency controls, and high-impact configuration.
+- **Operator:** manages agents, resources, operational workflows, and permitted payment actions.
+- **Approver:** makes approval decisions according to role and threshold requirements.
+- **Viewer:** receives authorized read access without financial mutation authority.
+- **Autonomous agent:** calls AgentPay using a scoped agent credential.
+- **Application client:** integrates through REST, SDK, MCP, LangChain, or other approved adapters.
+- **Payer/customer:** pays an invoice, resource, or hosted Moove payment link.
+- **External provider/network:** executes or reports financial/network state under a constrained integration contract.
 
-## 2. Current system boundary
+## 3. System boundary
 
-The implemented production topology is:
+The implemented system contains:
 
-- **Control plane:** Next.js/TypeScript dashboard and APIs on Vercel.
-- **System of record:** PostgreSQL through Prisma.
-- **Unified facilitator:** Render service serving Hedera Testnet/Mainnet, Arc Testnet, Cardano Preprod and Cardano Mainnet.
-- **Cardano signer gateway:** separate Render web service with isolated Preprod and Mainnet workers.
-- **Resource server:** x402-protected paid-resource implementation.
-- **External trust/data systems:** Pyth Hermes, Masumi Registry/Payment Service, optional Veridian/KERIA, Dune and Blockfrost.
-- **External Cardano Mainnet custody:** per-agent Ed25519 HSM/KMS/delegation adapter, when autonomous Mainnet custody is enabled.
+- Next.js/TypeScript control plane and dashboard;
+- PostgreSQL system of record accessed through Prisma and explicit SQL where required;
+- network facilitators for Hedera, Arc, and Cardano profiles;
+- isolated Cardano signing service;
+- x402 resource server;
+- Moove Receive payment-link integration;
+- Masumi registry and escrow integrations;
+- Stripe-backed card/fiat adapter and sandbox adapter;
+- Pyth, Veridian/KERIA, Blockfrost, Dune, and other configured external dependencies;
+- SDK, MCP, LangChain, and agent-skill integration layers;
+- CI, security, release, backup, and operational tooling.
 
-## 3. Core requirements
+## 4. Organization, identity, and access requirements
 
-### 3.1 Identity, tenancy and access
+1. Every organization-scoped record must be protected from cross-tenant read or mutation.
+2. Human access must be authenticated and authorized server-side.
+3. Role checks must not rely on hidden UI controls alone.
+4. Agents must have stable immutable identifiers.
+5. Agent credentials must be scoped, revocable, expirable, and stored as non-recoverable secret representations after initial issuance.
+6. Sensitive administrative and financial actions must emit audit evidence.
+7. Organization workspaces and membership lifecycle must preserve tenant boundaries.
+8. Emergency-stop state must be enforceable independently of agent intent.
 
-- Every organization-scoped record must be protected from cross-tenant access.
-- Dashboard users must be authenticated before organization data is exposed.
-- Owner, Operator, Approver and Viewer authorization semantics must be enforced server-side.
-- Sensitive actions must be auditable.
-- Agent API credentials must be scoped, revocable, expirable and shown in plaintext only once at creation.
-- An agent must have a stable immutable identifier used to bind managed payment identity.
+## 5. Managed payment-identity requirements
 
-### 3.2 Agent payment-identity isolation
-
-The invariant is:
+For blockchain managed accounts, the system must enforce:
 
 ```text
-(network, canonical payment identity) -> exactly one PaymentAccount -> exactly one agent
+(network, canonical payment identity) -> one PaymentAccount -> one agent
 ```
 
-- A shared service deployment is allowed; a shared managed-agent wallet is not.
-- The database must reject duplicate canonical payment identities, including concurrent claims across organizations/application replicas.
-- Historical settlement evidence must not be rewritten when an old/shared identity is retired.
+- A managed identity must never be silently shared between agents or organizations.
+- Concurrent attempts to claim the same canonical identity must fail closed.
+- Historical transaction evidence must retain the identity that actually performed the operation.
+- Network-specific address/account normalization must happen before uniqueness decisions.
 
-Implemented managed identity modes:
+Current managed-capable profiles include Hedera Testnet, Arc Testnet, Cardano Preprod, and Cardano Mainnet external per-agent custody. Self-custody profiles remain separate from managed custody.
 
-- Hedera Testnet: distinct Ed25519 account per agent.
-- Arc Testnet: distinct secp256k1 address per agent.
-- Cardano Preprod: distinct Ed25519 payment identity per agent, derived only inside the isolated signer from a testnet-only master secret.
-- Cardano Mainnet: distinct externally custodied Ed25519 public key/signer reference per agent when external custody is configured.
+## 6. Policy requirements
 
-### 3.3 Custody requirements
+Published policy versions must be immutable. A policy change is performed by publishing a complete successor version rather than mutating a version that previously authorized financial activity.
 
-- The Vercel control plane must not contain blockchain private keys, managed-agent master keys or Cardano Mainnet custody API credentials.
-- Testnet master secrets must remain testnet-only.
-- `CARDANO_MANAGED_AGENT_MASTER_KEY` must never be accepted on Cardano Mainnet.
-- Cardano Mainnet must support self-custody transaction preparation.
-- Cardano Mainnet autonomous managed agents must use an external per-agent custody identity rather than a deployment-wide payer/master key.
-- The external custody adapter must return a stable Ed25519 public key and signer reference for an immutable Agent ID.
-- AgentPay must derive the corresponding `addr1...` address locally.
-- Only the Cardano transaction-body hash may be sent to the external custody signer for signing.
-- Returned Ed25519 signatures must be verified locally before signed CBOR is accepted.
-- Custody-provider failure must fail closed; there must be no fallback to another agent, shared key, or platform payer.
+A policy may constrain:
 
-### 3.4 Policy requirements
-
-Published agent policy may constrain:
-
-- per-transaction, hourly, daily and monthly atomic spend;
-- over-limit action (`DENY` or `REQUIRE_APPROVAL`);
+- per-transaction, hourly, daily, and monthly spend;
+- asset and network;
 - merchant/resource allow and deny rules;
-- merchant categories;
-- approval/rejection thresholds;
-- transaction velocity and cooldown;
-- activation/expiry and UTC schedule windows;
-- Pyth-valued USD ceilings;
-- Masumi identity/capability/freshness requirements;
-- minimum observed Masumi escrow history/reputation;
-- optional Veridian/KERI issuer/schema/freshness requirements.
+- resource categories and contract allowlists;
+- schedule/activation/expiration windows;
+- velocity and cooldown;
+- `DENY` versus `REQUIRE_APPROVAL` behavior;
+- approval and rejection thresholds;
+- conservative USD-valued ceilings using Pyth where configured;
+- Masumi counterparty, capability, online/freshness, observed-history, and reputation requirements;
+- optional Veridian/KERI issuer, schema, subject, freshness, revocation, and identity-binding requirements.
 
-Published policy versions must remain immutable. A new version supersedes the old one atomically.
+External trust or pricing evidence that is required by policy must fail closed when missing, invalid, stale, or mismatched.
 
-### 3.5 Spend and approval requirements
+## 7. Approval requirements
 
-- Authorized spend must be represented by a durable reservation before signing.
-- Active reservations and recently settled commitments must prevent stale balance snapshots from reopening budget.
-- Initiators must not self-approve where separation of duties is required.
-- Approval-required requests must not sign until the approval state is consumed.
-- Organization emergency stop must block new risky side effects while allowing defensive reconciliation/evidence processing.
+- A policy decision requiring approval must leave the underlying payment non-signable until the threshold is satisfied.
+- Approval context must identify agent, amount, asset/network, purpose/resource, policy reason, and expiry where applicable.
+- Separation-of-duties rules must prevent prohibited self-approval.
+- Approval decisions must be durable and auditable.
+- An approval must not be reusable to authorize a materially different operation.
 
-## 4. x402 payment requirements
+## 8. Reservation and idempotency requirements
 
-### 4.1 Resource interaction
+- Financial mutations must use durable idempotency or equivalent one-shot claims where the provider/network semantics require it.
+- Spend must be reserved before an authorized side effect when concurrent requests could exceed policy.
+- A retry of the same intended operation must not create a second payment simply because the first response was lost.
+- Operations with ambiguous submission must preserve enough evidence to reconcile rather than being reset to a clean pre-submission state.
 
-The direct flow is:
+## 9. Direct x402 requirements
 
-```text
-Agent -> AgentPay -> x402 resource -> HTTP 402 requirement
-      -> policy/reservation -> managed/self-custody signing
-      -> resource with payment payload -> facilitator verify/settle
-      -> confirmed resource response
-```
+AgentPay must:
 
-- Resource URLs must be SSRF-protected and response bodies bounded.
-- Idempotency keys must prevent duplicate intent creation.
-- Cardano requirements must bind the canonical paid-resource URL using SHA-256 `resourceBinding`.
+1. retrieve paid resources using SSRF-safe network rules;
+2. parse supported x402 payment requirements;
+3. bind the requirement to the exact canonical resource requested;
+4. verify the configured network, asset, amount, and payee;
+5. apply organization/agent policy and trust requirements;
+6. reserve spend before execution where required;
+7. produce the correct self-custody or managed payment flow;
+8. verify settlement evidence before treating the resource as paid;
+9. persist payment and fulfillment evidence.
 
-### 4.2 Cardano exact profile
+Supported direct profiles include Hedera Testnet/Mainnet, Arc Testnet, and Cardano Preprod/Mainnet subject to each environment's readiness configuration.
 
-Supported networks:
+## 10. Cardano requirements
 
-- `cardano:preprod`
-- `cardano:mainnet`
+Cardano direct x402 supports the narrow `exact` profile implemented by the signer/facilitator boundary.
 
-Requirements:
+The signer must:
 
-- x402 version 2, scheme `exact`;
-- ADA represented as `lovelace`;
-- optional native-token support restricted to exactly the configured asset unit;
-- Mainnet USDCx only when configured to the pinned canonical Cardano asset identity;
-- server-submission policy and explicit confirmation depth;
-- key-spend payment shape only;
-- payer-only inputs and change;
-- exact payee, asset and amount;
-- token conservation;
-- bounded fee and TTL;
-- no scripts, minting, certificates, withdrawals, collateral, bootstrap witnesses, auxiliary data or unrelated third-party outputs.
+- resolve the exact payer identity;
+- select bounded payer-owned inputs;
+- construct a narrow key-spend transaction;
+- calculate fee, TTL, outputs, and payer change;
+- sign only under the selected custody mode;
+- return unsigned/signed CBOR and identifiers required for independent verification;
+- never submit the transaction to the chain.
 
-The Cardano signer constructs the narrow transaction. The facilitator independently decodes and verifies the signed transaction before submission.
+The facilitator must independently verify:
 
-### 4.3 Cardano settlement and ambiguity
+- encoding and network;
+- exact payer and payer-only inputs;
+- exact payee, asset, and amount;
+- supported asset set and conservation;
+- payer-only change;
+- fee and TTL bounds;
+- resource binding and nonce/replay state;
+- settlement claim uniqueness.
 
-- The facilitator, not the signer, submits Cardano transactions through Blockfrost.
-- A durable settlement claim must bind transaction hash, resource-bound requirement, payer and UTxO nonce.
-- Submission state must be recorded before network submission.
-- Timeouts/ambiguous responses must not be treated as definitive failure.
-- Ambiguous outcomes must remain `SUBMISSION_UNKNOWN`/reconciliation-required until independent chain evidence resolves them.
-- Confirmations and replay/mismatch decisions must use chain evidence.
+Submission and confirmation use independent Blockfrost evidence. An uncertain submission must be reconciled rather than blindly resubmitted.
 
-## 5. Masumi requirements
+Cardano Mainnet managed custody must not use a deployment-wide master payment key. External managed custody must resolve a stable per-agent Ed25519 public key/signer reference; AgentPay derives the address and verifies returned signatures locally.
 
-Masumi serves two distinct roles:
+## 11. Moove Receive requirements
 
-1. **Direct x402 counterparty trust:** verify registry source, agent identifier, capability, seller wallet and Cardano payment credential.
-2. **Escrow payment lifecycle:** create purchase, lock funds, start job, reconcile state, verify returned result hash, support refund request/authorization, and record disputes/failures.
+AgentPay supports the live Moove Receive payment-link surface.
 
-Direct x402 must never be represented as Masumi escrow.
+The integration must:
 
-Seller reputation used by AgentPay policy must be derived from AgentPay-observed linked escrow outcomes, not invented or presented as a Masumi-native score.
+- keep the Moove API key server-side;
+- restrict production API traffic to the configured trusted Moove host;
+- bind one Moove account credential to one AgentPay organization;
+- persist a local payment record before/around provider creation according to the idempotency protocol;
+- use a durable AgentPay idempotency key for repeated client requests;
+- never blindly retry an ambiguous create POST;
+- reconcile ambiguous creates against provider-visible payment links using the durable marker strategy;
+- persist provider link identifier, URL, status, destination/token evidence, received amount, transaction URL, and reconciliation timestamps when available;
+- expose payment status through REST and agent adapters;
+- treat only verified `COMPLETED` provider evidence as completion;
+- validate exact configured token/network/decimals/amount before linked invoice automation marks an invoice paid.
 
-## 6. Pyth and KERI requirements
+## 12. Masumi requirements
 
-### Pyth
+Masumi has two independent roles:
 
-- USD valuation must use bounded/fresh observations.
-- Conservative policy valuation must not understate spend.
-- Stale, future, non-positive or over-wide-confidence observations must fail closed where Pyth policy is required.
-- Oracle failure must never relax an existing atomic policy.
+- **registry/trust:** verify counterparty identity, capability, payment-address facts, freshness, and optional observed-history/reputation requirements for direct payment policy;
+- **escrow:** maintain an explicit purchase/job lifecycle including funds locking, result evidence, completion, refunds, disputes, and reconciliation.
 
-### Veridian/KERIA
+Direct x402 must never be mislabeled as escrow merely because Masumi registry evidence was used.
 
-- KERI/ACDC cryptographic verification is delegated to the configured verifier.
-- AgentPay must additionally enforce trusted issuer/schema sets, subject identity, expiry/revocation evidence and the expected Masumi-agent binding.
-- Required credential evidence that is stale, invalid or mismatched must deny/defer new spend.
+## 13. Cards and fiat requirements
 
-## 7. Observability and audit requirements
+The provider adapter layer supports a Stripe implementation and local sandbox implementation.
 
-- Payment/policy/approval/security events must be auditable.
-- Public Dune analytics may expose only public Cardano chain facts and must never authorize/sign/settle payments.
-- Private organization, prompt, policy, credential and resource-content data must not be published to Dune.
-- Reconciliation must remain available during emergency-stop operation.
-- Incidents and ambiguous settlements must retain enough evidence for investigation.
+When the Stripe profile is enabled, the application may provide:
 
-## 8. Deployment requirements
+- cardholder creation and lifecycle state;
+- virtual-card issuance and status control;
+- spending-limit/category/country controls passed to the provider;
+- short-lived card display-key creation through the provider;
+- signed webhook processing for authorization events;
+- provider financial-account creation and balance retrieval;
+- inbound and outbound money movement and status retrieval.
 
-### Vercel
+Provider capability must be gated by configuration, entitlements, account eligibility, and provider responses. Raw card data must not be persisted or exposed through normal AgentPay APIs. Sandbox results must not be represented as real financial activity.
 
-The dashboard/API deployment requires valid application/auth/database/configuration secrets and must contain no blockchain signing secrets.
+## 14. Invoicing, resources, and marketplace requirements
 
-### Render facilitator
+The system must support:
 
-The combined facilitator hosts the supported rail-specific protocol boundaries and Cardano settlement verification/submission logic.
+- providers and verified provider/resource relationships;
+- resource listings, categories, endpoints, prices, and health state;
+- marketplace discovery and reviews;
+- invoices, items, sequence, lifecycle events, collection/payment, settlement, and voiding;
+- resource fulfillment evidence;
+- optional Masumi and Veridian identity bindings;
+- payment-link or direct-payment association where supported.
 
-### Render Cardano signer
+A resource or invoice must not advance to a paid/fulfilled state solely because a payment request was initiated.
 
-One public gateway starts isolated Preprod and Mainnet workers with distinct Blockfrost and capability credentials.
+## 15. Cross-chain requirements
 
-- Preprod worker: per-agent deterministic testnet identity + self-custody preparation.
-- Mainnet worker: self-custody preparation + external per-agent custody when configured.
+Cross-chain functionality is an orchestration surface for network discovery, quotes, transfer preparation, submission, and transfer state. It must remain provider/network gated and must not imply that every listed route is executable in every deployment.
 
-### External Mainnet custody
+Quotes and prepared operations must be bound to the intended source/destination, asset/amount, expiry, policy decision, and submission state. Ambiguous provider submission must be reconciled before a duplicate transfer is created.
 
-The provider is an external deployment dependency. It must implement:
+## 16. Automation requirements
 
-```text
-POST /identity
-POST /sign
-```
+- Automation rules must be organization-scoped and auditable.
+- Executions must have durable state.
+- Webhook-triggered and manually triggered execution paths must authenticate/verify their configured boundary.
+- Financial automation must still pass policy, approval, reservation, provider-readiness, idempotency, and emergency-stop controls.
+- An automation failure after possible submission must preserve ambiguity and require reconciliation rather than automatic duplicate execution.
 
-and retain private keys outside AgentPay.
+## 17. Financial intelligence requirements
 
-## 9. Verification requirements
+AgentPay may compute and expose financial observations, forecasts, anomaly records, summaries, and budget recommendations. These outputs are advisory. They must not independently bypass published policy or grant new payment authority.
 
-A release candidate must execute, not merely declare, the applicable checks:
+## 18. Audit, notifications, incidents, and data lifecycle
 
-- forward-only database migrations;
-- concurrent payment-identity isolation verification;
-- dashboard lint/typecheck/unit tests/build;
-- browser smoke tests;
-- Hedera/Arc/combined facilitator tests/builds;
-- Cardano signer tests/image build;
-- resource-server tests/build;
-- CodeQL/dependency review and other required release gates.
+- Material actions must emit structured audit events.
+- Audit integrity/sequence controls must make unauthorized rewriting detectable.
+- Notification delivery must use durable outbox/delivery state where implemented.
+- Reconciliation and maintenance operations must remain available when needed for defensive recovery.
+- Organization exports must be authorized and bounded.
+- Retention and deletion workflows must respect financial/audit evidence requirements and current application policy.
+- Support cases and messages must remain tenant-scoped.
 
-A workflow that fails before executable steps are created is infrastructure-blocked, not a successful application validation.
+## 19. Security requirements
 
-## 10. Current maturity and proposal boundary
+The system must protect against:
 
-For Catalyst purposes, the current implementation is described conservatively as **TRL 5** until the intended Cardano Mainnet/pilot configuration is demonstrated in a relevant environment. The repository now contains the Mainnet external per-agent custody path, but source implementation alone is not a TRL 6 demonstration.
+- cross-tenant access;
+- credential leakage and privilege escalation;
+- managed payment-identity collision;
+- SSRF through paid-resource endpoints;
+- replay and duplicate financial side effects;
+- stale or manipulated trust/price evidence;
+- forged provider webhooks;
+- arbitrary contract or transaction complexity outside supported profiles;
+- ambiguous provider/network response being misreported as success;
+- supply-chain vulnerabilities and leaked repository secrets.
 
-**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor. AgentPay was originally built for the Hedera x402 bounty and later extended into the current multi-rail system. Prior Hedera work remains prior work. Catalyst scope should describe only the Cardano-specific and pilot work being proposed rather than retroactively treating completed Hedera work as Catalyst-funded delivery.
+See [`threat-model.md`](threat-model.md) and [`../SECURITY.md`](../SECURITY.md).
 
-## 11. Authoritative companion documents
+## 20. Reliability and consistency requirements
 
-- [`README.md`](../README.md)
-- [`implementation-status.md`](implementation-status.md)
-- [`managed-signer-isolation.md`](managed-signer-isolation.md)
-- [`cardano-production.md`](cardano-production.md)
-- [`production-readiness.md`](production-readiness.md)
-- [`unified-production-deployment.md`](unified-production-deployment.md)
-- [`threat-model.md`](threat-model.md)
+- Financial state changes must be transactionally consistent where multiple durable records represent one business event.
+- Idempotent retries must return/reconcile the original intended operation.
+- External timeouts must have bounded deadlines.
+- Provider/network failures must not silently relax policy or security.
+- Reconciliation must be able to repair local status from authoritative external evidence without duplicating the original side effect.
+- Health and readiness endpoints must distinguish process health from capability readiness.
 
-The pre-2026-08-22 version of this document remains available in Git history as the original Hedera MVP requirements baseline.
+## 21. Deployment and release requirements
+
+A production profile must define and verify:
+
+- exact source revision;
+- database migration state;
+- required secrets and external endpoints;
+- enabled networks/providers;
+- custody mode;
+- HTTPS and trusted-host restrictions;
+- reconciliation/maintenance scheduling;
+- monitoring and incident procedures;
+- backup/recovery expectations;
+- successful lint, typecheck, unit/integration checks, security scans, and production service/container builds.
+
+The presence of source code for a provider does not by itself establish that the provider is enabled in a specific deployment.
+
+## 22. Agent integration requirements
+
+REST, TypeScript SDK, MCP, LangChain, and skill adapters must delegate financial authority to AgentPay. They may expose status and non-secret evidence but must not require or return underlying blockchain private keys, managed master secrets, provider restricted keys, session secrets, or raw card credentials.
