@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": false,
   "license": "MIT",
-  "description": "Policy-controlled x402 payment OS for autonomous software agents across Hedera, Arc and Cardano",
+  "description": "AgentPay control plane for policy-governed payments and financial operations by autonomous software agents",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Daniel419797/agentpay-control.git"
@@ -60,7 +60,7 @@
     "ethers": "6.17.0",
     "jose": "6.1.3",
     "lucide-react": "0.468.0",
-    "next": "16.3.0",
+    "next": "16.3.3",
     "pg": "8.16.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -81,7 +81,7 @@
     "@types/react-dom": "19.2.3",
     "dotenv": "17.2.3",
     "eslint": "9.39.2",
-    "eslint-config-next": "16.2.11",
+    "eslint-config-next": "16.3.3",
     "jsdom": "28.1.0",
     "lightningcss": "1.31.1",
     "postcss": "8.5.25",
