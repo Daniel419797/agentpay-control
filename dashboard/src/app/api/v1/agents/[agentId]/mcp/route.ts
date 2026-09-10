@@ -1,3 +1,4 @@
+import { createAutonomousCardPurchase, listAutonomousCardPurchases, readAutonomousCardPurchase } from "@/domain/card-autonomy-service";
 import { createMooveReceivePayment, getMooveReceivePayment } from "@/domain/moove-receive-service";
 import { createPaidRequest } from "@/domain/payment-service";
 import { authorizeAgentRequest, boundedJson, handleApiError, problem } from "@/lib/api";
@@ -8,12 +9,7 @@ export const dynamic = "force-dynamic";
 const MCP_PROTOCOL_VERSION = "2025-06-18";
 
 type JsonRpcId = string | number | null;
-type JsonRpcMessage = {
-  jsonrpc?: string;
-  id?: JsonRpcId;
-  method?: string;
-  params?: Record<string, unknown>;
-};
+type JsonRpcMessage = { jsonrpc?: string; id?: JsonRpcId; method?: string; params?: Record<string, unknown> };
 
 const tools = [
   {
@@ -35,9 +31,9 @@ const tools = [
       type: "object",
       properties: {
         resourceUrl: { type: "string", format: "uri", description: "Exact HTTPS resource URL to purchase." },
-        purpose: { type: "string", maxLength: 300, description: "Why the agent needs the purchase." },
-        maxAmountAtomic: { type: "string", pattern: "^[0-9]+$", description: "Optional maximum spend in the selected asset's atomic denomination." },
-        idempotencyKey: { type: "string", minLength: 8, maxLength: 100, description: "Stable unique key for this intended purchase. Reuse the same key when retrying the same purchase." },
+        purpose: { type: "string", maxLength: 300 },
+        maxAmountAtomic: { type: "string", pattern: "^[0-9]+$" },
+        idempotencyKey: { type: "string", minLength: 8, maxLength: 100 },
       },
       required: ["resourceUrl", "idempotencyKey"],
       additionalProperties: false,
@@ -47,12 +43,7 @@ const tools = [
   {
     name: "agentpay_get_payment_status",
     description: "Read the latest status and settlement evidence for a payment intent created by this agent.",
-    inputSchema: {
-      type: "object",
-      properties: { intentId: { type: "string", format: "uuid", description: "AgentPay payment intent ID." } },
-      required: ["intentId"],
-      additionalProperties: false,
-    },
+    inputSchema: { type: "object", properties: { intentId: { type: "string", format: "uuid" } }, required: ["intentId"], additionalProperties: false },
     annotations: { title: "Read AgentPay payment status", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   {
@@ -85,24 +76,48 @@ const tools = [
     },
     annotations: { title: "Read Moove receive payment status", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   },
+  {
+    name: "agentpay_create_card_purchase",
+    description: "Initiate a policy-controlled virtual-card checkout. AgentPay evaluates card limits and autonomy policy, may require human approval, and never exposes PAN or CVC to the agent.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        virtualCardId: { type: "string", format: "uuid" },
+        merchantUrl: { type: "string", format: "uri" },
+        amountMinor: { type: "string", pattern: "^[0-9]+$", description: "Purchase amount in the card currency's minor units." },
+        currency: { type: "string", minLength: 3, maxLength: 3 },
+        merchantCategory: { type: "string", maxLength: 80 },
+        merchantCountry: { type: "string", minLength: 2, maxLength: 2 },
+        purpose: { type: "string", maxLength: 300 },
+        checkoutPlan: { type: "object", description: "Constrained checkout plan. Card secrets are referenced symbolically and injected only by the isolated executor." },
+        idempotencyKey: { type: "string", minLength: 8, maxLength: 100 },
+      },
+      required: ["merchantUrl", "amountMinor", "currency", "checkoutPlan", "idempotencyKey"],
+      additionalProperties: false,
+    },
+    annotations: { title: "Purchase with an AgentPay virtual card", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  },
+  {
+    name: "agentpay_get_card_purchase",
+    description: "Read the status of one autonomous card purchase without exposing checkout secrets or card credentials.",
+    inputSchema: { type: "object", properties: { purchaseId: { type: "string", format: "uuid" } }, required: ["purchaseId"], additionalProperties: false },
+    annotations: { title: "Read autonomous card purchase", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "agentpay_list_card_purchases",
+    description: "List recent autonomous card purchases for this agent.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    annotations: { title: "List autonomous card purchases", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
 ];
 
-function jsonRpcResult(id: JsonRpcId, result: unknown) {
-  return { jsonrpc: "2.0", id, result };
-}
-
-function jsonRpcError(id: JsonRpcId, code: number, message: string, data?: unknown) {
-  return { jsonrpc: "2.0", id, error: { code, message, ...(data === undefined ? {} : { data }) } };
-}
-
+function jsonRpcResult(id: JsonRpcId, result: unknown) { return { jsonrpc: "2.0", id, result }; }
+function jsonRpcError(id: JsonRpcId, code: number, message: string, data?: unknown) { return { jsonrpc: "2.0", id, error: { code, message, ...(data === undefined ? {} : { data }) } }; }
 function textToolResult(value: unknown, isError = false) {
   const text = JSON.stringify(value, (_key, item) => typeof item === "bigint" ? item.toString() : item, 2);
   return { content: [{ type: "text", text }], ...(isError ? { isError: true } : {}) };
 }
-
-async function authorize(request: Request, agentId: string, scope: string) {
-  return authorizeAgentRequest(request, agentId, scope);
-}
+async function authorize(request: Request, agentId: string, scope: string) { return authorizeAgentRequest(request, agentId, scope); }
 
 async function connectionStatus(agentId: string) {
   const agent = await db.agent.findUnique({
@@ -111,6 +126,7 @@ async function connectionStatus(agentId: string) {
       organization: { select: { status: true, killSwitchEnabled: true } },
       defaultAsset: { select: { symbol: true, decimals: true, network: true } },
       accounts: { orderBy: { createdAt: "asc" }, take: 1, select: { accountId: true, network: true, custodyType: true, signingMode: true, status: true } },
+      virtualCards: { where: { status: "ACTIVE" }, take: 2, select: { id: true, status: true, provider: true, currency: true, last4: true } },
       effectivePolicy: { include: { asset: { select: { symbol: true, decimals: true } } } },
     },
   });
@@ -128,6 +144,7 @@ async function connectionStatus(agentId: string) {
     blockingReasons,
     agent: { id: agent.id, name: agent.name, status: agent.status, network: agent.network, defaultAsset: agent.defaultAsset },
     account,
+    activeCards: agent.virtualCards,
     policy: policy ? {
       id: policy.id,
       version: policy.version,
@@ -151,62 +168,34 @@ async function listResources(agentId: string) {
   const agent = await db.agent.findUnique({ where: { id: agentId }, select: { organizationId: true } });
   if (!agent) return null;
   const rows = await db.resourceListing.findMany({
-    where: {
-      OR: [
-        { public: true, status: "ACTIVE", provider: { status: "ACTIVE", verificationStatus: "VERIFIED" } },
-        { status: "ACTIVE", provider: { organizationId: agent.organizationId, status: "ACTIVE" } },
-      ],
-    },
-    include: {
-      provider: { select: { id: true, name: true, publicSlug: true, websiteUrl: true, verifiedAt: true } },
-      prices: { include: { asset: true } },
-    },
+    where: { OR: [
+      { public: true, status: "ACTIVE", provider: { status: "ACTIVE", verificationStatus: "VERIFIED" } },
+      { status: "ACTIVE", provider: { organizationId: agent.organizationId, status: "ACTIVE" } },
+    ] },
+    include: { provider: { select: { id: true, name: true, publicSlug: true, websiteUrl: true, verifiedAt: true } }, prices: { include: { asset: true } } },
     orderBy: { name: "asc" },
     take: 100,
   });
-  return rows.map((resource) => ({
-    ...resource,
-    prices: resource.prices.map((price) => ({ ...price, atomicAmount: price.atomicAmount.toString() })),
-  }));
+  return rows.map((resource) => ({ ...resource, prices: resource.prices.map((price) => ({ ...price, atomicAmount: price.atomicAmount.toString() })) }));
 }
 
 async function paymentStatus(agentId: string, intentId: string) {
   const row = await db.paymentIntent.findFirst({
     where: { id: intentId, agentId },
-    include: {
-      quote: { include: { asset: true } },
-      approval: true,
-      fulfillment: true,
-      attempts: { include: { settlement: true }, orderBy: { createdAt: "desc" }, take: 5 },
-    },
+    include: { quote: { include: { asset: true } }, approval: true, fulfillment: true, attempts: { include: { settlement: true }, orderBy: { createdAt: "desc" }, take: 5 } },
   });
   if (!row) return null;
   const fulfillment = row.fulfillment ? {
-    id: row.fulfillment.id,
-    status: row.fulfillment.status,
-    contentType: row.fulfillment.contentType,
-    contentHash: row.fulfillment.contentHash,
-    contentBytes: row.fulfillment.contentBytes,
-    errorCode: row.fulfillment.errorCode,
-    fulfilledAt: row.fulfillment.fulfilledAt,
-    createdAt: row.fulfillment.createdAt,
-    updatedAt: row.fulfillment.updatedAt,
+    id: row.fulfillment.id, status: row.fulfillment.status, contentType: row.fulfillment.contentType, contentHash: row.fulfillment.contentHash,
+    contentBytes: row.fulfillment.contentBytes, errorCode: row.fulfillment.errorCode, fulfilledAt: row.fulfillment.fulfilledAt,
+    createdAt: row.fulfillment.createdAt, updatedAt: row.fulfillment.updatedAt,
   } : null;
   return {
-    id: row.id,
-    resourceUrl: row.resourceUrl,
-    merchantHost: row.merchantHost,
-    purpose: row.purpose,
-    status: row.status,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
+    id: row.id, resourceUrl: row.resourceUrl, merchantHost: row.merchantHost, purpose: row.purpose, status: row.status, createdAt: row.createdAt, updatedAt: row.updatedAt,
     quote: row.quote ? { ...row.quote, amountAtomic: row.quote.amountAtomic.toString() } : null,
     approval: row.approval,
     fulfillment,
-    attempts: row.attempts.map((attempt) => ({
-      ...attempt,
-      settlement: attempt.settlement ? { ...attempt.settlement, amountAtomic: attempt.settlement.amountAtomic.toString() } : null,
-    })),
+    attempts: row.attempts.map((attempt) => ({ ...attempt, settlement: attempt.settlement ? { ...attempt.settlement, amountAtomic: attempt.settlement.amountAtomic.toString() } : null })),
   };
 }
 
@@ -225,27 +214,19 @@ async function mooveStatus(agentId: string, paymentId: string) {
 async function handleMessage(request: Request, agentId: string, message: JsonRpcMessage) {
   const id = message.id ?? null;
   if (message.jsonrpc !== "2.0" || !message.method) return jsonRpcError(id, -32600, "Invalid JSON-RPC request.");
-
   if (message.method === "initialize") {
     if (!(await authorize(request, agentId, "resources:read"))) return jsonRpcError(id, -32001, "Unauthorized AgentPay connection.");
-    return jsonRpcResult(id, {
-      protocolVersion: MCP_PROTOCOL_VERSION,
-      capabilities: { tools: { listChanged: false } },
-      serverInfo: { name: "agentpay-control", version: "0.3.0" },
-      instructions: "Use AgentPay tools for controlled purchases and Moove Receive requests. Never treat a receive payment as complete until AgentPay reports providerStatus=COMPLETED.",
-    });
+    return jsonRpcResult(id, { protocolVersion: MCP_PROTOCOL_VERSION, capabilities: { tools: { listChanged: false } }, serverInfo: { name: "agentpay-control", version: "1.0.0" }, instructions: "Use AgentPay for policy-controlled resource payments, Moove Receive requests, and virtual-card purchases. Never assume a financial action completed until AgentPay reports provider-backed terminal evidence." });
   }
   if (message.method === "notifications/initialized") return null;
   if (message.method === "ping") {
     if (!(await authorize(request, agentId, "resources:read"))) return jsonRpcError(id, -32001, "Unauthorized AgentPay connection.");
     return jsonRpcResult(id, {});
   }
-
   if (message.method === "tools/list") {
     if (!(await authorize(request, agentId, "resources:read"))) return jsonRpcError(id, -32001, "Unauthorized AgentPay connection.");
     return jsonRpcResult(id, { tools });
   }
-
   if (message.method !== "tools/call") return jsonRpcError(id, -32601, `Method not found: ${message.method}`);
   const params = message.params ?? {};
   const name = typeof params.name === "string" ? params.name : "";
@@ -257,26 +238,20 @@ async function handleMessage(request: Request, agentId: string, message: JsonRpc
       const status = await connectionStatus(agentId);
       return jsonRpcResult(id, textToolResult(status ?? { code: "AGENT_NOT_FOUND" }, !status));
     }
-
     if (name === "agentpay_list_resources") {
       if (!(await authorize(request, agentId, "resources:read"))) return jsonRpcError(id, -32001, "Unauthorized AgentPay connection.");
       const resources = await listResources(agentId);
       return jsonRpcResult(id, textToolResult(resources ?? { code: "AGENT_NOT_FOUND" }, !resources));
     }
-
     if (name === "agentpay_purchase_resource") {
       if (!(await authorize(request, agentId, "payments:create"))) return jsonRpcError(id, -32001, "Unauthorized AgentPay connection.");
       const resourceUrl = typeof args.resourceUrl === "string" ? args.resourceUrl : "";
       const idempotencyKey = typeof args.idempotencyKey === "string" ? args.idempotencyKey : "";
       const purpose = typeof args.purpose === "string" ? args.purpose : undefined;
       const maxAmountAtomic = typeof args.maxAmountAtomic === "string" ? args.maxAmountAtomic : undefined;
-      if (!resourceUrl || idempotencyKey.length < 8 || idempotencyKey.length > 100) {
-        return jsonRpcResult(id, textToolResult({ code: "INVALID_ARGUMENTS", detail: "resourceUrl and an idempotencyKey between 8 and 100 characters are required." }, true));
-      }
-      const result = await createPaidRequest(agentId, idempotencyKey, { resourceUrl, purpose, maxAmountAtomic });
-      return jsonRpcResult(id, textToolResult(result));
+      if (!resourceUrl || idempotencyKey.length < 8 || idempotencyKey.length > 100) return jsonRpcResult(id, textToolResult({ code: "INVALID_ARGUMENTS", detail: "resourceUrl and an idempotencyKey between 8 and 100 characters are required." }, true));
+      return jsonRpcResult(id, textToolResult(await createPaidRequest(agentId, idempotencyKey, { resourceUrl, purpose, maxAmountAtomic })));
     }
-
     if (name === "agentpay_get_payment_status") {
       if (!(await authorize(request, agentId, "payments:read"))) return jsonRpcError(id, -32001, "Unauthorized AgentPay connection.");
       const intentId = typeof args.intentId === "string" ? args.intentId : "";
@@ -284,7 +259,6 @@ async function handleMessage(request: Request, agentId: string, message: JsonRpc
       const status = await paymentStatus(agentId, intentId);
       return jsonRpcResult(id, textToolResult(status ?? { code: "PAYMENT_INTENT_NOT_FOUND" }, !status));
     }
-
     if (name === "agentpay_create_moove_payment_link") {
       if (!(await authorize(request, agentId, "payments:create"))) return jsonRpcError(id, -32001, "Unauthorized AgentPay connection.");
       const identity = await mooveAgentIdentity(agentId);
@@ -302,7 +276,6 @@ async function handleMessage(request: Request, agentId: string, message: JsonRpc
       const result = await createMooveReceivePayment({ organizationId: identity.organizationId, agentId, toAmount, description, maxUsage, expirationDate, resourceListingId, invoiceId, idempotencyKey, actorType: "AGENT", actorId: agentId });
       return jsonRpcResult(id, textToolResult(result));
     }
-
     if (name === "agentpay_get_moove_payment_status") {
       if (!(await authorize(request, agentId, "payments:read"))) return jsonRpcError(id, -32001, "Unauthorized AgentPay connection.");
       const paymentId = typeof args.paymentId === "string" ? args.paymentId : "";
@@ -310,7 +283,38 @@ async function handleMessage(request: Request, agentId: string, message: JsonRpc
       const status = await mooveStatus(agentId, paymentId);
       return jsonRpcResult(id, textToolResult(status ?? { code: "MOOVE_PAYMENT_LINK_NOT_FOUND" }, !status));
     }
-
+    if (name === "agentpay_create_card_purchase") {
+      if (!(await authorize(request, agentId, "cards:purchase"))) return jsonRpcError(id, -32001, "Unauthorized AgentPay card connection.");
+      const merchantUrl = typeof args.merchantUrl === "string" ? args.merchantUrl : "";
+      const amountMinor = typeof args.amountMinor === "string" ? args.amountMinor : "";
+      const currency = typeof args.currency === "string" ? args.currency : "";
+      const idempotencyKey = typeof args.idempotencyKey === "string" ? args.idempotencyKey : "";
+      if (!merchantUrl || !/^\d+$/.test(amountMinor) || currency.length !== 3 || idempotencyKey.length < 8 || idempotencyKey.length > 100 || !args.checkoutPlan || typeof args.checkoutPlan !== "object") {
+        return jsonRpcResult(id, textToolResult({ code: "INVALID_ARGUMENTS", detail: "merchantUrl, positive amountMinor, three-letter currency, checkoutPlan, and idempotencyKey are required." }, true));
+      }
+      const result = await createAutonomousCardPurchase(agentId, idempotencyKey, {
+        virtualCardId: typeof args.virtualCardId === "string" ? args.virtualCardId : undefined,
+        merchantUrl,
+        amountMinor,
+        currency,
+        merchantCategory: typeof args.merchantCategory === "string" ? args.merchantCategory : undefined,
+        merchantCountry: typeof args.merchantCountry === "string" ? args.merchantCountry : undefined,
+        purpose: typeof args.purpose === "string" ? args.purpose : undefined,
+        checkoutPlan: args.checkoutPlan,
+      });
+      return jsonRpcResult(id, textToolResult(result));
+    }
+    if (name === "agentpay_get_card_purchase") {
+      if (!(await authorize(request, agentId, "cards:read"))) return jsonRpcError(id, -32001, "Unauthorized AgentPay card connection.");
+      const purchaseId = typeof args.purchaseId === "string" ? args.purchaseId : "";
+      const purchase = purchaseId ? await readAutonomousCardPurchase(purchaseId) : null;
+      if (!purchase || purchase.agentId !== agentId) return jsonRpcResult(id, textToolResult({ code: "CARD_PURCHASE_NOT_FOUND" }, true));
+      return jsonRpcResult(id, textToolResult(purchase));
+    }
+    if (name === "agentpay_list_card_purchases") {
+      if (!(await authorize(request, agentId, "cards:read"))) return jsonRpcError(id, -32001, "Unauthorized AgentPay card connection.");
+      return jsonRpcResult(id, textToolResult(await listAutonomousCardPurchases(agentId)));
+    }
     return jsonRpcResult(id, textToolResult({ code: "UNKNOWN_TOOL", detail: `Unknown AgentPay tool: ${name}` }, true));
   } catch (error) {
     const code = error instanceof Error ? error.message : "AGENTPAY_TOOL_FAILED";
@@ -319,21 +323,13 @@ async function handleMessage(request: Request, agentId: string, message: JsonRpc
 }
 
 function responseJson(body: unknown, status = 200) {
-  return Response.json(body, {
-    status,
-    headers: {
-      "cache-control": "no-store",
-      "mcp-protocol-version": MCP_PROTOCOL_VERSION,
-    },
-  });
+  return Response.json(body, { status, headers: { "cache-control": "no-store", "mcp-protocol-version": MCP_PROTOCOL_VERSION } });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ agentId: string }> }) {
   try {
     const origin = request.headers.get("origin");
-    if (origin && origin !== new URL(request.url).origin) {
-      return problem(403, "MCP_ORIGIN_REJECTED", "Cross-origin browser access to the AgentPay MCP endpoint is not allowed.");
-    }
+    if (origin && origin !== new URL(request.url).origin) return problem(403, "MCP_ORIGIN_REJECTED", "Cross-origin browser access to the AgentPay MCP endpoint is not allowed.");
     const { agentId } = await params;
     const payload = await boundedJson(request, 128 * 1024);
     if (Array.isArray(payload)) {
@@ -349,10 +345,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
   }
 }
 
-export async function GET() {
-  return new Response(null, { status: 405, headers: { allow: "POST", "cache-control": "no-store" } });
-}
-
-export async function DELETE() {
-  return new Response(null, { status: 405, headers: { allow: "POST", "cache-control": "no-store" } });
-}
+export async function GET() { return new Response(null, { status: 405, headers: { allow: "POST", "cache-control": "no-store" } }); }
+export async function DELETE() { return new Response(null, { status: 405, headers: { allow: "POST", "cache-control": "no-store" } }); }
