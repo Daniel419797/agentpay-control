@@ -10,7 +10,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:17-alpine
@@ -70,6 +70,15 @@ jobs:
       - name: Verify resource server
         working-directory: resource-server
         run: npm run build && npm run typecheck && npm test
+      - name: Install card executor dependencies
+        working-directory: card-executor
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Audit card executor dependencies
+        working-directory: card-executor
+        run: npm audit --omit=dev --audit-level=high
+      - name: Verify card executor
+        working-directory: card-executor
+        run: node --check src/index.mjs && node --check src/checkout.mjs && node --check src/security.mjs && node --check src/stripe.mjs && npm test
       - name: Install Playwright browser
         working-directory: dashboard
         run: npx playwright install --with-deps chromium
@@ -79,7 +88,7 @@ jobs:
 
   container-builds:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -89,6 +98,7 @@ jobs:
           - facilitator-combined
           - resource-server
           - cardano-signer
+          - card-executor
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:

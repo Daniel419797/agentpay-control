@@ -7,11 +7,8 @@ import { db } from "@/lib/db";
 import { hasRecentAuthentication } from "@/lib/session";
 import { workspaceFromRequest, workspaceHasRole } from "@/lib/workspace";
 
-const schema = z.object({
-  label: z.string().min(2).max(80),
-  scopes: z.array(z.enum(["payments:create", "payments:read", "resources:read"])).min(1),
-  expiresAt: z.string().datetime().optional(),
-});
+const agentScope = z.enum(["payments:create", "payments:read", "resources:read", "cards:purchase", "cards:read"]);
+const schema = z.object({ label: z.string().min(2).max(80), scopes: z.array(agentScope).min(1), expiresAt: z.string().datetime().optional() });
 
 async function authorizedAgent(request: Request, agentId: string) {
   const workspace = await workspaceFromRequest(request);
@@ -47,6 +44,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
         status: true,
         effectivePolicy: { select: { id: true, status: true } },
         accounts: { where: { status: "ACTIVE" }, take: 1, select: { id: true } },
+        virtualCards: { where: { status: "ACTIVE" }, take: 1, select: { id: true } },
       },
     });
     if (!agent) return problem(404, "AGENT_NOT_FOUND", "Agent not found.");
@@ -54,6 +52,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
       if (agent.status !== "ACTIVE") return problem(409, "AGENT_NOT_ACTIVE", "Activate the agent before issuing a payment-capable credential.");
       if (!agent.accounts.length) return problem(409, "PAYMENT_ACCOUNT_UNAVAILABLE", "An active payment account is required before issuing a payment-capable credential.");
       if (!agent.effectivePolicy || agent.effectivePolicy.status !== "PUBLISHED") return problem(409, "POLICY_NOT_PUBLISHED", "Publish a spending policy before issuing a payment-capable credential.");
+    }
+    if (input.scopes.includes("cards:purchase")) {
+      if (agent.status !== "ACTIVE") return problem(409, "AGENT_NOT_ACTIVE", "Activate the agent before issuing an autonomous card credential.");
+      if (!agent.virtualCards.length) return problem(409, "ACTIVE_AGENT_CARD_NOT_FOUND", "An active virtual card is required before issuing an autonomous card credential.");
     }
     const operationState = await db.organization.findUnique({ where: { id: workspace.organization.id }, select: { status: true, killSwitchEnabled: true } });
     if (!operationState || operationState.status !== "ACTIVE") return problem(409, "ORGANIZATION_NOT_ACTIVE", "The organization is not active.");
@@ -66,15 +68,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
       const organization = await tx.organization.findUnique({ where: { id: workspace.organization.id }, select: { status: true, killSwitchEnabled: true } });
       if (!organization || organization.status !== "ACTIVE") throw new Error("ORGANIZATION_NOT_ACTIVE");
       if (organization.killSwitchEnabled) throw new Error("ORGANIZATION_KILL_SWITCH_ENABLED");
+      const currentAgent = await tx.agent.findUnique({
+        where: { id: agentId },
+        select: { status: true, effectivePolicy: { select: { status: true } }, accounts: { where: { status: "ACTIVE" }, take: 1, select: { id: true } }, virtualCards: { where: { status: "ACTIVE" }, take: 1, select: { id: true } } },
+      });
+      if (!currentAgent || currentAgent.status !== "ACTIVE") throw new Error("AGENT_NOT_ACTIVE");
       if (input.scopes.includes("payments:create")) {
-        const currentAgent = await tx.agent.findUnique({
-          where: { id: agentId },
-          select: { status: true, effectivePolicy: { select: { status: true } }, accounts: { where: { status: "ACTIVE" }, take: 1, select: { id: true } } },
-        });
-        if (!currentAgent || currentAgent.status !== "ACTIVE") throw new Error("AGENT_NOT_ACTIVE");
         if (!currentAgent.accounts.length) throw new Error("PAYMENT_ACCOUNT_UNAVAILABLE");
         if (!currentAgent.effectivePolicy || currentAgent.effectivePolicy.status !== "PUBLISHED") throw new Error("POLICY_NOT_PUBLISHED");
       }
+      if (input.scopes.includes("cards:purchase") && !currentAgent.virtualCards.length) throw new Error("ACTIVE_AGENT_CARD_NOT_FOUND");
       const created = await tx.agentCredential.create({ data: { agentId, label: input.label, prefix, secretHash: createHash("sha256").update(secret).digest("hex"), scopes: input.scopes, expiresAt: input.expiresAt ? new Date(input.expiresAt) : undefined } });
       await tx.auditEvent.create({ data: { organizationId: workspace.organization.id, actorType: "USER", actorId: workspace.user.id, action: "AGENT_CREDENTIAL_CREATED", targetType: "AGENT_CREDENTIAL", targetId: created.id, result: "SUCCESS", metadata: { agentId, prefix, scopes: created.scopes } } });
       await tx.outboxEvent.create({ data: { organizationId: workspace.organization.id, eventType: "AGENT_CREDENTIAL_CREATED", aggregateType: "AGENT_CREDENTIAL", aggregateId: created.id, payload: { agentId, prefix, label: created.label } } });
@@ -85,6 +88,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     if (error instanceof Error && error.message === "AGENT_NOT_ACTIVE") return problem(409, error.message, "The agent is not active.");
     if (error instanceof Error && error.message === "PAYMENT_ACCOUNT_UNAVAILABLE") return problem(409, error.message, "An active payment account is required.");
     if (error instanceof Error && error.message === "POLICY_NOT_PUBLISHED") return problem(409, error.message, "Publish a spending policy before issuing a payment-capable credential.");
+    if (error instanceof Error && error.message === "ACTIVE_AGENT_CARD_NOT_FOUND") return problem(409, error.message, "An active virtual card is required.");
     if (error instanceof Error && error.message === "ORGANIZATION_NOT_ACTIVE") return problem(409, error.message, "The organization is not active.");
     if (error instanceof Error && error.message === "ORGANIZATION_KILL_SWITCH_ENABLED") return problem(409, error.message, "The emergency stop is active.");
     return handleApiError(error);

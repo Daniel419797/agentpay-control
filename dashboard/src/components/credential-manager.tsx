@@ -16,6 +16,7 @@ type Props = {
   createLabel?: string;
 };
 
+const allScopes = ["payments:create", "payments:read", "resources:read", "cards:purchase", "cards:read"];
 const standardScopes = ["payments:create", "payments:read"];
 const integrationScopes = ["payments:create", "payments:read", "resources:read"];
 
@@ -86,12 +87,8 @@ export function CredentialManager({ agentId, existing, defaultLabel, defaultScop
         setVerification(body?.detail ?? `Connection verification failed (${response.status}).`);
         return;
       }
-      if (body?.data?.ready) {
-        setVerification("Verified — this credential is authenticated and the agent, payment account, and published policy are ready.");
-      } else {
-        const blockers = body?.data?.blockingReasons?.join(", ") || "unknown readiness issue";
-        setVerification(`Credential authenticated, but spending is blocked: ${blockers}.`);
-      }
+      if (body?.data?.ready) setVerification("Verified — this credential is authenticated and the agent, payment account, and published policy are ready.");
+      else setVerification(`Credential authenticated, but spending is blocked: ${body?.data?.blockingReasons?.join(", ") || "unknown readiness issue"}.`);
       router.refresh();
     } catch {
       setVerification("Connection verification could not reach AgentPay.");
@@ -103,10 +100,7 @@ export function CredentialManager({ agentId, existing, defaultLabel, defaultScop
     if (!confirm(action)) return;
     const response = await fetch(`/api/v1/agents/${agentId}/credentials/${id}`, { method: "DELETE" });
     if (response.ok) {
-      if (created?.id === id) {
-        setCreated(null);
-        setVerification("");
-      }
+      if (created?.id === id) { setCreated(null); setVerification(""); }
       router.refresh();
     }
   }
@@ -120,9 +114,7 @@ export function CredentialManager({ agentId, existing, defaultLabel, defaultScop
       {created && (
         <div className="panel" style={{ marginBottom: 18, border: "1px solid var(--color-success, #22c55e)", borderRadius: 8, padding: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 8 }}>Credential created — copy the secret now, it won&apos;t be shown again.</div>
-          <div style={{ fontFamily: "monospace", background: "var(--color-surface, #f5f5f5)", padding: 12, borderRadius: 6, wordBreak: "break-all", fontSize: 13 }}>
-            {created.secret}
-          </div>
+          <div style={{ fontFamily: "monospace", background: "var(--color-surface, #f5f5f5)", padding: 12, borderRadius: 6, wordBreak: "break-all", fontSize: 13 }}>{created.secret}</div>
           <div className="button-row" style={{ marginTop: 10 }}>
             <button className="secondary-button" onClick={() => { void navigator.clipboard.writeText(created.secret); }}>Copy to clipboard</button>
             {integrationScreen && <button className="primary-button" onClick={() => void verifyCreatedConnection()}>Verify connection</button>}
@@ -140,9 +132,7 @@ export function CredentialManager({ agentId, existing, defaultLabel, defaultScop
                 <div className="record-title">{cred.label}</div>
                 <div className="record-subtitle">{cred.prefix}… &middot; {cred.scopes.join(", ")} &middot; {cred.status}</div>
               </div>
-              {cred.status !== "REVOKED" && (
-                <button className="secondary-button" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => void revoke(cred.id)}>{integrationScreen ? "Disconnect" : "Revoke"}</button>
-              )}
+              {cred.status !== "REVOKED" && <button className="secondary-button" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => void revoke(cred.id)}>{integrationScreen ? "Disconnect" : "Revoke"}</button>}
             </div>
           ))}
         </div>
@@ -156,13 +146,14 @@ export function CredentialManager({ agentId, existing, defaultLabel, defaultScop
           </div>
           <div>
             <label style={{ display: "block", fontSize: 13, marginBottom: 4 }}>Scopes</label>
-            <div style={{ display: "flex", gap: 12 }}>
-              {["payments:create", "payments:read", "resources:read"].map((scope) => (
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {allScopes.map((scope) => (
                 <label key={scope} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
                   <input type="checkbox" checked={scopes.includes(scope)} onChange={() => toggleScope(scope)} />{scope}
                 </label>
               ))}
             </div>
+            <div className="form-help" style={{ marginTop: 6 }}>Use cards:purchase only for agents that should be able to initiate card checkout. cards:read is sufficient for status and history.</div>
           </div>
           {error && <div className="form-error" role="alert">{error}</div>}
           {!label && <div className="form-error">Enter a label to continue.</div>}

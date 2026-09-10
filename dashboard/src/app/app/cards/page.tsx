@@ -1,17 +1,19 @@
 import { CreditCard, Landmark } from "lucide-react";
+import { CardAutonomyControls } from "@/components/card-autonomy-controls";
 import { CardOperations } from "@/components/card-operations";
 import { getConfig } from "@/lib/config";
 import { db } from "@/lib/db";
 import { currentWorkspace, workspaceHasRole } from "@/lib/workspace";
 
 function Empty({ text }: { text: string }) { return <div className="empty-state"><strong>Nothing to show</strong><p>{text}</p></div>; }
-function statusClass(status: string) { return ["ACTIVE", "SUCCEEDED", "APPROVED"].includes(status) ? "status-settled" : ["PENDING", "PROCESSING", "SUBMISSION_UNKNOWN", "FROZEN"].includes(status) ? "status-approval" : "status-error"; }
+function statusClass(status: string) { return ["ACTIVE", "SUCCEEDED", "APPROVED", "SETTLED"].includes(status) ? "status-settled" : ["PENDING", "PROCESSING", "SUBMISSION_UNKNOWN", "FROZEN", "REQUIRES_HUMAN"].includes(status) ? "status-approval" : "status-error"; }
 
 export default async function CardsPage() {
   const workspace = await currentWorkspace();
   const organizationId = workspace?.organization.id;
   const canOperate = Boolean(workspace && workspaceHasRole(workspace, ["OWNER", "OPERATOR"]));
-  const canOpenFiatAccount = Boolean(workspace && workspaceHasRole(workspace, ["OWNER"]));
+  const canEditAutonomy = Boolean(workspace && workspaceHasRole(workspace, ["OWNER"]));
+  const canOpenFiatAccount = canEditAutonomy;
   const config = getConfig();
   const [cards, accounts, authorizations, agents, cardholders, transfers] = organizationId ? await Promise.all([
     db.virtualCard.findMany({ where: { organizationId }, include: { agent: { select: { name: true } } }, orderBy: { createdAt: "desc" } }),
@@ -22,8 +24,8 @@ export default async function CardsPage() {
     db.fiatTransfer.findMany({ where: { organizationId }, orderBy: { createdAt: "desc" }, take: 20 }),
   ]) : [[], [], [], [], [], []];
   const providerLabel = config.VIRTUAL_CARDS_ENABLED ? `${config.CARD_PROVIDER} enabled` : `${config.CARD_PROVIDER} configured · live rail disabled`;
-  return <div className="page"><div className="page-heading"><div><h1>Cards & fiat</h1><p>Controlled virtual cards and fiat movement with provider-backed state, step-up protection, and reconciliation.</p></div><span className={`status-badge ${config.VIRTUAL_CARDS_ENABLED ? "status-settled" : "status-approval"}`}>{providerLabel}</span></div>
-    {config.CARD_PROVIDER === "SANDBOX" && <div className="inline-notice" role="note"><strong>Sandbox provider.</strong> Card and fiat actions on this environment are test fixtures, not live financial products. Production configuration cannot enable live card/fiat flags with the sandbox provider.</div>}
+  return <div className="page"><div className="page-heading"><div><h1>Cards & fiat</h1><p>Controlled virtual cards, autonomous checkout, and fiat movement with provider-backed state, step-up protection, and reconciliation.</p></div><span className={`status-badge ${config.VIRTUAL_CARDS_ENABLED ? "status-settled" : "status-approval"}`}>{providerLabel}</span></div>
+    {config.CARD_PROVIDER === "SANDBOX" && <div className="inline-notice" role="note"><strong>Sandbox provider.</strong> Card and fiat actions on this environment are test fixtures, not live financial products. Autonomous browser checkout can only be enabled for the Stripe rail.</div>}
     <div className="compact-metrics"><div><CreditCard size={17} aria-hidden="true"/><span>Active cards</span><strong>{cards.filter((card) => card.status === "ACTIVE").length}</strong></div><div><Landmark size={17} aria-hidden="true"/><span>Fiat accounts</span><strong>{accounts.length}</strong></div><div><span>Recent authorizations</span><strong>{authorizations.length}</strong></div></div>
     {canOperate ? <CardOperations
       enabled={config.VIRTUAL_CARDS_ENABLED}
@@ -34,6 +36,10 @@ export default async function CardsPage() {
       cards={cards.map((card) => ({ id: card.id, label: card.nickname ?? `•••• ${card.last4}`, status: card.status, version: card.version }))}
       fiatAccounts={accounts.map((account) => ({ id: account.id, label: `${account.currency} · ${account.status}`, currency: account.currency, status: account.status }))}
     /> : <section className="panel section-gap"><h2 className="panel-title">Financial operations</h2><p className="panel-description">This role has read-only access. Cardholder PII and card/fiat mutation controls are available only to authorized Owner/Operator roles; opening a fiat account requires an Owner.</p></section>}
+    <CardAutonomyControls
+      canEdit={canEditAutonomy}
+      cards={cards.map((card) => ({ id: card.id, label: card.nickname ?? `${card.brand ?? "Virtual"} •••• ${card.last4}`, status: card.status, agentName: card.agent.name }))}
+    />
     <div className="page-grid"><section className="panel"><div className="panel-header"><h2 className="panel-title">Virtual cards</h2></div>{cards.length ? <div className="record-list">{cards.map((card) => <div className="record-row" key={card.id}><div><div className="record-title">{card.nickname ?? `${card.brand ?? "Virtual"} •••• ${card.last4}`}</div><div className="record-subtitle">{card.agent.name} · {card.currency}</div></div><div className="record-aside"><span className="record-meta">{card.spendingLimitMinor ? `${card.spendingLimitMinor} ${card.currency} minor units` : "Policy limits"}</span><span className={`status-badge ${statusClass(card.status)}`}>{card.status}</span></div></div>)}</div> : <Empty text="No virtual cards have been issued." />}</section>
       <section className="panel"><div className="panel-header"><h2 className="panel-title">Fiat accounts</h2></div>{accounts.length ? <div className="record-list">{accounts.map((account) => <div className="record-row" key={account.id}><div><div className="record-title">{account.currency} operating account</div><div className="record-subtitle">{account.provider} fiat rail</div></div><div className="record-aside"><span className="record-meta">{account.availableMinor.toString()} available · {account.pendingMinor.toString()} pending (minor units)</span><span className={`status-badge ${statusClass(account.status)}`}>{account.status}</span></div></div>)}</div> : <Empty text="No fiat accounts are connected." />}</section></div>
     <section className="panel section-gap"><div className="panel-header"><h2 className="panel-title">Fiat transfers</h2></div>{transfers.length ? <div className="record-list">{transfers.map((transfer) => <div className="record-row" key={transfer.id}><div><div className="record-title">{transfer.direction} · {transfer.amountMinor.toString()} {transfer.currency} minor units</div><div className="record-subtitle">{transfer.description ?? "Fiat movement"} · {transfer.createdAt.toLocaleString()}</div></div><span className={`status-badge ${statusClass(transfer.status)}`}>{transfer.status.replaceAll("_", " ")}</span></div>)}</div> : <Empty text="No fiat transfers have been submitted." />}</section>

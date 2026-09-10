@@ -12,6 +12,32 @@ if (severe.length === 0) {
   process.exit(0);
 }
 
+function summarizeVia(via) {
+  if (!Array.isArray(via)) return via;
+  return via.map((entry) => {
+    if (typeof entry === "string") return entry;
+    if (!entry || typeof entry !== "object") return String(entry);
+    return {
+      source: entry.source,
+      name: entry.name,
+      title: entry.title,
+      url: entry.url,
+      severity: entry.severity,
+      range: entry.range,
+    };
+  });
+}
+
+for (const [name, value] of severe) {
+  console.error(`[production-audit] finding ${name}: ${JSON.stringify({
+    severity: value?.severity,
+    range: value?.range,
+    nodes: value?.nodes,
+    via: summarizeVia(value?.via),
+    fixAvailable: value?.fixAvailable,
+  })}`);
+}
+
 // Prisma 7.9.1 currently pulls its CLI/config package into npm's production
 // dependency graph through the Prisma Client peer relationship. The CLI config
 // package depends on deepmerge-ts <8 and is affected by GHSA-ggr8-5vv4-36mx.
