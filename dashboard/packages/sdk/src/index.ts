@@ -2,9 +2,61 @@ export type AgentPayClientOptions = { baseUrl: string; apiKey: string; fetch?: t
 
 export type PaidRequest = { resourceUrl: string; purpose?: string; maxAmountAtomic?: string; network?: string };
 
+export type CheckoutSecret = "CARD_NUMBER" | "CVC" | "CARD_EXPIRY" | "EXP_MONTH" | "EXP_YEAR";
+export type CheckoutStep =
+  | { op: "fill"; selector: string; value: string }
+  | { op: "select"; selector: string; value: string }
+  | { op: "click"; selector: string; timeoutMs?: number }
+  | { op: "submit"; selector: string; timeoutMs?: number }
+  | { op: "check"; selector: string }
+  | { op: "wait"; selector: string; timeoutMs?: number }
+  | { op: "secret"; selector: string; secret: CheckoutSecret }
+  | { op: "frame_secret"; frameSelector: string; selector: string; secret: CheckoutSecret }
+  | { op: "assert"; selector: string; contains: string; timeoutMs?: number };
+
+export type CheckoutPlan = {
+  steps: CheckoutStep[];
+  successUrlPrefix?: string;
+  successText?: { selector: string; contains: string };
+};
+
+export type AutonomousCardPurchaseRequest = {
+  virtualCardId?: string;
+  merchantUrl: string;
+  amountMinor: string;
+  currency: string;
+  merchantCategory?: string;
+  merchantCountry?: string;
+  purpose?: string;
+  checkoutPlan: CheckoutPlan;
+};
+
+export type AutonomousCardPurchase = {
+  id: string;
+  organizationId: string;
+  agentId: string;
+  virtualCardId: string;
+  paymentIntentId: string;
+  idempotencyKey: string;
+  merchantHost: string;
+  amountMinor: string;
+  currency: string;
+  merchantCategory?: string | null;
+  merchantCountry?: string | null;
+  purpose?: string | null;
+  policyVersion: number;
+  status: "APPROVAL_PENDING" | "READY" | "EXECUTING" | "CHECKOUT_SUCCEEDED" | "CHECKOUT_FAILED" | "REQUIRES_HUMAN" | "REJECTED" | "CANCELED" | "EXPIRED";
+  executorAttempt: number;
+  resultCode?: string | null;
+  resultUrl?: string | null;
+  resultSummary?: unknown;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type PaymentIntent = {
   id: string;
-  status: "DENIED" | "APPROVAL_PENDING" | "AUTHORIZED" | "SETTLED" | "SETTLEMENT_FAILED" | "FAILED_BEFORE_SUBMISSION" | string;
+  status: "DENIED" | "APPROVAL_PENDING" | "AUTHORIZED" | "SUBMITTED" | "SUBMISSION_UNKNOWN" | "SETTLED" | "SETTLEMENT_FAILED" | "FAILED_BEFORE_SUBMISSION" | string;
   resourceUrl: string;
   merchantHost?: string;
   purpose?: string | null;
@@ -118,54 +170,48 @@ export class AgentPayClient {
     });
     const body = await response.json();
     if (!response.ok) {
-      throw new AgentPayError(
-        response.status,
-        body.code ?? "REQUEST_FAILED",
-        body.detail ?? body.message ?? "AgentPay request failed"
-      );
+      throw new AgentPayError(response.status, body.code ?? "REQUEST_FAILED", body.detail ?? body.message ?? "AgentPay request failed");
     }
     return (body.data ?? body) as T;
   }
 
-  createPaidRequest(
-    agentId: string,
-    input: PaidRequest,
-    idempotencyKey = crypto.randomUUID()
-  ) {
-    return this.request<PaymentIntent>(
-      `/api/v1/agents/${agentId}/paid-requests`,
-      {
-        method: "POST",
-        headers: { "idempotency-key": idempotencyKey },
-        body: JSON.stringify(input),
-      }
+  createPaidRequest(agentId: string, input: PaidRequest, idempotencyKey = crypto.randomUUID()) {
+    return this.request<PaymentIntent>(`/api/v1/agents/${agentId}/paid-requests`, { method: "POST", headers: { "idempotency-key": idempotencyKey }, body: JSON.stringify(input) });
+  }
+
+  createAutonomousCardPurchase(agentId: string, input: AutonomousCardPurchaseRequest, idempotencyKey = crypto.randomUUID()) {
+    return this.request<{ purchase: AutonomousCardPurchase; approvalId?: string | null; existing: boolean }>(
+      `/api/v1/agents/${agentId}/card-purchases`,
+      { method: "POST", headers: { "idempotency-key": idempotencyKey }, body: JSON.stringify(input) },
     );
+  }
+
+  getAutonomousCardPurchase(purchaseId: string) {
+    return this.request<AutonomousCardPurchase & { paymentIntent?: { id: string; status: string; approval?: { id: string; status: string; expiresAt: string } | null } | null }>(`/api/v1/card-purchases/${purchaseId}`);
+  }
+
+  listAutonomousCardPurchases(agentId: string) {
+    return this.request<AutonomousCardPurchase[]>(`/api/v1/agents/${agentId}/card-purchases`);
   }
 
   getPaymentIntent(intentId: string) {
     return this.request<PaymentIntent>(`/api/v1/payment-intents/${intentId}`);
   }
 
-  async waitForSettlement(
-    intentId: string,
-    options?: { pollIntervalMs?: number; timeoutMs?: number }
-  ) {
+  async waitForSettlement(intentId: string, options?: { pollIntervalMs?: number; timeoutMs?: number }) {
     const pollInterval = options?.pollIntervalMs ?? 2000;
     const timeout = options?.timeoutMs ?? 30000;
     const deadline = Date.now() + timeout;
     while (Date.now() < deadline) {
       const intent = await this.getPaymentIntent(intentId);
       if (intent.status === "SETTLED") return intent;
-      if (["DENIED", "SETTLEMENT_FAILED", "FAILED_BEFORE_SUBMISSION", "REJECTED", "EXPIRED"].includes(intent.status)) return intent;
+      if (["DENIED", "SETTLEMENT_FAILED", "FAILED_BEFORE_SUBMISSION", "REJECTED", "EXPIRED", "CANCELED"].includes(intent.status)) return intent;
       await new Promise((r) => setTimeout(r, pollInterval));
     }
     throw new AgentPayError(408, "POLL_TIMEOUT", `Payment intent ${intentId} did not settle within ${timeout}ms`);
   }
 
-  createMooveReceivePayment(
-    input: MooveReceiveRequest,
-    idempotencyKey = crypto.randomUUID()
-  ) {
+  createMooveReceivePayment(input: MooveReceiveRequest, idempotencyKey = crypto.randomUUID()) {
     return this.request<MooveReceivePayment>("/api/v1/moove/payment-links", {
       method: "POST",
       headers: { "idempotency-key": idempotencyKey },
@@ -178,10 +224,7 @@ export class AgentPayClient {
     return this.request<MooveReceivePayment>(`/api/v1/moove/payment-links/${encodeURIComponent(id)}${suffix}`);
   }
 
-  async waitForMooveReceivePayment(
-    id: string,
-    options?: { pollIntervalMs?: number; timeoutMs?: number }
-  ) {
+  async waitForMooveReceivePayment(id: string, options?: { pollIntervalMs?: number; timeoutMs?: number }) {
     const pollInterval = options?.pollIntervalMs ?? 3000;
     const timeout = options?.timeoutMs ?? 120000;
     const deadline = Date.now() + timeout;
