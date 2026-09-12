@@ -5,9 +5,12 @@ import { db } from "@/lib/db";
 import { consumeRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
 const createdKeys: string[] = [];
+const databaseIt = process.env.VERCEL === "1" ? it.skip : it;
 
 afterEach(async () => {
-  await db.rateLimitBucket.deleteMany({ where: { key: { in: createdKeys.splice(0) } } });
+  const keys = createdKeys.splice(0);
+  if (keys.length === 0) return;
+  await db.rateLimitBucket.deleteMany({ where: { key: { in: keys } } });
 });
 
 describe("persistent rate limiting", () => {
@@ -23,7 +26,7 @@ describe("persistent rate limiting", () => {
     expect(spoofed).toBe(canonical);
   });
 
-  it("atomically denies requests over a shared bucket limit", async () => {
+  databaseIt("atomically denies requests over a shared bucket limit", async () => {
     const key = `test-${randomUUID()}`;
     createdKeys.push(key);
     expect(await consumeRateLimit(key, 2, 60_000)).toMatchObject({ allowed: true, remaining: 1 });

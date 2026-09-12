@@ -1,288 +1,262 @@
 # AgentPay Threat Model
 
-**Status:** Current implementation threat model  
-**Updated:** 2026-08-22
+**Updated:** 2026-09-10
 
-## Revision note
+## 1. Scope
 
-Cardano Mainnet now has an implemented external per-agent Ed25519 custody path. The threat model treats Mainnet autonomous custody as a current trust boundary while self custody remains supported in parallel.
+This threat model covers AgentPay's control plane, autonomous-agent interfaces, payment rails, provider adapters, custody boundaries, persistence, resource fetching, automation, and production operations.
 
-## 1. Security objective
+## 2. Protected assets
 
-An autonomous agent may request financial action, but it must not be able to:
+High-value assets include:
 
-- bypass organization or agent policy;
-- use another agent's payment identity;
-- obtain unrestricted private-key authority;
-- alter a verified x402 requirement after authorization;
-- replay a payment against another resource;
-- cause blind resubmission after an ambiguous side effect;
-- cross organization boundaries;
-- weaken required trust or oracle evidence.
+- organization membership, roles, policies, approvals, and emergency controls;
+- agent credentials and stable agent identity;
+- blockchain payment identities, private keys, signing capability, and custody references;
+- provider API keys, webhook secrets, database/session secrets, and encryption material;
+- cardholder/card/fiat-account provider state and any provider-authorized card-display flow;
+- spend reservations, invoices, payment intents, attempts, settlements, transfer/automation state;
+- Moove payment-link state and provider settlement evidence;
+- Masumi escrow purchase/result/refund state;
+- audit, reconciliation, incident, and notification evidence;
+- private resource/customer/organization data.
 
-## 2. Trust boundaries
+## 3. Core security invariants
 
-### Control plane: Vercel
+1. Organization-owned data cannot cross tenant boundaries.
+2. Agent credentials authorize AgentPay operations, not unrestricted underlying payment secrets.
+3. Published policy cannot be bypassed or mutated retroactively.
+4. Required approvals must be satisfied before execution.
+5. Managed blockchain payment identities are unique per agent and network.
+6. Authorized payment context cannot be silently changed after approval.
+7. A possible financial side effect is never retried as though nothing happened.
+8. Settlement/transfer completion requires validated rail/provider evidence.
+9. Required external trust evidence fails closed when invalid or unavailable.
+10. Emergency controls can stop new risky side effects without destroying reconciliation evidence.
 
-Trusts authenticated users and agents only within explicit organization, role and scope boundaries. Holds business state, policy, reservations, approvals, audit and reconciliation records. Holds no blockchain private keys or Mainnet custody API credentials.
+## 4. Trust boundaries
+
+### Browser / human client
+
+Untrusted input boundary. Session authentication and server-side RBAC are authoritative.
+
+### Autonomous agent / SDK / MCP / LangChain
+
+Untrusted instruction boundary. The client receives only an AgentPay credential scoped to allowed API capabilities.
+
+### Control plane
+
+Authoritative organization/policy orchestration boundary. It performs tenant resolution, authorization, policy evaluation, approvals, reservations, persistence, audit, and provider orchestration.
 
 ### PostgreSQL
 
-Authoritative application-state boundary. Must preserve tenant isolation, transaction integrity and canonical payment-identity uniqueness.
+Durable state and concurrency boundary. Financial uniqueness, idempotency, and transaction consistency rely on database constraints/locks in addition to application checks.
 
-### Unified facilitator: Render
+### Facilitators and Cardano signer
 
-Protocol and settlement boundary for Hedera, Arc and Cardano. The Cardano side verifies signed transactions, controls replay and claims, submits through Blockfrost and evaluates confirmation evidence. It does not hold the Cardano payer private key.
+Protocol/custody boundaries. They must execute only supported network/payment profiles and validate exact identities/transactions.
 
-### Cardano signer: Render
+### External custody
 
-Transaction construction and signing boundary. Preprod may hold a testnet-only derivation secret. Mainnet may hold an external custody API capability but not the managed-agent private keys themselves. The signer does not perform Cardano on-chain submission.
+Holds Mainnet Cardano managed private keys. It is trusted only to resolve/sign the exact per-agent identity requested; AgentPay verifies public identity/address and returned signatures.
 
-### External Cardano Mainnet custody
+### Moove
 
-Separate provider, HSM, KMS or delegation boundary. Holds per-agent Mainnet private keys and exposes only bounded public identity and body-hash signing operations.
+Hosted receive-payment provider boundary. Its payment status and token/destination evidence are externally supplied and schema/identity validated before local business state advances.
+
+### Stripe / financial providers
+
+Card and fiat execution boundary. Provider identifiers/status and signed webhooks are validated; raw card secrets remain outside normal AgentPay persistence.
 
 ### Resource providers
 
-Untrusted or semi-trusted external HTTP and x402 systems. Resource URLs, challenges and responses are treated as hostile input until validated.
+External URLs, x402 challenges, redirects, bodies, and fulfillment payloads are untrusted.
 
-### Pyth / Masumi / KERIA / Dune / Blockfrost
+### Pyth / Masumi / KERIA / Blockfrost / Dune
 
-External evidence and provider boundaries with different authority. None may silently gain policy authority beyond its configured role.
+External evidence boundaries with deliberately limited authority.
 
-### Blockchains
+## 5. Tenant-isolation threats
 
-Authoritative final settlement evidence, subject to the confirmation and reconciliation rules for the supported rail.
-
-## 3. Protected assets
-
-- blockchain private keys;
-- testnet managed-agent master keys;
-- external HSM/KMS signer references and credentials;
-- agent API credentials;
-- session and authentication secrets;
-- organization membership and roles;
-- immutable policy versions;
-- spend reservations;
-- approvals;
-- payment intents, attempts and settlements;
-- settlement claims and nonces;
-- audit and incident evidence;
-- encrypted escrow and job inputs and provider secrets;
-- private organization, resource and prompt content.
-
-## 4. Identity-isolation threats
-
-### Threat: two agents share one wallet
-
-Impact: one agent can spend from another agent's authority or attribution becomes false.
+**Threat:** attacker supplies another organization's object ID or agent ID.
 
 Controls:
 
-- one canonical payment identity per network, PaymentAccount and agent;
-- canonical unique DB index;
-- transaction-scoped advisory locking;
-- per-agent signer provisioning;
-- reject legacy duplicate or shared-payer identities rather than silently migrating them.
+- server-side organization resolution;
+- role/scope checks on every mutation/read path;
+- ownership validation for resource/invoice/payment bindings;
+- agent-specific status reads where appropriate;
+- no trust in client-provided organization IDs without authorization.
 
-### Threat: infrastructure account becomes agent wallet
+## 6. Agent credential threats
 
-Controls:
-
-- distinguish Hedera operator and payer, Arc relayer and contract executor, and other service principals from `PaymentAccount.accountId`;
-- do not assign deployment-wide service identities to autonomous agents.
-
-## 5. Cardano Mainnet custody threats
-
-### Shared Mainnet master key
-
-Threat: compromise of one derivation secret compromises every managed agent.
-
-Control: `CARDANO_MANAGED_AGENT_MASTER_KEY` is prohibited on Mainnet.
-
-### Custody provider returns same key for multiple agents
+**Threats:** leaked token, over-broad scope, revoked token reuse, secret logging.
 
 Controls:
 
-- immutable Agent ID in `/identity` request;
-- locally derive Cardano payer address from returned Ed25519 public key;
-- global DB canonical identity uniqueness;
-- operational verification using multiple Agent IDs.
+- hashed/non-recoverable secret storage where implemented;
+- one-time plaintext credential presentation;
+- scopes, expiry, revocation, and agent binding;
+- rate limiting;
+- audit of credential lifecycle;
+- no underlying blockchain/provider keys in agent context.
 
-### Custody returns wrong or changed public key or signer reference
+## 7. Policy and approval threats
 
-Controls:
-
-- bind payer address to resolved public key;
-- verify optional claimed address;
-- compare returned signer reference and public key on signing;
-- fail closed on mismatch.
-
-### Custody signs altered data
-
-Control: external signer receives only the exact transaction-body hash constructed by AgentPay. Returned signature is verified locally against the resolved public key and body hash.
-
-### Custody outage
-
-Control: managed signing fails. There is no fallback to shared hot wallet, another agent, deployment-wide payer or deterministic Mainnet master key.
-
-### Custody API credential compromise
+**Threat:** agent bypasses limits or self-approves.
 
 Controls:
 
-- signer-only placement;
-- HTTPS;
-- distinct capability from Cardano signer and facilitator keys;
-- provider-side authorization, rate and policy controls should be applied;
-- rotate affected credential and contain managed signing if compromise is suspected.
+- immutable published policy versions;
+- server-side decision engine;
+- spend reservations before irreversible execution;
+- threshold approvals and separation rules;
+- approval bound to original payment context;
+- emergency-stop check before new risky actions.
 
-## 6. Preprod derivation threats
+## 8. Managed identity collision
 
-Preprod deterministic derivation is testnet-only. The master secret must be random, isolated to the signer and never copied into Mainnet or Vercel configuration.
-
-Compromise affects the derived testnet identities and should trigger testnet key rotation and reprovisioning, but this design must not be extrapolated to Mainnet custody.
-
-## 7. Transaction-construction threats
-
-Threats include malicious UTxO selection, extra outputs or assets, excessive fees, scripts, minting, certificates, withdrawals, collateral and payer or change manipulation.
+**Threat:** two agents share the same managed payer.
 
 Controls:
 
-- narrow transaction builder;
-- payer-only inputs;
-- exact payee, amount and asset;
-- allowed asset set and conservation;
-- payer-only change;
-- bounded fee, TTL and input count;
-- reject unsupported transaction features;
-- facilitator independently decodes and verifies CBOR after signing.
+```text
+(network, canonical payment identity) -> one PaymentAccount -> one agent
+```
 
-## 8. Resource and replay threats
+- network-specific canonical normalization;
+- database unique constraint;
+- transaction-scoped advisory lock;
+- per-agent identity provisioning;
+- fail-closed migration/provisioning if conflicts exist.
 
-### Payment reused for different resource
+## 9. Payment mutation and replay
 
-Control: SHA-256 binding of the canonical paid-resource URL is part of the Cardano requirement and settlement binding.
-
-### Duplicate submission
+**Threats:** amount/payee/network/resource altered after authorization; old payment replayed.
 
 Controls:
 
-- idempotent payment intent creation;
-- UTxO nonce;
-- durable settlement claim;
-- replay and mismatch checks before submission.
+- quote/requirement fingerprinting;
+- canonical resource binding;
+- exact payer/payee/asset/amount checks;
+- nonce/UTxO/claim controls where applicable;
+- idempotency keys and one-shot mutation claims;
+- facilitator independent validation.
 
-### Ambiguous timeout retried blindly
+## 10. Ambiguous submission
 
-Controls:
-
-- record submission-started state before external submit;
-- preserve candidate transaction and reservation;
-- mark pending or `SUBMISSION_UNKNOWN`;
-- independent evidence reconciliation rather than blind retry.
-
-## 9. Policy and authorization threats
-
-### Agent bypasses spend policy
+**Threat:** timeout causes duplicate payment/transfer/link creation.
 
 Controls:
 
-- server-side immutable policy evaluation;
-- active policy version binding;
-- spend reservations;
-- pre-sign revalidation;
-- scoped credentials;
-- payment account and network checks.
+- durable pre-submission/submission-started state;
+- preserve candidate transaction/provider identifiers and reservations;
+- `SUBMISSION_UNKNOWN`/pending classification;
+- safe read reconciliation;
+- no blind retry of irreversible provider/network mutations.
 
-### Self-approval
+For Moove create operations, AgentPay uses a durable provider-description marker plus account listing reconciliation because provider-side create idempotency is not assumed.
 
-Control: role and approval rules prevent initiator approval where separation is required.
+## 11. Cardano threats
 
-### Kill-switch bypass
+### Transaction injection/complexity
 
-Control: organization emergency stop is checked before new risky side effects. Defensive reconciliation and evidence processing remains available.
+Reject unsupported scripts, minting, certificates, withdrawals, collateral, bootstrap witnesses, auxiliary data, unrelated assets/outputs, excessive fees/inputs, or payer/change manipulation.
 
-### Stale balance reopens budget
+### Mainnet custody compromise
 
-Control: active, consumed and recently settled reservations remain part of spend accounting rather than trusting a stale chain balance snapshot alone.
+- no Mainnet managed-agent master key;
+- per-agent external Ed25519 identity;
+- local Cardano address derivation;
+- body-hash-only external signing;
+- local signature verification;
+- distinct signer/facilitator/custody capability credentials;
+- fail closed on outage, key drift, signer-ref drift, or invalid signature.
 
-## 10. External trust threats
+### Provider ambiguity
 
-### Pyth
+Blockfrost transport failure after possible submission remains pending until chain evidence resolves it.
 
-Threat: stale, manipulated or uncertain price relaxes policy.
+## 12. Moove threats
 
-Controls: freshness, confidence and positive-value validation and conservative upper-bound valuation. Required oracle failure cannot relax atomic limits.
+### Cross-tenant settlement
 
-### Masumi Registry
+Moove payment links settle according to the configured Moove account. AgentPay therefore binds the credential to one organization and rejects sibling-tenant use.
 
-Threat: wrong seller, capability or payment key becomes trusted.
+### Duplicate link after timeout
 
-Controls: trusted registry source and network, agent identifier, capability, seller address and payment-key verification, freshness and online requirements.
+Create POST is not blindly retried. A durable marker allows safe recovery through provider listing.
 
-### Masumi escrow
+### False invoice completion
 
-Threat: HTTP success is mistaken for escrow completion.
+Invoice settlement requires exact expected network/symbol/decimals/requested amount/received amount and provider completion evidence.
 
-Control: durable provider lifecycle reconciliation and exact result-hash verification before verified completion contributes to reputation.
+### Provider payload manipulation
 
-### KERIA/Veridian
+Provider JSON is schema-validated and converted to durable JSON-safe evidence before storage.
 
-Threat: untrusted, stale, revoked or mismatched credential passes policy.
+## 13. Card and fiat threats
 
-Controls: verified authority response plus pinned issuer and schema, subject and binding, freshness, expiry and revocation checks.
+### Raw card disclosure
 
-### Dune
+AgentPay stores provider identifiers and non-secret card metadata; raw PAN/CVC is not part of ordinary persistence/API DTOs. Short-lived provider display authorization remains provider-controlled.
 
-Threat: analytics outage or manipulation affects payment authorization.
+### Forged Stripe webhook
 
-Control: Dune is read-only observability and is never an authorization, signing or settlement dependency.
+Validate signed timestamp/signature with the configured webhook secret and tolerance before mutating authorization state.
 
-### Blockfrost
+### Duplicate money movement
 
-Threat: provider error or ambiguous submission is treated as authoritative failure.
+Use provider idempotency keys and durable local transfer state; distinguish accepted/processing from terminal success.
 
-Controls: classify definitive versus ambiguous responses; query transaction and latest-block evidence; retain durable reconciliation state.
+### Sandbox confusion
 
-## 11. Web and API threats
+Development sandbox data must not be presented as live provider financial evidence.
 
-Controls include:
+## 14. Cross-chain threats
 
-- server-side RBAC and tenant checks;
-- scoped and revocable API credentials;
-- secure session and authentication configuration;
-- recent authentication for sensitive actions where implemented;
-- SSRF-safe outbound resource fetching;
-- bounded request and response sizes;
-- secret redaction and non-return;
-- no raw signing material in browser or LLM context;
-- HTTPS for production payment and custody endpoints.
+Threats include quote expiry, route drift, source/destination swap, amount mutation, duplicate submission, and provider ambiguity.
 
-## 12. Data and audit threats
+Controls include persisted quote identity, explicit prepare/submit boundary, policy/readiness checks before submission, durable transfer status, and reconciliation after possible submission.
 
-- audit records must remain tamper-evident and immutable according to implemented controls;
-- export APIs redact credential-bearing data;
-- deletion must not falsely report completion before required cleanup succeeds;
-- historical settlement evidence must survive agent or key migration where necessary for auditability.
+## 15. Resource / SSRF threats
 
-## 13. Security test expectations
+Threat: an agent points AgentPay at internal/private metadata endpoints or abusive redirects.
 
-For relevant release profiles test:
+Controls include URL validation/canonicalization, private-network restrictions, bounded redirects/timeouts/response sizes, resource registration rules, and requirement/payee verification.
 
-- duplicate identity race;
-- cross-tenant access rejection;
-- invalid, expired or scopeless credentials;
-- policy denial and approval separation;
-- emergency stop;
-- Cardano transaction mismatch and replay;
-- submission ambiguity;
-- Mainnet custody unavailable, wrong key, wrong signer reference or invalid signature;
-- stale or invalid Pyth evidence;
-- invalid Masumi or KERI evidence;
-- production secret-placement and configuration guards.
+## 16. Pyth threats
 
-## 14. Update provenance
+Threat: stale, future, negative, or high-uncertainty price weakens policy.
 
-Updated 2026-08-22 because the external per-agent Cardano Mainnet custody boundary is now implemented and merged. The threat model treats it as a current architecture component while continuing to require deployment-specific validation and fail-closed behavior.
+Controls: publish-time/freshness, positive-price, confidence bounds, conservative valuation, and fail-closed required evidence.
 
-Primary builder: **Daniel Praise** (`Daniel419797`).
+## 17. Masumi threats
+
+Registry evidence is checked for expected identity/network/capability/payment facts and freshness. Escrow provider state is separately reconciled; result completion requires exact result-hash evidence. Refund/dispute operations have their own lifecycle and authorization.
+
+## 18. Veridian/KERIA threats
+
+External cryptographic verification is not blindly trusted as policy truth. AgentPay additionally checks configured issuer/schema/subject, freshness, expiry/revocation, and binding to the expected counterparty identity.
+
+## 19. Audit and database threats
+
+Controls include transactional state transitions, tamper-evident/hash-linked audit behavior where implemented, durable outbox events, export redaction, and retention/deletion rules that preserve required financial evidence.
+
+## 20. Supply-chain and CI threats
+
+Controls include pinned/managed dependency versions, production dependency audit, OSV, Semgrep, Gitleaks, CodeQL, signer/service tests, container builds, and exact-commit release evidence.
+
+A scanner exception must be narrow, reviewed, and tied to the exact known advisory/dependency chain; broad suppression is not acceptable.
+
+## 21. Availability and denial of service
+
+Rate limits, external request timeouts, bounded reconciliation, worker/cron controls, and provider-specific retries protect the application from unbounded work. Safe reads may be retried; irreversible writes use stricter semantics.
+
+## 22. Residual risk
+
+External chains/providers can fail, change behavior, or experience compromise. AgentPay limits blast radius through scoped credentials, payment-identity isolation, fail-closed validation, durable evidence, emergency stop, and operational reconciliation. Production operators must still apply provider-side access controls, monitoring, backups, and low-value rollout procedures.
+
+## 23. Security verification
+
+See [`testing-script.md`](testing-script.md), [`production-readiness.md`](production-readiness.md), and [`../SECURITY.md`](../SECURITY.md) for release and incident procedures.

@@ -1,100 +1,53 @@
 # AgentPay Dune Analytics
 
-**Status:** Current analytics documentation  
-**Updated:** 2026-08-22  
-**Primary builder:** Daniel Praise (`Daniel419797`)
+Read-only public Cardano analytics for AgentPay settlement activity.
 
-These queries expose **public Cardano settlement activity only**. Dune is not in the payment authorization, policy, signing, submission, custody or reconciliation critical path.
-
-## Where Dune sits in the architecture
+Dune is deliberately outside AgentPay's authorization, policy, signing, custody, submission, and reconciliation critical path.
 
 ```text
-AgentPay policy / signing / facilitator
+AgentPay -> Cardano settlement
+            |\
+            | +-> Blockfrost/chain evidence -> AgentPay reconciliation
             |
-            v
-         Cardano
-            |
-            +----> Blockfrost evidence -> AgentPay reconciliation
-            |
-            `----> Dune public analytics
+            +-> Dune public analytics
 ```
 
-Dune cannot authorize, deny, sign, submit or settle a transaction. A Dune outage must not block AgentPay payments.
+A Dune outage may degrade analytics views but must not change whether AgentPay authorizes or considers a payment settled.
 
-## Queries
+## Queries and publishing
 
-The checked-in SQL targets Dune's Cardano public-chain datasets and is intended to expose public settlement activity for the configured provider/asset profile.
+Checked-in SQL targets public Cardano datasets. `publish.mjs` can create/update queries using verified public deployment facts such as the relevant provider address/asset unit.
 
-Before presenting any Dune dashboard as validated production/pilot evidence:
+Typical publishing environment:
 
-1. publish/execute the real queries;
-2. verify the configured provider address/native-asset unit;
-3. cross-check sample transaction hashes/timestamps against independent Cardano evidence;
-4. record the real query/dashboard identifiers;
-5. keep observed analytics separate from proposal targets or synthetic fixtures.
-
-## Reproducible publishing
-
-`publish.mjs` creates or updates the public Dune queries through Dune's Query API. It substitutes only validated public deployment facts into the SQL.
-
-```bash
-export DUNE_API_KEY='<write-scoped Dune key>'
-export DUNE_PROVIDER_ADDRESS='<exact Cardano provider address>'
-export DUNE_USDCX_ASSET_UNIT='<exact Cardano native-asset unit>'
-node analytics/dune/publish.mjs
+```text
+DUNE_API_KEY=<write-scoped key>
+DUNE_PROVIDER_ADDRESS=<verified public Cardano address>
+DUNE_USDCX_ASSET_UNIT=<verified native-asset unit>
 ```
 
-To update existing queries:
+Optional existing query IDs can be supplied when updating previously published queries. `publish-dashboard.mjs` handles dashboard publishing where the configured account/API supports it.
 
-```bash
-export DUNE_AGENTPAY_OVERVIEW_QUERY_ID='<verified query id>'
-export DUNE_AGENTPAY_ACTIVITY_QUERY_ID='<verified query id>'
-node analytics/dune/publish.mjs
-```
+Never commit a Dune API key or invent query/dashboard IDs.
 
-Do not commit a write-scoped Dune API key. Query-management access is an external deployment credential, not source-code evidence.
+## Runtime analytics
 
-## Dashboard publishing
-
-Where supported/configured, use the checked-in dashboard publishing script after the underlying queries are real and verified:
-
-```bash
-node analytics/dune/publish-dashboard.mjs
-```
-
-A dashboard/query ID must not be invented merely to satisfy documentation or a proposal field.
-
-## AgentPay runtime environment
-
-The dashboard can read completed Dune results using a read-scoped API key:
-
-```env
-DUNE_ANALYTICS_ENABLED=true
-DUNE_API_KEY=<read-scoped Dune API key>
-DUNE_AGENTPAY_OVERVIEW_QUERY_ID=<verified query id>
-DUNE_AGENTPAY_ACTIVITY_QUERY_ID=<verified query id>
-DUNE_AGENTPAY_SAMPLE_QUERY_ID=<verified sample query id>
-DUNE_DASHBOARD_URL=<public dashboard URL>
-```
-
-Runtime Dune access is observability only. If Dune is unavailable, AgentPay should degrade the analytics view rather than change payment authorization/settlement behavior.
+The AgentPay dashboard may read completed query results using read-scoped configuration such as query IDs and a public dashboard URL. Runtime Dune data is observability only.
 
 ## Privacy boundary
 
-Do not publish private AgentPay data to Dune, including:
+Only public chain facts belong in Dune-facing analytics. Do not publish:
 
-- organization/user identifiers that are not already public chain facts;
-- API keys or credentials;
-- private prompts/job inputs;
-- organization spending policy;
-- private resource contents/responses;
-- external custody credentials/signer secrets;
-- internal approval/audit details unrelated to public chain evidence.
+- private organization/user identifiers;
+- agent credentials;
+- prompts/job inputs;
+- private policy/approval records;
+- provider/custody secrets;
+- non-public resource content;
+- raw internal audit metadata not already represented by public chain facts.
 
-## Scope and limitations
+## Verification
 
-The checked-in templates identify public Cardano activity using configured public addresses/assets. They do not prove customer adoption, exact business volume, pilot conversion or production readiness by themselves.
+Before relying on a chart/report, cross-check sample transaction hashes, timestamps, addresses, and asset units against independent Cardano evidence. Analytics counts are observations from the selected query scope, not payment authorization truth.
 
-Public-chain transaction counts, distinct wallets and observed fees may be useful Catalyst evidence **only when derived from real qualifying activity and clearly reported as observed values**. Proposal targets are separate planning commitments.
-
-See [`../../docs/catalyst-submission.md`](../../docs/catalyst-submission.md) and [`../../docs/production-readiness.md`](../../docs/production-readiness.md).
+See [`../../docs/cardano-production.md`](../../docs/cardano-production.md) and [`../../docs/production-readiness.md`](../../docs/production-readiness.md).

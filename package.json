@@ -27,9 +27,10 @@
     },
     "@grpc/grpc-js": "1.12.7",
     "@coinbase/cdp-sdk": {
-      "axios": "1.18.1"
+      "axios": "1.20.0"
     },
-    "axios": "1.18.1",
+    "axios": "1.20.0",
+    "form-data": "4.0.6",
     "bn.js": "5.2.3",
     "brace-expansion@<1.1.18": "1.1.18",
     "brace-expansion@>=2.0.0 <2.1.4": "2.1.4",

@@ -1,302 +1,390 @@
-# AgentPay Control: Detailed Workflows
+# AgentPay Detailed Workflows
 
-**Status:** Current implementation workflows  
-**Updated:** 2026-08-22  
-**Primary builder:** Daniel Praise (`Daniel419797`)
+**Status:** implementation-aligned operational workflows  
+**Updated:** 2026-09-10
 
-## Revision note
-
-The original workflow document described the July 2026 Hedera MVP. This version documents the payment, custody, trust and reconciliation flows currently implemented. The original workflow document remains available in Git history.
-
-## 1. Agent provisioning
-
-### Managed testnet agent
+## 1. Organization and agent provisioning
 
 ```text
-Authorized operator
-  -> create Agent
-  -> choose managed-capable testnet network
-  -> control plane calls facilitator /managed-identity
-  -> network signer/facilitator resolves unique identity for immutable Agent ID
-  -> PaymentAccount created
-  -> DB canonical identity uniqueness enforced
-  -> agent becomes usable when required configuration is valid
+authorized human
+ -> create/select organization and workspace
+ -> create agent
+ -> assign network/custody profile
+ -> resolve or attach payment identity where required
+ -> enforce canonical identity uniqueness
+ -> publish policy
+ -> create scoped agent credential
+ -> readiness checks pass
+ -> agent can request permitted actions
 ```
 
-A duplicate canonical identity is rejected rather than shared between agents.
+Agent credentials authorize AgentPay APIs; they do not expose the underlying blockchain/provider secret.
 
-### Cardano Mainnet external-delegated agent
+## 2. Direct x402 resource purchase
 
 ```text
-Authorized operator
-  -> create Cardano Mainnet agent
-  -> choose external delegated custody
-  -> control plane calls Cardano Mainnet facilitator /managed-identity
-  -> facilitator calls isolated Cardano signer
-  -> signer calls external custody POST /identity
-  -> custody returns publicKeyHex + signerRef
-  -> AgentPay derives addr1... locally
-  -> optional claimed address must match derived address
-  -> PaymentAccount uniqueness check
-  -> account stored as autonomous managed/external delegated
+agent -> paid-request API
+      -> authenticate credential + organization
+      -> SSRF-safe request to resource
+      -> receive HTTP 402 requirements
+      -> canonicalize resource + validate requirement
+      -> resolve resource/provider/trust evidence
+      -> evaluate immutable policy
+      -> reserve spend
+      -> DENY | REQUIRE_APPROVAL | AUTHORIZE
+      -> execute selected custody/network path
+      -> verify settlement evidence
+      -> retry resource request with payment proof
+      -> persist fulfillment + audit
 ```
 
-`CARDANO_MANAGED_AGENT_MASTER_KEY` is not used or accepted on Mainnet.
+A lost resource response after confirmed settlement does not make the payment disappear; fulfillment recovery is separate from payment reconciliation.
 
-## 2. Direct x402 paid request
+## 3. Approval flow
 
 ```text
-Autonomous agent / operator
-  -> AgentPay paid-request API
-  -> validate agent credential/session
-  -> SSRF-safe GET to resource
-  -> resource responds HTTP 402
-  -> parse x402 V2 requirements
-  -> locate registered resource/price
-  -> verify configured trust requirements
-  -> evaluate immutable policy
-  -> reserve spend
-  -> DENY | APPROVAL_PENDING | AUTHORIZED
+policy => REQUIRE_APPROVAL
+ -> durable approval request
+ -> authorized approver decision(s)
+ -> threshold not met => remain pending
+ -> rejection => stop execution/release reservation as applicable
+ -> approval threshold met
+ -> bind approval to original financial context
+ -> consume approval once
+ -> resume authorized execution
 ```
 
-For Cardano, the selected requirement must match the exact canonical resource URL, network, asset, amount and payee and must contain the expected resource binding/server-submission/confirmation policy.
-
-## 3. Approval workflow
+## 4. Hedera payment flow
 
 ```text
-Policy result = REQUIRE_APPROVAL
-  -> payment intent remains non-signable
-  -> approval request created
-  -> authorized approver reviews context
-  -> reject => no signing / reservation released as applicable
-  -> approve threshold reached
-  -> approval consumed
-  -> intent becomes authorized
-  -> execution resumes once
+authorized payment
+ -> resolve expected Hedera account/custody mode
+ -> build/verify supported payment payload
+ -> facilitator applies rail-specific validation
+ -> submit/observe Hedera settlement
+ -> persist transaction evidence
+ -> settle local intent only after accepted evidence
 ```
 
-Where separation of duties applies, the initiator cannot approve their own request.
+Managed Testnet identities remain per-agent. Mainnet operation follows its configured custody profile and readiness contract.
 
-## 4. Cardano Preprod managed signing
+## 5. Arc payment flow
 
 ```text
-Authorized payment intent
-  -> facilitator /managed-agent-sign
-  -> isolated Cardano Preprod signer
-  -> derive Agent-ID-specific seed from signer-only testnet master key
-  -> derive Ed25519 public key + addr_test1...
-  -> verify expected payer identity
-  -> fetch payer UTxOs/protocol data through Blockfrost
-  -> build narrow transaction
-  -> sign transaction-body hash
-  -> return signed CBOR + nonce + transaction ID
-  -> facilitator independently verifies transaction
+authorized payment
+ -> resolve Arc Testnet account/custody
+ -> construct supported EVM payment path
+ -> validate network, payer, payee, amount and contract constraints
+ -> submit/observe settlement
+ -> persist evidence
 ```
 
-The Preprod master secret never goes to Vercel.
+The adapter does not imply an unconfigured public production network.
 
-## 5. Cardano Mainnet external per-agent signing
+## 6. Cardano Preprod managed flow
 
 ```text
-Authorized payment intent
-  -> facilitator /managed-agent-sign
-  -> isolated Cardano Mainnet signer
-  -> external custody POST /identity(agentId)
-  -> receive publicKeyHex + signerRef
-  -> derive expected addr1... locally
-  -> verify payerAccountId matches
-  -> fetch UTxOs/protocol data through Blockfrost
-  -> build narrow Cardano transaction
-  -> hash transaction body
-  -> external custody POST /sign
-       agentId + signerRef + payerAddress + messageHex
-  -> receive Ed25519 signature
-  -> verify signerRef/public key consistency
-  -> verify Ed25519 signature locally
-  -> return signed CBOR
-  -> facilitator independently verifies full transaction
+authorized intent
+ -> Cardano facilitator
+ -> isolated Preprod signer
+ -> derive Agent-ID-specific Ed25519 identity
+ -> verify expected addr_test1... payer
+ -> fetch bounded UTxOs/protocol inputs from Blockfrost
+ -> build narrow key-spend transaction
+ -> sign transaction-body hash
+ -> return signed CBOR
+ -> facilitator independently verifies full transaction
+ -> create durable settlement claim
+ -> submit through Blockfrost
+ -> poll confirmation evidence
+ -> confirm or reconcile
 ```
 
-The private key remains in the external HSM/KMS/delegation boundary. Custody failure is terminal for that signing attempt and cannot fall back to a shared key or another agent.
-
-## 6. Cardano self-custody preparation
+## 7. Cardano Mainnet external custody flow
 
 ```text
-Verified wallet owner
-  -> request preparation for exact payer
-  -> Cardano facilitator
-  -> signer /unsigned
-  -> signer fetches UTxOs/protocol data
-  -> returns unsigned transaction
-  -> wallet/provider signs outside AgentPay
-  -> signed payload is verified by facilitator before settlement
+authorized intent
+ -> Cardano facilitator
+ -> isolated Mainnet signer
+ -> external custody /identity(agentId)
+ -> publicKeyHex + signerRef
+ -> derive expected addr1... locally
+ -> build bounded transaction
+ -> hash transaction body
+ -> external custody /sign(exact agent/signer/message)
+ -> verify returned Ed25519 signature locally
+ -> signed CBOR
+ -> facilitator independently verifies
+ -> durable settlement claim
+ -> Blockfrost submission/confirmation
 ```
 
-Self custody remains available on Cardano Mainnet in parallel with external per-agent managed custody.
+There is no fallback to another agent or shared deployment-wide payer when the custody dependency fails.
 
-## 7. Cardano verification and settlement
-
-The facilitator performs an independent verification after signing/preparation.
-
-It checks the supported transaction profile, including:
-
-- transaction/witness encoding;
-- exact payer credential and payer-only inputs;
-- exact payee, amount and asset;
-- allowed asset set and conservation;
-- payer-only change;
-- fee ceiling;
-- TTL/network;
-- resource binding;
-- UTxO nonce/replay state.
-
-Then:
+## 8. Cardano self-custody flow
 
 ```text
-verified transaction
-  -> durable settlement claim
-  -> MARK_SUBMISSION_STARTED
-  -> POST Blockfrost /tx/submit
-  -> poll transaction + latest block evidence
-  -> enough confirmations => CONFIRM
-  -> resource response may be fulfilled
+verified payer/wallet
+ -> request exact payment preparation
+ -> signer builds unsigned transaction for exact payer
+ -> wallet/provider signs outside AgentPay
+ -> signed transaction returned
+ -> facilitator independently validates it
+ -> durable settlement claim
+ -> submit/confirm/reconcile
 ```
 
-The Cardano signer does **not** submit transactions on-chain; submission belongs to the facilitator.
-
-## 8. Ambiguous submission/reconciliation
+## 9. Ambiguous blockchain submission
 
 ```text
-signing succeeded
-  -> submission started
-  -> timeout / 5xx / uncertain provider response
-  -> do NOT mark clean failure
-  -> preserve candidate transaction ID and reservation state
-  -> mark submission unknown / reconciliation required
-  -> query independent chain evidence
-       -> confirmed => settle
-       -> definitively rejected/not valid according to reconciliation rules => resolve failure
-       -> still uncertain => remain unresolved
+submission started
+ -> timeout / transport failure / uncertain provider response
+ -> preserve candidate transaction + reservation + claim
+ -> mark pending/submission-unknown
+ -> query authoritative chain evidence
+      -> confirmed => SETTLED
+      -> definitive rejection => resolved failure
+      -> still uncertain => remain pending
 ```
 
-This prevents blind retry from creating an unintended second payment.
+AgentPay does not create a second payment simply because the first HTTP response was lost.
 
-## 9. Masumi registry trust for direct x402
+## 10. Moove Receive link creation
 
 ```text
-Resource is governed by Masumi policy
-  -> load cached Masumi resource binding
-  -> validate network / agent identifier / capability
-  -> refresh through Masumi Registry when required
-  -> verify seller address and payment-key facts
-  -> enforce freshness/online/history/reputation controls
-  -> derive trusted payee
-  -> continue normal AgentPay policy evaluation
+agent/application
+ -> POST /api/v1/moove/payment-links + Idempotency-Key
+ -> authenticate organization/agent and validate input
+ -> validate optional resource/invoice binding
+ -> create/find durable local request fingerprint
+ -> call Moove create-payment-link
+      -> success: store provider ID + URL + active state
+      -> ambiguous: mark SUBMISSION_UNKNOWN and reconcile listing
+ -> return AgentPay payment record
 ```
 
-Masumi registry trust does not turn a direct x402 transfer into escrow.
+A repeated client request with the same idempotency key and same payload resolves to the same intended AgentPay payment. A conflicting payload using that key is rejected.
 
-## 10. Masumi escrow workflow
+## 11. Moove payment completion
 
 ```text
-Agent requests escrow-backed job
-  -> verify Masumi resource identity
-  -> evaluate AgentPay financial/trust policy
-  -> create durable purchase state
-  -> call Masumi Payment Service
-  -> FundsLockingRequested
-  -> FundsLocked
-  -> start/reconcile seller job
-  -> ResultSubmitted
-  -> verify exact returned result against result hash
-  -> Completed
+payer opens hosted link
+ -> Moove processes payment and settles according to account configuration
+ -> AgentPay refresh/reconciliation retrieves provider evidence
+ -> validate provider link identity/status
+ -> persist destination address, token/chain, amount, tx URL
+ -> providerStatus = COMPLETED
+ -> emit durable completion event
+ -> if invoice-bound: verify exact expected settlement configuration
+ -> atomically mark matching invoice settlement/paid state
+ -> if resource-bound: emit resource-payment completion event
 ```
 
-Refund/dispute paths are tracked separately. A buyer may request refund and an authorized seller/provider workspace may authorize it according to the implemented lifecycle.
+A browser redirect or hosted checkout page is never treated as payment evidence.
 
-Only linked, observed terminal outcomes feed AgentPay's seller reputation calculation.
-
-## 11. Pyth-valued policy workflow
+## 12. Masumi registry trust
 
 ```text
-payment amount
-  -> fetch Pyth observation
-  -> validate publish time, confidence and positive price
-  -> calculate conservative USD micro-dollar value
-  -> compare against per-tx/hour/day/month USD limits
-  -> combine with base atomic policy using most restrictive result
+resource requires Masumi trust
+ -> load/refresh registry evidence
+ -> verify expected agent identity/capability/network/payment facts
+ -> enforce freshness/online/history/reputation policy
+ -> trusted payee/result becomes policy input
+ -> continue direct payment workflow
 ```
 
-Oracle failure must not relax the base policy.
+Registry trust does not convert a direct payment into escrow.
 
-## 12. Veridian/KERIA workflow
+## 13. Masumi escrow purchase
 
 ```text
-Masumi resource already verified
-  -> fetch/receive credential verification evidence from configured KERIA endpoint
-  -> validate issuer/schema/subject/freshness/revocation requirements
-  -> require claim that binds credential to expected Masumi agent identity
-  -> attach evidence to policy context
-  -> invalid/stale/mismatched required evidence => fail closed
+agent requests escrow-backed purchase
+ -> verify resource/counterparty
+ -> evaluate policy + reserve spend
+ -> create durable purchase
+ -> call Masumi payment service
+ -> funds locking requested
+ -> funds locked
+ -> provider job/result lifecycle
+ -> verify exact result hash/evidence
+ -> completed
 ```
 
-AgentPay does not reimplement KERI/CESR cryptography.
+Refund, dispute, provider mutation, and reconciliation paths maintain their own one-shot claims and incident evidence.
 
-## 13. Emergency stop workflow
+## 14. Pyth policy valuation
 
 ```text
-Owner enables organization emergency stop
-  -> new risky payment/automation side effects blocked
-  -> existing evidence ingestion/reconciliation remains available
-  -> operator investigates
-  -> authenticated administrative action restores normal operation
+candidate payment
+ -> fetch configured Pyth price observation
+ -> verify positive price, publish time and confidence
+ -> compute conservative USD micro-value
+ -> compare to per-tx/hour/day/month USD policy
+ -> combine with atomic policy
+ -> most restrictive decision wins
 ```
 
-## 14. Resource fulfillment workflow
+If required oracle evidence is unavailable or invalid, it cannot relax policy.
 
-For direct x402:
+## 15. Veridian/KERI trust flow
 
 ```text
-resource 402 challenge
-  -> AgentPay obtains signed payment payload
-  -> repeat resource request with payment-signature
-  -> resource verifies/settles through facilitator
-  -> successful settlement evidence
-  -> paid resource returned
+resource/counterparty context
+ -> configured KERIA verifier
+ -> cryptographic credential result
+ -> validate issuer/schema/subject/freshness/revocation/binding claims
+ -> attach non-secret evidence to policy context
+ -> required invalid/mismatched evidence => fail closed
 ```
 
-If the resource response is lost after settlement, the transaction remains a payment and is reconciled rather than automatically retried.
-
-## 15. Dune/public analytics workflow
+## 16. Virtual-card flow
 
 ```text
-Cardano public settlement activity
-  -> Dune queries/dashboard
-  -> read-only public analytics
+authorized organization/operator
+ -> create provider cardholder
+ -> provider KYC/status response
+ -> issue virtual card with configured limits/categories/countries
+ -> persist non-secret provider card metadata
+ -> signed provider authorization events arrive through webhook
+ -> AgentPay records authorization state
+ -> freeze/reactivate/cancel through provider status controls
 ```
 
-Dune cannot approve, sign, submit or reconcile a payment and must not receive private AgentPay organization/prompt/policy/credential data.
+Stripe is used when configured; Sandbox is development-only. AgentPay does not persist raw card credentials.
 
-## 16. Release/deployment workflow
+## 17. Fiat account and transfer flow
 
 ```text
-exact Git commit
-  -> repository checks execute
-  -> database migration validation
-  -> Render signer + facilitator deployment
-  -> Vercel dashboard/API deployment
-  -> readiness checks
-  -> provision exact custody/provider configuration
-  -> low-value canary for enabled profile
-  -> independent chain verification
+authorized request
+ -> provider adapter
+ -> create/read financial account
+ -> initiate inbound or outbound movement with idempotency key
+ -> persist provider transfer identifier/status
+ -> reconcile provider state
+ -> update local transfer state
 ```
 
-A workflow that terminates before test/build steps are created is infrastructure-blocked and is not treated as a passing validation.
+A provider request being accepted is distinct from the transfer succeeding.
 
-## 17. Provenance and current maturity
+## 18. Invoice flow
 
-**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor. AgentPay was originally built for the Hedera x402 bounty. The workflows above document the multi-rail system that now exists after the Cardano, custody, trust and operational extensions.
+```text
+create invoice + items
+ -> send/publish invoice
+ -> choose supported collection path
+ -> direct payment / configured provider / Moove Receive
+ -> persist payment/settlement evidence
+ -> exact settlement validation
+ -> invoice paid
+```
 
-For Catalyst purposes, the current maturity remains **TRL 5** until the intended Cardano Mainnet/pilot configuration is demonstrated in a relevant environment. Mainnet external per-agent custody is now implemented in source; that implementation is one prerequisite for, not a substitute for, a TRL 6 demonstration.
+Invoices may be voided only according to current lifecycle rules. Payment evidence is retained separately from invoice presentation state.
 
-See [`02-software-design-document.md`](02-software-design-document.md), [`cardano-production.md`](cardano-production.md), [`production-readiness.md`](production-readiness.md), and [`implementation-status.md`](implementation-status.md).
+## 19. Resource-provider and marketplace flow
+
+```text
+provider registered
+ -> provider verified where required
+ -> resource registered with canonical endpoint
+ -> price/listing published
+ -> optional Masumi/Veridian binding
+ -> marketplace discovery
+ -> buyer/agent purchase
+ -> settlement
+ -> fulfillment
+ -> review/operational evidence
+```
+
+## 20. Cross-chain flow
+
+```text
+request source/destination/asset intent
+ -> discover supported network profiles
+ -> obtain durable quote
+ -> evaluate policy/readiness
+ -> prepare exact transfer
+ -> submit once
+ -> persist provider/network submission state
+ -> reconcile terminal outcome
+```
+
+Expired/mismatched quotes cannot be silently repurposed.
+
+## 21. Automation flow
+
+```text
+rule trigger (manual/scheduled/provider webhook as configured)
+ -> create durable execution
+ -> validate organization + rule state
+ -> generate candidate action
+ -> normal policy/approval/reservation checks
+ -> execute authorized side effect
+ -> checkpoint irreversible boundary
+ -> persist result or ambiguity
+ -> optional human execution decision
+```
+
+Emergency stop blocks new risky side effects while defensive reconciliation may continue.
+
+## 22. Financial intelligence flow
+
+```text
+persisted financial observations
+ -> aggregation/analysis
+ -> anomaly records
+ -> spend forecasts
+ -> budget recommendations
+ -> operator/agent read access
+```
+
+Intelligence is advisory and cannot grant payment authority.
+
+## 23. Notification flow
+
+```text
+business event
+ -> durable outbox event
+ -> configured notification endpoint
+ -> delivery attempt
+ -> success or retryable/terminal delivery state
+```
+
+Notification failure does not roll back the underlying financial truth.
+
+## 24. Organization emergency stop
+
+```text
+owner activates kill switch
+ -> new risky financial/automation side effects blocked
+ -> defensive reads, evidence ingestion and reconciliation remain available
+ -> operator investigates and revokes/rotates affected provider credentials if needed
+ -> owner restores operation after review
+```
+
+## 25. Organization export/retention/deletion
+
+```text
+authorized organization request
+ -> validate role and lifecycle constraints
+ -> generate bounded export or retention action
+ -> preserve required financial/audit evidence
+ -> stream/complete export or process deletion workflow
+ -> audit administrative action
+```
+
+## 26. Release workflow
+
+```text
+exact source revision
+ -> dependency install + lock validation
+ -> lint/typecheck/tests
+ -> security scans
+ -> service/container builds
+ -> migration verification
+ -> deploy service boundaries
+ -> readiness checks
+ -> low-value controlled canary for enabled financial profiles
+ -> monitor/reconcile
+```
+
+See [`production-runbook.md`](production-runbook.md) and [`testing-script.md`](testing-script.md).

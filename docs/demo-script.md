@@ -1,161 +1,110 @@
-# AgentPay: Current Product Demo Script
+# AgentPay Product Demonstration
 
-**Status:** Current implementation demo  
-**Updated:** 2026-08-22  
-**Presenter/builder:** Daniel Praise (`Daniel419797`)
+This walkthrough presents AgentPay as an autonomous-finance control system. Use only capabilities configured in the demonstration environment and clearly label Sandbox/provider test environments.
 
-## Revision note
+## 1. Start with the organization
 
-The previous script was the original Hedera x402 bounty demo and no longer represented the current product. This version covers the current multi-rail and Cardano implementation without presenting planning targets or unconfigured external providers as live evidence.
+Show the authenticated dashboard and explain that financial authority belongs to the organization, not the AI runtime. Demonstrate members/RBAC, workspace context, and organization status.
 
-## Demo objective
+## 2. Create or inspect an agent
 
-Show one coherent story: an autonomous agent can request a paid service while AgentPay enforces policy, isolates payment identity, controls signing authority, verifies settlement and preserves audit and reconciliation evidence.
+Show the agent's stable identity, network/payment-account configuration, status, and scoped AgentPay credential. Emphasize that the credential authorizes AgentPay APIs and does not reveal an underlying blockchain private key or provider restricted key.
 
-## 0:00-0:30: Introduction
+## 3. Show policy
 
-Suggested narration:
+Open the published policy and demonstrate:
 
-AgentPay was originally built for the Hedera x402 bounty and later extended into a multi-rail financial control plane for autonomous agents. The current system supports Hedera, Arc and Cardano, with Cardano-specific policy, identity, signing, reconciliation and ecosystem integrations.
-
-Show the dashboard overview.
-
-## 0:30-1:00: Agent identity and policy
-
-Open an active agent and show:
-
-- immutable Agent ID;
-- selected network and payment account;
-- custody mode;
-- current policy;
-- transaction, daily or other configured limits;
+- transaction/day/month limits;
+- merchant/resource/network/asset controls;
 - approval behavior;
-- relevant trust controls.
+- optional Pyth/Masumi/Veridian trust constraints.
 
-Explain that managed payment identity is isolated per agent and the agent does not receive the unrestricted signing key.
+Explain that published versions are immutable and that reservations protect concurrent spend.
 
-## 1:00-1:40: Cardano custody modes
+## 4. Direct paid-resource purchase
 
-For Cardano show the implemented distinction:
-
-### Preprod managed
-
-- unique `addr_test1...` per Agent ID;
-- signing derives inside the isolated signer from a testnet-only master secret.
-
-### Mainnet self custody
-
-- AgentPay prepares the narrow transaction;
-- wallet or provider signs externally.
-
-### Mainnet external per-agent managed custody
-
-- one external Ed25519 public key and signer reference per Agent ID;
-- AgentPay derives the `addr1...` address locally;
-- only transaction-body hash is sent to the external signer;
-- returned signature is verified locally;
-- no Mainnet managed-agent master key or shared platform payer.
-
-If the external custody provider is not actually configured in the demo environment, describe the implemented source path rather than claiming a live Mainnet managed signing demonstration.
-
-## 1:40-2:40: Direct x402 purchase
-
-Use a registered x402 resource.
-
-Show and narrate:
-
-1. resource returns HTTP 402 requirements;
-2. AgentPay verifies exact resource, network, payee, asset and amount;
-3. policy evaluates the request;
-4. spend reservation is created;
-5. signing or preparation uses the selected custody mode;
-6. Cardano signer constructs the transaction;
-7. facilitator independently verifies the signed transaction;
-8. facilitator submits via Blockfrost;
-9. settlement is confirmed and reconciled;
-10. paid resource response and transaction evidence are shown.
-
-For Cardano point out the SHA-256 resource binding and exact payer, payee, asset and amount verification.
-
-## 2:40-3:10: Policy denial
-
-Submit a request that intentionally violates the active policy.
-
-Expected result:
+Use a controlled x402 resource.
 
 ```text
-DENY
-no signing
-no on-chain submission
+agent request -> resource 402 -> policy -> reserve
+ -> optional approval -> payment execution
+ -> verified settlement -> paid resource
 ```
 
-Do not change the policy just to make the demo pass.
+Show the payment intent, amount/asset/network/payee, settlement evidence, fulfillment, and audit record.
 
-## 3:10-3:40: Human approval
+## 5. Approval path
 
-Submit a request that requires approval.
+Trigger a request that requires human approval. Show `APPROVAL_PENDING`, have an authorized approver decide it, and demonstrate that execution resumes only after the threshold is satisfied.
 
-Show:
+## 6. Network execution
 
-- `APPROVAL_PENDING`;
-- approver context;
-- approve and reject control;
-- initiator separation where configured;
-- execution resumes once after valid approval.
+When configured, show one low-value settlement from an enabled rail and its evidence. For Cardano, explain the signer/facilitator split and show that the signer constructs/signs while the facilitator independently verifies/submits/confirms.
 
-## 3:40-4:15: Trust controls
+## 7. Moove Receive
 
-Show only integrations actually configured in the environment.
-
-Possible evidence:
-
-- Pyth price, confidence and freshness used for USD policy;
-- Masumi registry identity, capability and seller payment-key evidence;
-- Masumi escrow lifecycle and result-hash evidence;
-- Veridian/KERIA verified credential evidence.
-
-If an integration is not live, identify it as implemented or configurable rather than demonstrating synthetic data as production evidence.
-
-## 4:15-4:45: Ambiguous settlement safety
-
-Explain or safely demonstrate the failure behavior.
-
-A network timeout after possible submission is not automatically treated as failure. AgentPay retains the candidate transaction and spend state and reconciles independent chain evidence rather than blindly retrying.
-
-Show `SUBMISSION_UNKNOWN` or reconciliation state if available.
-
-## 4:45-5:15: Emergency stop and audit
-
-Enable the organization emergency stop and demonstrate a new risky action being blocked while reconciliation and evidence access remains available.
-
-Open audit or transaction detail and show the decision and settlement trail.
-
-## 5:15-5:40: Public evidence and analytics
+Create a single-use low-value receive link for an agent/resource or invoice.
 
 Show:
 
-- Cardano chain, explorer or Blockfrost-backed transaction evidence;
-- Dune public dashboard only if real query and dashboard IDs are configured.
+- stable AgentPay idempotency key;
+- hosted payment URL;
+- local `ACTIVE` state before payment;
+- payer completing the hosted flow;
+- AgentPay refresh/reconciliation;
+- `COMPLETED` with provider token/destination/received amount/transaction evidence;
+- resource completion event or exact invoice `PAID` transition where applicable.
 
-Explain that Dune is read-only and receives only public-chain facts, not private AgentPay policy, prompts or credentials.
+Point out that the URL itself is not treated as payment proof.
 
-## 5:40-6:00: Closing
+## 8. Cards and fiat
 
-AgentPay gives agents bounded financial autonomy. Policy and approvals live in the control plane, signing is isolated, Cardano Mainnet managed agents can use separate external signer identities, the facilitator independently verifies and submits transactions, and ambiguous outcomes are reconciled from chain evidence.
+Only show this section when an appropriate provider environment is enabled.
 
-## Preparation checklist
+Demonstrate provider-backed cardholder/card metadata and status controls without exposing raw card data. If using Sandbox, label it plainly as a development simulation.
 
-- [ ] Use the exact release SHA being demonstrated.
-- [ ] Verify Vercel and Render services are from the intended release.
-- [ ] Verify database migrations are current.
-- [ ] Use low-value funded accounts for the network and custody mode shown.
-- [ ] Verify Blockfrost credentials for the correct Cardano network.
-- [ ] If Mainnet external custody is shown live, verify its signer-only URL and API key and distinct agent identities first.
-- [ ] Configure only the Pyth, Masumi, KERIA and Dune integrations actually shown.
-- [ ] Hide API keys, private credentials and sensitive tenant data.
-- [ ] Keep chain evidence links ready.
-- [ ] Do not use proposal targets as if they were observed metrics.
+For fiat, show account/transfer state and explain the distinction between submitted/processing and terminal provider success.
 
-## Provenance
+## 9. Invoices and marketplace
 
-This script supersedes the old Hedera-bounty-only demo script. That original remains in Git history. The update is necessary because the current repository includes Cardano Preprod and Mainnet, external per-agent Mainnet custody, Masumi, Pyth and KERI integrations, stronger policy and reconciliation controls, and a unified multi-rail facilitator.
+Show a resource/provider listing, price, invoice/items, and how payment evidence is linked to commercial state rather than inferred from the UI.
+
+## 10. Automation
+
+Show an automation rule and execution record. Demonstrate that the automation still passes the same policy/approval/provider-readiness rules and that its irreversible boundary is checkpointed.
+
+## 11. Financial intelligence
+
+Show summary/forecast/anomaly/recommendation views. Explain that these are advisory outputs built from financial observations and cannot independently authorize a payment.
+
+## 12. Reconciliation
+
+Open an intentionally pending/ambiguous example if available. Explain why AgentPay keeps candidate/provider evidence and checks authoritative external state instead of automatically retrying an uncertain financial side effect.
+
+## 13. Audit and emergency control
+
+Show audit events for policy/payment/provider actions. Enable the kill switch in a safe environment and demonstrate that a new risky action is blocked while defensive reconciliation remains possible.
+
+## 14. Agent integration
+
+Show one agent-facing integration:
+
+- REST/TypeScript SDK;
+- MCP;
+- LangChain.
+
+Demonstrate that all adapters converge on the same AgentPay policy and settlement state.
+
+## 15. Close with architecture
+
+Summarize the system as:
+
+```text
+agent intent
+ -> organization identity/policy/approval
+ -> bounded execution rail/provider
+ -> evidence-based settlement
+ -> audit + reconciliation + operations
+```
+
+Do not use fixture or Sandbox output as evidence of a live provider transaction. When showing a real payment, use low-value controlled funds and redact sensitive identifiers where appropriate.

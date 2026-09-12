@@ -1,260 +1,281 @@
-# AgentPay Control: Software Design Document
+# AgentPay Software Design
 
-**Status:** Current implementation architecture  
-**Updated:** 2026-08-22  
-**Primary builder:** Daniel Praise (`Daniel419797`)
+**Status:** implementation-aligned architecture reference  
+**Updated:** 2026-09-10
 
-## Revision note
+## 1. Design goals
 
-The July 2026 design was written for the original Hedera x402 MVP and contained now-obsolete statements such as Mainnet being disabled pending a future custody migration. This version reflects the architecture implemented after the Cardano Mainnet external per-agent custody merge. The original design remains in Git history.
+AgentPay is designed to let autonomous software participate in payments and commerce without making an LLM, tool runtime, or individual provider adapter the final source of financial authority.
 
-## 1. Design intent
+The architecture therefore separates:
 
-AgentPay is a multi-tenant financial control plane for autonomous agents. The primary design property is that an agent may request spend, but cannot bypass organization policy, obtain unrestricted treasury authority, substitute another agent's payment identity, or force a settlement that the independent protocol boundary has not verified.
+- **intent** — what an agent wants to do;
+- **authorization** — whether organization policy permits it;
+- **execution** — which rail/provider performs it;
+- **custody** — where signing or provider authority resides;
+- **evidence** — what proves the outcome;
+- **reconciliation** — how uncertain outcomes are repaired;
+- **operations** — how humans observe, stop, recover, and audit the system.
 
-## 2. Deployed service architecture
-
-```text
-Human users / Autonomous agents
-             |
-             v
-     Next.js Control Plane
-         (Vercel)
-             |
-   +---------+----------+
-   |                    |
-PostgreSQL          External trust/data
-(Prisma)        Pyth / Masumi / KERIA
-   |
-   +-----------------------------+
-                                 |
-                       payment orchestration
-                                 |
-                  +--------------+--------------+
-                  |                             |
-             Direct x402                   Masumi escrow
-                  |                             |
-          x402 Resource Server           Masumi Payment Service
-                  |                             |
-                  +-------------+---------------+
-                                |
-                       Unified Facilitator
-                            (Render)
-      Hedera Testnet/Mainnet | Arc Testnet | Cardano Preprod/Mainnet
-                                |
-                     Cardano Signer Gateway
-                            (Render)
-                         /              \
-                  Preprod worker      Mainnet worker
-                  per-agent keys      self-custody +
-                                      external per-agent custody
-                                             |
-                                  HSM/KMS/delegation adapter
-                                             |
-                                  private key stays external
-```
-
-## 3. Control-plane design
-
-The dashboard/API is a modular Next.js application containing:
-
-- authentication and organization/RBAC;
-- agents and scoped credentials;
-- immutable policy versions;
-- approvals;
-- spend reservations/idempotency;
-- resources and payment orchestration;
-- transactions and settlement evidence;
-- audit events;
-- emergency stop;
-- incidents/reconciliation;
-- analytics/financial intelligence;
-- data export/deletion and integration settings.
-
-The control plane decides whether a spend is allowed, approval-required or denied. It does **not** hold production Cardano private signing material.
-
-## 4. PostgreSQL design
-
-PostgreSQL/Prisma is the system of record for organization state, agents, policy, reservations, payment intents, attempts, settlements, approvals, resources, audit/evidence and operational state.
-
-A global canonical payment-identity invariant is enforced with a canonical unique identity index and transaction-scoped PostgreSQL advisory locking:
+## 2. Logical architecture
 
 ```text
-network + canonical account identity -> one PaymentAccount -> one agent
-```
-
-This prevents two agents, including agents in different organizations or application replicas, from claiming the same managed payment identity.
-
-## 5. Payment orchestration design
-
-### 5.1 Direct x402
-
-The control plane discovers the resource's HTTP 402 challenge, selects the exact requirement matching resource/network/asset/amount/payee, evaluates policy, creates/reserves spend, and then requests the correct managed/self-custody signing path.
-
-The paid resource receives the x402 payment payload and invokes the facilitator's verify/settle protocol before returning paid content.
-
-### 5.2 Masumi escrow
-
-Masumi escrow is a separate protocol path. AgentPay verifies seller/registry facts, evaluates the same financial policy plus configured trust controls, creates/reconciles the purchase/job lifecycle, verifies result-hash evidence and records refund/dispute outcomes.
-
-Direct x402 and escrow are never conflated.
-
-## 6. Unified facilitator design
-
-`facilitator-combined` is the public multi-rail protocol boundary. It mounts:
-
-- `hedera:testnet`
-- `hedera:mainnet`
-- `eip155:5042002` (Arc Testnet)
-- `cardano:preprod`
-- `cardano:mainnet`
-
-Root `/verify` and `/settle` dispatch by the exact network bound in payment requirement/payload.
-
-For Cardano the facilitator:
-
-1. receives/forwards managed identity/sign requests to the isolated signer;
-2. independently decodes/verifies returned transaction CBOR;
-3. checks payer, payee, amount, asset set, conservation, change, fee, TTL, nonce and resource binding;
-4. maintains durable replay/settlement-claim state;
-5. submits through Blockfrost;
-6. polls independent chain evidence for confirmation;
-7. returns success, definitive rejection, pending or ambiguous settlement state.
-
-The Cardano facilitator does not hold a Cardano private signing key.
-
-## 7. Cardano signer design
-
-`cardano-signer` is a Render web-service gateway that starts isolated network-scoped child workers.
-
-### 7.1 Preprod worker
-
-- derives a unique Ed25519 identity for each immutable Agent ID from a signer-only testnet master secret;
-- supports dedicated `/managed-identity` and `/managed-agent-sign` routes;
-- supports unsigned/self-custody preparation;
-- builds the narrow supported transaction shape.
-
-### 7.2 Mainnet worker
-
-- does not accept `CARDANO_MANAGED_AGENT_MASTER_KEY`;
-- supports unsigned/self-custody preparation;
-- supports external per-agent managed custody when configured;
-- resolves a stable external Ed25519 `publicKeyHex` and `signerRef` for the immutable Agent ID;
-- derives the `addr1...` payer address locally;
-- sends only the transaction-body hash to the external signer;
-- verifies the returned signature locally before returning signed CBOR.
-
-The generic worker signing mode remains `unsigned-only`; dedicated per-agent managed routes coexist with it and do not introduce deployment-wide shared signing.
-
-## 8. External Mainnet custody adapter
-
-The external custody service is not hosted by AgentPay. It is a deployment dependency with the bounded API contract:
-
-```text
-POST /identity
-POST /sign
-```
-
-`/identity` resolves public identity material for one Agent ID. `/sign` signs only the supplied transaction-body hash for that agent's signer reference.
-
-Required safety properties:
-
-- one stable signer identity per managed agent;
-- no shared platform wallet;
-- private keys never enter AgentPay;
-- HTTPS and separate custody capability credential in production;
-- identity/address mismatch fails closed;
-- public-key/signer-reference mismatch fails closed;
-- invalid signatures fail closed;
-- provider unavailability does not trigger fallback to another key.
-
-## 9. Cardano transaction design
-
-The supported payment shape is deliberately narrow:
-
-- phase-1/key-spend transactions;
-- payer-only inputs;
-- exact payee/asset/amount;
-- ADA (`lovelace`) plus at most one explicitly configured native asset;
-- payer-only change;
-- bounded input count, fee and TTL;
-- no scripts, minting, certificates, withdrawals, collateral, bootstrap witnesses, auxiliary data or unrelated assets/outputs.
-
-The requirement includes SHA-256 binding of the canonical paid-resource URL.
-
-## 10. Blockfrost boundary
-
-Blockfrost is used by both Cardano components for different purposes:
-
-- **Signer:** UTxOs/protocol/chain data required to construct the transaction.
-- **Facilitator:** submission (`/tx/submit`), transaction evidence, latest block and confirmation depth.
-
-Blockfrost is chain-access infrastructure, not an authorization system.
-
-## 11. Policy and trust design
-
-The control plane composes the most restrictive applicable outcome from:
-
-- atomic spend policy;
-- approval rules;
-- reservations/budget state;
-- Pyth USD valuation constraints;
-- Masumi registry/capability/payment-key trust;
-- observed Masumi escrow history/reputation;
-- optional KERI/ACDC issuer/schema/freshness trust.
-
-A configured trust dependency may make a payment more restrictive; failure must not silently relax policy.
-
-## 12. Reconciliation design
-
-A post-sign or post-submission timeout is not automatically a failure. Candidate transaction identity and durable claim state are retained and independently reconciled.
-
-```text
-SIGNED/SUBMISSION_STARTED
+             Human dashboard / REST clients / AI agents
+                              |
+                              v
+                    Next.js Control Plane
+ +----------------------------------------------------------------+
+ | auth | organizations | workspaces | members | agents | creds    |
+ | policies | approvals | reservations | intents | invoices        |
+ | resources | marketplace | cards | fiat | cross-chain           |
+ | automation | intelligence | audit | notifications | operations  |
+ +----------------------------------------------------------------+
+                              |
+                    PostgreSQL system of record
+                              |
+        +---------------------+----------------------+ 
+        |                     |                      |
+        v                     v                      v
+ direct x402 layer       Moove Receive         provider services
+        |                     |              Stripe / Masumi / etc.
+        v                     v
+ unified facilitator       hosted checkout
         |
-        +-- confirmed evidence -> SETTLED
-        +-- definitive rejection -> rejected/failed
-        +-- unresolved -> SUBMISSION_UNKNOWN / reconciliation required
+ +------+------------------------+
+ |              |                |
+ Hedera         Arc            Cardano
+                                |
+                      isolated Cardano signer
+                                |
+                Preprod key derivation / Mainnet
+                 external per-agent custody
 ```
 
-Blind resubmission is prohibited for ambiguous side effects.
+## 3. Control plane
 
-## 13. Deployment trust boundaries
+The dashboard application is both the user-facing control surface and the primary authenticated API surface.
 
-### Vercel control plane
+Major domains include:
 
-Holds policy/business state and provider configuration. No blockchain private keys or Mainnet custody API credentials.
+- authentication/session and wallet-auth challenges;
+- organizations, workspaces, memberships, entitlements, usage, and support;
+- agents, credentials, payment accounts, and integration metadata;
+- policies, policy versions, decisions, approvals, reservations, and contract allowlists;
+- payment intents, attempts, settlements, transactions, and fulfillment;
+- providers, resources, resource health, marketplace listings/reviews, and invoices;
+- cards, cardholders, card authorizations, fiat accounts/transfers;
+- cross-chain quotes/transfers;
+- automation rules/executions/decisions;
+- financial observations, anomalies, forecasts, recommendations;
+- audit, notifications, reconciliation, retention, exports, deletion, release evidence, and emergency controls;
+- Moove Receive and Masumi-specific lifecycle state.
 
-### Unified facilitator
+## 4. Persistence model
 
-Holds rail-specific protocol capability/infrastructure credentials. Cardano path verifies/submits but does not possess the payer private key.
+PostgreSQL is the durable system of record. Prisma provides the primary model/client layer; explicit SQL is used when a feature requires a database invariant or table not represented as a first-class Prisma model.
 
-### Cardano signer
+Durable records intentionally distinguish:
 
-Holds the Preprod derivation secret and Mainnet custody API capability where configured. It builds/signs but does not submit Cardano transactions on-chain.
+- a requested payment from an executed attempt;
+- an attempt from a confirmed settlement;
+- policy decision from approval decision;
+- spend reservation from final spend;
+- provider/network submission from confirmed outcome;
+- resource fulfillment from payment settlement;
+- external provider evidence from local interpretation.
 
-### External custody
+This separation prevents an intermediate event from being mistaken for financial completion.
 
-Holds Mainnet managed-agent private keys and signs body hashes only.
+## 5. Identity and tenancy
 
-### Blockchains
+Every organization-owned object is resolved under an authenticated organization context. Human RBAC and agent credential scopes are enforced server-side.
 
-Authoritative source of final settlement evidence.
+Managed blockchain payment accounts use canonical identity normalization and database uniqueness. The core invariant is:
 
-## 14. Current maturity and provenance
+```text
+(network, canonical identity) -> one PaymentAccount -> one agent
+```
 
-**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor. AgentPay was originally built for the Hedera x402 bounty and later extended to the implemented multi-rail architecture described here.
+Transaction-scoped locking protects the identity-claim path from concurrent assignment races.
 
-For Catalyst submission purposes, the current maturity remains **TRL 5** until the intended Cardano Mainnet/pilot configuration is demonstrated in a relevant environment. The source now implements external per-agent Mainnet custody, but implementation is not by itself a TRL 6 demonstration.
+## 6. Policy engine
 
-## 15. Current authoritative references
+The policy engine evaluates the requested financial action against the currently published immutable policy version. Decisions are persisted so a later audit can reconstruct the policy context used at authorization time.
 
-- [`README.md`](../README.md)
-- [`implementation-status.md`](implementation-status.md)
-- [`cardano-production.md`](cardano-production.md)
-- [`managed-signer-isolation.md`](managed-signer-isolation.md)
-- [`threat-model.md`](threat-model.md)
-- [`production-readiness.md`](production-readiness.md)
-- [`unified-production-deployment.md`](unified-production-deployment.md)
+Policy can combine:
 
-The prior July 2026 Hedera-specific SDD remains available in Git history for provenance.
+- atomic asset limits;
+- USD-valued limits from Pyth evidence;
+- merchant/resource/category controls;
+- time/velocity/cooldown constraints;
+- approval requirements;
+- Masumi trust/history/reputation evidence;
+- optional Veridian/KERI evidence;
+- contract allowlists and network restrictions.
+
+The most restrictive applicable outcome wins. Required external evidence failing validation cannot loosen the decision.
+
+## 7. Approval architecture
+
+Approval requests are separate durable objects from payment intents. Threshold decisions are accumulated under role/separation rules. Only after the required approval state is reached may the execution service proceed.
+
+Approval consumption is bound to the intended operation so an approval cannot be repurposed for a materially different amount, resource, or payment identity.
+
+## 8. Direct x402 architecture
+
+The direct paid-resource path is:
+
+```text
+request resource
+ -> receive 402/payment requirements
+ -> canonicalize + validate resource
+ -> verify registered resource/trust evidence
+ -> evaluate policy
+ -> reserve spend
+ -> approval if required
+ -> obtain self-custody or managed payment payload
+ -> resource/facilitator verification and settlement
+ -> validate settlement evidence
+ -> persist fulfillment
+```
+
+External resource URLs are untrusted input and use bounded/SSRF-safe access controls.
+
+## 9. Network facilitator architecture
+
+Facilitators are payment-protocol/network services, not organization policy engines. They receive already-authorized execution context and enforce rail-specific cryptographic/transaction requirements.
+
+### Hedera
+
+The Hedera facilitator implements the supported Hedera payment/x402 profile and rail-scoped security/environment validation for Testnet/Mainnet profiles.
+
+### Arc
+
+The Arc facilitator implements the configured Arc Testnet EVM payment path, including network/security validation and settlement evidence. No unsupported Arc production network is implied by the adapter existing.
+
+### Cardano
+
+The combined facilitator dispatches Cardano Preprod/Mainnet and performs independent transaction verification, settlement claims, submission, and confirmation classification.
+
+## 10. Cardano signer architecture
+
+The Cardano signer is a separate service boundary because transaction construction/signing authority should not be co-located with the control-plane application.
+
+Preprod can derive a unique Ed25519 identity per immutable Agent ID from a signer-only test secret.
+
+Mainnet supports:
+
+- unsigned self-custody transaction preparation; or
+- external per-agent Ed25519 custody.
+
+For external custody:
+
+```text
+agentId
+ -> external custody /identity
+ -> publicKeyHex + signerRef
+ -> derive addr1... locally
+ -> construct bounded transaction
+ -> hash transaction body
+ -> external custody /sign
+ -> verify returned Ed25519 signature locally
+ -> signed CBOR
+```
+
+The signer never submits transactions. Submission belongs to the facilitator after independent verification.
+
+## 11. Cardano settlement claims
+
+Before on-chain submission, the facilitator creates/updates a durable claim bound to the candidate transaction and resource/payment context. This separates:
+
+- not submitted;
+- submission started;
+- confirmed;
+- definitively failed;
+- submission unknown/reconciliation required.
+
+Timeouts after possible submission therefore cannot trigger blind duplication.
+
+## 12. Moove Receive architecture
+
+Moove is modeled as a hosted receive-payment rail rather than a blockchain signer.
+
+The service layer stores an AgentPay payment record and durable idempotency fingerprint, then creates or recovers the provider payment link. Because provider-side create idempotency is not assumed, ambiguous create responses are reconciled through the provider listing surface using an AgentPay marker.
+
+A Moove account settles according to its account-level wallet/token configuration. AgentPay therefore binds the Moove credential to one organization and records provider-reported destination/token evidence.
+
+Completion processing is transactional: settlement evidence is persisted, linked resource/invoice events are emitted, and invoice state changes only after exact settlement configuration checks pass.
+
+## 13. Masumi architecture
+
+Masumi is integrated through two separate services:
+
+- registry/payment identity evidence used as policy/trust input for direct payment;
+- escrow purchase lifecycle with its own provider state, result-hash verification, refund/dispute, and reconciliation logic.
+
+These lifecycles remain separate in storage and UI because their financial semantics differ.
+
+## 14. Card and fiat provider architecture
+
+`CardProviderAdapter` isolates AgentPay business logic from the external provider implementation. Current implementations include Stripe and Sandbox.
+
+The Stripe adapter covers issuing/cardholders, virtual cards, status changes, display-key creation, financial accounts, inbound/outbound money movement, provider reads, and signed webhook verification. The sandbox implementation produces development-only state and deliberately cannot reveal usable card credentials.
+
+Provider records store non-secret identifiers/status rather than raw card credentials.
+
+## 15. Cross-chain architecture
+
+Cross-chain operations are represented as quotes and transfers with explicit lifecycle state. Preparation and submission are distinct so policy/readiness can be checked before the irreversible boundary. Source/destination and quote identity are persisted to support later reconciliation.
+
+Provider/network configuration determines which routes are actually executable.
+
+## 16. Automation architecture
+
+Automation consists of rules, executions, and execution decisions. A trigger creates or advances durable execution state; financial actions still invoke the normal policy/approval/reservation/execution layers.
+
+Webhook endpoints and manual execution routes are separate boundaries. Emergency stop can block new risky side effects while allowing defensive reconciliation/maintenance.
+
+## 17. Financial intelligence architecture
+
+Financial intelligence operates over persisted financial observations and produces summaries, anomalies, forecasts, and recommendations. It is an advisory layer and does not sign, settle, or authorize payments.
+
+## 18. Resource and marketplace architecture
+
+Resource providers, resource definitions, health checks, prices, marketplace listings, reviews, invoice data, and fulfillment evidence are stored separately so commercial presentation does not become the source of payment truth.
+
+Canonical endpoint handling prevents the same paid endpoint from being ambiguously registered under multiple forms.
+
+## 19. Notifications and audit
+
+Material business events are written to audit/outbox structures. Notification endpoints and deliveries are processed from durable state so transient delivery failure does not erase the underlying event.
+
+Audit integrity/sequence controls are designed to make mutation or ordering problems detectable.
+
+## 20. External trust/data integrations
+
+- **Pyth Hermes:** price/confidence/publish-time evidence for conservative policy valuation.
+- **Masumi:** registry/payment identity and escrow provider evidence.
+- **Veridian/KERIA:** optional cryptographic credential-verification boundary; AgentPay validates the returned claims against policy.
+- **Blockfrost:** Cardano UTxO/protocol data, transaction submission, and confirmation evidence.
+- **Dune:** read-only public analytics; never part of authorization/signing/reconciliation authority.
+
+## 21. Failure model
+
+AgentPay classifies failures by the irreversible boundary.
+
+- **Before submission:** safe to report as pre-submission failure when no financial side effect occurred.
+- **After possible submission:** preserve ambiguity, candidate identifiers, reservations, and evidence; reconcile before retry.
+- **After confirmed settlement but failed fulfillment:** payment remains settled; fulfillment is recovered independently.
+- **External trust/readiness failure:** fail closed when that dependency is required.
+
+## 22. Deployment topology
+
+The canonical topology uses Vercel for the control plane, PostgreSQL for durable state, and Render for facilitator/signer services. Provider/network credentials are scoped to the service that requires them.
+
+The deployment contract is documented in [`unified-production-deployment.md`](unified-production-deployment.md).
+
+## 23. Security model
+
+The design assumes browsers, agents, resource URLs, provider responses, and network responses can be malformed or adversarial. Security depends on layered validation rather than trusting any single external source.
+
+See [`threat-model.md`](threat-model.md), [`managed-signer-isolation.md`](managed-signer-isolation.md), and [`../SECURITY.md`](../SECURITY.md).

@@ -1,4 +1,5 @@
 import { createAutonomousCardPurchase, listAutonomousCardPurchases, readAutonomousCardPurchase } from "@/domain/card-autonomy-service";
+import { createMooveReceivePayment, getMooveReceivePayment } from "@/domain/moove-receive-service";
 import { createPaidRequest } from "@/domain/payment-service";
 import { authorizeAgentRequest, boundedJson, handleApiError, problem } from "@/lib/api";
 import { db } from "@/lib/db";
@@ -44,6 +45,36 @@ const tools = [
     description: "Read the latest status and settlement evidence for a payment intent created by this agent.",
     inputSchema: { type: "object", properties: { intentId: { type: "string", format: "uuid" } }, required: ["intentId"], additionalProperties: false },
     annotations: { title: "Read AgentPay payment status", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "agentpay_create_moove_payment_link",
+    description: "Create a Moove Receive payment link so this agent can accept payment into the organization's configured Moove settlement wallet. The amount is expressed in the Moove account's configured destination token units.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        toAmount: { type: "string", pattern: "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$", description: "Positive decimal amount as a string; exponent notation is not accepted." },
+        description: { type: "string", maxLength: 450, description: "Human-readable description shown on the Moove payment link." },
+        maxUsage: { type: "integer", minimum: 1, maximum: 2147483647, description: "Maximum successful uses. Omit for unlimited usage." },
+        expirationDate: { type: "string", format: "date-time", description: "Future ISO-8601 expiration. Omit for no expiry." },
+        resourceListingId: { type: "string", format: "uuid", description: "Optional AgentPay resource owned by this organization to bind to the receive request." },
+        invoiceId: { type: "string", format: "uuid", description: "Optional AgentPay invoice issued by this organization to bind to the receive request." },
+        idempotencyKey: { type: "string", minLength: 8, maxLength: 100, description: "Stable key for this intended payment link. Reuse the same key when retrying." },
+      },
+      required: ["toAmount", "idempotencyKey"],
+      additionalProperties: false,
+    },
+    annotations: { title: "Create Moove receive payment", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  },
+  {
+    name: "agentpay_get_moove_payment_status",
+    description: "Refresh and read a Moove Receive payment link owned by this agent, including completion, received amount, token and transaction evidence when available.",
+    inputSchema: {
+      type: "object",
+      properties: { paymentId: { type: "string", format: "uuid", description: "Internal AgentPay Moove receive-payment ID." } },
+      required: ["paymentId"],
+      additionalProperties: false,
+    },
+    annotations: { title: "Read Moove receive payment status", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   },
   {
     name: "agentpay_create_card_purchase",
@@ -168,12 +199,24 @@ async function paymentStatus(agentId: string, intentId: string) {
   };
 }
 
+async function mooveAgentIdentity(agentId: string) {
+  return db.agent.findFirst({ where: { id: agentId, status: { not: "ARCHIVED" } }, select: { id: true, organizationId: true } });
+}
+
+async function mooveStatus(agentId: string, paymentId: string) {
+  const agent = await mooveAgentIdentity(agentId);
+  if (!agent) return null;
+  const local = await getMooveReceivePayment({ organizationId: agent.organizationId, id: paymentId, refresh: false });
+  if (local.agentId !== agentId) return null;
+  return getMooveReceivePayment({ organizationId: agent.organizationId, id: paymentId, refresh: true });
+}
+
 async function handleMessage(request: Request, agentId: string, message: JsonRpcMessage) {
   const id = message.id ?? null;
   if (message.jsonrpc !== "2.0" || !message.method) return jsonRpcError(id, -32600, "Invalid JSON-RPC request.");
   if (message.method === "initialize") {
     if (!(await authorize(request, agentId, "resources:read"))) return jsonRpcError(id, -32001, "Unauthorized AgentPay connection.");
-    return jsonRpcResult(id, { protocolVersion: MCP_PROTOCOL_VERSION, capabilities: { tools: { listChanged: false } }, serverInfo: { name: "agentpay-control", version: "1.0.0" }, instructions: "Use AgentPay for policy-controlled resource payments and virtual-card purchases. Never assume a financial action completed until AgentPay reports provider-backed terminal evidence." });
+    return jsonRpcResult(id, { protocolVersion: MCP_PROTOCOL_VERSION, capabilities: { tools: { listChanged: false } }, serverInfo: { name: "agentpay-control", version: "1.0.0" }, instructions: "Use AgentPay for policy-controlled resource payments, Moove Receive requests, and virtual-card purchases. Never assume a financial action completed until AgentPay reports provider-backed terminal evidence." });
   }
   if (message.method === "notifications/initialized") return null;
   if (message.method === "ping") {
@@ -215,6 +258,30 @@ async function handleMessage(request: Request, agentId: string, message: JsonRpc
       if (!intentId) return jsonRpcResult(id, textToolResult({ code: "INVALID_ARGUMENTS", detail: "intentId is required." }, true));
       const status = await paymentStatus(agentId, intentId);
       return jsonRpcResult(id, textToolResult(status ?? { code: "PAYMENT_INTENT_NOT_FOUND" }, !status));
+    }
+    if (name === "agentpay_create_moove_payment_link") {
+      if (!(await authorize(request, agentId, "payments:create"))) return jsonRpcError(id, -32001, "Unauthorized AgentPay connection.");
+      const identity = await mooveAgentIdentity(agentId);
+      if (!identity) return jsonRpcResult(id, textToolResult({ code: "AGENT_NOT_FOUND" }, true));
+      const toAmount = typeof args.toAmount === "string" ? args.toAmount : "";
+      const idempotencyKey = typeof args.idempotencyKey === "string" ? args.idempotencyKey : "";
+      const description = typeof args.description === "string" ? args.description : undefined;
+      const maxUsage = typeof args.maxUsage === "number" ? args.maxUsage : undefined;
+      const expirationDate = typeof args.expirationDate === "string" ? args.expirationDate : undefined;
+      const resourceListingId = typeof args.resourceListingId === "string" ? args.resourceListingId : undefined;
+      const invoiceId = typeof args.invoiceId === "string" ? args.invoiceId : undefined;
+      if (!/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(toAmount) || /^0(?:\.0+)?$/.test(toAmount) || idempotencyKey.length < 8 || idempotencyKey.length > 100) {
+        return jsonRpcResult(id, textToolResult({ code: "INVALID_ARGUMENTS", detail: "A positive decimal toAmount string and an idempotencyKey between 8 and 100 characters are required." }, true));
+      }
+      const result = await createMooveReceivePayment({ organizationId: identity.organizationId, agentId, toAmount, description, maxUsage, expirationDate, resourceListingId, invoiceId, idempotencyKey, actorType: "AGENT", actorId: agentId });
+      return jsonRpcResult(id, textToolResult(result));
+    }
+    if (name === "agentpay_get_moove_payment_status") {
+      if (!(await authorize(request, agentId, "payments:read"))) return jsonRpcError(id, -32001, "Unauthorized AgentPay connection.");
+      const paymentId = typeof args.paymentId === "string" ? args.paymentId : "";
+      if (!paymentId) return jsonRpcResult(id, textToolResult({ code: "INVALID_ARGUMENTS", detail: "paymentId is required." }, true));
+      const status = await mooveStatus(agentId, paymentId);
+      return jsonRpcResult(id, textToolResult(status ?? { code: "MOOVE_PAYMENT_LINK_NOT_FOUND" }, !status));
     }
     if (name === "agentpay_create_card_purchase") {
       if (!(await authorize(request, agentId, "cards:purchase"))) return jsonRpcError(id, -32001, "Unauthorized AgentPay card connection.");

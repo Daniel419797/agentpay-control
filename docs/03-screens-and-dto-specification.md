@@ -1,54 +1,266 @@
-# AgentPay Control: Screens and DTO Specification
+# AgentPay Application and API Reference
 
-**Status:** Current implementation-facing UI/API reference  
-**Updated:** 2026-08-22  
-**Primary builder:** Daniel Praise (`Daniel419797`)
+**Status:** implementation-facing UI and API contract  
+**Updated:** 2026-09-10
 
-## 1. UI surface
+This document describes the major application surfaces and API contract conventions. Route implementation remains authoritative for exact validation fields and response details.
 
-The authenticated application is a Next.js dashboard/API control plane. Current functional areas include:
+## 1. Product UI
 
-- overview/analytics;
-- organizations and members/RBAC;
-- agents and payment accounts;
-- scoped agent credentials;
-- policy creation/publishing;
-- payment initiation and x402 paid requests;
-- approvals;
-- transactions/settlements;
-- resources/marketplace;
-- audit;
-- incidents/reconciliation;
+The authenticated application exposes operational workspaces for:
+
+- Overview and organization status;
+- Agents, credentials, integrations, payment accounts, and policy;
+- Approvals and payment execution;
+- Transactions and audit;
+- Resources, providers, marketplace, and paid-resource flows;
+- Invoices;
+- Virtual cards/card operations;
+- Cross-chain operations;
+- Automation rules/executions;
+- Financial intelligence;
 - Cardano analytics;
-- invoices;
-- cards/fiat adapters where enabled;
-- cross-chain/automations where enabled;
-- financial intelligence;
-- organization settings, emergency stop, exports and deletion.
+- Organization settings, workspaces, members, retention/export/deletion, and emergency controls.
 
-UI availability does not itself imply a production provider is enabled; feature pages must reflect configuration/readiness state.
+Provider-dependent pages must represent readiness/configuration honestly. A visible page or stored provider model does not mean that a production provider account is enabled.
 
-## 2. Agent creation and custody choices
+## 2. API conventions
 
-An agent has a stable immutable ID, network, status, payment account and policy relationship.
+Authenticated API routes live under `/api/v1`.
 
-Current managed-capable networks include:
+Common conventions:
 
-- Hedera Testnet;
-- Arc Testnet;
-- Cardano Preprod;
-- Cardano Mainnet with `EXTERNAL_DELEGATED` custody.
+- session or Bearer authentication depending on route/client type;
+- organization scoping resolved server-side;
+- scoped agent credentials for agent-facing actions;
+- `Idempotency-Key` on financial create/execute operations where required;
+- structured JSON responses and stable error codes;
+- atomic amounts represented as strings where integer precision matters;
+- ISO-8601 timestamps;
+- no private keys, restricted provider keys, session secrets, or raw card credentials in normal response DTOs.
 
-Cardano Mainnet must distinguish:
+## 3. Major API groups
 
-- **self custody:** wallet-controlled signing of the prepared transaction;
-- **external delegated custody:** one external Ed25519 signer identity for the immutable Agent ID.
+### Agents and credentials
 
-The UI must never describe a shared Mainnet platform payer/master key because that architecture is prohibited.
+Representative routes:
 
-## 3. Payment account DTO
+```text
+GET/POST /api/v1/agents
+GET      /api/v1/agents/{agentId}/status
+GET      /api/v1/agents/{agentId}/connection
+GET/POST /api/v1/agents/{agentId}/credentials
+DELETE   /api/v1/agents/{agentId}/credentials/{credentialId}
+GET      /api/v1/agents/{agentId}/integrations
+POST     /api/v1/agents/{agentId}/paid-requests
+POST     /api/v1/agents/{agentId}/mcp
+```
 
-Conceptually, a payment account exposes only non-secret identity and mode information:
+An agent's credential authorizes AgentPay operations according to scope; it is not the underlying payment private key.
+
+### Policy
+
+```text
+GET  /api/v1/agents/{agentId}/policies/current
+POST /api/v1/agents/{agentId}/policies/preview
+POST /api/v1/agents/{agentId}/policies/publish
+GET  /api/v1/policy-versions/{policyVersionId}/...
+GET/POST /api/v1/contract-allowlist
+```
+
+Published policy versions are immutable.
+
+### Approvals
+
+```text
+GET /api/v1/approvals
+GET /api/v1/approvals/{approvalId}
+POST /api/v1/approvals/{approvalId}/decision
+```
+
+Approval DTOs carry decision context without exposing signing secrets.
+
+### Payment intents and transactions
+
+```text
+GET  /api/v1/payment-intents/{intentId}
+POST /api/v1/payment-intents/{intentId}/cancel
+POST /api/v1/payment-intents/{intentId}/self-custody
+GET  /api/v1/transactions
+GET  /api/v1/transactions/{transactionId}
+```
+
+Intent state and settlement state are separate. An ambiguous submission must not be rendered as a simple failed-before-submission result.
+
+### Resources, providers, and marketplace
+
+```text
+GET/POST /api/v1/providers
+POST     /api/v1/providers/{providerId}/verify
+GET/POST /api/v1/providers/{providerId}/resources
+GET/POST /api/v1/resources
+GET      /api/v1/resources/{resourceId}
+PUT/POST /api/v1/resources/{resourceId}/masumi-binding
+PUT/POST /api/v1/resources/{resourceId}/veridian-binding
+GET      /api/v1/marketplace/resources
+GET      /api/v1/marketplace/resources/{resourceId}
+GET/POST /api/v1/marketplace/resources/{resourceId}/reviews
+```
+
+Exact HTTP verbs should be checked against the route implementation when integrating directly; the group above documents the supported route surfaces.
+
+### Invoices
+
+```text
+GET/POST /api/v1/invoices
+GET      /api/v1/invoices/{invoiceId}
+POST     /api/v1/invoices/{invoiceId}/send
+POST     /api/v1/invoices/{invoiceId}/collect
+POST     /api/v1/invoices/{invoiceId}/pay
+POST     /api/v1/invoices/{invoiceId}/void
+```
+
+Invoices maintain separate item, event, settlement, and lifecycle state.
+
+### Moove Receive
+
+```text
+POST /api/v1/moove/payment-links
+GET  /api/v1/moove/payment-links
+GET  /api/v1/moove/payment-links/{id}
+POST /api/v1/moove/reconcile
+```
+
+Create requests use a durable idempotency key. `GET .../{id}?refresh=true` requests provider reconciliation before returning current local state.
+
+Conceptual create input:
+
+```ts
+type MooveReceiveRequest = {
+  agentId: string;
+  toAmount: string;
+  description?: string;
+  maxUsage?: number;
+  expirationDate?: string;
+  resourceListingId?: string;
+  invoiceId?: string;
+};
+```
+
+Important response fields include AgentPay ID, provider link ID/URL, provider status, amount, resource/invoice binding, destination address, token/chain evidence, received amount, transaction URL, failure/reconciliation state, and timestamps.
+
+Only `COMPLETED` backed by reconciled provider evidence is completion.
+
+### Cards and cardholders
+
+```text
+GET/POST /api/v1/cardholders
+GET/POST /api/v1/cards
+POST     /api/v1/cards/{cardId}/status
+POST     /api/v1/cards/{cardId}/display-key
+GET      /api/v1/card-authorizations
+POST     /api/v1/webhooks/stripe
+```
+
+The provider path may be Stripe or Sandbox depending on environment. Raw PAN/CVC must not be returned by AgentPay's ordinary card APIs.
+
+### Fiat
+
+```text
+GET/POST /api/v1/fiat-accounts
+GET/POST /api/v1/fiat-transfers
+```
+
+Provider-backed account/transfer availability depends on configuration and provider eligibility.
+
+### Cross-chain
+
+```text
+GET  /api/v1/cross-chain/networks
+POST /api/v1/cross-chain/quotes
+POST /api/v1/cross-chain/quotes/{quoteId}/prepare
+GET  /api/v1/cross-chain/transfers
+POST /api/v1/cross-chain/transfers/{transferId}/submit
+```
+
+Quote, preparation, and submission state are deliberately separate.
+
+### Automation
+
+```text
+GET/POST /api/v1/automations
+POST     /api/v1/automations/{ruleId}/execute
+GET      /api/v1/automations/{ruleId}/status
+POST     /api/v1/automations/{ruleId}/webhook
+GET      /api/v1/automations/executions
+POST     /api/v1/automations/executions/{executionId}/decision
+```
+
+Automation does not bypass financial policy or emergency controls.
+
+### Financial intelligence
+
+```text
+GET /api/v1/intelligence/summary
+GET /api/v1/intelligence/anomalies
+GET /api/v1/intelligence/anomalies/{anomalyId}
+GET /api/v1/intelligence/forecasts
+GET /api/v1/intelligence/recommendations
+GET /api/v1/intelligence/recommendations/{recommendationId}
+```
+
+These outputs are advisory rather than payment authorization.
+
+### Organization operations
+
+```text
+GET  /api/v1/organization
+POST /api/v1/organization/kill-switch
+GET/POST /api/v1/organization/retention
+POST /api/v1/organization/export
+GET  /api/v1/organization/export-stream
+POST /api/v1/organization/export-complete
+POST /api/v1/organization/deletion
+GET  /api/v1/organization/release-evidence
+GET  /api/v1/audit-events
+GET  /api/v1/audit-events/export
+GET/POST /api/v1/notification-endpoints
+GET/POST /api/v1/support-cases
+GET      /api/v1/usage
+```
+
+## 4. Payment intent DTO
+
+The TypeScript SDK exposes a normalized intent view similar to:
+
+```ts
+type PaymentIntent = {
+  id: string;
+  status: string;
+  resourceUrl: string;
+  merchantHost?: string;
+  purpose?: string | null;
+  quote?: {
+    amountAtomic: string;
+    asset: { symbol: string; decimals: number };
+    payToAccountId: string;
+    fingerprint: string;
+    validUntil: string;
+  } | null;
+  approval?: { id: string; status: string } | null;
+  fulfillment?: {
+    status: "PENDING" | "FULFILLED" | "FAILED";
+    contentType?: string | null;
+    contentHash?: string | null;
+  } | null;
+};
+```
+
+Important terminal/nonterminal states include `DENIED`, `APPROVAL_PENDING`, `AUTHORIZED`, `SETTLED`, `SETTLEMENT_FAILED`, `FAILED_BEFORE_SUBMISSION`, and rail-specific pending/ambiguous states.
+
+## 5. Payment account view
+
+A normal payment-account response contains non-secret identity/configuration information only:
 
 ```ts
 type PaymentAccountView = {
@@ -62,13 +274,9 @@ type PaymentAccountView = {
 };
 ```
 
-Private keys, testnet master secrets, custody API credentials and encrypted secret material are never returned by ordinary read APIs.
+Managed payment identities are canonicalized and unique per network.
 
-The canonical identity must remain globally unique per network.
-
-## 4. Managed identity DTO
-
-The implemented managed-identity response is equivalent to:
+## 6. Managed identity view
 
 ```ts
 type ManagedAgentIdentity = {
@@ -78,18 +286,11 @@ type ManagedAgentIdentity = {
 };
 ```
 
-Validation is network-specific:
+Network-specific identifiers include Hedera `0.0.x`, EVM `0x...`, Cardano Preprod `addr_test1...`, and Cardano Mainnet `addr1...`.
 
-- Hedera Testnet: `0.0.x`;
-- Arc Testnet: `0x...` address;
-- Cardano Preprod: `addr_test1...`;
-- Cardano Mainnet: `addr1...`.
+## 7. x402 requirement shape
 
-For Cardano Mainnet, the public identity comes from the external custody adapter, but AgentPay derives and validates the Cardano payer address itself.
-
-## 5. x402 requirement DTO
-
-The direct payment client expects x402 V2 requirements with:
+The direct client expects supported x402 V2 `exact` requirements conceptually shaped as:
 
 ```ts
 type PaymentRequirement = {
@@ -103,129 +304,54 @@ type PaymentRequirement = {
 };
 ```
 
-For Cardano, `extra` must contain the implemented safety metadata, including server submission, resource binding and confirmation policy.
+The requirement must match the exact resource/network/asset/amount/payee selected by AgentPay.
 
-The selected requirement must match the exact canonical resource URL, network, asset, amount and payee expected by AgentPay.
+## 8. TypeScript SDK
 
-## 6. Managed signing request
-
-The control plane sends the facilitator:
+Current client methods include:
 
 ```ts
-{
-  paymentRequirements,
-  agentId,
-  payerAccountId
-}
+createPaidRequest(agentId, input, idempotencyKey?)
+getPaymentIntent(intentId)
+waitForSettlement(intentId, options?)
+createMooveReceivePayment(input, idempotencyKey?)
+getMooveReceivePayment(id, { refresh? })
+waitForMooveReceivePayment(id, options?)
+listResources()
+getAgents()
 ```
 
-The facilitator then uses the isolated Cardano signer. For Mainnet external custody, the signer resolves the exact Agent ID's public key/signer reference and signs only the resulting transaction-body hash.
+See [`../dashboard/packages/sdk/README.md`](../dashboard/packages/sdk/README.md).
 
-## 7. Payment intent lifecycle
+## 9. MCP tools
 
-Relevant visible states include the policy/approval/signing/settlement distinction:
+The hosted/local MCP integration exposes AgentPay operations including connection/resource/payment tools and Moove Receive tools. The current Moove tools include:
 
 ```text
-request
-  -> policy evaluation
-  -> DENIED | APPROVAL_PENDING | AUTHORIZED
-  -> SIGNING
-  -> signed/submitted
-  -> SETTLED
-       or
-     SUBMISSION_UNKNOWN -> reconciliation
-       or
-     FAILED_BEFORE_SUBMISSION
+agentpay_create_moove_payment_link
+agentpay_get_moove_payment_status
 ```
 
-The UI should not display an ambiguous post-submission outcome as a clean pre-submission failure.
+See [`../dashboard/packages/mcp/README.md`](../dashboard/packages/mcp/README.md).
 
-## 8. Approval screens
+## 10. LangChain tools
 
-Approval detail must show enough context to make a financial decision:
+Current LangChain-compatible helpers include:
 
-- requesting agent;
-- resource/provider;
-- network;
-- asset and amount;
-- policy reason;
-- expiration;
-- prior decision state.
+- `agentpay_purchase_resource`;
+- `agentpay_create_moove_payment_link`.
 
-Self-approval is blocked where the configured role/threshold model requires separation.
+The wrappers return structured AgentPay intent/payment state and never perform independent payment authorization.
 
-## 9. Policy screens
+## 11. UI security rules
 
-Published policy can expose/configure:
+- never render private keys, provider restricted keys, managed master keys, or custody credentials;
+- only reveal short-lived provider-authorized card display material through the dedicated provider flow;
+- clearly distinguish policy denial, approval pending, pre-submission failure, ambiguous submission, and confirmed settlement;
+- destructive organization actions require authenticated authorization;
+- provider/readiness state must not be hidden behind optimistic UI;
+- external URLs and provider payloads are untrusted data.
 
-- atomic transaction/hour/day/month limits;
-- allow/deny merchant rules and categories;
-- `DENY` or `REQUIRE_APPROVAL` over-limit behavior;
-- approval/rejection thresholds;
-- velocity and cooldown;
-- schedule windows;
-- Pyth USD ceilings;
-- Masumi trust/history/reputation controls;
-- optional KERI issuer/schema/freshness controls.
+## 12. Readiness and health
 
-The UI must make clear that a published policy version is immutable and superseded by publishing a new complete version.
-
-## 10. Cardano transaction detail
-
-Cardano detail/evidence should distinguish:
-
-- network (`cardano:preprod` or `cardano:mainnet`);
-- payer and payee;
-- asset and atomic amount;
-- transaction ID;
-- settlement/confirmation state;
-- custody mode;
-- reconciliation state if ambiguous.
-
-The UI may link to public chain evidence but must not expose private keys, custody credentials or private AgentPay context.
-
-## 11. Trust integration DTOs
-
-### Pyth
-
-Store/expose only the observation/evaluation evidence needed for policy traceability: price, confidence, publish time and resulting conservative USD valuation.
-
-### Masumi
-
-Resource binding includes verified registry source, agent identifier, capability, seller address/payment-key facts, pricing snapshot, verification time and expiry.
-
-Escrow state is modeled separately from direct x402 and includes provider purchase/job identifiers, lifecycle status, result hash evidence and refund/dispute state.
-
-### KERI/Veridian
-
-Expose non-secret verification evidence such as credential SAID, issuer AID, schema SAID, verification/freshness status and binding result, not private credential/key material.
-
-## 12. Operational screens
-
-### Emergency stop
-
-The organization emergency stop must clearly communicate that new risky side effects are blocked while reconciliation/defensive processing remains available.
-
-### Readiness
-
-Readiness views/endpoints must distinguish source support from the actually configured deployment profile.
-
-### Incidents/reconciliation
-
-Operators need transaction candidate ID, network, error/reason, current evidence and reconciliation status without needing access to signing secrets.
-
-## 13. Security/UI rules
-
-- never display raw blockchain private keys;
-- never display managed-agent master secrets;
-- never display Mainnet custody API credentials;
-- secrets created for agents are shown once and subsequently represented only by non-secret metadata;
-- destructive settings require authenticated authorization;
-- tenant identifiers must not allow cross-organization reads/writes;
-- external resource URLs must be treated as untrusted input.
-
-## 14. Provenance
-
-**Daniel Praise** (`Daniel419797`) is the repository owner and primary technical contributor. The first AgentPay UI/API was originally built around the Hedera x402 bounty and later expanded into the current multi-rail implementation. This document describes the current functional contracts rather than the original Hedera-only screen plan.
-
-See [`implementation-status.md`](implementation-status.md), [`04-detailed-workflows.md`](04-detailed-workflows.md), [`cardano-production.md`](cardano-production.md), and the code under `dashboard/src/` for authoritative implementation details.
+`/api/v1/health` establishes process health. `/api/v1/ready` evaluates deployment capability/configuration. Integrations should use readiness rather than assuming source support means a rail is operational.

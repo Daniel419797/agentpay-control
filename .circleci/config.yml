@@ -54,8 +54,55 @@ jobs:
             echo "PostgreSQL did not become reachable within the retry window." >&2
             exit 1
       - run:
-          name: Verify application and browser smoke tests
-          command: bash scripts/ci/verify.sh
+          name: Deploy database migrations
+          command: cd dashboard && npm run db:deploy
+      - run:
+          name: Verify canonical resources
+          command: cd dashboard && npm run db:resources:check
+      - run:
+          name: Verify governance invariants
+          command: cd dashboard && npm run verify:governance
+      - run:
+          name: Lint dashboard
+          command: cd dashboard && npm run lint
+      - run:
+          name: Typecheck dashboard
+          command: cd dashboard && npm run typecheck
+      - run:
+          name: Run dashboard unit tests
+          command: cd dashboard && npm run test
+      - run:
+          name: Build dashboard
+          command: cd dashboard && bash ../scripts/ci/build-dashboard.sh
+      - run:
+          name: Verify Hedera facilitator
+          command: cd facilitator && npm run build && npm run typecheck && npm test
+      - run:
+          name: Verify Arc facilitator
+          command: cd facilitator-arc && npm run build && npm run typecheck && npm test
+      - run:
+          name: Verify combined facilitator
+          command: npm run build --workspace=@agentpay/hedera-facilitator && npm run build --workspace=@agentpay/arc-facilitator && npm run typecheck --workspace=@agentpay/combined-facilitator && npm test --workspace=@agentpay/combined-facilitator && npm run build --workspace=@agentpay/combined-facilitator
+      - run:
+          name: Verify resource server
+          command: cd resource-server && npm run build && npm run typecheck && npm test
+      - run:
+          name: Verify card executor
+          command: |
+            cd card-executor
+            npm install --ignore-scripts --no-audit --no-fund
+            npm audit --omit=dev --audit-level=high
+            node --check src/index.mjs
+            node --check src/checkout.mjs
+            node --check src/security.mjs
+            node --check src/stripe.mjs
+            npm test
+      - run:
+          name: Install Playwright Chromium
+          command: cd dashboard && npx playwright install --with-deps chromium
+      - run:
+          name: Run browser smoke tests
+          command: cd dashboard && npm run test:e2e
 
   security:
     machine:
