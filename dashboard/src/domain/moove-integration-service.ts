@@ -7,6 +7,7 @@ import {
   MooveProviderError,
   type MooveConfig,
   assertMooveSettlementToken,
+  withMooveConfig,
 } from "@/lib/moove";
 import { decryptSecret, encryptSecret } from "@/lib/secret-box";
 
@@ -126,7 +127,7 @@ async function requireIntegration(organizationId: string) {
 export async function withMooveConfigForOrganization<T>(organizationId: string, fn: (config: MooveConfig) => Promise<T>) {
   const { config, row } = await requireIntegration(organizationId);
   try {
-    return await fn(config);
+    return await withMooveConfig(config, () => fn(config));
   } finally {
     await db.$executeRaw`
       UPDATE "MooveIntegration"
