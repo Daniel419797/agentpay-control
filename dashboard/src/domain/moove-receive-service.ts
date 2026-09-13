@@ -2,13 +2,12 @@ import { createHash, randomUUID } from "node:crypto";
 
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { getMooveConfigForOrganization } from "@/domain/moove-integration-service";
 import {
   assertMooveAmount,
-  assertMooveOrganization,
   assertMooveSettlementToken,
   createMoovePaymentLink,
   listAllMoovePaymentLinks,
-  mooveConfigFromEnv,
   MooveProviderError,
   retrieveMoovePaymentLink,
   type MooveConfig,
@@ -168,7 +167,7 @@ async function markInvoicePending(invoiceId: string, row: MoovePaymentLinkRow) {
 }
 
 async function applyProviderRecord(row: MoovePaymentLinkRow, link: MoovePaymentLink | MoovePublicPaymentLink) {
-  const config = mooveConfigFromEnv();
+  const config = await getMooveConfigForOrganization(row.organizationId);
   if (config.settlement) assertMooveSettlementToken(link.token, config.settlement);
   const status = localStatus(link.status);
   const evidence = JSON.stringify(link);
@@ -245,7 +244,7 @@ async function applyProviderRecord(row: MoovePaymentLinkRow, link: MoovePaymentL
 }
 
 async function recoverByMarker(row: MoovePaymentLinkRow) {
-  const config = mooveConfigFromEnv();
+  const config = await getMooveConfigForOrganization(row.organizationId);
   const { links } = await listAllMoovePaymentLinks(config);
   const matches = links.filter((link) => link.description === row.providerDescription);
   if (matches.length > 1) throw new Error("MOOVE_RECOVERY_AMBIGUOUS");
@@ -254,8 +253,7 @@ async function recoverByMarker(row: MoovePaymentLinkRow) {
 }
 
 export async function createMooveReceivePayment(input: CreateMooveReceiveInput) {
-  const config = mooveConfigFromEnv();
-  assertMooveOrganization(input.organizationId, config);
+  const config = await getMooveConfigForOrganization(input.organizationId);
   assertMooveAmount(input.toAmount);
   if (input.idempotencyKey.length < 8 || input.idempotencyKey.length > 100) throw new Error("IDEMPOTENCY_KEY_REQUIRED");
   if (input.description && input.description.length > 450) throw new Error("MOOVE_DESCRIPTION_TOO_LONG");
@@ -342,8 +340,7 @@ export async function createMooveReceivePayment(input: CreateMooveReceiveInput) 
 }
 
 export async function listLocalMoovePaymentLinks(input: { organizationId: string; status?: MooveLocalStatus; limit?: number; offset?: number }) {
-  const config = mooveConfigFromEnv();
-  assertMooveOrganization(input.organizationId, config);
+  await getMooveConfigForOrganization(input.organizationId);
   const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
   const offset = Math.max(input.offset ?? 0, 0);
   if (input.status) {
@@ -359,8 +356,7 @@ export async function listLocalMoovePaymentLinks(input: { organizationId: string
 }
 
 export async function getMooveReceivePayment(input: { organizationId: string; id: string; refresh?: boolean }) {
-  const config = mooveConfigFromEnv();
-  assertMooveOrganization(input.organizationId, config);
+  const config = await getMooveConfigForOrganization(input.organizationId);
   const row = await findLocalById(input.id, input.organizationId);
   if (!row) throw new Error("MOOVE_PAYMENT_LINK_NOT_FOUND");
   if (input.refresh && row.providerLinkId && row.providerStatus !== "FAILED") {
@@ -374,8 +370,7 @@ export async function getMooveReceivePayment(input: { organizationId: string; id
 }
 
 export async function reconcileMooveReceive(organizationId: string) {
-  const config = mooveConfigFromEnv();
-  assertMooveOrganization(organizationId, config);
+  const config = await getMooveConfigForOrganization(organizationId);
   const local = await db.$queryRaw<MoovePaymentLinkRow[]>`
     SELECT * FROM "MoovePaymentLink"
     WHERE "organizationId"=${organizationId}::uuid
