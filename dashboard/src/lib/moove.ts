@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { z } from "zod";
 
 const chainSchema = z.object({
@@ -93,12 +94,19 @@ export class MooveProviderError extends Error {
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const decimal = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
+const mooveConfigContext = new AsyncLocalStorage<MooveConfig>();
 
 export function mooveEnabled(env: NodeJS.ProcessEnv = process.env) {
   return env.MOOVE_RECEIVE_ENABLED === "true";
 }
 
+export function withMooveConfig<T>(config: MooveConfig, fn: () => Promise<T>) {
+  return mooveConfigContext.run(config, fn);
+}
+
 export function mooveConfigFromEnv(env: NodeJS.ProcessEnv = process.env): MooveConfig {
+  const contextual = mooveConfigContext.getStore();
+  if (contextual) return contextual;
   if (!mooveEnabled(env)) throw new Error("MOOVE_RECEIVE_DISABLED");
   const baseUrl = (env.MOOVE_API_BASE_URL || "https://api.moove.xyz").replace(/\/$/, "");
   const apiKey = env.MOOVE_API_KEY || "";

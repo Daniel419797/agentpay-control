@@ -7,7 +7,6 @@ import { db } from "@/lib/db";
 import { duneReadinessErrors } from "@/lib/dune";
 import { masumiReadinessErrors } from "@/lib/masumi";
 import { masumiPaymentReadinessErrors } from "@/lib/masumi-payment";
-import { mooveReadinessErrors } from "@/lib/moove";
 import { ok, problem } from "@/lib/api";
 import { pythReadinessErrors } from "@/lib/pyth";
 import { veridianReadinessErrors } from "@/lib/veridian-keri";
@@ -28,12 +27,17 @@ export async function GET() {
   try {
     getConfig();
     const router = getNetworkRouter();
-    const blockingConfigErrors = [...cardanoAssetReadinessErrors(process.env), ...pythReadinessErrors(process.env), ...masumiReadinessErrors(process.env), ...masumiPaymentReadinessErrors(process.env), ...mooveReadinessErrors(process.env), ...veridianReadinessErrors(process.env)];
+    const blockingConfigErrors = [...cardanoAssetReadinessErrors(process.env), ...pythReadinessErrors(process.env), ...masumiReadinessErrors(process.env), ...masumiPaymentReadinessErrors(process.env), ...veridianReadinessErrors(process.env)];
     if (blockingConfigErrors.length) throw new Error(`INTEGRATION_CONFIG:${blockingConfigErrors.join(",")}`);
 
     await db.$queryRaw`SELECT 1`;
     const migrations = await db.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM "_prisma_migrations" WHERE "finished_at" IS NULL AND "rolled_back_at" IS NULL`;
     if ((migrations[0]?.count ?? 0n) > 0n) throw new Error("MIGRATION_INCOMPLETE");
+
+    const mooveEnabled = process.env.MOOVE_RECEIVE_ENABLED === "true";
+    const mooveTenants = mooveEnabled
+      ? await db.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM "MooveIntegration" WHERE "status"='ACTIVE' AND "encryptedApiKey" IS NOT NULL`
+      : [{ count: 0n }];
 
     const requiredFacilitators = router.supportedNetworks().map((network) => ({ network, url: router.getRoute(network).facilitatorUrl }));
     if (!requiredFacilitators.some(({ network }) => network === "hedera:testnet")) throw new Error("HEDERA_TESTNET_ROUTE_REQUIRED");
@@ -51,7 +55,8 @@ export async function GET() {
         pythPolicy: process.env.PYTH_POLICY_ENABLED === "true" ? "configured" : "disabled",
         masumiPolicy: process.env.MASUMI_POLICY_ENABLED === "true" ? "configured" : "disabled",
         masumiEscrow: process.env.MASUMI_ESCROW_ENABLED === "true" ? "configured" : "disabled",
-        mooveReceive: process.env.MOOVE_RECEIVE_ENABLED === "true" ? "configured" : "disabled",
+        mooveReceive: !mooveEnabled ? "disabled" : "enabled",
+        mooveTenantIntegrations: Number(mooveTenants[0]?.count ?? 0n),
         veridianIdentity: process.env.VERIDIAN_IDENTITY_ENABLED === "true" ? "configured" : "disabled",
         usdcx: process.env.CARDANO_USDCX_ENABLED === "true" ? "configured" : "disabled",
         duneAnalytics: process.env.DUNE_ANALYTICS_ENABLED !== "true" ? "disabled" : duneErrors.length ? "degraded" : "configured",

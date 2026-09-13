@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { createMooveReceivePayment, listLocalMoovePaymentLinks } from "@/domain/moove-receive-service";
+import { withMooveConfigForOrganization } from "@/domain/moove-integration-service";
 import { authorizeAgentRequest, boundedJson, handleApiError, ok, problem, rateLimitProblem } from "@/lib/api";
 import { db } from "@/lib/db";
 import { MooveProviderError } from "@/lib/moove";
@@ -22,6 +23,8 @@ const localStatuses = ["CREATING", "ACTIVE", "COMPLETED", "INACTIVE", "SUBMISSIO
 function mooveProblem(error: Error) {
   const statuses: Record<string, number> = {
     MOOVE_RECEIVE_DISABLED: 503,
+    MOOVE_INTEGRATION_NOT_CONFIGURED: 409,
+    MOOVE_INTEGRATION_SECRET_INVALID: 503,
     MOOVE_API_KEY_REQUIRED: 503,
     MOOVE_ACCOUNT_ORGANIZATION_ID_REQUIRED: 503,
     MOOVE_TIMEOUT_INVALID: 503,
@@ -70,12 +73,13 @@ export async function GET(request: Request) {
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || "50"), 1), 100);
     const offset = Math.max(Number(url.searchParams.get("offset") || "0"), 0);
     if (!Number.isInteger(limit) || !Number.isInteger(offset)) return problem(422, "VALIDATION_ERROR", "Pagination values must be integers.");
-    const rows = await listLocalMoovePaymentLinks({
+
+    const rows = await withMooveConfigForOrganization(workspace.organization.id, async () => listLocalMoovePaymentLinks({
       organizationId: workspace.organization.id,
       status: statusValue as (typeof localStatuses)[number] | undefined,
       limit,
       offset,
-    });
+    }));
     return ok({ data: rows, limit, offset, nextOffset: rows.length === limit ? offset + limit : null });
   } catch (error) {
     if (error instanceof Error) {
@@ -121,7 +125,7 @@ export async function POST(request: Request) {
     const rate = await enforceRateLimit(request, { scope: "moove-payment-link-create", subject: rateSubject, limit: 30, windowMs: 60_000 });
     if (!rate.allowed) return rateLimitProblem(rate.retryAfterSeconds);
 
-    const row = await createMooveReceivePayment({
+    const row = await withMooveConfigForOrganization(organizationId, async () => createMooveReceivePayment({
       organizationId,
       idempotencyKey,
       toAmount: input.toAmount,
@@ -133,7 +137,7 @@ export async function POST(request: Request) {
       invoiceId: input.invoiceId,
       actorType,
       actorId,
-    });
+    }));
     const pending = row.providerStatus === "CREATING" || row.providerStatus === "SUBMISSION_UNKNOWN";
     return ok(row, { status: pending ? 202 : 201 });
   } catch (error) {
