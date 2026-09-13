@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 
 import { db } from "@/lib/db";
 import {
-  listAllMoovePaymentLinks,
   listMoovePaymentLinks,
   mooveConfigFromEnv,
   MooveProviderError,
@@ -11,20 +10,7 @@ import {
 } from "@/lib/moove";
 import { decryptSecret, encryptSecret } from "@/lib/secret-box";
 
-const ACTIVE_STATUSES = ["ACTIVE", "ERROR"] as const;
-const NON_TERMINAL_PAYMENT_STATUSES = ["CREATING", "ACTIVE", "SUBMISSION_UNKNOWN", "INACTIVE"] as const;
 const LEGACY_ENV_KEYS = ["MOOVE_API_KEY", "MOOVE_ACCOUNT_ORGANIZATION_ID"] as const;
-
-export type MooveIntegrationSummary = {
-  configured: boolean;
-  status: string | null;
-  keyHint: string | null;
-  settlement: { network: string; symbol: string; decimals: number } | null;
-  lastValidatedAt: Date | null;
-  lastUsedAt: Date | null;
-  lastReconciledAt: Date | null;
-  lastFailureCode: string | null;
-};
 
 type IntegrationRow = {
   id: string;
@@ -36,6 +22,17 @@ type IntegrationRow = {
   settlementNetwork: string | null;
   settlementSymbol: string | null;
   settlementDecimals: number | null;
+  lastValidatedAt: Date | null;
+  lastUsedAt: Date | null;
+  lastReconciledAt: Date | null;
+  lastFailureCode: string | null;
+};
+
+export type MooveIntegrationSummary = {
+  configured: boolean;
+  status: string | null;
+  keyHint: string | null;
+  settlement: { network: string; symbol: string; decimals: number } | null;
   lastValidatedAt: Date | null;
   lastUsedAt: Date | null;
   lastReconciledAt: Date | null;
@@ -84,6 +81,7 @@ async function migrateLegacyIntegration(organizationId: string) {
   const legacyApiKey = process.env[LEGACY_ENV_KEYS[0]]?.trim();
   const legacyOrganizationId = process.env[LEGACY_ENV_KEYS[1]]?.trim();
   if (!legacyApiKey || legacyOrganizationId !== organizationId) return null;
+
   const existing = await findIntegration(organizationId);
   if (existing) return existing;
 
@@ -97,6 +95,7 @@ async function migrateLegacyIntegration(organizationId: string) {
       FOR UPDATE
     `)[0];
     if (current) return;
+
     await tx.$executeRaw`
       INSERT INTO "MooveIntegration" (
         "id","organizationId","encryptedApiKey","keyFingerprint","keyHint","status","lastValidatedAt"
@@ -112,28 +111,29 @@ async function migrateLegacyIntegration(organizationId: string) {
 async function requireIntegration(organizationId: string) {
   if (process.env.MOOVE_RECEIVE_ENABLED !== "true") throw new Error("MOOVE_RECEIVE_DISABLED");
   const row = (await findIntegration(organizationId)) ?? (await migrateLegacyIntegration(organizationId));
-  if (!row || !row.encryptedApiKey || !ACTIVE_STATUSES.includes(row.status as (typeof ACTIVE_STATUSES)[number])) {
-    throw new Error("MOOVE_INTEGRATION_NOT_CONFIGURED");
-  }
+  if (!row || !row.encryptedApiKey || row.status !== "ACTIVE") throw new Error("MOOVE_INTEGRATION_NOT_CONFIGURED");
+
   let apiKey: string;
   try {
     apiKey = decryptSecret(row.encryptedApiKey);
   } catch {
     throw new Error("MOOVE_INTEGRATION_SECRET_INVALID");
   }
-  const config = buildConfig(apiKey, organizationId, settlementConfig(row));
-  return { row, config };
+
+  return { row, config: buildConfig(apiKey, organizationId, settlementConfig(row)) };
 }
 
 export async function withMooveConfigForOrganization<T>(organizationId: string, fn: (config: MooveConfig) => Promise<T>) {
   const { config, row } = await requireIntegration(organizationId);
-  const result = await fn(config);
-  await db.$executeRaw`
-    UPDATE "MooveIntegration"
-    SET "lastUsedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP
-    WHERE "id"=${row.id}::uuid AND "organizationId"=${organizationId}::uuid
-  `;
-  return result;
+  try {
+    return await fn(config);
+  } finally {
+    await db.$executeRaw`
+      UPDATE "MooveIntegration"
+      SET "lastUsedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP
+      WHERE "id"=${row.id}::uuid AND "organizationId"=${organizationId}::uuid
+    `;
+  }
 }
 
 export async function connectMooveIntegration(input: {
@@ -155,73 +155,67 @@ export async function connectMooveIntegration(input: {
 
   const fingerprint = keyFingerprint(input.apiKey);
   const encrypted = encryptSecret(input.apiKey);
-  try {
-    await db.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`moove-integration:${input.organizationId}`}, 0))`;
-      const duplicate = (await tx.$queryRaw<Array<{ organizationId: string }>>`
-        SELECT "organizationId" FROM "MooveIntegration"
-        WHERE "keyFingerprint"=${fingerprint} AND "organizationId"<>${input.organizationId}::uuid
-        LIMIT 1
-      `)[0];
-      if (duplicate) throw new Error("MOOVE_CREDENTIAL_ALREADY_BOUND");
+  await db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`moove-integration:${input.organizationId}`}, 0))`;
 
-      await tx.$executeRaw`
-        INSERT INTO "MooveIntegration" (
-          "id","organizationId","encryptedApiKey","keyFingerprint","keyHint","status",
-          "settlementNetwork","settlementSymbol","settlementDecimals","lastValidatedAt","lastFailureCode","createdBy"
-        ) VALUES (
-          gen_random_uuid(),${input.organizationId}::uuid,${encrypted},${fingerprint},${keyHint(input.apiKey)},'ACTIVE',
-          ${input.settlement?.network ?? null},${input.settlement?.symbol?.toUpperCase() ?? null},${input.settlement?.decimals ?? null},CURRENT_TIMESTAMP,NULL,${input.actorId}::uuid
-        )
-        ON CONFLICT ("organizationId") DO UPDATE SET
-          "encryptedApiKey"=EXCLUDED."encryptedApiKey",
-          "keyFingerprint"=EXCLUDED."keyFingerprint",
-          "keyHint"=EXCLUDED."keyHint",
-          "status"='ACTIVE',
-          "settlementNetwork"=EXCLUDED."settlementNetwork",
-          "settlementSymbol"=EXCLUDED."settlementSymbol",
-          "settlementDecimals"=EXCLUDED."settlementDecimals",
-          "lastValidatedAt"=CURRENT_TIMESTAMP,
-          "lastFailureCode"=NULL,
-          "updatedAt"=CURRENT_TIMESTAMP
-      `;
-      await tx.auditEvent.create({
-        data: {
-          organizationId: input.organizationId,
-          actorType: "USER",
-          actorId: input.actorId,
-          action: "MOOVE_INTEGRATION_CONNECTED",
-          targetType: "MOOVE_INTEGRATION",
-          targetId: input.organizationId,
-          result: "SUCCESS",
-          metadata: { keyHint: keyHint(input.apiKey), settlementConfigured: Boolean(input.settlement) },
-        },
-      });
-    }, { isolationLevel: "Serializable" });
-  } catch (error) {
-    if (error instanceof Error && error.message === "MOOVE_CREDENTIAL_ALREADY_BOUND") throw error;
-    if (String(error).includes("MooveIntegration_key_fingerprint_key")) throw new Error("MOOVE_CREDENTIAL_ALREADY_BOUND");
-    throw error;
-  }
+    const duplicate = (await tx.$queryRaw<Array<{ organizationId: string }>>`
+      SELECT "organizationId" FROM "MooveIntegration"
+      WHERE "keyFingerprint"=${fingerprint} AND "organizationId"<>${input.organizationId}::uuid
+      LIMIT 1
+    `)[0];
+    if (duplicate) throw new Error("MOOVE_CREDENTIAL_ALREADY_BOUND");
+
+    await tx.$executeRaw`
+      INSERT INTO "MooveIntegration" (
+        "id","organizationId","encryptedApiKey","keyFingerprint","keyHint","status",
+        "settlementNetwork","settlementSymbol","settlementDecimals","lastValidatedAt","lastFailureCode","createdBy"
+      ) VALUES (
+        gen_random_uuid(),${input.organizationId}::uuid,${encrypted},${fingerprint},${keyHint(input.apiKey)},'ACTIVE',
+        ${input.settlement?.network ?? null},${input.settlement?.symbol?.toUpperCase() ?? null},${input.settlement?.decimals ?? null},CURRENT_TIMESTAMP,NULL,${input.actorId}::uuid
+      )
+      ON CONFLICT ("organizationId") DO UPDATE SET
+        "encryptedApiKey"=EXCLUDED."encryptedApiKey",
+        "keyFingerprint"=EXCLUDED."keyFingerprint",
+        "keyHint"=EXCLUDED."keyHint",
+        "status"='ACTIVE',
+        "settlementNetwork"=EXCLUDED."settlementNetwork",
+        "settlementSymbol"=EXCLUDED."settlementSymbol",
+        "settlementDecimals"=EXCLUDED."settlementDecimals",
+        "lastValidatedAt"=CURRENT_TIMESTAMP,
+        "lastFailureCode"=NULL,
+        "updatedAt"=CURRENT_TIMESTAMP
+    `;
+
+    await tx.auditEvent.create({
+      data: {
+        organizationId: input.organizationId,
+        actorType: "USER",
+        actorId: input.actorId,
+        action: "MOOVE_INTEGRATION_CONNECTED",
+        targetType: "MOOVE_INTEGRATION",
+        targetId: input.organizationId,
+        result: "SUCCESS",
+        metadata: { keyHint: keyHint(input.apiKey), settlementConfigured: Boolean(input.settlement) },
+      },
+    });
+  }, { isolationLevel: "Serializable" });
 
   return getMooveIntegrationSummary(input.organizationId);
 }
 
 export async function getMooveIntegrationSummary(organizationId: string): Promise<MooveIntegrationSummary> {
-  const row = await findIntegration(organizationId);
-  if (!row) {
-    await migrateLegacyIntegration(organizationId);
-  }
-  const current = row ?? await findIntegration(organizationId);
+  let row = await findIntegration(organizationId);
+  if (!row) row = await migrateLegacyIntegration(organizationId);
+
   return {
-    configured: Boolean(current?.encryptedApiKey) && current?.status === "ACTIVE",
-    status: current?.status ?? null,
-    keyHint: current?.keyHint ?? null,
-    settlement: current ? settlementConfig(current) ?? null : null,
-    lastValidatedAt: current?.lastValidatedAt ?? null,
-    lastUsedAt: current?.lastUsedAt ?? null,
-    lastReconciledAt: current?.lastReconciledAt ?? null,
-    lastFailureCode: current?.lastFailureCode ?? null,
+    configured: Boolean(row?.encryptedApiKey) && row?.status === "ACTIVE",
+    status: row?.status ?? null,
+    keyHint: row?.keyHint ?? null,
+    settlement: row ? settlementConfig(row) ?? null : null,
+    lastValidatedAt: row?.lastValidatedAt ?? null,
+    lastUsedAt: row?.lastUsedAt ?? null,
+    lastReconciledAt: row?.lastReconciledAt ?? null,
+    lastFailureCode: row?.lastFailureCode ?? null,
   };
 }
 
@@ -236,6 +230,7 @@ export async function disconnectMooveIntegration(organizationId: string, actorId
 
   const current = await findIntegration(organizationId);
   if (!current) return { disconnected: false };
+
   await db.$transaction(async (tx) => {
     await tx.$executeRaw`
       UPDATE "MooveIntegration"
@@ -255,20 +250,19 @@ export async function disconnectMooveIntegration(organizationId: string, actorId
       },
     });
   });
+
   return { disconnected: true };
 }
 
 export async function reconcileAllMooveTenants(limit = 20, concurrency = 3) {
-  if (process.env.MOOVE_RECEIVE_ENABLED !== "true") return { tenantsScanned: 0, completed: 0, failed: 0 };
+  if (process.env.MOOVE_RECEIVE_ENABLED !== "true") return { tenantsScanned: 0, completed: 0, failed: 0, summaries: [] };
 
-  // A deployment that still has the legacy env contract gets one chance to migrate before
-  // the first multi-tenant scheduler pass.
   const legacyOrg = process.env.MOOVE_ACCOUNT_ORGANIZATION_ID?.trim();
   if (legacyOrg && process.env.MOOVE_API_KEY?.trim()) await migrateLegacyIntegration(legacyOrg);
 
   const tenants = await db.$queryRaw<Array<{ id: string; organizationId: string }>>`
     SELECT "id","organizationId" FROM "MooveIntegration"
-    WHERE "status" IN ('ACTIVE','ERROR') AND "encryptedApiKey" IS NOT NULL
+    WHERE "status"='ACTIVE' AND "encryptedApiKey" IS NOT NULL
     ORDER BY "lastReconciledAt" ASC NULLS FIRST, "updatedAt" ASC
     LIMIT ${Math.min(Math.max(limit, 1), 100)}
   `;
@@ -288,25 +282,26 @@ export async function reconcileAllMooveTenants(limit = 20, concurrency = 3) {
         });
         await db.$executeRaw`
           UPDATE "MooveIntegration"
-          SET "lastReconciledAt"=CURRENT_TIMESTAMP,"lastFailureCode"=NULL,"status='ACTIVE',"updatedAt"=CURRENT_TIMESTAMP
+          SET "lastReconciledAt"=CURRENT_TIMESTAMP,"lastFailureCode"=NULL,"status"='ACTIVE',"updatedAt"=CURRENT_TIMESTAMP
           WHERE "id"=${tenant.id}::uuid
         `;
         completed += 1;
         return { organizationId: tenant.organizationId, status: "ok" as const, result };
       } catch (error) {
-        const code = isAuthError(error) ? (error as MooveProviderError).code : error instanceof Error ? error.message : "MOOVE_RECONCILIATION_FAILED";
+        const authError = isAuthError(error);
+        const code = authError ? (error as MooveProviderError).code : error instanceof Error ? error.message : "MOOVE_RECONCILIATION_FAILED";
         await db.$executeRaw`
           UPDATE "MooveIntegration"
-          SET "lastReconciledAt"=CURRENT_TIMESTAMP,"lastFailureCode"=${code},"status"=${isAuthError(error) ? "ERROR" : "ACTIVE"},"updatedAt"=CURRENT_TIMESTAMP
+          SET "lastReconciledAt"=CURRENT_TIMESTAMP,"lastFailureCode"=${code},"status"=${authError ? "ERROR" : "ACTIVE"},"updatedAt"=CURRENT_TIMESTAMP
           WHERE "id"=${tenant.id}::uuid
         `;
         failed += 1;
         return { organizationId: tenant.organizationId, status: "failed" as const, error: code };
       }
     }));
+
     for (const result of results) {
-      if (result.status === "fulfilled") summaries.push(result.value);
-      else summaries.push({ organizationId: "unknown", status: "failed", error: "MOOVE_RECONCILIATION_WORKER_FAILED" });
+      summaries.push(result.status === "fulfilled" ? result.value : { organizationId: "unknown", status: "failed", error: "MOOVE_RECONCILIATION_WORKER_FAILED" });
     }
     cursor += batch.length;
   }
