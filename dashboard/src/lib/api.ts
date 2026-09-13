@@ -74,7 +74,12 @@ export async function boundedBytes(request: Request, maxBytes = 64 * 1024): Prom
     const { done, value } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > maxBytes) { await reader.cancel(); throw new Error("REQUEST_BODY_TOO_LARGE"); }
+    // Do not cancel after a read has already delivered an oversized chunk.
+    // Undici can enqueue into the canceled stream asynchronously, producing an
+    // unhandled ERR_INVALID_STATE in supported Node test runtimes. Releasing
+    // the reader is sufficient here: the request is rejected and its body is
+    // no longer retained by this handler.
+    if (size > maxBytes) { reader.releaseLock(); throw new Error("REQUEST_BODY_TOO_LARGE"); }
     chunks.push(value);
   }
   const bytes = new Uint8Array(size);

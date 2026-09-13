@@ -12,7 +12,11 @@ describe("secret box", () => {
     const encrypted = encryptSecret("webhook-secret");
     expect(encrypted).not.toContain("webhook-secret");
     expect(decryptSecret(encrypted)).toBe("webhook-secret");
-    expect(() => decryptSecret(`${encrypted.slice(0, -1)}A`)).toThrow();
+    const [version, iv, tag, ciphertext] = encrypted.split(":");
+    const bytes = Buffer.from(ciphertext!, "base64url");
+    bytes[0] = bytes[0]! ^ 1;
+    const tampered = [version, iv, tag, bytes.toString("base64url")].join(":");
+    expect(() => decryptSecret(tampered)).toThrow();
   });
 
   it("decrypts legacy v1 ciphertext during key-format migration", async () => {

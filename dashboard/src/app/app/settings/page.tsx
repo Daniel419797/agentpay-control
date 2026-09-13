@@ -1,5 +1,7 @@
 import { OrganizationDataControls } from "@/components/organization-data-controls";
+import { MooveIntegrationPanel } from "@/components/moove-integration-panel";
 import { SettingsOperations } from "@/components/settings-operations";
+import { getMooveIntegrationSummary } from "@/domain/moove-integration-service";
 import { db } from "@/lib/db";
 import { notificationDestinationDisplay } from "@/lib/notification-destination";
 import { currentWorkspace } from "@/lib/workspace";
@@ -10,10 +12,11 @@ export default async function SettingsPage() {
   const organizationId = workspace.organization.id;
   const roles = workspace.membership.roles;
   const isOwner = roles.includes("OWNER");
+  const canManageMoove = isOwner || roles.includes("PROVIDER_ADMIN");
   const canViewMembers = isOwner || roles.includes("OPERATOR") || roles.includes("VIEWER");
   const canViewEndpoints = isOwner || roles.includes("OPERATOR") || roles.includes("VIEWER");
 
-  const [members, endpoints, retention] = await Promise.all([
+  const [members, endpoints, retention, moove] = await Promise.all([
     canViewMembers
       ? db.membership.findMany({ where: { organizationId }, include: { user: { select: { email: true, displayName: true } } }, orderBy: { invitedAt: "desc" } })
       : Promise.resolve([]),
@@ -21,6 +24,7 @@ export default async function SettingsPage() {
       ? db.notificationEndpoint.findMany({ where: { organizationId }, orderBy: { createdAt: "desc" } })
       : Promise.resolve([]),
     db.dataRetentionPolicy.upsert({ where: { organizationId }, update: {}, create: { organizationId } }),
+    canManageMoove ? getMooveIntegrationSummary(organizationId) : Promise.resolve(null),
   ]);
 
   return <div className="page">
@@ -32,6 +36,7 @@ export default async function SettingsPage() {
       endpoints={endpoints.map((endpoint) => ({ id: endpoint.id, name: endpoint.name, type: endpoint.type, destination: notificationDestinationDisplay(endpoint.type, endpoint.destination), status: endpoint.status }))}
       retention={{ auditDays: retention.auditDays, financialRecordDays: retention.financialRecordDays, fulfillmentBodyDays: retention.fulfillmentBodyDays, notificationDays: retention.notificationDays }}
     />
+    <MooveIntegrationPanel summary={moove} canManage={canManageMoove} />
     <OrganizationDataControls organizationSlug={workspace.organization.slug} isOwner={isOwner} />
   </div>;
 }

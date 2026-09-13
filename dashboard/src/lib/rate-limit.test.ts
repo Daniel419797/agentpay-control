@@ -5,7 +5,13 @@ import { db } from "@/lib/db";
 import { consumeRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
 const createdKeys: string[] = [];
-const databaseIt = process.env.VERCEL === "1" ? it.skip : it;
+const databaseUrl = process.env.DATABASE_URL ?? "";
+const databaseHost = (() => {
+  try { return new URL(databaseUrl).hostname; } catch { return ""; }
+})();
+// This test writes to its database. Only run it against the disposable local
+// database provisioned by Docker Compose or CI, never a developer's remote URL.
+const databaseIt = process.env.VERCEL === "1" || !["localhost", "127.0.0.1"].includes(databaseHost) ? it.skip : it;
 
 afterEach(async () => {
   const keys = createdKeys.splice(0);
