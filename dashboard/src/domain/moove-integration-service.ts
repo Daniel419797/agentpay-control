@@ -208,7 +208,10 @@ export async function connectMooveIntegration(input: {
 }
 
 export async function getMooveIntegrationSummary(organizationId: string): Promise<MooveIntegrationSummary> {
-  let row = await findIntegration(organizationId);
+  // Keep the nullable type after control-flow narrowing in the fallback branch.
+  // `migrateLegacyIntegration` can still return null when no matching legacy
+  // environment configuration exists.
+  let row: IntegrationRow | null = await findIntegration(organizationId);
   if (!row) row = await migrateLegacyIntegration(organizationId);
 
   return {
