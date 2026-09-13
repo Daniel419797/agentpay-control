@@ -7,7 +7,6 @@ import {
   MooveProviderError,
   type MooveConfig,
   assertMooveSettlementToken,
-  withMooveConfig,
 } from "@/lib/moove";
 import { decryptSecret, encryptSecret } from "@/lib/secret-box";
 
@@ -124,10 +123,14 @@ async function requireIntegration(organizationId: string) {
   return { row, config: buildConfig(apiKey, organizationId, settlementConfig(row)) };
 }
 
+export async function getMooveConfigForOrganization(organizationId: string) {
+  return (await requireIntegration(organizationId)).config;
+}
+
 export async function withMooveConfigForOrganization<T>(organizationId: string, fn: (config: MooveConfig) => Promise<T>) {
   const { config, row } = await requireIntegration(organizationId);
   try {
-    return await withMooveConfig(config, () => fn(config));
+    return await fn(config);
   } finally {
     await db.$executeRaw`
       UPDATE "MooveIntegration"
